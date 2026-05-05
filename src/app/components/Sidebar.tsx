@@ -46,7 +46,7 @@ export default function Sidebar() {
         // 2. Rol específico de la unidad (más preciso)
         const { data: userUnit } = await supabase
           .from('user_units')
-          .select('role')
+          .select('role, unit_id')
           .eq('user_id', user.id)
           .limit(1)
           .single();

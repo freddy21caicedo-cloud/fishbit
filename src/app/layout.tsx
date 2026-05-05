@@ -18,6 +18,7 @@ export default function RootLayout({
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    document.title = "FishBit | Gestión Acuícola Premium";
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       setSession(session);
