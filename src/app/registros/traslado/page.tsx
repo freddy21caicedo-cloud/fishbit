@@ -23,10 +23,9 @@ export default function TrasladoPage() {
   const [fecha, setFecha] = useState(new Date().toISOString().split('T')[0]);
   const [origenId, setOrigenId] = useState('');
   const [destinoId, setDestinoId] = useState('');
-  const [especieId, setEspecieId] = useState('');
-  const [cantidad, setCantidad] = useState('');
+  const [traslados, setTraslados] = useState<any[]>([]);
   const [ponds, setPonds] = useState<any[]>([]);
-  const [origenSpecies, setOrigenSpecies] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     fetchPonds();
@@ -43,130 +42,112 @@ export default function TrasladoPage() {
   };
 
   const fetchOrigenSpecies = async (pondId: string) => {
+    setLoading(true);
     const { data } = await supabase.from('pond_species').select('*').eq('estanque_id', pondId);
-    setOrigenSpecies(data || []);
-    if (data && data.length > 0) setEspecieId(data[0].species_name);
-    else setEspecieId('');
+    if (data && data.length > 0) {
+      setTraslados(data.map(s => ({
+        speciesId: s.id,
+        speciesName: s.species_name,
+        quantity: '',
+        currentCount: s.current_count || 0
+      })));
+    } else {
+      const p = ponds.find(pond => pond.id === pondId);
+      setTraslados([{
+        speciesId: null,
+        speciesName: p?.current_species || 'Especie Principal',
+        quantity: '',
+        currentCount: p?.current_count || 0
+      }]);
+    }
+    setLoading(false);
   };
 
   useEffect(() => {
     if (origenId) {
-      const p = ponds.find(p => p.id === origenId);
-      if (p?.is_polyculture) {
-        fetchOrigenSpecies(origenId);
-      } else {
-        setEspecieId(p?.current_species || '');
-        setOrigenSpecies([]);
-      }
+      fetchOrigenSpecies(origenId);
+    } else {
+      setTraslados([]);
     }
   }, [origenId, ponds]);
 
-  const origenPond = useMemo(() => ponds.find(p => p.id === origenId), [ponds, origenId]);
-  const destinoPond = useMemo(() => ponds.find(p => p.id === destinoId), [ponds, destinoId]);
-  const selectedSpeciesData = useMemo(() => origenSpecies.find(s => s.species_name === especieId), [origenSpecies, especieId]);
-
-  // Validation
-  const canTransfer = useMemo(() => {
-    if (!origenPond || !cantidad) return false;
-    const qty = parseInt(cantidad) || 0;
-    const maxQty = origenPond.is_polyculture ? (selectedSpeciesData?.current_count || 0) : (origenPond.current_count || 0);
-    return qty > 0 && qty <= maxQty;
-  }, [origenPond, selectedSpeciesData, cantidad]);
+  const updateTraslado = (index: number, qty: string) => {
+    const newTraslados = [...traslados];
+    newTraslados[index].quantity = qty;
+    setTraslados(newTraslados);
+  };
 
   const handleRegisterTraslado = async () => {
-    if (!origenId || !destinoId || !cantidad || !especieId) {
-      alert("Por favor complete todos los campos.");
+    if (!origenId || !destinoId || traslados.every(t => !t.quantity || parseInt(t.quantity) <= 0)) {
+      alert("Por favor complete los campos obligatorios.");
       return;
     }
 
-    const qty = parseInt(cantidad);
     const activeUnitId = localStorage.getItem('active_unit_id');
-    
-    // 0. Obtener Batch ID y Acumulado de alimentación del origen
-    let batchId = origenPond?.current_batch_id;
-    let feedAccumulated = 0;
+    setLoading(true);
 
-    if (batchId) {
-      const { data: feedData } = await supabase
-        .from('alimentacion_diaria')
-        .select('quantity_kg')
-        .eq('estanque_id', origenId)
-        .eq('batch_id', batchId);
-      
-      if (feedData) {
-        feedAccumulated = feedData.reduce((acc, curr) => acc + (parseFloat(curr.quantity_kg) || 0), 0);
+    try {
+      for (const t of traslados) {
+        const qty = parseInt(t.quantity) || 0;
+        if (qty <= 0) continue;
+
+        if (qty > t.currentCount) {
+          alert(`La cantidad a trasladar de ${t.speciesName} excede la población actual.`);
+          setLoading(false);
+          return;
+        }
+
+        // 1. Log Transfer
+        const { error: logError } = await supabase.from('transfers').insert([{
+          origen_id: origenId,
+          destino_id: destinoId,
+          unit_id: activeUnitId,
+          species_name: t.speciesName,
+          quantity: qty,
+          date: fecha
+        }]);
+
+        if (logError) throw logError;
+
+        // 2. Update Origin (Species or Pond)
+        if (t.speciesId) {
+          await supabase.from('pond_species').update({ current_count: t.currentCount - qty }).eq('id', t.speciesId);
+        }
+
+        // 3. Update Destino (Logic to find or create species in destination)
+        const { data: destSpecies } = await supabase
+          .from('pond_species')
+          .select('*')
+          .eq('estanque_id', destinoId)
+          .eq('species_name', t.speciesName)
+          .single();
+        
+        if (destSpecies) {
+          await supabase.from('pond_species').update({ current_count: (destSpecies.current_count || 0) + qty }).eq('id', destSpecies.id);
+        } else {
+          // If monoculture pond destination, check if it matches
+          const dp = ponds.find(p => p.id === destinoId);
+          if (dp && !dp.is_polyculture && dp.current_species === t.speciesName) {
+            await supabase.from('estanques').update({ current_count: (dp.current_count || 0) + qty }).eq('id', destinoId);
+          } else if (dp && dp.is_polyculture) {
+            await supabase.from('pond_species').insert([{ estanque_id: destinoId, species_name: t.speciesName, current_count: qty, unit_id: activeUnitId }]);
+          }
+        }
       }
+
+      // Update Global Pond Counts (Origen)
+      const op = ponds.find(p => p.id === origenId);
+      const totalMoved = traslados.reduce((acc, curr) => acc + (parseInt(curr.quantity) || 0), 0);
+      await supabase.from('estanques').update({ current_count: (op?.current_count || 0) - totalMoved }).eq('id', origenId);
+
+      alert("¡Traslado registrado con éxito!");
+      setOrigenId('');
+      setDestinoId('');
+      fetchPonds();
+    } catch (err: any) {
+      alert("Error: " + err.message);
     }
-
-    // 1. Log Transfer with Batch and Feed
-    const { error: logError } = await supabase.from('transfers').insert([{
-      origen_id: origenId,
-      destino_id: destinoId,
-      unit_id: activeUnitId,
-      species_name: especieId,
-      quantity: qty,
-      date: fecha,
-      batch_id: batchId,
-      accumulated_feed: feedAccumulated
-    }]);
-
-    if (logError) {
-      alert("Error al registrar traslado: " + logError.message);
-      return;
-    }
-
-    // 2. Update Source Species (if polyculture)
-    if (origenPond?.is_polyculture && selectedSpeciesData) {
-      await supabase.from('pond_species')
-        .update({ current_count: selectedSpeciesData.current_count - qty })
-        .eq('id', selectedSpeciesData.id);
-    }
-
-    // 3. Update Source Pond Total
-    const newSourceCount = (origenPond?.current_count || 0) - qty;
-    await supabase.from('estanques').update({
-      current_count: newSourceCount,
-      status: newSourceCount <= 0 ? 'vacio' : 'con_peces',
-      ...(newSourceCount <= 0 ? { current_batch_id: null } : {})
-    }).eq('id', origenId);
-
-    // 4. Update Destination Species
-    const { data: destSpecies } = await supabase.from('pond_species')
-      .select('*')
-      .eq('estanque_id', destinoId)
-      .eq('species_name', especieId)
-      .single();
-
-    if (destSpecies) {
-      await supabase.from('pond_species')
-        .update({ 
-          current_count: destSpecies.current_count + qty,
-          batch_id: batchId // Heredar lote
-        })
-        .eq('id', destSpecies.id);
-    } else {
-      await supabase.from('pond_species').insert([{
-        estanque_id: destinoId,
-        species_name: especieId,
-        current_count: qty,
-        batch_id: batchId // Heredar lote
-      }]);
-    }
-
-    // 5. Update Destination Pond Total
-    const newDestCount = (destinoPond?.current_count || 0) + qty;
-    await supabase.from('estanques').update({
-      current_count: newDestCount,
-      status: 'con_peces',
-      current_batch_id: batchId, // El estanque ahora tiene este lote
-      ...( (destinoPond?.current_count || 0) === 0 ? { current_species: especieId } : {} )
-    }).eq('id', destinoId);
-
-    alert("¡Traslado completado con éxito!");
-    setCantidad('');
-    setOrigenId('');
-    setDestinoId('');
-    fetchPonds();
+    setLoading(false);
   };
 
   return (
@@ -177,7 +158,7 @@ export default function TrasladoPage() {
         </Link>
         <div>
           <h1 style={{ fontSize: '1.875rem', fontWeight: 700 }}>Traslado de Peces</h1>
-          <p style={{ color: 'var(--muted-foreground)' }}>Movimiento interno de biomasa entre estanques.</p>
+          <p style={{ color: 'var(--muted-foreground)' }}>Movimiento interno de biomasa entre estanques por especie.</p>
         </div>
       </header>
 
@@ -186,45 +167,22 @@ export default function TrasladoPage() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
           <div className="card-premium" style={{ padding: '2.5rem' }}>
             <div style={{ marginBottom: '2rem' }}>
-              <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 700, marginBottom: '0.5rem', textTransform: 'uppercase', color: 'var(--muted-foreground)' }}>Fecha del Traslado</label>
-              <input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} style={{ width: '200px', padding: '0.75rem', borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--secondary)', outline: 'none' }} />
+              <label className="premium-label">Fecha del Traslado</label>
+              <input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} className="premium-date-input" style={{ width: '200px' }} />
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 60px 1fr', gap: '1.5rem', alignItems: 'center', marginBottom: '2.5rem' }}>
-              {/* Source */}
+              {/* Origen */}
               <div style={{ padding: '1.5rem', background: 'rgba(245, 158, 11, 0.05)', borderRadius: '20px', border: '2px solid rgba(245, 158, 11, 0.2)' }}>
-                <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 800, color: '#f59e0b', textTransform: 'uppercase', marginBottom: '0.75rem' }}>Estanque de Origen</label>
+                <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 800, color: '#f59e0b', textTransform: 'uppercase', marginBottom: '0.75rem' }}>Origen</label>
                 <select 
                   value={origenId}
-                  onChange={(e) => {
-                    setOrigenId(e.target.value);
-                    setEspecieId('');
-                  }}
+                  onChange={(e) => setOrigenId(e.target.value)}
                   style={{ width: '100%', padding: '0.75rem', borderRadius: '10px', border: '1px solid var(--border)', background: 'white', outline: 'none', fontWeight: 700 }}
                 >
                   <option value="">Seleccionar...</option>
-                  {ponds.map(p => <option key={p.id} value={p.id}>{p.name} {p.is_polyculture ? '(Policultivo)' : ''}</option>)}
+                  {ponds.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                 </select>
-
-                 {origenPond && (
-                   <div style={{ marginTop: '1.5rem' }}>
-                     <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 700, color: 'var(--muted-foreground)', textTransform: 'uppercase', marginBottom: '0.4rem' }}>Especie a Trasladar</label>
-                     {origenPond.is_polyculture ? (
-                       <select 
-                         value={especieId}
-                         onChange={(e) => setEspecieId(e.target.value)}
-                         style={{ width: '100%', padding: '0.6rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'white', fontWeight: 600, outline: 'none' }}
-                       >
-                         <option value="">Seleccionar Especie...</option>
-                         {origenSpecies.map(s => <option key={s.id} value={s.species_name}>{s.species_name} ({s.current_count})</option>)}
-                       </select>
-                     ) : (
-                       <div style={{ padding: '0.6rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'white', fontWeight: 600 }}>
-                         {origenPond.current_species || 'Vacio'} ({origenPond.current_count || 0})
-                       </div>
-                     )}
-                   </div>
-                 )}
               </div>
 
               {/* Arrow */}
@@ -234,9 +192,9 @@ export default function TrasladoPage() {
                 </div>
               </div>
 
-              {/* Destination */}
+              {/* Destino */}
               <div style={{ padding: '1.5rem', background: 'rgba(59, 130, 246, 0.05)', borderRadius: '20px', border: '2px solid rgba(59, 130, 246, 0.2)' }}>
-                <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 800, color: '#3b82f6', textTransform: 'uppercase', marginBottom: '0.75rem' }}>Estanque de Destino</label>
+                <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 800, color: '#3b82f6', textTransform: 'uppercase', marginBottom: '0.75rem' }}>Destino</label>
                 <select 
                   value={destinoId}
                   onChange={(e) => setDestinoId(e.target.value)}
@@ -244,107 +202,85 @@ export default function TrasladoPage() {
                 >
                   <option value="">Seleccionar...</option>
                   {ponds.filter(p => p.id !== origenId).map(p => (
-                    <option key={p.id} value={p.id}>{p.name} {p.status === 'vacio' ? '(Vacio)' : p.is_polyculture ? '(Policultivo)' : `(${p.current_species})`}</option>
+                    <option key={p.id} value={p.id}>{p.name} {p.status === 'vacio' ? '(Vacio)' : ''}</option>
                   ))}
                 </select>
-                <div style={{ marginTop: '1.5rem', fontSize: '0.75rem', color: 'var(--muted-foreground)' }}>
-                  {destinoPond ? `Destino seleccionado: ${destinoPond.name}` : 'Seleccione un destino válido.'}
-                </div>
               </div>
             </div>
 
-            <div style={{ marginBottom: '2.5rem', maxWidth: '400px' }}>
-              <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, marginBottom: '0.5rem', textTransform: 'uppercase', color: 'var(--muted-foreground)' }}>Cantidad de Individuos a Trasladar</label>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                <input 
-                  type="number" 
-                  value={cantidad}
-                  onChange={(e) => setCantidad(e.target.value)}
-                  placeholder="0"
-                  style={{ flex: 1, padding: '1rem', fontSize: '1.5rem', borderRadius: '12px', border: '1px solid var(--border)', background: 'var(--secondary)', outline: 'none', fontWeight: 800 }} 
-                />
-                {origenPond && (
-                  <div style={{ fontSize: '0.8rem', color: 'var(--muted-foreground)' }}>
-                    de {(origenPond.current_count || 0).toLocaleString()} disponibles
+            <AnimatePresence>
+              {origenId && (
+                <motion.div 
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0 }}
+                >
+                  <h3 style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--muted-foreground)', textTransform: 'uppercase', marginBottom: '1.5rem', borderTop: '1px solid var(--border)', paddingTop: '1.5rem' }}>Especies a Trasladar</h3>
+                  
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '2.5rem' }}>
+                    {traslados.map((t, index) => (
+                      <div key={index} style={{ 
+                        padding: '1.25rem', 
+                        background: 'var(--secondary)', 
+                        borderRadius: '12px', 
+                        border: '1px solid var(--border)',
+                        display: 'grid',
+                        gridTemplateColumns: '2fr 1fr 1fr',
+                        gap: '1rem',
+                        alignItems: 'center'
+                      }}>
+                        <div>
+                          <div style={{ fontWeight: 800, fontSize: '0.95rem' }}>{t.speciesName}</div>
+                          <div style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)' }}>En origen: {t.currentCount.toLocaleString()}</div>
+                        </div>
+                        <div>
+                          <input 
+                            type="number" 
+                            value={t.quantity}
+                            onChange={(e) => updateTraslado(index, e.target.value)}
+                            placeholder="Cantidad"
+                            style={{ width: '100%', padding: '0.5rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'white', outline: 'none', fontWeight: 800 }}
+                          />
+                        </div>
+                        <div style={{ textAlign: 'center' }}>
+                          <CornerRightDown size={18} style={{ color: 'var(--primary)' }} />
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                )}
-              </div>
-            </div>
 
-            <button 
-              onClick={handleRegisterTraslado}
-              className="btn-primary" 
-              disabled={!canTransfer || !destinoId}
-              style={{ width: '100%', padding: '1.25rem', borderRadius: '16px', background: '#f59e0b', fontSize: '1.1rem', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.75rem', opacity: (!canTransfer || !destinoId) ? 0.5 : 1 }}
-            >
-              <ArrowRightLeft size={22} />
-              Confirmar Traslado
-            </button>
+                  <button 
+                    onClick={handleRegisterTraslado}
+                    disabled={loading || traslados.every(t => !t.quantity || parseInt(t.quantity) <= 0) || !destinoId}
+                    className="btn-primary" 
+                    style={{ width: '100%', padding: '1.25rem', borderRadius: '16px', background: '#f59e0b', fontSize: '1.1rem', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.75rem', opacity: (loading || !destinoId || traslados.every(t => !t.quantity || parseInt(t.quantity) <= 0)) ? 0.6 : 1 }}
+                  >
+                    {loading ? <Activity className="animate-spin" size={22} /> : <ArrowRightLeft size={22} />}
+                    Ejecutar Traslado Masivo
+                  </button>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         </div>
 
-        {/* Impact Analysis Sidebar */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-          {/* Inventory Preview Card */}
+        {/* Info Panel */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
           <div className="card-premium" style={{ padding: '2rem' }}>
-            <h3 style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--muted-foreground)', textTransform: 'uppercase', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <Box size={18} style={{ color: '#f59e0b' }} /> Vista Previa de Inventario
+            <h3 style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--muted-foreground)', textTransform: 'uppercase', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <ShieldCheck size={20} style={{ color: 'var(--primary)' }} />
+              Reglas de Traslado
             </h3>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-              <div style={{ padding: '1rem', background: 'var(--secondary)', borderRadius: '12px' }}>
-                <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>Origen ({origenPond?.name || '--'})</div>
-                <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#ef4444', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  {origenPond ? (origenPond.current_count - (parseInt(cantidad) || 0)).toLocaleString() : '--'}
-                  <TrendingDown size={16} />
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'center' }}>
-                <CornerRightDown size={24} style={{ color: 'var(--muted-foreground)', opacity: 0.3 }} />
-              </div>
-
-              <div style={{ padding: '1rem', background: 'var(--secondary)', borderRadius: '12px' }}>
-                <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>Destino ({destinoPond?.name || '--'})</div>
-                <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#10b981', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  {destinoPond ? ((destinoPond.current_count || 0) + (parseInt(cantidad) || 0)).toLocaleString() : '--'}
-                  <TrendingUp size={16} />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Quick Warning */}
-          {!canTransfer && cantidad && origenPond && (
-            <div style={{ 
-              padding: '1.25rem', 
-              borderRadius: '16px', 
-              background: 'rgba(239, 68, 68, 0.1)', 
-              border: '1px solid #ef4444',
-              display: 'flex', 
-              gap: '1rem',
-              alignItems: 'center'
-            }}>
-              <Info size={20} style={{ color: '#ef4444', flexShrink: 0 }} />
-              <p style={{ fontSize: '0.85rem', color: '#991b1b', fontWeight: 600 }}>
-                Cantidad excede la población disponible en el origen.
-              </p>
-            </div>
-          )}
-
-          {/* Safety Recommendation */}
-          <div style={{ 
-            padding: '1.5rem', 
-            borderRadius: '20px', 
-            background: 'var(--card)', 
-            border: '1px solid var(--border)',
-            display: 'flex', 
-            gap: '1rem'
-          }}>
-            <ShieldCheck size={20} style={{ color: '#10b981', flexShrink: 0 }} />
-            <p style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)', lineHeight: 1.5 }}>
-              Realice los traslados preferiblemente en <strong>horas frescas</strong> para reducir el estrés metabólico de los peces.
-            </p>
+            <ul style={{ listStyle: 'none', padding: 0, display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <li style={{ display: 'flex', gap: '0.75rem', fontSize: '0.85rem', lineHeight: 1.4 }}>
+                <Zap size={16} style={{ color: '#f59e0b', flexShrink: 0 }} />
+                <span>La trazabilidad de alimentación se mantiene vinculada al lote (Batch ID) durante el traslado.</span>
+              </li>
+              <li style={{ display: 'flex', gap: '0.75rem', fontSize: '0.85rem', lineHeight: 1.4 }}>
+                <Box size={16} style={{ color: '#3b82f6', flexShrink: 0 }} />
+                <span>Si el destino está vacío, heredará automáticamente las propiedades de las especies trasladadas.</span>
+              </li>
+            </ul>
           </div>
         </div>
       </div>

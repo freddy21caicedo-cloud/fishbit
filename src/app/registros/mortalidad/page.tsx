@@ -31,12 +31,10 @@ const causasMuerte = [
 export default function MortalidadPage() {
   const [fecha, setFecha] = useState(new Date().toISOString().split('T')[0]);
   const [estanqueId, setEstanqueId] = useState('');
-  const [especieId, setEspecieId] = useState(''); // Note: Using species name directly from pond status for now
-  const [cantidad, setCantidad] = useState('');
+  const [mortalidades, setMortalidades] = useState<any[]>([]);
   const [causa, setCausa] = useState(causasMuerte[0]);
   const [ponds, setPonds] = useState<any[]>([]);
-  const [pondSpecies, setPondSpecies] = useState<any[]>([]);
-  const [loadingSpecies, setLoadingSpecies] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     fetchPonds();
@@ -53,87 +51,85 @@ export default function MortalidadPage() {
   };
 
   const fetchSpecies = async (pondId: string) => {
-    setLoadingSpecies(true);
+    setLoading(true);
     const { data } = await supabase.from('pond_species').select('*').eq('estanque_id', pondId);
-    setPondSpecies(data || []);
     if (data && data.length > 0) {
-      setEspecieId(data[0].species_name);
+      setMortalidades(data.map(s => ({
+        speciesId: s.id,
+        speciesName: s.species_name,
+        quantity: '',
+        currentCount: s.current_count || 0
+      })));
     } else {
-      setEspecieId('');
+      const p = ponds.find(p => p.id === pondId);
+      setMortalidades([{
+        speciesId: null,
+        speciesName: p?.current_species || 'Especie Principal',
+        quantity: '',
+        currentCount: p?.current_count || 0
+      }]);
     }
-    setLoadingSpecies(false);
+    setLoading(false);
   };
 
   useEffect(() => {
     if (estanqueId) {
-      const p = ponds.find(p => p.id === estanqueId);
-      if (p?.is_polyculture) {
-        fetchSpecies(estanqueId);
-      } else {
-        setEspecieId(p?.current_species || '');
-        setPondSpecies([]);
-      }
+      fetchSpecies(estanqueId);
+    } else {
+      setMortalidades([]);
     }
   }, [estanqueId, ponds]);
 
-  const selectedPond = useMemo(() => ponds.find(p => p.id === estanqueId), [ponds, estanqueId]);
-  const selectedSpeciesData = useMemo(() => pondSpecies.find(s => s.species_name === especieId), [pondSpecies, especieId]);
+  const updateMortality = (index: number, qty: string) => {
+    const newMorts = [...mortalidades];
+    newMorts[index].quantity = qty;
+    setMortalidades(newMorts);
+  };
 
   const handleRegisterMortalidad = async () => {
-    if (!estanqueId || !cantidad || (selectedPond?.is_polyculture && !especieId)) {
-      alert("Por favor complete los campos obligatorios.");
-      return;
-    }
-
-    const qty = parseInt(cantidad);
-    const maxQty = selectedPond?.is_polyculture 
-      ? (selectedSpeciesData?.current_count || 0) 
-      : (selectedPond?.current_count || 0);
-
-    if (qty > maxQty) {
-      alert(`La cantidad de bajas excede la población actual de ${especieId || 'el estanque'}.`);
-      return;
-    }
-
     const activeUnitId = localStorage.getItem('active_unit_id');
-    if (!activeUnitId) return;
+    if (!estanqueId || !activeUnitId) return;
 
-    // 1. Insert Mortality Record
-    const { error: mortError } = await supabase.from('mortality').insert([{
-      estanque_id: estanqueId,
-      unit_id: activeUnitId,
-      species_name: especieId,
-      date: fecha,
-      quantity: qty,
-      cause: causa
-    }]);
+    setLoading(true);
+    let totalPondMortality = 0;
 
-    if (mortError) {
-      alert("Error al registrar mortalidad: " + mortError.message);
-      return;
-    }
+    for (const mort of mortalidades) {
+      const qty = parseInt(mort.quantity) || 0;
+      if (qty <= 0) continue;
 
-    // 2. Update Pond Species Count (if polyculture)
-    if (selectedPond?.is_polyculture && selectedSpeciesData) {
-      await supabase
-        .from('pond_species')
-        .update({ 
-          current_count: selectedSpeciesData.current_count - qty,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', selectedSpeciesData.id);
+      if (qty > mort.currentCount) {
+        alert(`La cantidad de bajas para ${mort.speciesName} excede la población actual.`);
+        setLoading(false);
+        return;
+      }
+
+      totalPondMortality += qty;
+
+      // 1. Insert Mortality Record
+      const { error: mortError } = await supabase.from('mortality').insert([{
+        estanque_id: estanqueId,
+        unit_id: activeUnitId,
+        species_name: mort.speciesName,
+        date: fecha,
+        quantity: qty,
+        cause: causa
+      }]);
+
+      if (mortError) {
+        alert("Error al registrar mortalidad: " + mortError.message);
+        continue;
+      }
+
+      // 2. Update Species Count if polyculture
+      if (mort.speciesId) {
+        await supabase
+          .from('pond_species')
+          .update({ current_count: mort.currentCount - qty })
+          .eq('id', mort.speciesId);
+      }
     }
 
     // 3. Update Global Pond Count
-    const { error: pondError } = await supabase
-      .from('estanques')
-      .update({ current_count: (selectedPond?.current_count || 0) - qty })
-      .eq('id', estanqueId);
-
-    if (pondError) {
-      alert("Error al actualizar población global del estanque: " + pondError.message);
-    } else {
-      alert("¡Mortalidad registrada con éxito!");
       setCantidad('');
       fetchPonds();
       if (selectedPond?.is_polyculture) fetchSpecies(estanqueId);
@@ -142,17 +138,15 @@ export default function MortalidadPage() {
 
   // Calculations
   const metrics = useMemo(() => {
-    if (!selectedPond) return null;
-    
-    const count = parseInt(cantidad) || 0;
-    // We don't have initial seeding count here easily, but let's assume current + mortality for rate
-    // Actually, it's better to show real rate if we have it. For now, simple logic:
-    const populationActual = selectedPond.current_count - count;
-    const mortalityRate = (count / (selectedPond.current_count || 1)) * 100;
+    const p = ponds.find(pond => pond.id === estanqueId);
+    if (!p) return null;
+
+    const totalMort = mortalidades.reduce((acc, curr) => acc + (parseInt(curr.quantity) || 0), 0);
+    const populationActual = (p.current_count || 0) - totalMort;
+    const mortalityRate = (totalMort / (p.current_count || 1)) * 100;
     const survivalRate = 100 - mortalityRate;
 
-    // Parameterized thresholds
-    const limit = (selectedPond.current_species || '').toLowerCase().includes('trucha') ? 10 : 5;
+    const limit = (p.current_species || '').toLowerCase().includes('trucha') ? 10 : 5;
     
     let alertLevel = 'normal';
     if (mortalityRate > limit) alertLevel = 'critical';
@@ -163,9 +157,10 @@ export default function MortalidadPage() {
       mortalityRate: mortalityRate.toFixed(2),
       survivalRate: survivalRate.toFixed(2),
       alertLevel,
-      limit
+      limit,
+      totalMort
     };
-  }, [selectedPond, cantidad]);
+  }, [estanqueId, ponds, mortalidades]);
 
   return (
     <div className="animate-fade-in" style={{ maxWidth: '1200px', margin: '0 auto', paddingBottom: '4rem' }}>
@@ -175,7 +170,7 @@ export default function MortalidadPage() {
         </Link>
         <div>
           <h1 style={{ fontSize: '1.875rem', fontWeight: 700 }}>Registro de Mortalidad</h1>
-          <p style={{ color: 'var(--muted-foreground)' }}>Seguimiento de bajas y análisis de supervivencia.</p>
+          <p style={{ color: 'var(--muted-foreground)' }}>Seguimiento de bajas y análisis de supervivencia por especie.</p>
         </div>
       </header>
 
@@ -191,10 +186,7 @@ export default function MortalidadPage() {
                 <div className="premium-input-wrapper">
                   <select 
                     value={estanqueId}
-                    onChange={(e) => {
-                      setEstanqueId(e.target.value);
-                      setEspecieId('');
-                    }}
+                    onChange={(e) => setEstanqueId(e.target.value)}
                     style={{ width: '100%', background: 'transparent', border: 'none', outline: 'none', fontWeight: 700 }}
                   >
                     <option value="">Seleccionar Estanque...</option>
@@ -218,62 +210,80 @@ export default function MortalidadPage() {
               </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
-              <div className="premium-input-group">
-                <label className="premium-label">Especie Afectada</label>
-                <div className="premium-input-wrapper">
-                  <select 
-                    value={especieId}
-                    onChange={(e) => setEspecieId(e.target.value)}
-                    disabled={!estanqueId}
-                    style={{ width: '100%', background: 'transparent', border: 'none', outline: 'none', fontWeight: 700, opacity: !estanqueId ? 0.5 : 1 }}
-                  >
-                    <option value="">Seleccionar Especie...</option>
-                    {selectedPond?.is_polyculture ? (
-                      pondSpecies.map(s => <option key={s.id} value={s.species_name}>{s.species_name} ({s.current_count})</option>)
-                    ) : (
-                      selectedPond && <option value={selectedPond.current_species}>{selectedPond.current_species}</option>
-                    )}
-                  </select>
-                </div>
-              </div>
-              <div className="premium-input-group">
-                <label className="premium-label">Causa de la Baja</label>
-                <div className="premium-input-wrapper">
-                  <select 
-                    value={causa}
-                    onChange={(e) => setCausa(e.target.value)}
-                    style={{ width: '100%', background: 'transparent', border: 'none', outline: 'none', fontWeight: 700 }}
-                  >
-                    {causasMuerte.map(c => <option key={c} value={c}>{c}</option>)}
-                  </select>
-                </div>
+            <div className="premium-input-group" style={{ marginBottom: '2rem' }}>
+              <label className="premium-label">Causa General de la Baja</label>
+              <div className="premium-input-wrapper">
+                <select 
+                  value={causa}
+                  onChange={(e) => setCausa(e.target.value)}
+                  style={{ width: '100%', background: 'transparent', border: 'none', outline: 'none', fontWeight: 700 }}
+                >
+                  {causasMuerte.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
               </div>
             </div>
 
-            <div style={{ marginBottom: '2.5rem' }}>
-              <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, marginBottom: '0.5rem', textTransform: 'uppercase', color: 'var(--muted-foreground)' }}>Número de Individuos Muertos</label>
-              <input 
-                type="number" 
-                value={cantidad}
-                onChange={(e) => setCantidad(e.target.value)}
-                placeholder="0"
-                style={{ width: '100%', padding: '1rem', fontSize: '1.5rem', borderRadius: '12px', border: '1px solid var(--border)', background: 'var(--secondary)', outline: 'none', fontWeight: 800, color: '#ef4444' }} 
-              />
-            </div>
+            <AnimatePresence>
+              {estanqueId && (
+                <motion.div 
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                >
+                  <h3 style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--muted-foreground)', textTransform: 'uppercase', marginBottom: '1rem', borderTop: '1px solid var(--border)', paddingTop: '1.5rem' }}>Especies en Estanque</h3>
+                  
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '2.5rem' }}>
+                    {mortalidades.map((mort, index) => (
+                      <div key={index} style={{ 
+                        padding: '1.25rem', 
+                        background: 'var(--secondary)', 
+                        borderRadius: '12px', 
+                        border: '1px solid var(--border)',
+                        display: 'grid',
+                        gridTemplateColumns: '2fr 1fr 1fr',
+                        gap: '1rem',
+                        alignItems: 'center'
+                      }}>
+                        <div>
+                          <div style={{ fontWeight: 800, fontSize: '0.95rem' }}>{mort.speciesName}</div>
+                          <div style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)' }}>Pob. actual: {mort.currentCount.toLocaleString()}</div>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: '0.65rem', fontWeight: 700, color: 'var(--muted-foreground)', textTransform: 'uppercase', marginBottom: '0.25rem' }}>Bajas</div>
+                          <input 
+                            type="number" 
+                            value={mort.quantity}
+                            onChange={(e) => updateMortality(index, e.target.value)}
+                            placeholder="0"
+                            style={{ width: '100%', padding: '0.5rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'white', outline: 'none', fontWeight: 800, color: '#ef4444' }}
+                          />
+                        </div>
+                        <div style={{ textAlign: 'center' }}>
+                          <div style={{ fontSize: '0.65rem', fontWeight: 700, color: 'var(--muted-foreground)', textTransform: 'uppercase', marginBottom: '0.25rem' }}>Quedan</div>
+                          <div style={{ fontWeight: 800, color: 'var(--primary)' }}>
+                            {(mort.currentCount - (parseInt(mort.quantity) || 0)).toLocaleString()}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
 
-            <button 
-              onClick={handleRegisterMortalidad}
-              className="btn-primary" 
-              style={{ width: '100%', padding: '1.25rem', borderRadius: '16px', background: '#ef4444', fontSize: '1.1rem', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.75rem' }}
-            >
-              <Skull size={22} />
-              Registrar Mortalidad
-            </button>
+                  <button 
+                    onClick={handleRegisterMortalidad}
+                    disabled={loading || mortalidades.every(m => !m.quantity || parseInt(m.quantity) <= 0)}
+                    className="btn-primary" 
+                    style={{ width: '100%', padding: '1.25rem', borderRadius: '16px', background: '#ef4444', fontSize: '1.1rem', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.75rem', opacity: (loading || mortalidades.every(m => !m.quantity || parseInt(m.quantity) <= 0)) ? 0.6 : 1 }}
+                  >
+                    {loading ? <Activity className="animate-spin" size={22} /> : <Skull size={22} />}
+                    Registrar Bajas Seleccionadas
+                  </button>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
 
           {/* Critical Threshold Alert */}
-          {metrics && metrics.alertLevel !== 'normal' && (
+          {metrics && metrics.alertLevel !== 'normal' && metrics.totalMort > 0 && (
             <motion.div 
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
