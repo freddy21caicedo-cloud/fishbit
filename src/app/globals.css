@@ -311,6 +311,33 @@ h1, h2, h3, h4, h5, h6 {
   
   .almacen-inventory-card {
     min-height: 500px;
+    border-radius: 20px !important;
+  }
+
+  .almacen-table-responsive {
+    font-size: 0.8rem;
+  }
+
+  .almacen-table-responsive th, .almacen-table-responsive td {
+    padding: 0.75rem 0.5rem !important;
+  }
+}
+
+/* Fix for overlapping text in inventory headers on mobile */
+@media (max-width: 480px) {
+  .inventory-header-actions {
+    flex-direction: column;
+    width: 100%;
+    gap: 0.5rem !important;
+  }
+  
+  .inventory-header-actions button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .stat-item-text {
+    display: none; /* Ocultar texto "Total Items" dejando solo el número e icono en pantallas muy pequeñas */
   }
 }
 

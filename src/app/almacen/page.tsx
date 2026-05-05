@@ -633,14 +633,14 @@ export default function AlmacenPage() {
         <div className="card-premium almacen-inventory-card" style={{ background: 'var(--card)', display: 'flex', flexDirection: 'column' }}>
           
           {/* Content Header */}
-          <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', overflow: 'visible' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-              <div style={{ color: currentCategory?.color }}>
-                {currentCategory && <currentCategory.icon size={24} />}
+          <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <div style={{ color: currentCategory?.color, background: 'var(--secondary)', padding: '0.5rem', borderRadius: '10px' }}>
+                {currentCategory && <currentCategory.icon size={20} />}
               </div>
-              <h2 style={{ fontSize: '1.25rem', fontWeight: 700 }}>Inventario de {currentCategory?.label}</h2>
+              <h2 style={{ fontSize: '1.1rem', fontWeight: 800 }}>Inventario de {currentCategory?.label}</h2>
             </div>
-            <div style={{ display: 'flex', gap: '0.75rem' }}>
+            <div className="inventory-header-actions" style={{ display: 'flex', gap: '0.75rem' }}>
               <button 
                 onClick={() => setIsInvoiceListOpen(true)}
                 style={{ 
@@ -735,10 +735,13 @@ export default function AlmacenPage() {
           </div>
 
           {/* Quick Stats Bar */}
-          <div style={{ padding: '1rem 1.5rem', background: 'rgba(37, 99, 235, 0.02)', borderBottom: '1px solid var(--border)', display: 'flex', gap: '2rem' }}>
+          <div style={{ padding: '0.75rem 1.5rem', background: 'rgba(37, 99, 235, 0.02)', borderBottom: '1px solid var(--border)', display: 'flex', gap: '1.5rem', flexWrap: 'wrap' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <Package size={16} style={{ color: 'var(--muted-foreground)' }} />
-              <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>Total Items: <span style={{ color: 'var(--primary)' }}>{inventory.filter(i => i.category === activeCat && (parseFloat(i.current_stock) || 0) > 0).length}</span></span>
+              <Package size={14} style={{ color: 'var(--muted-foreground)' }} />
+              <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>
+                <span className="stat-item-text">Total Items: </span>
+                <span style={{ color: 'var(--primary)' }}>{inventory.filter(i => i.category === activeCat && (parseFloat(i.current_stock) || 0) > 0).length}</span>
+              </span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               {(() => {
@@ -751,9 +754,10 @@ export default function AlmacenPage() {
                 
                 return (
                   <>
-                    <TrendingUp size={16} style={{ color }} />
-                    <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>
-                      Estado: <span style={{ color }}>{text}</span>
+                    <TrendingUp size={14} style={{ color }} />
+                    <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>
+                      <span className="stat-item-text">Estado: </span>
+                      <span style={{ color }}>{text}</span>
                     </span>
                   </>
                 );
@@ -762,7 +766,7 @@ export default function AlmacenPage() {
           </div>
 
           {/* Search & Table Area */}
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'auto' }}>
             <div style={{ padding: '1rem 1.5rem' }}>
               <div style={{ position: 'relative' }}>
                 <Search size={18} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--muted-foreground)' }} />
@@ -775,12 +779,12 @@ export default function AlmacenPage() {
             </div>
 
             <div style={{ flex: 1, overflowY: 'auto', padding: '0 1.5rem 1.5rem' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+              <table className="almacen-table-responsive" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
                 <thead>
                   <tr style={{ borderBottom: '1px solid var(--border)', fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--muted-foreground)', letterSpacing: '0.05em' }}>
                     <th style={{ padding: '0.75rem 0', fontWeight: 700 }}>Producto</th>
                     <th style={{ padding: '0.75rem 0', fontWeight: 700 }}>Marca</th>
-                    <th style={{ padding: '0.75rem 0', fontWeight: 700 }}>Cantidad Actual</th>
+                    <th style={{ padding: '0.75rem 0', fontWeight: 700 }}>Stock Actual</th>
                     <th style={{ padding: '0.75rem 0', fontWeight: 700 }}>Último Ingreso</th>
                     <th style={{ padding: '0.75rem 0', fontWeight: 700, textAlign: 'right' }}></th>
                   </tr>
