@@ -47,10 +47,12 @@ export default function AlimentacionPage() {
     setPonds(pondsData || []);
 
     // 2. Fetch Alimento Inventory
+    const activeUnitId = localStorage.getItem('active_unit_id');
     const { data: invData } = await supabase
       .from('inventory')
       .select('*')
-      .eq('category', 'alimento');
+      .eq('category', 'alimento')
+      .eq('unit_id', activeUnitId);
     setFoodStock(invData || []);
   };
 
@@ -227,7 +229,7 @@ export default function AlimentacionPage() {
               >
                 <option value="">-- Seleccionar Alimento --</option>
                 {foodStock.map(f => (
-                  <option key={f.id} value={f.id}>{f.name} ({f.current_stock} bultos)</option>
+                  <option key={f.id} value={f.id}>{f.name} ({parseFloat(f.current_stock).toLocaleString()} kg)</option>
                 ))}
               </select>
             </div>

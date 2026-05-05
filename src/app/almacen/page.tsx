@@ -391,7 +391,10 @@ export default function AlmacenPage() {
         .eq('name', item.product)
         .eq('unit_id', unitId)
         .single();
-      const qtyToAdd = parseFloat(item.quantity) || 0;
+      
+      // Si es alimento, guardamos KILOS. Si es otra cosa, unidades.
+      const qtyToAdd = category === 'alimento' ? (parseFloat(item.kilos) || 0) : (parseFloat(item.quantity) || 0);
+      
       if (existing) {
         await supabase.from('inventory').update({ 
           current_stock: (parseFloat(existing.current_stock) || 0) + qtyToAdd, 
@@ -402,7 +405,7 @@ export default function AlmacenPage() {
           category,
           name: item.product,
           current_stock: qtyToAdd,
-          unit: category === 'alimento' ? 'bultos' : 'unidades',
+          unit: category === 'alimento' ? 'kg' : category === 'alevinos' ? 'unidades' : 'bultos',
           unit_id: unitId,
           last_entry: new Date().toISOString()
         }]);
@@ -442,7 +445,9 @@ export default function AlmacenPage() {
           .single();
         
         if (inventoryItem) {
-          const newStock = Math.max(0, (parseFloat(inventoryItem.current_stock) || 0) - (parseFloat(item.quantity) || 0));
+          // Si es alimento, restamos KILOS. Si es otra cosa, bultos/unidades.
+          const qtyToRemove = category === 'alimento' ? (parseFloat(item.kilos) || 0) : (parseFloat(item.quantity) || 0);
+          const newStock = Math.max(0, (parseFloat(inventoryItem.current_stock) || 0) - qtyToRemove);
           await supabase
             .from('inventory')
             .update({ current_stock: newStock })
