@@ -67,19 +67,19 @@ export default function Sidebar() {
         style={{
           position: 'fixed',
           top: '1.25rem',
-          left: '1.25rem',
+          left: isOpen ? '230px' : '1.25rem', // Se desplaza con el sidebar si está abierto
           zIndex: 110,
-          background: isOpen ? 'transparent' : 'white',
-          border: isOpen ? 'none' : '1px solid var(--border)',
+          background: isOpen ? 'white' : 'white',
+          border: '1px solid var(--border)',
           borderRadius: '10px',
           padding: '0.6rem',
           display: 'none', 
           alignItems: 'center',
           justifyContent: 'center',
-          boxShadow: isOpen ? 'none' : 'var(--shadow-md)',
+          boxShadow: 'var(--shadow-md)',
           cursor: 'pointer',
-          color: isOpen ? 'white' : 'var(--foreground)',
-          transition: 'all 0.3s ease'
+          color: 'var(--foreground)',
+          transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
         }}
         className="mobile-toggle"
       >
@@ -109,7 +109,7 @@ export default function Sidebar() {
           alignItems: 'center', 
           justifyContent: 'space-between',
           marginBottom: '2.5rem', 
-          padding: '0 0.5rem' 
+          padding: '0.5rem 0.5rem' 
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
             <div style={{ 

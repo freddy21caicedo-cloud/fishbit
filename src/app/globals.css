@@ -249,11 +249,12 @@ h1, h2, h3, h4, h5, h6 {
 
   .sidebar.open {
     transform: translateX(0);
+    box-shadow: 20px 0 50px rgba(0,0,0,0.1);
   }
 
   .main-content {
     margin-left: 0;
-    padding: 1.5rem;
+    padding: 1rem;
     padding-top: 5rem;
   }
 
@@ -262,6 +263,33 @@ h1, h2, h3, h4, h5, h6 {
   }
 
   .header {
-    margin-top: 1rem;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+    margin-top: 0.5rem;
+  }
+
+  .header div:last-child {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Extra small devices (phones) */
+@media (max-width: 640px) {
+  h1 { font-size: 1.5rem !important; }
+  h2 { font-size: 1.25rem !important; }
+  
+  .card-premium {
+    padding: 1rem !important;
+  }
+
+  .btn-primary {
+    width: 100%;
+    justify-content: center;
   }
 }

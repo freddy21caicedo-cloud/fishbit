@@ -864,9 +864,9 @@ export default function AlmacenPage() {
               exit={{ scale: 0.9, opacity: 0, y: 30 }}
               className="card-premium" 
               style={{ 
-                width: '100%', 
+                width: '95%', 
                 maxWidth: '900px', 
-                maxHeight: '90vh', 
+                maxHeight: '95vh', 
                 position: 'relative', 
                 zIndex: 10, 
                 padding: '2rem', 
@@ -891,7 +891,12 @@ export default function AlmacenPage() {
 
               {/* Invoice Meta */}
               <div style={{ background: 'var(--secondary)', borderRadius: '16px', padding: '1.25rem', marginBottom: '2rem' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr 1fr', gap: '1rem', marginBottom: '1.25rem' }}>
+                <div style={{ 
+                  display: 'grid', 
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+                  gap: '1rem', 
+                  marginBottom: '1.25rem' 
+                }}>
                   <div>
                     <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 700, marginBottom: '0.4rem', color: 'var(--muted-foreground)' }}>NRO. FACTURA</label>
                     <input 
@@ -1008,9 +1013,9 @@ export default function AlmacenPage() {
                 </div>
               )}
 
-              {/* Items Table */}
-              <div style={{ flex: 1, overflowY: 'auto', marginBottom: '1.5rem' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              {/* Items Table Container with scroll */}
+              <div style={{ flex: 1, overflow: 'auto', marginBottom: '1.5rem', border: '1px solid var(--border)', borderRadius: '8px' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '800px' }}>
                   <thead>
                     <tr style={{ textAlign: 'left', fontSize: '0.7rem', textTransform: 'uppercase', color: 'var(--muted-foreground)', borderBottom: '1px solid var(--border)' }}>
                       <th style={{ padding: '0.5rem' }}>{activeCat === 'aireadores' ? 'Equipo / Marca' : activeCat === 'alevinos' ? 'Especie' : 'Producto'}</th>
@@ -1161,8 +1166,8 @@ export default function AlmacenPage() {
               </div>
 
               {/* Footer */}
-              <div style={{ display: 'flex', gap: '1rem', borderTop: '1px solid var(--border)', paddingTop: '1.5rem' }}>
-                <button onClick={() => setIsModalOpen(false)} style={{ flex: 1, padding: '1rem', borderRadius: '12px', border: '1px solid var(--border)', background: 'transparent', fontWeight: 700, cursor: 'pointer' }}>Cancelar</button>
+              <div style={{ display: 'flex', gap: '1rem', borderTop: '1px solid var(--border)', paddingTop: '1.5rem', flexWrap: 'wrap' }}>
+                <button onClick={() => setIsModalOpen(false)} style={{ flex: 1, minWidth: '120px', padding: '1rem', borderRadius: '12px', border: '1px solid var(--border)', background: 'transparent', fontWeight: 700, cursor: 'pointer' }}>Cancelar</button>
                 <button 
                   onClick={handleRegisterInvoice}
                   className="btn-primary" 
@@ -1200,7 +1205,7 @@ export default function AlmacenPage() {
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.9, opacity: 0, y: 30 }}
               className="card-premium" 
-              style={{ width: '100%', maxWidth: '800px', maxHeight: '80vh', position: 'relative', zIndex: 10, padding: '2.5rem', display: 'flex', flexDirection: 'column', boxShadow: '0 0 80px rgba(0,0,0,0.2)' }}
+              style={{ width: '95%', maxWidth: '800px', maxHeight: '85vh', position: 'relative', zIndex: 10, padding: 'clamp(1rem, 5vw, 2.5rem)', display: 'flex', flexDirection: 'column', boxShadow: '0 0 80px rgba(0,0,0,0.2)' }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '2rem' }}>
                 <div>
@@ -1213,8 +1218,8 @@ export default function AlmacenPage() {
                 <button onClick={() => setIsInvoiceListOpen(false)} style={{ background: 'transparent', border: 'none', color: 'var(--muted-foreground)', cursor: 'pointer', fontSize: '1.5rem' }}>&times;</button>
               </div>
 
-              <div style={{ flex: 1, overflowY: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <div style={{ flex: 1, overflow: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '600px' }}>
                   <thead>
                     <tr style={{ textAlign: 'left', fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--muted-foreground)', borderBottom: '1px solid var(--border)' }}>
                       <th style={{ padding: '0.75rem' }}>Factura / Proveedor</th>
