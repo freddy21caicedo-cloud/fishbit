@@ -100,6 +100,28 @@ export default function AlimentacionPage() {
     }
   };
 
+  const addNewSpeciesRow = () => {
+    setAlimentaciones([...alimentaciones, {
+      speciesId: null,
+      speciesName: '',
+      quantity: ''
+    }]);
+  };
+
+  const removeSpeciesRow = (index: number) => {
+    if (alimentaciones.length > 1) {
+      const newAlims = [...alimentaciones];
+      newAlims.splice(index, 1);
+      setAlimentaciones(newAlims);
+    }
+  };
+
+  const updateAlimentacion = (index: number, field: string, value: string) => {
+    const newAlims = [...alimentaciones];
+    newAlims[index] = { ...newAlims[index], [field]: value };
+    setAlimentaciones(newAlims);
+  };
+
   const fetchPondDetails = async (id: string) => {
     // 0. Get Pond Current Batch
     const { data: pondData } = await supabase.from('estanques').select('current_batch_id').eq('id', id).single();
