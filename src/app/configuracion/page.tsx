@@ -147,8 +147,8 @@ export default function ConfiguracionPage() {
               <button className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><Save size={18} /> Guardar Tarifas</button>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem' }}>
-              <PriceCard title="Plan Básico" icon={CreditCard} value={prices.basic} onChange={v => setPrices({...prices, basic: v})} />
-              <PriceCard title="Plan Premium" icon={DollarSign} value={prices.premium} onChange={v => setPrices({...prices, premium: v})} color="#f59e0b" />
+              <PriceCard title="Plan Básico" icon={CreditCard} value={prices.basic} onChange={(v: number) => setPrices({...prices, basic: v})} />
+              <PriceCard title="Plan Premium" icon={DollarSign} value={prices.premium} onChange={(v: number) => setPrices({...prices, premium: v})} color="#f59e0b" />
             </div>
           </motion.div>
         )}
