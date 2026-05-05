@@ -168,10 +168,10 @@ export default function AlimentacionPage() {
         </div>
       </header>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: '2rem' }}>
+      <div className="responsive-container">
         {/* Main Form Card */}
-        <div className="card-premium" style={{ padding: '2.5rem', position: 'relative', overflow: 'hidden' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem', marginBottom: '2rem' }}>
+        <div className="card-premium" style={{ flex: 1.4, padding: 'clamp(1.5rem, 5vw, 2.5rem)', position: 'relative', overflow: 'hidden' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
             <div>
               <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, marginBottom: '0.5rem', textTransform: 'uppercase', color: 'var(--muted-foreground)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -259,7 +259,7 @@ export default function AlimentacionPage() {
         </div>
 
         {/* FCA & Analysis Sidebar */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+        <div className="responsive-side-panel" style={{ display: 'flex', flexDirection: 'column', gap: '2rem', flex: 1 }}>
           {/* FCA Gauge Card */}
           <div className="card-premium" style={{ padding: '2rem', textAlign: 'center' }}>
             <h3 style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--muted-foreground)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '1.5rem' }}>Factor de Conversión (F.C.A.)</h3>

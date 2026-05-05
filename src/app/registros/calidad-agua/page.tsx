@@ -122,12 +122,12 @@ export default function CalidadAguaPage() {
         </div>
       </header>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '2rem' }}>
+      <div className="responsive-container">
         {/* Main Form Section */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem', flex: 1.5 }}>
           <div className="card-premium" style={{ padding: '2.5rem' }}>
             {/* Header Info */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1fr', gap: '1.5rem', marginBottom: '2.5rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '1.5rem', marginBottom: '2.5rem' }}>
               <div>
                 <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 700, marginBottom: '0.5rem', textTransform: 'uppercase', color: 'var(--muted-foreground)' }}>Estanque</label>
                 <select
@@ -155,7 +155,7 @@ export default function CalidadAguaPage() {
               Mediciones Técnicas
             </h2>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '2rem' }}>
               {/* Column 1: Oxygen & pH */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
                 <div>
@@ -240,7 +240,7 @@ export default function CalidadAguaPage() {
         </div>
 
         {/* Status & Analysis Sidebar */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+        <div className="responsive-side-panel" style={{ display: 'flex', flexDirection: 'column', gap: '2rem', flex: 1 }}>
           {/* Real-time Analysis Card */}
           <div className="card-premium" style={{ padding: '2rem', textAlign: 'center' }}>
             <h3 style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--muted-foreground)', textTransform: 'uppercase', marginBottom: '1.5rem' }}>Estado del Estanque</h3>

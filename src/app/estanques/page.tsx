@@ -458,7 +458,10 @@ export default function EstanquesPage() {
         </button>
       </header>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '2rem' }}>
+        </button>
+      </header>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(clamp(280px, 100%, 350px), 1fr))', gap: '1.5rem' }}>
         {ponds.map((pond) => (
           <motion.div
             key={pond.id}
@@ -576,7 +579,7 @@ export default function EstanquesPage() {
               initial={{ opacity: 0, scale: 0.9, y: 40 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9, y: 40 }}
-              style={{ position: 'fixed', top: '10%', left: '50%', x: '-50%', width: '100%', maxWidth: '550px', zIndex: 101, maxHeight: '85vh', overflowY: 'auto' }}
+              style={{ position: 'fixed', top: '5%', left: '50%', x: '-50%', width: '95%', maxWidth: '550px', zIndex: 101, maxHeight: '90vh', overflowY: 'auto' }}
             >
               <div className="card-premium" style={{ padding: '2rem', background: 'var(--card)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
@@ -606,7 +609,7 @@ export default function EstanquesPage() {
                   </div>
 
                   {/* Medidas */}
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '1rem' }}>
                     <div>
                       <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, marginBottom: '0.5rem', textTransform: 'uppercase', color: 'var(--muted-foreground)' }}>Largo (m)</label>
                       <input type="number" name="largo" value={formData.largo} onChange={handleInputChange} placeholder="0.0" style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--secondary)', outline: 'none' }} />

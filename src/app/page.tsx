@@ -53,8 +53,8 @@ const StatCard = ({ title, value, change, icon: Icon, color }: any) => (
         <ArrowUpRight size={14} />
       </div>
     </div>
-    <div className="stat-value">{value}</div>
-    <div className="stat-label">{title}</div>
+    <div className="stat-value" style={{ fontSize: 'clamp(1.5rem, 4vw, 2rem)', fontWeight: 800, margin: '0.5rem 0' }}>{value}</div>
+    <div className="stat-label" style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>{title}</div>
   </motion.div>
 );
 
@@ -159,8 +159,8 @@ export default function Dashboard() {
         />
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '1.5rem', marginBottom: '2rem' }}>
-        <div className="card-premium" style={{ padding: '1.5rem' }}>
+      <div className="responsive-container" style={{ marginBottom: '2rem' }}>
+        <div className="card-premium" style={{ flex: 2, padding: '1.5rem' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
             <h3 style={{ fontSize: '1.125rem' }}>Tendencias de Calidad del Agua</h3>
             <select style={{ background: 'var(--secondary)', border: 'none', padding: '0.4rem 0.8rem', borderRadius: 'var(--radius)', fontSize: '0.875rem' }}>
@@ -189,9 +189,11 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+        </div>
+
+        <div className="responsive-side-panel" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', flex: 1 }}>
           <div className="card-premium" style={{ padding: '1.5rem', flex: 1 }}>
-            <h3 style={{ fontSize: '1.125rem', marginBottom: '1rem' }}>Estado de la Granja</h3>
+            <h3 style={{ fontSize: '1.125rem', marginBottom: '1.5rem' }}>Estado de la Granja</h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                 <div style={{ padding: '0.5rem', background: '#ecfdf5', color: '#10b981', borderRadius: '0.5rem' }}>

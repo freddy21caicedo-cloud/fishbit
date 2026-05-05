@@ -166,10 +166,10 @@ export default function BiometriaPage() {
         </div>
       </header>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: '2rem' }}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+      <div className="responsive-container">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem', flex: 1.5 }}>
           {/* Header Form */}
-          <div className="card-premium" style={{ padding: '2rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
+          <div className="card-premium" style={{ padding: '2rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '2rem' }}>
             <div>
               <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, marginBottom: '0.5rem', textTransform: 'uppercase', color: 'var(--muted-foreground)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -248,7 +248,7 @@ export default function BiometriaPage() {
                       borderRadius: '16px', 
                       border: '1px solid var(--border)',
                       display: 'grid',
-                      gridTemplateColumns: '1.2fr 1fr 1fr 1.2fr',
+                      gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
                       gap: '1.5rem',
                       alignItems: 'center'
                     }}>
@@ -304,7 +304,7 @@ export default function BiometriaPage() {
         </div>
 
         {/* Sidebar Summary */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+        <div className="responsive-side-panel" style={{ display: 'flex', flexDirection: 'column', gap: '2rem', flex: 1 }}>
           {/* Biomass Stats Card */}
           <div className="card-premium" style={{ padding: '2rem', background: 'linear-gradient(135deg, #ffffff 0%, #f9fafb 100%)' }}>
             <h3 style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--muted-foreground)', textTransform: 'uppercase', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
