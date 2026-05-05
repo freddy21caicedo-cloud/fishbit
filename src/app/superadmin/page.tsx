@@ -292,8 +292,8 @@ export default function SuperAdminHub() {
         {isUnitModalOpen && (
           <Modal title="Crear Unidad Acuícola" onClose={() => setIsUnitModalOpen(false)}>
             <form onSubmit={handleCreateUnit} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-              <InputGroup label="Nombre de la Granja" placeholder="Ej. FishBit Central" value={newUnit.name} onChange={v => setNewUnit({...newUnit, name: v})} />
-              <InputGroup label="Ubicación Geográfica" placeholder="Ej. Antioquia, Colombia" value={newUnit.location} onChange={v => setNewUnit({...newUnit, location: v})} />
+              <InputGroup label="Nombre de la Granja" placeholder="Ej. FishBit Central" value={newUnit.name} onChange={(v: string) => setNewUnit({...newUnit, name: v})} />
+              <InputGroup label="Ubicación Geográfica" placeholder="Ej. Antioquia, Colombia" value={newUnit.location} onChange={(v: string) => setNewUnit({...newUnit, location: v})} />
               <button type="submit" className="btn-primary" style={{ padding: '1rem', fontWeight: 800 }}>Confirmar Creación</button>
             </form>
           </Modal>
@@ -302,9 +302,9 @@ export default function SuperAdminHub() {
         {isUserModalOpen && (
           <Modal title="Registrar Administrador" onClose={() => setIsUserModalOpen(false)}>
             <form onSubmit={handleCreateUser} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-              <InputGroup label="Nombre Completo" placeholder="Ej. Carlos Mendoza" value={newUser.fullName} onChange={v => setNewUser({...newUser, fullName: v})} />
-              <InputGroup label="Email de Acceso" type="email" placeholder="carlos@email.com" value={newUser.email} onChange={v => setNewUser({...newUser, email: v})} />
-              <InputGroup label="Contraseña Temporal" type="password" placeholder="••••••••" value={newUser.password} onChange={v => setNewUser({...newUser, password: v})} />
+              <InputGroup label="Nombre Completo" placeholder="Ej. Carlos Mendoza" value={newUser.fullName} onChange={(v: string) => setNewUser({...newUser, fullName: v})} />
+              <InputGroup label="Email de Acceso" type="email" placeholder="carlos@email.com" value={newUser.email} onChange={(v: string) => setNewUser({...newUser, email: v})} />
+              <InputGroup label="Contraseña Temporal" type="password" placeholder="••••••••" value={newUser.password} onChange={(v: string) => setNewUser({...newUser, password: v})} />
               <button type="submit" className="btn-primary" style={{ padding: '1rem', fontWeight: 800 }}>Registrar en FishBit</button>
             </form>
           </Modal>
@@ -316,14 +316,14 @@ export default function SuperAdminHub() {
               <p style={{ fontSize: '0.9rem', color: 'var(--muted-foreground)' }}>Asignando a: <strong style={{ color: 'var(--foreground)' }}>{selectedUser?.full_name}</strong></p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                 <label style={labelStyle}>Seleccionar Unidad</label>
-                <select required value={selectedUnitId} onChange={e => setSelectedUnitId(e.target.value)} style={inputStyle}>
+                <select required value={selectedUnitId} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setSelectedUnitId(e.target.value)} style={inputStyle}>
                   <option value="">-- Elige una granja --</option>
-                  {units.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+                  {units.map((u: any) => <option key={u.id} value={u.id}>{u.name}</option>)}
                 </select>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                 <label style={labelStyle}>Rol del Usuario</label>
-                <select value={selectedRole} onChange={e => setSelectedRole(e.target.value)} style={inputStyle}>
+                <select value={selectedRole} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setSelectedRole(e.target.value)} style={inputStyle}>
                   <option value="admin">Administrador Principal</option>
                   <option value="tecnico">Técnico Especialista</option>
                   <option value="operario">Operario de Campo</option>
@@ -717,7 +717,7 @@ const SupportTab = ({ tickets, onRefresh }: { tickets: any[], onRefresh: () => v
                 rows={4} 
                 placeholder="Escribe aquí la solución o respuesta para el cliente..." 
                 value={response}
-                onChange={e => setResponse(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setResponse(e.target.value)}
                 style={{ ...inputStyle, resize: 'none' }}
               />
             </div>
@@ -767,7 +767,7 @@ const Modal = ({ title, children, onClose }: any) => (
 const InputGroup = ({ label, value, onChange, type = 'text', placeholder }: any) => (
   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
     <label style={labelStyle}>{label}</label>
-    <input type={type} placeholder={placeholder} value={value} onChange={e => onChange(e.target.value)} style={inputStyle} required />
+    <input type={type} placeholder={placeholder} value={value} onChange={(e: React.ChangeEvent<HTMLInputElement>) => onChange(e.target.value)} style={inputStyle} required />
   </div>
 );
 
