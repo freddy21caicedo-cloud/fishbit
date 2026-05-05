@@ -86,6 +86,7 @@ export default function BiometriaPage() {
       }]);
     }
     setLoading(false);
+  };
 
   const updateBiometria = (index: number, field: string, value: string) => {
     const newBiometrias = [...biometrias];
