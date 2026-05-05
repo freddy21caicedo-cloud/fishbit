@@ -33,7 +33,12 @@ export default function TrasladoPage() {
   }, []);
 
   const fetchPonds = async () => {
-    const { data } = await supabase.from('estanques').select('*').order('name');
+    const activeUnitId = localStorage.getItem('active_unit_id');
+    const { data } = await supabase
+      .from('estanques')
+      .select('*')
+      .eq('unit_id', activeUnitId)
+      .order('name');
     setPonds(data || []);
   };
 
@@ -75,6 +80,7 @@ export default function TrasladoPage() {
     }
 
     const qty = parseInt(cantidad);
+    const activeUnitId = localStorage.getItem('active_unit_id');
     
     // 0. Obtener Batch ID y Acumulado de alimentación del origen
     let batchId = origenPond?.current_batch_id;
@@ -82,13 +88,13 @@ export default function TrasladoPage() {
 
     if (batchId) {
       const { data: feedData } = await supabase
-        .from('alimentacion')
-        .select('cantidad_kilos')
+        .from('alimentacion_diaria')
+        .select('quantity_kg')
         .eq('estanque_id', origenId)
         .eq('batch_id', batchId);
       
       if (feedData) {
-        feedAccumulated = feedData.reduce((acc, curr) => acc + (parseFloat(curr.cantidad_kilos) || 0), 0);
+        feedAccumulated = feedData.reduce((acc, curr) => acc + (parseFloat(curr.quantity_kg) || 0), 0);
       }
     }
 
@@ -96,6 +102,7 @@ export default function TrasladoPage() {
     const { error: logError } = await supabase.from('transfers').insert([{
       origen_id: origenId,
       destino_id: destinoId,
+      unit_id: activeUnitId,
       species_name: especieId,
       quantity: qty,
       date: fecha,

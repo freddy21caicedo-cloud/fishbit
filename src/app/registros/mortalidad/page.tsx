@@ -43,7 +43,12 @@ export default function MortalidadPage() {
   }, []);
 
   const fetchPonds = async () => {
-    const { data } = await supabase.from('estanques').select('*').eq('status', 'con_peces');
+    const activeUnitId = localStorage.getItem('active_unit_id');
+    const { data } = await supabase
+      .from('estanques')
+      .select('*')
+      .eq('status', 'con_peces')
+      .eq('unit_id', activeUnitId);
     setPonds(data || []);
   };
 
@@ -96,11 +101,11 @@ export default function MortalidadPage() {
     // 1. Insert Mortality Record
     const { error: mortError } = await supabase.from('mortality').insert([{
       estanque_id: estanqueId,
+      unit_id: activeUnitId,
       species_name: especieId,
       date: fecha,
       quantity: qty,
-      cause: causa,
-      unit_id: activeUnitId
+      cause: causa
     }]);
 
     if (mortError) {

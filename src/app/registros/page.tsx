@@ -80,19 +80,27 @@ export default function RegistrosPage() {
 
   const fetchInitialData = async () => {
     setLoading(true);
+    const activeUnitId = localStorage.getItem('active_unit_id');
+    if (!activeUnitId) { setLoading(false); return; }
+
     // 1. Fetch Ponds
-    const { data: pondsData } = await supabase.from('estanques').select('name').order('name');
+    const { data: pondsData } = await supabase
+      .from('estanques')
+      .select('name')
+      .eq('unit_id', activeUnitId)
+      .order('name');
+    
     if (pondsData) {
       setPonds(['Todos los Estanques', ...pondsData.map(p => p.name)]);
     }
 
     // 2. Fetch Activity from all tables
     const [alimentacion, biometrias, calidadAgua, mortalidad, traslados] = await Promise.all([
-      supabase.from('alimentacion_diaria').select('*, estanques(name)').order('created_at', { ascending: false }).limit(5),
-      supabase.from('biometrias').select('*, estanques(name)').order('created_at', { ascending: false }).limit(5),
-      supabase.from('water_quality').select('*, estanques(name)').order('created_at', { ascending: false }).limit(5),
-      supabase.from('mortality').select('*, estanques(name)').order('created_at', { ascending: false }).limit(5),
-      supabase.from('transfers').select('*, origen:estanques!origen_id(name), destino:estanques!destino_id(name)').order('created_at', { ascending: false }).limit(5),
+      supabase.from('alimentacion_diaria').select('*, estanques(name)').eq('unit_id', activeUnitId).order('created_at', { ascending: false }).limit(5),
+      supabase.from('biometrias').select('*, estanques(name)').eq('unit_id', activeUnitId).order('created_at', { ascending: false }).limit(5),
+      supabase.from('water_quality').select('*, estanques(name)').eq('unit_id', activeUnitId).order('created_at', { ascending: false }).limit(5),
+      supabase.from('mortality').select('*, estanques(name)').eq('unit_id', activeUnitId).order('created_at', { ascending: false }).limit(5),
+      supabase.from('transfers').select('*, origen:estanques!origen_id(name), destino:estanques!destino_id(name)').eq('unit_id', activeUnitId).order('created_at', { ascending: false }).limit(5),
     ]);
 
     const combined: any[] = [

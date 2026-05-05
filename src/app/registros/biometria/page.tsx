@@ -30,10 +30,12 @@ export default function BiometriaPage() {
   }, []);
 
   const fetchEstanques = async () => {
+    const activeUnitId = localStorage.getItem('active_unit_id');
     const { data, error } = await supabase
       .from('estanques')
       .select('*')
-      .eq('status', 'con_peces');
+      .eq('status', 'con_peces')
+      .eq('unit_id', activeUnitId);
     if (error) console.error('Error fetching estanques:', error);
     else setEstanquesList(data || []);
   };
@@ -62,7 +64,7 @@ export default function BiometriaPage() {
   const fetchPondSpecies = async (pondId: string) => {
     setLoading(true);
     const { data } = await supabase.from('pond_species').select('*').eq('estanque_id', pondId);
-    if (data) {
+    if (data && data.length > 0) {
       setBiometrias(data.map(s => ({
         speciesName: s.species_name,
         speciesId: s.id,
@@ -71,9 +73,19 @@ export default function BiometriaPage() {
         poblacionTotal: s.current_count || 0,
         biomasaInicial: parseFloat(s.current_biomass_kg) || 0
       })));
+    } else {
+      // Fallback: Si es policultivo pero no hay especies registradas, 
+      // usar los datos globales del estanque
+      const pond = estanquesList.find(p => p.id === pondId);
+      setBiometrias([{
+        speciesName: pond?.current_species || 'Especie Principal',
+        pesoCaptura: '',
+        pecesCapturados: '',
+        poblacionTotal: pond?.current_count || 0,
+        biomasaInicial: parseFloat(pond?.current_biomass_kg) || 0
+      }]);
     }
     setLoading(false);
-  };
 
   const updateBiometria = (index: number, field: string, value: string) => {
     const newBiometrias = [...biometrias];

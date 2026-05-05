@@ -47,7 +47,12 @@ export default function CalidadAguaPage() {
   }, []);
 
   const fetchPonds = async () => {
-    const { data } = await supabase.from('estanques').select('*').order('name');
+    const activeUnitId = localStorage.getItem('active_unit_id');
+    const { data } = await supabase
+      .from('estanques')
+      .select('*')
+      .eq('unit_id', activeUnitId)
+      .order('name');
     setPondsList(data || []);
   };
 
@@ -57,8 +62,11 @@ export default function CalidadAguaPage() {
       return;
     }
 
+    const activeUnitId = localStorage.getItem('active_unit_id');
+
     const { error } = await supabase.from('water_quality').insert([{
       estanque_id: estanqueId,
+      unit_id: activeUnitId,
       date: fecha,
       hour: hora,
       o2_mg_l: parseFloat(oxigeno) || 0,
