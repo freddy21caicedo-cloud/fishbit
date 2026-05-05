@@ -455,9 +455,20 @@ const TeamManagement = () => {
   const handleUpdateRole = async (userId: string, newRole: string) => {
     setRefreshing(true);
     try {
-      await supabase.from('profiles').update({ role: newRole }).eq('id', userId);
+      const activeUnitId = localStorage.getItem('active_unit_id');
+      const { error } = await supabase
+        .from('user_units')
+        .update({ role: newRole })
+        .eq('user_id', userId)
+        .eq('unit_id', activeUnitId);
+      
+      if (error) throw error;
+      alert("¡Rol actualizado con éxito!");
       fetchTeam(true);
-    } catch (err) { alert("Error al cambiar rol"); setRefreshing(false); }
+    } catch (err: any) { 
+      alert("Error al cambiar rol: " + err.message); 
+      setRefreshing(false); 
+    }
   };
 
   if (loading) return <div style={{ padding: '2rem', textAlign: 'center' }}>Cargando equipo...</div>;
