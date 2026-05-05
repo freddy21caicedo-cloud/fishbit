@@ -334,8 +334,13 @@ export default function EstanquesPage() {
         .update({ name, capacity_m3: vol, unit_id: activeUnitId })
         .eq('id', editingPond.id);
 
-      if (error) alert("Error al actualizar estanque: " + error.message);
-      else {
+      if (error) {
+        if (error.code === '23505') {
+          alert("Conflicto de Nomenclatura: No es posible renombrar el estanque con esta identificación porque ya se encuentra en uso dentro de esta unidad.");
+        } else {
+          alert("Error Operativo: " + error.message);
+        }
+      } else {
         alert("¡Estanque actualizado con éxito!");
         resetForm();
         fetchEstanques();
@@ -349,7 +354,11 @@ export default function EstanquesPage() {
       }]);
 
       if (error) {
-        alert("Error al crear estanque: " + error.message);
+        if (error.code === '23505') {
+          alert("Conflicto de Infraestructura: Ya existe un estanque con esta identificación en la unidad activa. Por favor, verifique el número de estanque.");
+        } else {
+          alert("Error de Sincronización: " + error.message);
+        }
       } else {
         alert("¡Estanque creado con éxito!");
         resetForm();

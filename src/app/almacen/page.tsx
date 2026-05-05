@@ -67,24 +67,31 @@ export default function AlmacenPage() {
   }, []);
 
   const fetchProviders = async () => {
-    const { data, error } = await supabase.from('providers').select('*').order('name');
+    const activeUnitId = localStorage.getItem('active_unit_id');
+    if (!activeUnitId) return;
+    const { data, error } = await supabase.from('providers').select('*').eq('unit_id', activeUnitId).order('name');
     if (error) console.error('Error fetching providers:', error);
     else setProviders(data || []);
   };
 
   const fetchInventory = async () => {
-    const { data, error } = await supabase.from('inventory').select('*');
+    const activeUnitId = localStorage.getItem('active_unit_id');
+    if (!activeUnitId) return;
+    const { data, error } = await supabase.from('inventory').select('*').eq('unit_id', activeUnitId);
     if (error) console.error('Error fetching inventory:', error);
     else setInventory(data || []);
   };
 
   const fetchInvoices = async () => {
+    const activeUnitId = localStorage.getItem('active_unit_id');
+    if (!activeUnitId) return;
     const { data, error } = await supabase
       .from('invoices')
       .select(`
         *,
         providers (name)
       `)
+      .eq('unit_id', activeUnitId)
       .order('date', { ascending: false });
     
     if (error) console.error('Error fetching invoices:', error);
