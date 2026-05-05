@@ -229,10 +229,14 @@ export default function EstanquesPage() {
   }, []);
 
   const fetchEstanques = async () => {
+    const activeUnitId = localStorage.getItem('active_unit_id');
+    if (!activeUnitId) return;
+
     // 1. Fetch Ponds
     const { data: pondsData, error: pErr } = await supabase
       .from('estanques')
       .select('*')
+      .eq('unit_id', activeUnitId)
       .order('name');
     
     if (pErr) {
@@ -317,11 +321,17 @@ export default function EstanquesPage() {
 
     const name = `Est-${formData.numero.padStart(2, '0')}`;
     const vol = parseFloat(volumen);
+    const activeUnitId = localStorage.getItem('active_unit_id');
+
+    if (!activeUnitId) {
+      alert("No se encontró una unidad activa. Por favor, recarga la página.");
+      return;
+    }
 
     if (editingPond) {
       const { error } = await supabase
         .from('estanques')
-        .update({ name, capacity_m3: vol })
+        .update({ name, capacity_m3: vol, unit_id: activeUnitId })
         .eq('id', editingPond.id);
 
       if (error) alert("Error al actualizar estanque: " + error.message);
@@ -334,7 +344,8 @@ export default function EstanquesPage() {
       const { error } = await supabase.from('estanques').insert([{
         name,
         capacity_m3: vol,
-        status: 'vacio'
+        status: 'vacio',
+        unit_id: activeUnitId
       }]);
 
       if (error) {
