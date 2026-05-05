@@ -66,8 +66,51 @@ export default function AlmacenPage() {
     fetchInventory();
   }, []);
 
+  const saveProvider = async () => {
+    if (!newProvider.name) return;
+    let activeUnitId = localStorage.getItem('active_unit_id');
+    
+    if (!activeUnitId) {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: uu } = await supabase.from('user_units').select('unit_id').eq('user_id', user.id).single();
+        if (uu) activeUnitId = uu.unit_id;
+      }
+    }
+
+    if (!activeUnitId) {
+      alert("Error: No se detectó unidad vinculada.");
+      return;
+    }
+
+    console.log("Intentando crear proveedor para la unidad:", activeUnitId);
+    console.log("Datos del proveedor:", newProvider);
+
+    try {
+      const { data, error } = await supabase.from('providers').insert([{ ...newProvider, unit_id: activeUnitId }]).select();
+      if (error) {
+        console.error("Detalle del error Supabase:", error);
+        throw error;
+      }
+      setProviders([...providers, ...(data || [])]);
+      setNewProvider({ name: '', nit: '', types: [] });
+      setIsProviderModalOpen(false);
+    } catch (e) {
+      console.error(e);
+      alert("Error al guardar proveedor");
+    }
+  };
+
   const fetchProviders = async () => {
-    const activeUnitId = localStorage.getItem('active_unit_id');
+    let activeUnitId = localStorage.getItem('active_unit_id');
+    if (!activeUnitId) {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: uu } = await supabase.from('user_units').select('unit_id').eq('user_id', user.id).single();
+        if (uu) activeUnitId = uu.unit_id;
+      }
+    }
+    
     if (!activeUnitId) return;
     const { data, error } = await supabase.from('providers').select('*').eq('unit_id', activeUnitId).order('name');
     if (error) console.error('Error fetching providers:', error);
@@ -80,6 +123,74 @@ export default function AlmacenPage() {
     const { data, error } = await supabase.from('inventory').select('*').eq('unit_id', activeUnitId);
     if (error) console.error('Error fetching inventory:', error);
     else setInventory(data || []);
+  };
+
+  const handleSaveInvoice = async () => {
+    if (!nroFactura || !proveedor) {
+      alert("Por favor complete el número de factura y seleccione un proveedor.");
+      return;
+    }
+
+    let activeUnitId = localStorage.getItem('active_unit_id');
+    if (!activeUnitId) {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: uu } = await supabase.from('user_units').select('unit_id').eq('user_id', user.id).single();
+        if (uu) { activeUnitId = uu.unit_id; localStorage.setItem('active_unit_id', uu.unit_id); }
+      }
+    }
+    if (!activeUnitId) { alert("Error: No se detectó unidad vinculada."); return; }
+
+    const { data: provData } = await supabase.from('providers').select('id').eq('name', proveedor).eq('unit_id', activeUnitId).single();
+    if (!provData) { alert("Proveedor no encontrado. Verifique la selección."); return; }
+
+    const dueDate = isCredit
+      ? new Date(Date.now() + parseInt(diasCredito) * 86400000).toISOString().split('T')[0]
+      : fechaFactura;
+
+    try {
+      // 1. Insert Invoice
+      const { error: invErr } = await supabase.from('invoices').insert([{
+        invoice_number: nroFactura,
+        provider_id: provData.id,
+        date: fechaFactura,
+        total: totalFactura,
+        status: isCredit ? 'pendiente' : 'pagada',
+        unit_id: activeUnitId
+      }]);
+      if (invErr) throw invErr;
+
+      // 2. Update Inventory for each item
+      for (const item of items) {
+        if (!item.product || !item.quantity) continue;
+        const qty = parseFloat(item.quantity) || 0;
+        const { data: existing } = await supabase.from('inventory')
+          .select('*').eq('name', item.product).eq('unit_id', activeUnitId).single();
+
+        if (existing) {
+          await supabase.from('inventory').update({
+            current_stock: (parseFloat(existing.current_stock) || 0) + qty,
+            last_entry: new Date().toISOString()
+          }).eq('id', existing.id);
+        } else {
+          await supabase.from('inventory').insert([{
+            name: item.product,
+            category: activeCat,
+            current_stock: qty,
+            unit: 'uds',
+            unit_id: activeUnitId,
+            last_entry: new Date().toISOString()
+          }]);
+        }
+      }
+
+      setIsModalOpen(false);
+      fetchInvoices();
+      fetchInventory();
+      alert("¡Factura e inventario registrados con éxito!");
+    } catch (err: any) {
+      alert("Error al registrar factura: " + err.message);
+    }
   };
 
   const fetchInvoices = async () => {
@@ -997,10 +1108,7 @@ export default function AlmacenPage() {
                 <button onClick={() => setIsModalOpen(false)} style={{ flex: 1, padding: '1rem', borderRadius: '12px', border: '1px solid var(--border)', background: 'transparent', fontWeight: 700, cursor: 'pointer' }}>Cancelar</button>
                 <button 
                   onClick={() => {
-                    if (activeCat === 'alimento') handleRegisterAlimento();
-                    else if (activeCat === 'farmacia') handleRegisterFarmacia();
-                    else if (activeCat === 'insumos') handleRegisterInsumos();
-                    else handleRegisterGeneric();
+                    handleSaveInvoice();
                   }}
                   className="btn-primary" 
                   style={{ 
@@ -1201,7 +1309,7 @@ export default function AlmacenPage() {
                 </div>
 
                 <button 
-                  onClick={handleCreateProvider}
+                  onClick={saveProvider}
                   className="btn-primary" 
                   style={{ width: '100%', padding: '1rem', marginTop: '1rem' }}
                 >

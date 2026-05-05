@@ -87,6 +87,17 @@ export default function SiembraPage() {
       return;
     }
 
+    // Get active unit
+    let activeUnitId = localStorage.getItem('active_unit_id');
+    if (!activeUnitId) {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: uu } = await supabase.from('user_units').select('unit_id').eq('user_id', user.id).single();
+        if (uu) { activeUnitId = uu.unit_id; localStorage.setItem('active_unit_id', uu.unit_id); }
+      }
+    }
+    if (!activeUnitId) { alert("Error: No se detectó unidad vinculada."); return; }
+
     // 2. Create Seeding Header
     const totalQty = rows.reduce((acc, r) => acc + (parseInt(r.cantidad) || 0), 0);
     const { data: siembraData, error: siembraError } = await supabase
@@ -96,7 +107,8 @@ export default function SiembraPage() {
         date: fecha,
         hour: hora,
         total_quantity: totalQty,
-        total_biomass_kg: totalBiomasa
+        total_biomass_kg: totalBiomasa,
+        unit_id: activeUnitId
       }])
       .select();
 

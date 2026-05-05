@@ -321,10 +321,22 @@ export default function EstanquesPage() {
 
     const name = `Est-${formData.numero.padStart(2, '0')}`;
     const vol = parseFloat(volumen);
-    const activeUnitId = localStorage.getItem('active_unit_id');
+    let activeUnitId = localStorage.getItem('active_unit_id');
+
+    // Si no está en localStorage, lo buscamos en la DB (Resiliencia total)
+    if (!activeUnitId) {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: uu } = await supabase.from('user_units').select('unit_id').eq('user_id', user.id).single();
+        if (uu) {
+          activeUnitId = uu.unit_id;
+          localStorage.setItem('active_unit_id', uu.unit_id);
+        }
+      }
+    }
 
     if (!activeUnitId) {
-      alert("No se encontró una unidad activa. Por favor, recarga la página.");
+      alert("Error: No se ha detectado una unidad productiva vinculada a su cuenta.");
       return;
     }
 
