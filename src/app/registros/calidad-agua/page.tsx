@@ -2,12 +2,12 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  Plus, 
-  Droplets, 
-  Calendar, 
-  Clock, 
-  Waves, 
+import {
+  Plus,
+  Droplets,
+  Calendar,
+  Clock,
+  Waves,
   ArrowLeft,
   Activity,
   AlertTriangle,
@@ -33,7 +33,7 @@ export default function CalidadAguaPage() {
   const [hora, setHora] = useState(new Date().toTimeString().slice(0, 5));
   const [estanqueId, setEstanqueId] = useState('');
   const [pondsList, setPondsList] = useState<any[]>([]);
-  
+
   // Parameters
   const [oxigeno, setOxigeno] = useState('');
   const [oxigenoPorc, setOxigenoPorc] = useState('');
@@ -88,7 +88,7 @@ export default function CalidadAguaPage() {
     const o2Val = parseFloat(oxigeno);
     const phVal = parseFloat(ph);
     const niVal = parseFloat(nitrito);
-    
+
     let status = 'Estable';
     let color = '#10b981';
     let advice = 'Los parámetros se encuentran dentro de los rangos óptimos de producción.';
@@ -130,7 +130,7 @@ export default function CalidadAguaPage() {
             <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1fr', gap: '1.5rem', marginBottom: '2.5rem' }}>
               <div>
                 <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 700, marginBottom: '0.5rem', textTransform: 'uppercase', color: 'var(--muted-foreground)' }}>Estanque</label>
-                <select 
+                <select
                   value={estanqueId}
                   onChange={(e) => setEstanqueId(e.target.value)}
                   style={{ width: '100%', padding: '0.75rem', borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--secondary)', outline: 'none', fontWeight: 600 }}
@@ -163,32 +163,32 @@ export default function CalidadAguaPage() {
                     <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>Oxígeno Disuelto (mg/L)</label>
                     <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#3b82f6' }}>Rango: 5.0 - 8.0</span>
                   </div>
-                  <input 
-                    type="number" 
+                  <input
+                    type="number"
                     value={oxigeno}
                     onChange={(e) => setOxigeno(e.target.value)}
                     placeholder="0.0"
-                    style={{ width: '100%', padding: '1rem', fontSize: '1.25rem', borderRadius: '12px', border: '1px solid', borderColor: parseFloat(oxigeno) < ranges.oxigeno.min ? '#ef4444' : 'var(--border)', background: 'var(--secondary)', outline: 'none', fontWeight: 800 }} 
+                    style={{ width: '100%', padding: '1rem', fontSize: '1.25rem', borderRadius: '12px', border: '1px solid', borderColor: parseFloat(oxigeno) < ranges.oxigeno.min ? '#ef4444' : 'var(--border)', background: 'var(--secondary)', outline: 'none', fontWeight: 800 }}
                   />
                 </div>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, marginBottom: '0.5rem', textTransform: 'uppercase', color: 'var(--muted-foreground)' }}>Concentración O2 (%)</label>
-                  <input 
-                    type="number" 
+                  <input
+                    type="number"
                     value={oxigenoPorc}
                     onChange={(e) => setOxigenoPorc(e.target.value)}
                     placeholder="0.0"
-                    style={{ width: '100%', padding: '1rem', fontSize: '1.25rem', borderRadius: '12px', border: '1px solid var(--border)', background: 'var(--secondary)', outline: 'none', fontWeight: 800 }} 
+                    style={{ width: '100%', padding: '1rem', fontSize: '1.25rem', borderRadius: '12px', border: '1px solid var(--border)', background: 'var(--secondary)', outline: 'none', fontWeight: 800 }}
                   />
                 </div>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, marginBottom: '0.5rem', textTransform: 'uppercase', color: 'var(--muted-foreground)' }}>Nivel de pH</label>
-                  <input 
-                    type="number" 
+                  <input
+                    type="number"
                     value={ph}
                     onChange={(e) => setPh(e.target.value)}
                     placeholder="7.0"
-                    style={{ width: '100%', padding: '1rem', fontSize: '1.25rem', borderRadius: '12px', border: '1px solid', borderColor: (parseFloat(ph) < ranges.ph.min || parseFloat(ph) > ranges.ph.max) ? '#f59e0b' : 'var(--border)', background: 'var(--secondary)', outline: 'none', fontWeight: 800 }} 
+                    style={{ width: '100%', padding: '1rem', fontSize: '1.25rem', borderRadius: '12px', border: '1px solid', borderColor: (parseFloat(ph) < ranges.ph.min || parseFloat(ph) > ranges.ph.max) ? '#f59e0b' : 'var(--border)', background: 'var(--secondary)', outline: 'none', fontWeight: 800 }}
                   />
                 </div>
               </div>
@@ -197,40 +197,40 @@ export default function CalidadAguaPage() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, marginBottom: '0.5rem', textTransform: 'uppercase', color: 'var(--muted-foreground)' }}>Amonia / Amonio (mg/L)</label>
-                  <input 
-                    type="number" 
+                  <input
+                    type="number"
                     value={amonia}
                     onChange={(e) => setAmonia(e.target.value)}
                     placeholder="0.00"
-                    style={{ width: '100%', padding: '1rem', fontSize: '1.25rem', borderRadius: '12px', border: '1px solid var(--border)', background: 'var(--secondary)', outline: 'none', fontWeight: 800 }} 
+                    style={{ width: '100%', padding: '1rem', fontSize: '1.25rem', borderRadius: '12px', border: '1px solid var(--border)', background: 'var(--secondary)', outline: 'none', fontWeight: 800 }}
                   />
                 </div>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, marginBottom: '0.5rem', textTransform: 'uppercase', color: 'var(--muted-foreground)' }}>Nitrito (mg/L)</label>
-                  <input 
-                    type="number" 
+                  <input
+                    type="number"
                     value={nitrito}
                     onChange={(e) => setNitrito(e.target.value)}
                     placeholder="0.00"
-                    style={{ width: '100%', padding: '1rem', fontSize: '1.25rem', borderRadius: '12px', border: '1px solid', borderColor: parseFloat(nitrito) > ranges.nitrito.max ? '#ef4444' : 'var(--border)', background: 'var(--secondary)', outline: 'none', fontWeight: 800 }} 
+                    style={{ width: '100%', padding: '1rem', fontSize: '1.25rem', borderRadius: '12px', border: '1px solid', borderColor: parseFloat(nitrito) > ranges.nitrito.max ? '#ef4444' : 'var(--border)', background: 'var(--secondary)', outline: 'none', fontWeight: 800 }}
                   />
                 </div>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, marginBottom: '0.5rem', textTransform: 'uppercase', color: 'var(--muted-foreground)' }}>Nitrato (mg/L)</label>
-                  <input 
-                    type="number" 
+                  <input
+                    type="number"
                     value={nitrato}
                     onChange={(e) => setNitrato(e.target.value)}
                     placeholder="0.00"
-                    style={{ width: '100%', padding: '1rem', fontSize: '1.25rem', borderRadius: '12px', border: '1px solid var(--border)', background: 'var(--secondary)', outline: 'none', fontWeight: 800 }} 
+                    style={{ width: '100%', padding: '1rem', fontSize: '1.25rem', borderRadius: '12px', border: '1px solid var(--border)', background: 'var(--secondary)', outline: 'none', fontWeight: 800 }}
                   />
                 </div>
               </div>
             </div>
 
-            <button 
+            <button
               onClick={handleSave}
-              className="btn-primary" 
+              className="btn-primary"
               style={{ width: '100%', marginTop: '3rem', padding: '1.25rem', borderRadius: '16px', background: 'var(--primary)', fontSize: '1.1rem', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.75rem' }}
             >
               <Droplets size={22} />
@@ -244,14 +244,14 @@ export default function CalidadAguaPage() {
           {/* Real-time Analysis Card */}
           <div className="card-premium" style={{ padding: '2rem', textAlign: 'center' }}>
             <h3 style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--muted-foreground)', textTransform: 'uppercase', marginBottom: '1.5rem' }}>Estado del Estanque</h3>
-            
+
             <div style={{ position: 'relative', marginBottom: '1.5rem' }}>
-              <motion.div 
+              <motion.div
                 animate={{ scale: [1, 1.02, 1] }}
                 transition={{ duration: 2, repeat: Infinity }}
-                style={{ 
-                  fontSize: '2rem', 
-                  fontWeight: 900, 
+                style={{
+                  fontSize: '2rem',
+                  fontWeight: 900,
                   color: analysis.color,
                   display: 'flex',
                   alignItems: 'center',
@@ -264,10 +264,10 @@ export default function CalidadAguaPage() {
               </motion.div>
             </div>
 
-            <div style={{ 
-              padding: '1.25rem', 
-              borderRadius: '16px', 
-              background: 'var(--secondary)', 
+            <div style={{
+              padding: '1.25rem',
+              borderRadius: '16px',
+              background: 'var(--secondary)',
               border: '1px solid var(--border)',
               textAlign: 'left'
             }}>

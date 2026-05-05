@@ -90,13 +90,17 @@ export default function MortalidadPage() {
       return;
     }
 
+    const activeUnitId = localStorage.getItem('active_unit_id');
+    if (!activeUnitId) return;
+
     // 1. Insert Mortality Record
     const { error: mortError } = await supabase.from('mortality').insert([{
       estanque_id: estanqueId,
       species_name: especieId,
       date: fecha,
       quantity: qty,
-      cause: causa
+      cause: causa,
+      unit_id: activeUnitId
     }]);
 
     if (mortError) {

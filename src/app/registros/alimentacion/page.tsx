@@ -95,12 +95,16 @@ export default function AlimentacionPage() {
       return;
     }
 
+    const activeUnitId = localStorage.getItem('active_unit_id');
+    if (!activeUnitId) return;
+
     // 1. Insert record
     const { error: regError } = await supabase.from('alimentacion_diaria').insert([{
       estanque_id: estanqueId,
       inventory_id: alimentoId,
+      quantity_kg: qty,
       date: fecha,
-      quantity_kg: qty
+      unit_id: activeUnitId
     }]);
 
     if (regError) {
