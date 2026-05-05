@@ -14,7 +14,8 @@ import {
   Skull,
   ShieldCheck,
   Info,
-  Bug
+  Bug,
+  History
 } from 'lucide-react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';

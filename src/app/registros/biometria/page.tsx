@@ -8,7 +8,8 @@ import {
   ArrowLeft, 
   Activity, 
   TrendingUp, 
-  Info 
+  Info,
+  History
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
