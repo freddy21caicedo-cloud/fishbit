@@ -458,9 +458,6 @@ export default function EstanquesPage() {
         </button>
       </header>
 
-        </button>
-      </header>
-
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(clamp(280px, 100%, 350px), 1fr))', gap: '1.5rem' }}>
         {ponds.map((pond) => (
           <motion.div

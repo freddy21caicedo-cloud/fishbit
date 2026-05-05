@@ -187,10 +187,6 @@ export default function Dashboard() {
               </AreaChart>
             </ResponsiveContainer>
           </div>
-        </div>
-
-        </div>
-
         <div className="responsive-side-panel" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', flex: 1 }}>
           <div className="card-premium" style={{ padding: '1.5rem', flex: 1 }}>
             <h3 style={{ fontSize: '1.125rem', marginBottom: '1.5rem' }}>Estado de la Granja</h3>
