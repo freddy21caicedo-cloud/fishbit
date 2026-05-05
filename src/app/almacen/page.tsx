@@ -1122,29 +1122,7 @@ export default function AlmacenPage() {
                     </div>
                   ))}
                 </div>
-                                <div style={{ width: '14px', height: '14px', borderRadius: '50%', background: 'white', position: 'absolute', top: '2px', left: item.hasIva ? '16px' : '2px', transition: '0.3s' }} />
-                              </div>
-                              {item.hasIva && (
-                                <input 
-                                  type="number" 
-                                  value={item.ivaPercent || '19'} 
-                                  onChange={(e) => updateItem(item.id, 'ivaPercent', e.target.value)} 
-                                  style={{ width: '45px', padding: '0.25rem', borderRadius: '4px', border: '1px solid var(--border)', fontSize: '0.75rem', outline: 'none' }} 
-                                />
-                              )}
-                            </div>
-                          </td>
-                        )}
-                        <td style={{ padding: '0.5rem', textAlign: 'center' }}>
-                          <button onClick={() => removeItem(item.id)} style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '0.25rem' }}>
-                            <AlertCircle size={16} />
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                <button 
+                                <button 
                   onClick={addItem}
                   style={{ marginTop: '1rem', padding: '0.6rem 1.25rem', borderRadius: '8px', border: '1px dashed var(--primary)', background: 'transparent', color: 'var(--primary)', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
                 >

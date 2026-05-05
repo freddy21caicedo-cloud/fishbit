@@ -167,7 +167,6 @@ export default function SiembraPage() {
       }
 
       // C. Subtract from inventory
-      const stockItem = alevinosStock.find(s => s.especie === row.especie);
       if (stockItem) {
         await supabase
           .from('inventory')

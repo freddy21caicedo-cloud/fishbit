@@ -415,15 +415,26 @@ export default function EstanquesPage() {
       const { data: inv } = await supabase
         .from('inventory')
         .select('*')
-        .eq('name', detail.species_name)
-        .eq('category', 'alevinos')
+        .eq('id', detail.inventory_item_id || '00000000-0000-0000-0000-000000000000') // Usar el ID guardado
         .single();
       
-      if (inv) {
+      // Si no encuentra por ID, intentar por nombre como fallback
+      let targetInv = inv;
+      if (!targetInv) {
+        const { data: invByName } = await supabase
+          .from('inventory')
+          .select('*')
+          .eq('product', detail.species_name)
+          .eq('category', 'alevinos')
+          .single();
+        targetInv = invByName;
+      }
+      
+      if (targetInv) {
         await supabase
           .from('inventory')
-          .update({ current_stock: (parseFloat(inv.current_stock) || 0) + detail.quantity })
-          .eq('id', inv.id);
+          .update({ current_stock: (parseFloat(targetInv.current_stock) || 0) + detail.quantity })
+          .eq('id', targetInv.id);
       }
     }
 

@@ -55,6 +55,10 @@ export default function AlimentacionPage() {
   };
 
   const fetchPondDetails = async (id: string) => {
+    // 0. Get Pond Current Batch
+    const { data: pondData } = await supabase.from('estanques').select('current_batch_id').eq('id', id).single();
+    const activeBatchId = pondData?.current_batch_id;
+
     // 1. Get Last Biometry
     const { data: bioData } = await supabase
       .from('biometrias')
@@ -66,14 +70,18 @@ export default function AlimentacionPage() {
     const lastBio = bioData?.[0] || null;
     setLastBiometryData(lastBio);
 
-    // 2. Get Total Food Consumed since that bio (or total if no bio)
-    const query = supabase
+    // 2. Get Total Food Consumed ONLY FOR THIS BATCH
+    let query = supabase
       .from('alimentacion_diaria')
       .select('quantity_kg')
       .eq('estanque_id', id);
     
+    if (activeBatchId) {
+      query = query.eq('batch_id', activeBatchId);
+    }
+
     if (lastBio) {
-      query.gt('date', lastBio.date);
+      query = query.gt('date', lastBio.date);
     }
 
     const { data: foodData } = await query;
