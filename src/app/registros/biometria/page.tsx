@@ -170,33 +170,33 @@ export default function BiometriaPage() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem', flex: 1.5 }}>
           {/* Header Form */}
           <div className="card-premium" style={{ padding: '2rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '2rem' }}>
-            <div>
-              <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, marginBottom: '0.5rem', textTransform: 'uppercase', color: 'var(--muted-foreground)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <Calendar size={14} /> Fecha de Muestreo
-                </div>
+            <div className="premium-input-group">
+              <label className="premium-label">
+                <Calendar size={14} /> Fecha de Muestreo
               </label>
-              <input 
-                type="date" 
-                value={fecha}
-                onChange={(e) => setFecha(e.target.value)}
-                style={{ width: '100%', padding: '0.875rem', borderRadius: '12px', border: '1px solid var(--border)', background: 'var(--secondary)', outline: 'none' }} 
-              />
+              <div className="premium-input-wrapper">
+                <input 
+                  type="date" 
+                  value={fecha}
+                  onChange={(e) => setFecha(e.target.value)}
+                  className="premium-date-input"
+                />
+              </div>
             </div>
-            <div>
-              <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, marginBottom: '0.5rem', textTransform: 'uppercase', color: 'var(--muted-foreground)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <Waves size={14} /> Seleccionar Estanque
-                </div>
+            <div className="premium-input-group">
+              <label className="premium-label">
+                <Waves size={14} /> Seleccionar Estanque
               </label>
-              <select 
-                value={estanqueId}
-                onChange={(e) => setEstanqueId(e.target.value)}
-                style={{ width: '100%', padding: '0.875rem', borderRadius: '12px', border: '1px solid var(--border)', background: 'var(--secondary)', outline: 'none', fontWeight: 600 }}
-              >
-                <option value="">-- Seleccionar --</option>
-                {estanquesList.map(p => <option key={p.id} value={p.id}>{p.name} {p.is_polyculture ? '(Policultivo)' : ''}</option>)}
-              </select>
+              <div className="premium-input-wrapper">
+                <select 
+                  value={estanqueId}
+                  onChange={(e) => setEstanqueId(e.target.value)}
+                  style={{ width: '100%', background: 'transparent', border: 'none', outline: 'none', fontWeight: 700 }}
+                >
+                  <option value="">-- Seleccionar --</option>
+                  {estanquesList.map(p => <option key={p.id} value={p.id}>{p.name} {p.is_polyculture ? '(Policultivo)' : ''}</option>)}
+                </select>
+              </div>
             </div>
           </div>
 

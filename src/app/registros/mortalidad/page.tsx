@@ -174,57 +174,75 @@ export default function MortalidadPage() {
         </div>
       </header>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '2rem' }}>
+      <div className="responsive-container">
         {/* Main Form Section */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-          <div className="card-premium" style={{ padding: '2.5rem' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '1.5rem', marginBottom: '2rem' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 700, marginBottom: '0.5rem', textTransform: 'uppercase', color: 'var(--muted-foreground)' }}>Estanque</label>
-                <select 
-                  value={estanqueId}
-                  onChange={(e) => {
-                    setEstanqueId(e.target.value);
-                    setEspecieId('');
-                  }}
-                  style={{ width: '100%', padding: '0.75rem', borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--secondary)', outline: 'none', fontWeight: 600 }}
-                >
-                  <option value="">Seleccionar Estanque...</option>
-                  {ponds.map(p => <option key={p.id} value={p.id}>{p.name} {p.is_polyculture ? '(Policultivo)' : ''}</option>)}
-                </select>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem', flex: 1.5 }}>
+          <div className="card-premium" style={{ padding: 'clamp(1.5rem, 5vw, 2.5rem)' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
+              <div className="premium-input-group">
+                <label className="premium-label">
+                  <Waves size={14} /> Estanque
+                </label>
+                <div className="premium-input-wrapper">
+                  <select 
+                    value={estanqueId}
+                    onChange={(e) => {
+                      setEstanqueId(e.target.value);
+                      setEspecieId('');
+                    }}
+                    style={{ width: '100%', background: 'transparent', border: 'none', outline: 'none', fontWeight: 700 }}
+                  >
+                    <option value="">Seleccionar Estanque...</option>
+                    {ponds.map(p => <option key={p.id} value={p.id}>{p.name} {p.is_polyculture ? '(Policultivo)' : ''}</option>)}
+                  </select>
+                </div>
               </div>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 700, marginBottom: '0.5rem', textTransform: 'uppercase', color: 'var(--muted-foreground)' }}>Fecha</label>
-                <input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} style={{ width: '100%', padding: '0.75rem', borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--secondary)', outline: 'none' }} />
+              
+              <div className="premium-input-group">
+                <label className="premium-label">
+                  <Calendar size={14} /> Fecha de Registro
+                </label>
+                <div className="premium-input-wrapper">
+                  <input 
+                    type="date" 
+                    value={fecha} 
+                    onChange={(e) => setFecha(e.target.value)} 
+                    className="premium-date-input"
+                  />
+                </div>
               </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '2rem' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 700, marginBottom: '0.5rem', textTransform: 'uppercase', color: 'var(--muted-foreground)' }}>Especie Afectada</label>
-                <select 
-                  value={especieId}
-                  onChange={(e) => setEspecieId(e.target.value)}
-                  disabled={!estanqueId}
-                  style={{ width: '100%', padding: '0.75rem', borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--secondary)', outline: 'none', fontWeight: 600, opacity: !estanqueId ? 0.5 : 1 }}
-                >
-                  <option value="">Seleccionar Especie...</option>
-                  {selectedPond?.is_polyculture ? (
-                    pondSpecies.map(s => <option key={s.id} value={s.species_name}>{s.species_name} ({s.current_count})</option>)
-                  ) : (
-                    selectedPond && <option value={selectedPond.current_species}>{selectedPond.current_species}</option>
-                  )}
-                </select>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
+              <div className="premium-input-group">
+                <label className="premium-label">Especie Afectada</label>
+                <div className="premium-input-wrapper">
+                  <select 
+                    value={especieId}
+                    onChange={(e) => setEspecieId(e.target.value)}
+                    disabled={!estanqueId}
+                    style={{ width: '100%', background: 'transparent', border: 'none', outline: 'none', fontWeight: 700, opacity: !estanqueId ? 0.5 : 1 }}
+                  >
+                    <option value="">Seleccionar Especie...</option>
+                    {selectedPond?.is_polyculture ? (
+                      pondSpecies.map(s => <option key={s.id} value={s.species_name}>{s.species_name} ({s.current_count})</option>)
+                    ) : (
+                      selectedPond && <option value={selectedPond.current_species}>{selectedPond.current_species}</option>
+                    )}
+                  </select>
+                </div>
               </div>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 700, marginBottom: '0.5rem', textTransform: 'uppercase', color: 'var(--muted-foreground)' }}>Causa de la Baja</label>
-                <select 
-                  value={causa}
-                  onChange={(e) => setCausa(e.target.value)}
-                  style={{ width: '100%', padding: '0.75rem', borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--secondary)', outline: 'none', fontWeight: 600 }}
-                >
-                  {causasMuerte.map(c => <option key={c} value={c}>{c}</option>)}
-                </select>
+              <div className="premium-input-group">
+                <label className="premium-label">Causa de la Baja</label>
+                <div className="premium-input-wrapper">
+                  <select 
+                    value={causa}
+                    onChange={(e) => setCausa(e.target.value)}
+                    style={{ width: '100%', background: 'transparent', border: 'none', outline: 'none', fontWeight: 700 }}
+                  >
+                    {causasMuerte.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
               </div>
             </div>
 
@@ -290,7 +308,7 @@ export default function MortalidadPage() {
         </div>
 
         {/* Survival Metrics Sidebar */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+        <div className="responsive-side-panel" style={{ display: 'flex', flexDirection: 'column', gap: '2rem', flex: 1 }}>
           {/* Survival Rate Card */}
           <div className="card-premium" style={{ padding: '2rem', textAlign: 'center' }}>
             <h3 style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--muted-foreground)', textTransform: 'uppercase', marginBottom: '1.5rem' }}>Tasa de Supervivencia</h3>

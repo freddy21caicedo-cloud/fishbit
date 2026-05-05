@@ -876,41 +876,54 @@ export default function AlmacenPage() {
                 <div style={{ 
                   display: 'grid', 
                   gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
-                  gap: '1rem', 
+                  gap: '1.25rem', 
                   marginBottom: '1.25rem' 
                 }}>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 700, marginBottom: '0.4rem', color: 'var(--muted-foreground)' }}>NRO. FACTURA</label>
-                    <input 
-                      type="text" 
-                      value={nroFactura} 
-                      onChange={(e) => setNroFactura(e.target.value)} 
-                      placeholder={activeCat === 'alimento' ? 'Ej: BQAE 258328' : 'Ej: FACT-VET-99201'} 
-                      style={{ width: '100%', padding: '0.6rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'white', fontWeight: 700, outline: 'none' }} 
-                    />
+                  <div className="premium-input-group">
+                    <label className="premium-label">Nro. Factura</label>
+                    <div className="premium-input-wrapper">
+                      <input 
+                        type="text" 
+                        value={nroFactura} 
+                        onChange={(e) => setNroFactura(e.target.value)} 
+                        placeholder="Ej: BQAE 258328" 
+                        style={{ width: '100%', background: 'transparent', border: 'none', outline: 'none', fontWeight: 700 }} 
+                      />
+                    </div>
                   </div>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 700, marginBottom: '0.4rem', color: 'var(--muted-foreground)' }}>PROVEEDOR</label>
-                    <select 
-                      value={proveedor} 
-                      onChange={(e) => setProveedor(e.target.value)} 
-                      style={{ width: '100%', padding: '0.6rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'white', fontWeight: 700, outline: 'none', appearance: 'none', cursor: 'pointer' }}
-                    >
-                      <option value="">Seleccione proveedor...</option>
-                      {providers
-                        .filter(p => {
-                          const searchType = activeCat === 'farmacia' ? 'medicamentos' : activeCat;
-                          return p.types.includes(searchType);
-                        })
-                        .map(p => (
-                          <option key={p.id} value={p.name}>{p.name}</option>
-                        ))
-                      }
-                    </select>
+                  <div className="premium-input-group">
+                    <label className="premium-label">Proveedor</label>
+                    <div className="premium-input-wrapper">
+                      <select 
+                        value={proveedor} 
+                        onChange={(e) => setProveedor(e.target.value)} 
+                        style={{ width: '100%', background: 'transparent', border: 'none', outline: 'none', fontWeight: 700 }}
+                      >
+                        <option value="">Seleccione proveedor...</option>
+                        {providers
+                          .filter(p => {
+                            const searchType = activeCat === 'farmacia' ? 'medicamentos' : activeCat;
+                            return p.types.includes(searchType);
+                          })
+                          .map(p => (
+                            <option key={p.id} value={p.name}>{p.name}</option>
+                          ))
+                        }
+                      </select>
+                    </div>
                   </div>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 700, marginBottom: '0.4rem', color: 'var(--muted-foreground)' }}>FECHA</label>
-                    <input type="date" value={fechaFactura} onChange={(e) => setFechaFactura(e.target.value)} style={{ width: '100%', padding: '0.6rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'white', fontWeight: 600, outline: 'none' }} />
+                  <div className="premium-input-group">
+                    <label className="premium-label">
+                      <Calendar size={14} /> Fecha
+                    </label>
+                    <div className="premium-input-wrapper">
+                      <input 
+                        type="date" 
+                        value={fechaFactura} 
+                        onChange={(e) => setFechaFactura(e.target.value)} 
+                        className="premium-date-input"
+                      />
+                    </div>
                   </div>
                 </div>
 

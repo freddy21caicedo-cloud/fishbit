@@ -128,24 +128,44 @@ export default function CalidadAguaPage() {
           <div className="card-premium" style={{ padding: '2.5rem' }}>
             {/* Header Info */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '1.5rem', marginBottom: '2.5rem' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 700, marginBottom: '0.5rem', textTransform: 'uppercase', color: 'var(--muted-foreground)' }}>Estanque</label>
-                <select
-                  value={estanqueId}
-                  onChange={(e) => setEstanqueId(e.target.value)}
-                  style={{ width: '100%', padding: '0.75rem', borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--secondary)', outline: 'none', fontWeight: 600 }}
-                >
-                  <option value="">Seleccionar...</option>
-                  {pondsList.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                </select>
+              <div className="premium-input-group">
+                <label className="premium-label">Estanque</label>
+                <div className="premium-input-wrapper">
+                  <select
+                    value={estanqueId}
+                    onChange={(e) => setEstanqueId(e.target.value)}
+                    style={{ width: '100%', background: 'transparent', border: 'none', outline: 'none', fontWeight: 700 }}
+                  >
+                    <option value="">Seleccionar...</option>
+                    {pondsList.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                  </select>
+                </div>
               </div>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 700, marginBottom: '0.5rem', textTransform: 'uppercase', color: 'var(--muted-foreground)' }}>Fecha</label>
-                <input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} style={{ width: '100%', padding: '0.75rem', borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--secondary)', outline: 'none' }} />
+              <div className="premium-input-group">
+                <label className="premium-label">
+                  <Calendar size={14} /> Fecha
+                </label>
+                <div className="premium-input-wrapper">
+                  <input 
+                    type="date" 
+                    value={fecha} 
+                    onChange={(e) => setFecha(e.target.value)} 
+                    className="premium-date-input"
+                  />
+                </div>
               </div>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 700, marginBottom: '0.5rem', textTransform: 'uppercase', color: 'var(--muted-foreground)' }}>Hora</label>
-                <input type="time" value={hora} onChange={(e) => setHora(e.target.value)} style={{ width: '100%', padding: '0.75rem', borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--secondary)', outline: 'none' }} />
+              <div className="premium-input-group">
+                <label className="premium-label">
+                  <Clock size={14} /> Hora
+                </label>
+                <div className="premium-input-wrapper">
+                  <input 
+                    type="time" 
+                    value={hora} 
+                    onChange={(e) => setHora(e.target.value)} 
+                    className="premium-date-input"
+                  />
+                </div>
               </div>
             </div>
 

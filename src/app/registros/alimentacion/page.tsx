@@ -172,53 +172,53 @@ export default function AlimentacionPage() {
         {/* Main Form Card */}
         <div className="card-premium" style={{ flex: 1.4, padding: 'clamp(1.5rem, 5vw, 2.5rem)', position: 'relative', overflow: 'hidden' }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
-            <div>
-              <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, marginBottom: '0.5rem', textTransform: 'uppercase', color: 'var(--muted-foreground)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                   <Calendar size={14} /> Fecha
-                </div>
+            <div className="premium-input-group">
+              <label className="premium-label">
+                <Calendar size={14} /> Fecha de Suministro
               </label>
-              <input 
-                type="date" 
-                value={fecha}
-                onChange={(e) => setFecha(e.target.value)}
-                style={{ width: '100%', padding: '0.875rem', borderRadius: '12px', border: '1px solid var(--border)', background: 'var(--secondary)', outline: 'none' }} 
-              />
+              <div className="premium-input-wrapper">
+                <input 
+                  type="date" 
+                  value={fecha}
+                  onChange={(e) => setFecha(e.target.value)}
+                  className="premium-date-input"
+                />
+              </div>
             </div>
-            <div>
-              <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, marginBottom: '0.5rem', textTransform: 'uppercase', color: 'var(--muted-foreground)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <Waves size={14} /> Estanque
-                </div>
+            <div className="premium-input-group">
+              <label className="premium-label">
+                <Waves size={14} /> Estanque Seleccionado
               </label>
-              <select 
-                value={estanqueId}
-                onChange={(e) => setEstanqueId(e.target.value)}
-                style={{ width: '100%', padding: '0.875rem', borderRadius: '12px', border: '1px solid var(--border)', background: 'var(--secondary)', outline: 'none', fontWeight: 600 }}
-              >
-                <option value="">Seleccionar Estanque...</option>
-                {ponds.map(p => <option key={p.id} value={p.id}>{p.name} {p.is_polyculture ? '(Policultivo)' : `(${p.current_species})`}</option>)}
-              </select>
+              <div className="premium-input-wrapper">
+                <select 
+                  value={estanqueId}
+                  onChange={(e) => setEstanqueId(e.target.value)}
+                  style={{ width: '100%', background: 'transparent', border: 'none', outline: 'none', fontWeight: 700 }}
+                >
+                  <option value="">Seleccionar Estanque...</option>
+                  {ponds.map(p => <option key={p.id} value={p.id}>{p.name} {p.is_polyculture ? '(Policultivo)' : `(${p.current_species})`}</option>)}
+                </select>
+              </div>
             </div>
           </div>
 
-          <div style={{ marginBottom: '2rem' }}>
-            <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, marginBottom: '0.5rem', textTransform: 'uppercase', color: 'var(--muted-foreground)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <Package size={14} /> Alimento Disponible en Bodega
-              </div>
+          <div className="premium-input-group" style={{ marginBottom: '2rem' }}>
+            <label className="premium-label">
+              <Package size={14} /> Alimento Disponible en Bodega
             </label>
-            <select 
-              value={alimentoId}
-              onChange={(e) => setAlimentoId(e.target.value)}
-              disabled={!estanqueId}
-              style={{ width: '100%', padding: '0.875rem', borderRadius: '12px', border: '1px solid var(--border)', background: 'var(--secondary)', outline: 'none', fontWeight: 600, opacity: !estanqueId ? 0.5 : 1 }}
-            >
-              <option value="">-- Seleccionar Alimento --</option>
-              {foodStock.map(f => (
-                <option key={f.id} value={f.id}>{f.name} ({f.current_stock} bultos)</option>
-              ))}
-            </select>
+            <div className="premium-input-wrapper" style={{ opacity: !estanqueId ? 0.5 : 1 }}>
+              <select 
+                value={alimentoId}
+                onChange={(e) => setAlimentoId(e.target.value)}
+                disabled={!estanqueId}
+                style={{ width: '100%', background: 'transparent', border: 'none', outline: 'none', fontWeight: 700 }}
+              >
+                <option value="">-- Seleccionar Alimento --</option>
+                {foodStock.map(f => (
+                  <option key={f.id} value={f.id}>{f.name} ({f.current_stock} bultos)</option>
+                ))}
+              </select>
+            </div>
           </div>
 
           <div style={{ marginBottom: '2rem', display: 'flex', gap: '1.5rem', alignItems: 'flex-end' }}>
