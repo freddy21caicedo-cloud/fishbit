@@ -518,8 +518,8 @@ export default function AlmacenPage() {
   const laboratorios = ['Bayer (Elanco)', 'MSD Animal Health', 'Vet-Tech', 'Pronavet', 'Virbac'];
 
   return (
-    <div style={{ height: 'calc(100vh - 4rem)', display: 'flex', flexDirection: 'column', overflow: 'visible', position: 'relative' }}>
-      <div className="animate-fade-in" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'visible' }}>
+    <div className="almacen-page-root" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+      <div className="animate-fade-in" style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '1rem' }}>
         <header style={{ marginBottom: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
           <div>
             <h1 style={{ fontSize: '2.25rem', fontWeight: 900, letterSpacing: '-0.05em', color: 'var(--foreground)' }}>Almacén e Inventario</h1>
@@ -534,7 +534,7 @@ export default function AlmacenPage() {
           </button>
         </header>
 
-      <div className="almacen-layout" style={{ display: 'flex', gap: '2rem', flex: 1, overflow: 'hidden' }}>
+      <div className="almacen-layout" style={{ display: 'flex', gap: '2rem', flex: 1 }}>
         
         {/* Internal Sidebar */}
         <div className="almacen-sidebar-categories" style={{ width: '280px', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
@@ -630,7 +630,7 @@ export default function AlmacenPage() {
         </div>
 
         {/* Main Content Area */}
-        <div className="card-premium almacen-inventory-card" style={{ background: 'var(--card)', display: 'flex', flexDirection: 'column', overflow: 'visible' }}>
+        <div className="card-premium almacen-inventory-card" style={{ background: 'var(--card)', display: 'flex', flexDirection: 'column' }}>
           
           {/* Content Header */}
           <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', overflow: 'visible' }}>
