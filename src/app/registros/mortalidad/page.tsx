@@ -130,10 +130,18 @@ export default function MortalidadPage() {
     }
 
     // 3. Update Global Pond Count
-      setCantidad('');
-      fetchPonds();
-      if (selectedPond?.is_polyculture) fetchSpecies(estanqueId);
+    const p = ponds.find(pond => pond.id === estanqueId);
+    if (p) {
+      await supabase
+        .from('estanques')
+        .update({ current_count: (p.current_count || 0) - totalPondMortality })
+        .eq('id', estanqueId);
     }
+
+    alert("¡Registro de mortalidad procesado con éxito!");
+    setLoading(false);
+    fetchPonds();
+    setEstanqueId('');
   };
 
   // Calculations
