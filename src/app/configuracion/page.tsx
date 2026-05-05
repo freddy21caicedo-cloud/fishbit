@@ -497,7 +497,7 @@ const TeamManagement = () => {
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
               {member.role !== 'admin' ? (
-                <select value={member.role} onChange={(e) => handleUpdateRole(member.id, e.target.value)} style={{ padding: '0.4rem', borderRadius: '8px', background: 'var(--card)', fontSize: '0.75rem', fontWeight: 700, outline: 'none', cursor: 'pointer' }}>
+                <select value={member.role} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleUpdateRole(member.id, e.target.value)} style={{ padding: '0.4rem', borderRadius: '8px', background: 'var(--card)', fontSize: '0.75rem', fontWeight: 700, outline: 'none', cursor: 'pointer' }}>
                   <option value="tecnico">Técnico</option>
                   <option value="operario">Operario</option>
                 </select>
@@ -516,7 +516,7 @@ const TeamManagement = () => {
               <InputGroup label="Email" placeholder="correo@ejemplo.com" value={inviteData.email} onChange={(v:any) => setInviteData({...inviteData, email: v})} />
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                 <label style={{ fontSize: '0.75rem', fontWeight: 900, textTransform: 'uppercase' }}>Rol</label>
-                <select value={inviteData.role} onChange={e => setInviteData({...inviteData, role: e.target.value})} style={{ width: '100%', padding: '0.875rem', borderRadius: '12px', background: 'var(--secondary)', outline: 'none', fontWeight: 600 }}>
+                <select value={inviteData.role} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setInviteData({...inviteData, role: e.target.value})} style={{ width: '100%', padding: '0.875rem', borderRadius: '12px', background: 'var(--secondary)', outline: 'none', fontWeight: 600 }}>
                   <option value="tecnico">Técnico</option>
                   <option value="operario">Operario</option>
                 </select>

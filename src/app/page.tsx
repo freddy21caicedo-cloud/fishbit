@@ -271,7 +271,7 @@ export default function Dashboard() {
                   placeholder="¿En qué podemos ayudarte?" 
                   style={{ width: '100%', padding: '0.75rem', borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--secondary)', outline: 'none' }}
                   value={ticketSubject}
-                  onChange={e => setTicketSubject(e.target.value)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setTicketSubject(e.target.value)}
                 />
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
@@ -282,7 +282,7 @@ export default function Dashboard() {
                   placeholder="Describe tu problema o duda aquí..." 
                   style={{ width: '100%', padding: '0.75rem', borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--secondary)', outline: 'none', resize: 'none' }}
                   value={ticketMessage}
-                  onChange={e => setTicketMessage(e.target.value)}
+                  onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setTicketMessage(e.target.value)}
                 />
               </div>
               <button 
