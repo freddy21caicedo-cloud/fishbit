@@ -19,7 +19,8 @@ import {
   Users,
   Globe,
   CreditCard,
-  MessageSquare
+  MessageSquare,
+  LogOut
 } from "lucide-react";
 
 export default function Sidebar() {
@@ -74,6 +75,12 @@ export default function Sidebar() {
     }
     checkRole();
   }, []);
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    localStorage.removeItem('active_unit_id');
+    window.location.href = '/login';
+  };
 
   const toggleSidebar = () => setIsOpen(!isOpen);
   const closeSidebar = () => setIsOpen(false);
@@ -226,6 +233,49 @@ export default function Sidebar() {
               <HelpCircle size={20} />
               Centro de Ayuda
             </Link>
+            
+            <button 
+              onClick={handleSignOut}
+              className="nav-item" 
+              style={{ 
+                marginTop: '1rem',
+                width: '100%', 
+                textAlign: 'left', 
+                background: 'none', 
+                border: 'none', 
+                color: '#ef4444', 
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.75rem'
+              }}
+            >
+              <LogOut size={20} />
+              Cerrar Sesión
+            </button>
+          </div>
+        )}
+
+        {isSuperAdmin && (
+          <div style={{ marginTop: 'auto', paddingBottom: '1rem' }}>
+            <button 
+              onClick={handleSignOut}
+              className="nav-item" 
+              style={{ 
+                width: '100%', 
+                textAlign: 'left', 
+                background: 'none', 
+                border: 'none', 
+                color: '#ef4444', 
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.75rem'
+              }}
+            >
+              <LogOut size={20} />
+              Cerrar Sesión
+            </button>
           </div>
         )}
       </aside>
