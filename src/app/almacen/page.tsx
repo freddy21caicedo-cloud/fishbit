@@ -520,46 +520,24 @@ export default function AlmacenPage() {
   return (
     <div style={{ height: 'calc(100vh - 4rem)', display: 'flex', flexDirection: 'column', overflow: 'visible', position: 'relative' }}>
       <div className="animate-fade-in" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'visible' }}>
-        <header style={{ marginBottom: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
+        <header style={{ marginBottom: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
           <div>
-            <h1 style={{ fontSize: '1.875rem', fontWeight: 700, marginBottom: '0.25rem' }}>Almacén e Inventario</h1>
-            <p style={{ color: 'var(--muted-foreground)' }}>Gestión centralizada de abastecimiento y stock.</p>
+            <h1 style={{ fontSize: '2.25rem', fontWeight: 900, letterSpacing: '-0.05em', color: 'var(--foreground)' }}>Almacén e Inventario</h1>
+            <p style={{ color: 'var(--muted-foreground)', fontSize: '1.1rem' }}>Gestión centralizada de abastecimiento y stock.</p>
           </div>
           <button 
             onClick={() => setIsProviderModalOpen(true)}
-            style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: '0.5rem', 
-              padding: '0.5rem 1rem', 
-              borderRadius: '8px', 
-              border: '1px solid var(--border)', 
-              background: 'white', 
-              color: 'var(--primary)', 
-              fontSize: '0.8rem', 
-              fontWeight: 700, 
-              cursor: 'pointer',
-              marginTop: '0.5rem'
-            }}
+            className="btn-primary" 
+            style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.75rem 1.5rem', background: 'white', color: 'var(--primary)', border: '1px solid var(--border)' }}
           >
-            <UserPlus size={16} />
-            Crear Proveedor
+            <UserPlus size={18} /> Crear Proveedor
           </button>
-        </div>
-      </header>
+        </header>
 
-      <div style={{ 
-        display: 'grid', 
-        gridTemplateColumns: isSidebarCollapsed ? '80px 1fr' : '280px 1fr', 
-        gap: isSidebarCollapsed ? '1rem' : '2rem', 
-        flex: 1, 
-        overflow: 'hidden',
-        transition: 'all 0.3s ease'
-      }}>
+      <div className="almacen-layout" style={{ display: 'flex', gap: '2rem', flex: 1, overflow: 'hidden' }}>
         
         {/* Internal Sidebar */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+        <div className="almacen-sidebar-categories" style={{ width: '280px', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
           <h3 style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--muted-foreground)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.5rem' }}>Categorías de Almacén</h3>
           {categories.map(cat => (
             <button
@@ -652,7 +630,7 @@ export default function AlmacenPage() {
         </div>
 
         {/* Main Content Area */}
-        <div className="card-premium" style={{ background: 'var(--card)', display: 'flex', flexDirection: 'column', overflow: 'visible' }}>
+        <div className="card-premium almacen-inventory-card" style={{ background: 'var(--card)', display: 'flex', flexDirection: 'column', overflow: 'visible' }}>
           
           {/* Content Header */}
           <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', overflow: 'visible' }}>

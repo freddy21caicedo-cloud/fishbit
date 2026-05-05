@@ -277,6 +277,20 @@ h1, h2, h3, h4, h5, h6 {
   .dashboard-grid {
     grid-template-columns: 1fr;
   }
+
+  .almacen-layout {
+    flex-direction: column !important;
+    overflow-y: auto !important;
+  }
+
+  .almacen-sidebar-categories {
+    width: 100% !important;
+    margin-bottom: 1.5rem;
+  }
+  
+  .almacen-inventory-card {
+    min-height: 500px;
+  }
 }
 
 /* Extra small devices (phones) */
