@@ -136,22 +136,29 @@ export default function Sidebar() {
             </Link>
           ) : (
             <>
-              <Link href="/" className={`nav-item ${pathname === '/' ? 'active' : ''}`} onClick={closeSidebar}>
-                <LayoutDashboard size={20} />
-                Panel de Control
-              </Link>
+              {/* Solo Admin y Técnico ven el Dashboard */}
+              {userRole !== 'operario' && (
+                <Link href="/" className={`nav-item ${pathname === '/' ? 'active' : ''}`} onClick={closeSidebar}>
+                  <LayoutDashboard size={20} />
+                  Panel de Control
+                </Link>
+              )}
               
-              <Link href="/estanques" className={`nav-item ${pathname === '/estanques' ? 'active' : ''}`} onClick={closeSidebar}>
-                <Waves size={20} />
-                Estanques
-              </Link>
+              {/* Solo Admin y Técnico ven Estanques */}
+              {userRole !== 'operario' && (
+                <Link href="/estanques" className={`nav-item ${pathname === '/estanques' ? 'active' : ''}`} onClick={closeSidebar}>
+                  <Waves size={20} />
+                  Estanques
+                </Link>
+              )}
               
+              {/* TODOS ven Registros (es la base del Operario) */}
               <Link href="/registros" className={`nav-item ${pathname === '/registros' ? 'active' : ''}`} onClick={closeSidebar}>
                 <ClipboardList size={20} />
                 Registros
               </Link>
 
-              {/* Vistas restringidas */}
+              {/* Solo Admin y Técnico ven Almacén (Facturas/Inventario) */}
               {userRole !== 'operario' && (
                 <Link href="/almacen" className={`nav-item ${pathname === '/almacen' ? 'active' : ''}`} onClick={closeSidebar}>
                   <Package size={20} />
@@ -159,6 +166,7 @@ export default function Sidebar() {
                 </Link>
               )}
 
+              {/* SOLO el Admin ve Finanzas */}
               {userRole === 'admin' && (
                 <Link href="/finanzas" className={`nav-item ${pathname === '/finanzas' ? 'active' : ''}`} onClick={closeSidebar}>
                   <Coins size={20} />
@@ -171,7 +179,7 @@ export default function Sidebar() {
 
         {!isSuperAdmin && (
           <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-            {/* Solo Admin y Técnico entran a Configuración (con sus respectivas vistas internas) */}
+            {/* Solo Admin y Técnico entran a Configuración */}
             {userRole !== 'operario' && (
               <Link href="/configuracion" className={`nav-item ${pathname === '/configuracion' ? 'active' : ''}`} onClick={closeSidebar}>
                 <Settings size={20} />

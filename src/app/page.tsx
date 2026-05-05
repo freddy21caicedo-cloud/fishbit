@@ -72,16 +72,20 @@ export default function Dashboard() {
       
       setAuthLoading(false);
 
-      // Fetch user's unit and set it as active
-      const { data: userUnits } = await supabase
+      // Fetch user's unit and role
+      const { data: userUnit } = await supabase
         .from('user_units')
-        .select('unit_id')
+        .select('unit_id, role')
         .eq('user_id', session.user.id)
         .limit(1)
         .single();
       
-      if (userUnits?.unit_id) {
-        localStorage.setItem('active_unit_id', userUnits.unit_id);
+      if (userUnit) {
+        if (userUnit.role === 'operario') {
+          router.push('/registros');
+          return;
+        }
+        localStorage.setItem('active_unit_id', userUnit.unit_id);
       }
     }
     initDashboard();
