@@ -29,6 +29,7 @@ export default function AlimentacionPage() {
   const [foodStock, setFoodStock] = useState<any[]>([]);
   const [lastBiometryData, setLastBiometryData] = useState<any>(null);
   const [totalFoodSinceLastBio, setTotalFoodSinceLastBio] = useState(0);
+  const [alimentaciones, setAlimentaciones] = useState<any[]>([]);
 
   const [history, setHistory] = useState<any[]>([]);
 
