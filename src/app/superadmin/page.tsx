@@ -510,19 +510,36 @@ const BillingTab = ({ subscriptions, onRefresh }: { subscriptions: any[], onRefr
   };
 
   const handleTogglePlan = async (sub: any) => {
-    const newPlan = sub.plan_type === 'basic' ? 'premium' : 'basic';
+    const newPlan = sub.plan_type === 'premium' ? 'basic' : 'premium';
     if (!confirm(`¿Cambiar el plan de ${sub.units.name} a ${newPlan.toUpperCase()}?`)) return;
     
     try {
-      const { error } = await supabase
-        .from('subscriptions')
-        .update({ plan_type: newPlan })
-        .eq('id', sub.id);
-      if (error) throw error;
+      if (sub.id.startsWith('temp-')) {
+        // Si no existe en la DB, creamos la suscripción
+        const { error } = await supabase.from('subscriptions').insert([{ 
+          unit_id: sub.unit_id,
+          plan_type: newPlan,
+          status: 'active',
+          price: newPlan === 'premium' ? 30 : 18,
+          next_billing_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+        }]);
+        if (error) throw error;
+      } else {
+        // Si existe, actualizamos
+        const { error } = await supabase
+          .from('subscriptions')
+          .update({ 
+            plan_type: newPlan,
+            price: newPlan === 'premium' ? 30 : 18 
+          })
+          .eq('id', sub.id);
+        if (error) throw error;
+      }
+      
       onRefresh();
-      alert(`Plan actualizado a ${newPlan.toUpperCase()}`);
+      alert(`¡Éxito! El plan ahora es ${newPlan.toUpperCase()}.`);
     } catch (err: any) {
-      alert(err.message);
+      alert("Error: " + err.message);
     }
   };
 
