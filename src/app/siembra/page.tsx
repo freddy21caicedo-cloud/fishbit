@@ -153,12 +153,14 @@ export default function SiembraPage() {
         await supabase.from('pond_species').update({
           current_count: existingSpec.current_count + qty,
           current_biomass_kg: parseFloat(existingSpec.current_biomass_kg) + bio,
-          avg_weight_gr: weight, // Updated to latest seeding weight
+          avg_weight_gr: weight, 
+          unit_id: activeUnitId, // Ensure unit_id is present
           updated_at: new Date().toISOString()
         }).eq('id', existingSpec.id);
       } else {
         await supabase.from('pond_species').insert([{
           estanque_id: pond.id,
+          unit_id: activeUnitId, // CRITICAL FIX
           species_name: row.especie,
           current_count: qty,
           current_biomass_kg: bio,

@@ -81,7 +81,13 @@ export default function BiometriaPage() {
 
   const fetchPondSpecies = async (pondId: string) => {
     setLoading(true);
-    const { data } = await supabase.from('pond_species').select('*').eq('estanque_id', pondId);
+    const activeUnitId = localStorage.getItem('active_unit_id');
+    const { data } = await supabase
+      .from('pond_species')
+      .select('*')
+      .eq('estanque_id', pondId)
+      .eq('unit_id', activeUnitId);
+
     if (data && data.length > 0) {
       setBiometrias(data.map(s => ({
         speciesName: s.species_name,
@@ -92,11 +98,14 @@ export default function BiometriaPage() {
         biomasaInicial: parseFloat(s.current_biomass_kg) || 0
       })));
     } else {
-      // Fallback: Si es policultivo pero no hay especies registradas, 
-      // usar los datos globales del estanque
       const pond = estanquesList.find(p => p.id === pondId);
+      if (pond?.is_polyculture) {
+        // Warning: No species details found for a polyculture pond
+        console.warn("No se encontraron detalles de especies para este policultivo.");
+      }
       setBiometrias([{
-        speciesName: pond?.current_species || 'Especie Principal',
+        speciesName: pond?.current_species && pond.current_species !== 'Policultivo' ? pond.current_species : '',
+        speciesId: null,
         pesoCaptura: '',
         pecesCapturados: '',
         poblacionTotal: pond?.current_count || 0,
@@ -104,6 +113,25 @@ export default function BiometriaPage() {
       }]);
     }
     setLoading(false);
+  };
+
+  const addNewSpeciesRow = () => {
+    setBiometrias([...biometrias, {
+      speciesName: '',
+      speciesId: null,
+      pesoCaptura: '',
+      pecesCapturados: '',
+      poblacionTotal: 0,
+      biomasaInicial: 0
+    }]);
+  };
+
+  const removeSpeciesRow = (index: number) => {
+    if (biometrias.length > 1) {
+      const newBios = [...biometrias];
+      newBios.splice(index, 1);
+      setBiometrias(newBios);
+    }
   };
 
   const updateBiometria = (index: number, field: string, value: string) => {
@@ -116,6 +144,7 @@ export default function BiometriaPage() {
     if (!estanqueId || biometrias.length === 0) return;
 
     setLoading(true);
+    const activeUnitId = localStorage.getItem('active_unit_id');
     let totalPondBiomass = 0;
 
     for (let i = 0; i < biometrias.length; i++) {
@@ -126,11 +155,13 @@ export default function BiometriaPage() {
       totalPondBiomass += totalBio;
 
       // 1. Insert record
-      const { error: bioError } = await supabase.from('biometrias').insert([{
+      const { error: bioError } = await supabase.from('biometria').insert([{
         estanque_id: estanqueId,
+        unit_id: activeUnitId,
         species_name: raw.speciesName,
         date: fecha,
         avg_weight_gr: avgWeight,
+        average_weight_g: avgWeight, // Keep both for compatibility
         total_biomass_kg: totalBio
       }]);
 
@@ -139,7 +170,7 @@ export default function BiometriaPage() {
         continue;
       }
 
-      // 2. Update Species Table if applicable
+      // 2. Update or Create Species Record
       if (raw.speciesId) {
         await supabase
           .from('pond_species')
@@ -149,6 +180,16 @@ export default function BiometriaPage() {
             updated_at: new Date().toISOString()
           })
           .eq('id', raw.speciesId);
+      } else if (raw.speciesName) {
+        // If it's a new species name, create it in pond_species
+        await supabase.from('pond_species').insert([{
+          estanque_id: estanqueId,
+          unit_id: activeUnitId,
+          species_name: raw.speciesName,
+          current_count: raw.poblacionTotal,
+          current_biomass_kg: totalBio,
+          avg_weight_gr: avgWeight
+        }]);
       }
     }
 
@@ -163,6 +204,7 @@ export default function BiometriaPage() {
     alert("¡Biometría registrada con éxito! Los datos han sido actualizados.");
     setLoading(false);
     fetchEstanques();
+    fetchHistory();
   };
 
 
@@ -272,8 +314,25 @@ export default function BiometriaPage() {
                 </h2>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+                  {selectedPond?.is_polyculture && biometrias.some(b => !b.speciesId) && (
+                    <div style={{ 
+                      padding: '1rem', 
+                      borderRadius: '12px', 
+                      background: 'rgba(245, 158, 11, 0.1)', 
+                      border: '1px solid rgba(245, 158, 11, 0.2)',
+                      display: 'flex',
+                      gap: '0.75rem',
+                      alignItems: 'center',
+                      marginBottom: '1rem'
+                    }}>
+                      <AlertCircle size={20} style={{ color: '#f59e0b' }} />
+                      <div style={{ fontSize: '0.85rem', color: '#92400e', lineHeight: 1.4 }}>
+                        <strong>Aviso:</strong> No encontramos el desglose de especies para este policultivo. Puede definirlas a continuación o revisarlas en el módulo de Siembra.
+                      </div>
+                    </div>
+                  )}
                   {totals.map((bio, index) => (
-                    <div key={bio.speciesName} style={{ 
+                    <div key={index} style={{ 
                       padding: '1.5rem', 
                       background: 'var(--secondary)', 
                       borderRadius: '16px', 
@@ -281,12 +340,34 @@ export default function BiometriaPage() {
                       display: 'grid',
                       gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
                       gap: '1.5rem',
-                      alignItems: 'center'
+                      alignItems: 'center',
+                      position: 'relative'
                     }}>
+                      {biometrias.length > 1 && (
+                        <button 
+                          onClick={() => removeSpeciesRow(index)}
+                          style={{ position: 'absolute', top: '1rem', right: '1rem', color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.7rem', fontWeight: 800 }}
+                        >
+                          Eliminar
+                        </button>
+                      )}
+                      
                       <div>
                         <div style={{ fontSize: '0.7rem', fontWeight: 700, color: '#8b5cf6', textTransform: 'uppercase', marginBottom: '0.25rem' }}>Especie</div>
-                        <div style={{ fontWeight: 800, fontSize: '1rem', color: 'var(--foreground)' }}>{bio.speciesName}</div>
-                        <div style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)' }}>Pob. estimada: {bio.poblacionTotal.toLocaleString()}</div>
+                        {bio.speciesId ? (
+                          <div style={{ fontWeight: 800, fontSize: '1rem', color: 'var(--foreground)' }}>{bio.speciesName}</div>
+                        ) : (
+                          <input 
+                            type="text"
+                            value={bio.speciesName}
+                            onChange={(e) => updateBiometria(index, 'speciesName', e.target.value)}
+                            placeholder="Nombre de Especie"
+                            style={{ width: '100%', padding: '0.4rem', borderRadius: '6px', border: '1px solid var(--border)', fontSize: '0.9rem', fontWeight: 700 }}
+                          />
+                        )}
+                        <div style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)', marginTop: '0.25rem' }}>
+                          Pob: {bio.poblacionTotal?.toLocaleString() || '0'}
+                        </div>
                       </div>
                       
                       <div>
@@ -317,6 +398,28 @@ export default function BiometriaPage() {
                       </div>
                     </div>
                   ))}
+
+                  {selectedPond?.is_polyculture && (
+                    <button 
+                      onClick={addNewSpeciesRow}
+                      style={{ 
+                        width: '100%', 
+                        padding: '1rem', 
+                        borderRadius: '12px', 
+                        border: '2px dashed var(--border)', 
+                        background: 'none', 
+                        color: 'var(--muted-foreground)', 
+                        fontWeight: 700, 
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '0.5rem'
+                      }}
+                    >
+                      <Plus size={16} /> Agregar otra especie al muestreo
+                    </button>
+                  )}
                 </div>
 
                 <div style={{ marginTop: '2.5rem', paddingTop: '2rem', borderTop: '1px solid var(--border)' }}>

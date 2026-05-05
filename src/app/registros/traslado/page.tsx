@@ -91,9 +91,26 @@ export default function TrasladoPage() {
     }
   }, [origenId, ponds]);
 
-  const updateTraslado = (index: number, qty: string) => {
+  const addNewSpeciesRow = () => {
+    setTraslados([...traslados, {
+      speciesId: null,
+      speciesName: '',
+      quantity: '',
+      currentCount: 0
+    }]);
+  };
+
+  const removeSpeciesRow = (index: number) => {
+    if (traslados.length > 1) {
+      const newTras = [...traslados];
+      newTras.splice(index, 1);
+      setTraslados(newTras);
+    }
+  };
+
+  const updateTraslado = (index: number, field: string, value: string) => {
     const newTraslados = [...traslados];
-    newTraslados[index].quantity = qty;
+    newTraslados[index] = { ...newTraslados[index], [field]: value };
     setTraslados(newTraslados);
   };
 
@@ -247,18 +264,37 @@ export default function TrasladoPage() {
                         display: 'grid',
                         gridTemplateColumns: '2fr 1fr 1fr',
                         gap: '1rem',
-                        alignItems: 'center'
+                        alignItems: 'center',
+                        position: 'relative'
                       }}>
+                        {traslados.length > 1 && (
+                          <button 
+                            onClick={() => removeSpeciesRow(index)}
+                            style={{ position: 'absolute', top: '0.5rem', right: '0.5rem', color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.65rem', fontWeight: 800 }}
+                          >
+                            X
+                          </button>
+                        )}
                         <div>
-                          <div style={{ fontWeight: 800, fontSize: '0.95rem' }}>{t.speciesName}</div>
+                          {t.speciesId ? (
+                            <div style={{ fontWeight: 800, fontSize: '0.95rem' }}>{t.speciesName}</div>
+                          ) : (
+                            <input 
+                              type="text"
+                              value={t.speciesName}
+                              onChange={(e) => updateTraslado(index, 'speciesName', e.target.value)}
+                              placeholder="Especie"
+                              style={{ width: '100%', padding: '0.4rem', borderRadius: '6px', border: '1px solid var(--border)', fontSize: '0.85rem', fontWeight: 700 }}
+                            />
+                          )}
                           <div style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)' }}>En origen: {t.currentCount.toLocaleString()}</div>
                         </div>
                         <div>
                           <input 
                             type="number" 
                             value={t.quantity}
-                            onChange={(e) => updateTraslado(index, e.target.value)}
-                            placeholder="Cantidad"
+                            onChange={(e) => updateTraslado(index, 'quantity', e.target.value)}
+                            placeholder="Cant."
                             style={{ width: '100%', padding: '0.5rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'white', outline: 'none', fontWeight: 800 }}
                           />
                         </div>
@@ -267,6 +303,29 @@ export default function TrasladoPage() {
                         </div>
                       </div>
                     ))}
+
+                    {ponds.find(p => p.id === origenId)?.is_polyculture && (
+                      <button 
+                        onClick={addNewSpeciesRow}
+                        style={{ 
+                          width: '100%', 
+                          padding: '0.75rem', 
+                          borderRadius: '10px', 
+                          border: '2px dashed var(--border)', 
+                          background: 'none', 
+                          color: 'var(--muted-foreground)', 
+                          fontWeight: 700, 
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '0.5rem',
+                          fontSize: '0.85rem'
+                        }}
+                      >
+                        <Plus size={14} /> Agregar otra especie al traslado
+                      </button>
+                    )}
                   </div>
 
                   <button 

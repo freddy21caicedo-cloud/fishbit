@@ -70,7 +70,13 @@ export default function MortalidadPage() {
 
   const fetchSpecies = async (pondId: string) => {
     setLoading(true);
-    const { data } = await supabase.from('pond_species').select('*').eq('estanque_id', pondId);
+    const activeUnitId = localStorage.getItem('active_unit_id');
+    const { data } = await supabase
+      .from('pond_species')
+      .select('*')
+      .eq('estanque_id', pondId)
+      .eq('unit_id', activeUnitId);
+
     if (data && data.length > 0) {
       setMortalidades(data.map(s => ({
         speciesId: s.id,
@@ -82,7 +88,7 @@ export default function MortalidadPage() {
       const p = ponds.find(p => p.id === pondId);
       setMortalidades([{
         speciesId: null,
-        speciesName: p?.current_species || 'Especie Principal',
+        speciesName: p?.current_species && p.current_species !== 'Policultivo' ? p.current_species : '',
         quantity: '',
         currentCount: p?.current_count || 0
       }]);
@@ -98,9 +104,26 @@ export default function MortalidadPage() {
     }
   }, [estanqueId, ponds]);
 
-  const updateMortality = (index: number, qty: string) => {
+  const addNewSpeciesRow = () => {
+    setMortalidades([...mortalidades, {
+      speciesId: null,
+      speciesName: '',
+      quantity: '',
+      currentCount: 0
+    }]);
+  };
+
+  const removeSpeciesRow = (index: number) => {
+    if (mortalidades.length > 1) {
+      const newMorts = [...mortalidades];
+      newMorts.splice(index, 1);
+      setMortalidades(newMorts);
+    }
+  };
+
+  const updateMortality = (index: number, field: string, value: string) => {
     const newMorts = [...mortalidades];
-    newMorts[index].quantity = qty;
+    newMorts[index] = { ...newMorts[index], [field]: value };
     setMortalidades(newMorts);
   };
 
@@ -258,6 +281,24 @@ export default function MortalidadPage() {
                 >
                   <h3 style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--muted-foreground)', textTransform: 'uppercase', marginBottom: '1rem', borderTop: '1px solid var(--border)', paddingTop: '1.5rem' }}>Especies en Estanque</h3>
                   
+                  {ponds.find(p => p.id === estanqueId)?.is_polyculture && mortalidades.some(m => !m.speciesId) && (
+                    <div style={{ 
+                      padding: '1rem', 
+                      borderRadius: '12px', 
+                      background: 'rgba(245, 158, 11, 0.1)', 
+                      border: '1px solid rgba(245, 158, 11, 0.2)',
+                      display: 'flex',
+                      gap: '0.75rem',
+                      alignItems: 'center',
+                      marginBottom: '1rem'
+                    }}>
+                      <AlertCircle size={20} style={{ color: '#f59e0b' }} />
+                      <div style={{ fontSize: '0.85rem', color: '#92400e', lineHeight: 1.4 }}>
+                        <strong>Aviso:</strong> No hay desglose de especies para este policultivo. Puede definirlas a continuación o en Siembra.
+                      </div>
+                    </div>
+                  )}
+
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '2.5rem' }}>
                     {mortalidades.map((mort, index) => (
                       <div key={index} style={{ 
@@ -268,10 +309,29 @@ export default function MortalidadPage() {
                         display: 'grid',
                         gridTemplateColumns: '2fr 1fr 1fr',
                         gap: '1rem',
-                        alignItems: 'center'
+                        alignItems: 'center',
+                        position: 'relative'
                       }}>
+                        {mortalidades.length > 1 && (
+                          <button 
+                            onClick={() => removeSpeciesRow(index)}
+                            style={{ position: 'absolute', top: '0.5rem', right: '0.5rem', color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.65rem', fontWeight: 800 }}
+                          >
+                            X
+                          </button>
+                        )}
                         <div>
-                          <div style={{ fontWeight: 800, fontSize: '0.95rem' }}>{mort.speciesName}</div>
+                          {mort.speciesId ? (
+                            <div style={{ fontWeight: 800, fontSize: '0.95rem' }}>{mort.speciesName}</div>
+                          ) : (
+                            <input 
+                              type="text"
+                              value={mort.speciesName}
+                              onChange={(e) => updateMortality(index, 'speciesName', e.target.value)}
+                              placeholder="Nombre Especie"
+                              style={{ width: '100%', padding: '0.4rem', borderRadius: '6px', border: '1px solid var(--border)', fontSize: '0.85rem', fontWeight: 700 }}
+                            />
+                          )}
                           <div style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)' }}>Pob. actual: {mort.currentCount.toLocaleString()}</div>
                         </div>
                         <div>
@@ -279,9 +339,9 @@ export default function MortalidadPage() {
                           <input 
                             type="number" 
                             value={mort.quantity}
-                            onChange={(e) => updateMortality(index, e.target.value)}
+                            onChange={(e) => updateMortality(index, 'quantity', e.target.value)}
                             placeholder="0"
-                            style={{ width: '100%', padding: '0.5rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'white', outline: 'none', fontWeight: 800, color: '#ef4444' }}
+                            style={{ width: '100%', padding: '0.5rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'white', outline: 'none', fontWeight: 800 }}
                           />
                         </div>
                         <div style={{ textAlign: 'center' }}>
@@ -292,6 +352,29 @@ export default function MortalidadPage() {
                         </div>
                       </div>
                     ))}
+
+                    {ponds.find(p => p.id === estanqueId)?.is_polyculture && (
+                      <button 
+                        onClick={addNewSpeciesRow}
+                        style={{ 
+                          width: '100%', 
+                          padding: '0.75rem', 
+                          borderRadius: '10px', 
+                          border: '2px dashed var(--border)', 
+                          background: 'none', 
+                          color: 'var(--muted-foreground)', 
+                          fontWeight: 700, 
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '0.5rem',
+                          fontSize: '0.85rem'
+                        }}
+                      >
+                        <Plus size={14} /> Agregar otra especie al registro
+                      </button>
+                    )}
                   </div>
 
                   <button 

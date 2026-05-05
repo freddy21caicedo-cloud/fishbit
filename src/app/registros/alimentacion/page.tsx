@@ -7,7 +7,8 @@ import {
   Utensils, 
   ArrowLeft, 
   History, 
-  TrendingUp 
+  TrendingUp,
+  Plus
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
@@ -108,16 +109,25 @@ export default function AlimentacionPage() {
     setTotalFoodSinceLastBio(total);
   };
 
+  useEffect(() => {
+    if (estanqueId) {
+      fetchPondDetails(estanqueId);
+      fetchSpecies(estanqueId);
+    } else {
+      setAlimentaciones([]);
+    }
+  }, [estanqueId, ponds]);
+
   const handleRegisterAlimentacion = async () => {
-    if (!estanqueId || !alimentoId || !cantidad) {
-      alert("Por favor complete todos los campos.");
+    if (!estanqueId || !alimentoId || alimentaciones.every(a => !a.quantity || parseFloat(a.quantity) <= 0)) {
+      alert("Por favor complete todos los campos obligatorios.");
       return;
     }
 
-    const qty = parseFloat(cantidad);
+    const totalQty = alimentaciones.reduce((sum, a) => sum + (parseFloat(a.quantity) || 0), 0);
     const selectedFood = foodStock.find(f => f.id === alimentoId);
 
-    if (selectedFood && parseFloat(selectedFood.current_stock) < qty) {
+    if (selectedFood && parseFloat(selectedFood.current_stock) < totalQty) {
       alert("No hay suficiente alimento en inventario.");
       return;
     }
@@ -125,39 +135,43 @@ export default function AlimentacionPage() {
     const activeUnitId = localStorage.getItem('active_unit_id');
     if (!activeUnitId) return;
 
-    // 0. Obtener Lote actual del estanque
     const { data: pondData } = await supabase.from('estanques').select('current_batch_id').eq('id', estanqueId).single();
 
-    // 1. Insert record
-    const { error: regError } = await supabase.from('alimentacion_diaria').insert([{
-      estanque_id: estanqueId,
-      inventory_id: alimentoId,
-      quantity_kg: qty,
-      date: fecha,
-      unit_id: activeUnitId,
-      batch_id: pondData?.current_batch_id // Trazabilidad por lote
-    }]);
+    try {
+      for (const alim of alimentaciones) {
+        const qty = parseFloat(alim.quantity) || 0;
+        if (qty <= 0) continue;
 
-    if (regError) {
-      alert("Error al registrar alimentación: " + regError.message);
-      return;
+        const { error: regError } = await supabase.from('alimentacion_diaria').insert([{
+          estanque_id: estanqueId,
+          inventory_id: alimentoId,
+          quantity_kg: qty,
+          species_name: alim.speciesName,
+          date: fecha,
+          unit_id: activeUnitId,
+          batch_id: pondData?.current_batch_id
+        }]);
+
+        if (regError) throw regError;
+      }
+
+      if (selectedFood) {
+        await supabase
+          .from('inventory')
+          .update({ current_stock: parseFloat(selectedFood.current_stock) - totalQty })
+          .eq('id', selectedFood.id);
+      }
+
+      alert("¡Alimentación registrada con éxito!");
+      setEstanqueId('');
+      setAlimentoId('');
+      fetchBasicData();
+      fetchHistory();
+    } catch (err: any) {
+      alert("Error: " + err.message);
     }
-
-    // 2. Update Inventory
-    if (selectedFood) {
-      await supabase
-        .from('inventory')
-        .update({ current_stock: parseFloat(selectedFood.current_stock) - qty })
-        .eq('id', selectedFood.id);
-    }
-
-    alert("¡Alimentación registrada con éxito!");
-    setCantidad('');
-    fetchBasicData();
-    fetchPondDetails(estanqueId);
   };
 
-  // Dynamic Stock Calculation
   const remainingStock = useMemo(() => {
     const selectedFood = foodStock.find(f => f.id === alimentoId);
     if (!selectedFood) return 0;
@@ -252,20 +266,91 @@ export default function AlimentacionPage() {
             </div>
           </div>
 
-          <div style={{ marginBottom: '2rem', display: 'flex', gap: '1.5rem', alignItems: 'flex-end' }}>
-            <div style={{ flex: 1 }}>
-              <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, marginBottom: '0.5rem', textTransform: 'uppercase', color: 'var(--muted-foreground)' }}>
-                Cantidad a Suministrar (kg)
-              </label>
-              <input 
-                type="number" 
-                value={cantidad}
-                onChange={(e) => setCantidad(e.target.value)}
-                placeholder="0.00"
-                style={{ width: '100%', padding: '1rem', fontSize: '1.5rem', borderRadius: '12px', border: '1px solid var(--border)', background: 'var(--secondary)', outline: 'none', fontWeight: 800 }} 
-              />
-            </div>
-          </div>
+          <AnimatePresence>
+            {estanqueId && (
+              <motion.div 
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+              >
+                <h3 style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--muted-foreground)', textTransform: 'uppercase', marginBottom: '1.5rem', borderTop: '1px solid var(--border)', paddingTop: '1.5rem' }}>Detalle de Alimentación por Especie</h3>
+                
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '2rem' }}>
+                  {alimentaciones.map((alim, index) => (
+                    <div key={index} style={{ 
+                      padding: '1.25rem', 
+                      background: 'var(--secondary)', 
+                      borderRadius: '12px', 
+                      border: '1px solid var(--border)',
+                      display: 'grid',
+                      gridTemplateColumns: '2fr 1fr 40px',
+                      gap: '1rem',
+                      alignItems: 'center',
+                      position: 'relative'
+                    }}>
+                      {alimentaciones.length > 1 && (
+                        <button 
+                          onClick={() => removeSpeciesRow(index)}
+                          style={{ position: 'absolute', top: '0.5rem', right: '0.5rem', color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.65rem', fontWeight: 800 }}
+                        >
+                          X
+                        </button>
+                      )}
+                      <div>
+                        {alim.speciesId ? (
+                          <div style={{ fontWeight: 800, fontSize: '0.95rem' }}>{alim.speciesName}</div>
+                        ) : (
+                          <input 
+                            type="text"
+                            value={alim.speciesName}
+                            onChange={(e) => updateAlimentacion(index, 'speciesName', e.target.value)}
+                            placeholder="Especie"
+                            style={{ width: '100%', padding: '0.4rem', borderRadius: '6px', border: '1px solid var(--border)', fontSize: '0.85rem', fontWeight: 700 }}
+                          />
+                        )}
+                        <div style={{ fontSize: '0.7rem', color: 'var(--muted-foreground)' }}>Asignar kg para esta especie</div>
+                      </div>
+                      <div>
+                        <input 
+                          type="number" 
+                          value={alim.quantity}
+                          onChange={(e) => updateAlimentacion(index, 'quantity', e.target.value)}
+                          placeholder="kg"
+                          style={{ width: '100%', padding: '0.5rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'white', outline: 'none', fontWeight: 800, fontSize: '1.1rem' }}
+                        />
+                      </div>
+                      <div style={{ textAlign: 'center' }}>
+                        <Utensils size={18} style={{ color: alim.quantity > 0 ? '#10b981' : 'var(--border)' }} />
+                      </div>
+                    </div>
+                  ))}
+
+                  {ponds.find(p => p.id === estanqueId)?.is_polyculture && (
+                    <button 
+                      onClick={addNewSpeciesRow}
+                      style={{ 
+                        width: '100%', 
+                        padding: '0.75rem', 
+                        borderRadius: '10px', 
+                        border: '2px dashed var(--border)', 
+                        background: 'none', 
+                        color: 'var(--muted-foreground)', 
+                        fontWeight: 700, 
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '0.5rem',
+                        fontSize: '0.85rem'
+                      }}
+                    >
+                      <Plus size={14} /> Agregar otra especie al registro
+                    </button>
+                  )}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           <button 
             onClick={handleRegisterAlimentacion}
