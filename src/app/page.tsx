@@ -61,6 +61,8 @@ const StatCard = ({ title, value, change, icon: Icon, color }: any) => (
 export default function Dashboard() {
   const router = useRouter();
   const [authLoading, setAuthLoading] = useState(true);
+  const [planType, setPlanType] = useState('basic');
+  const [unitName, setUnitName] = useState('');
 
   useEffect(() => {
     async function initDashboard() {
@@ -86,6 +88,15 @@ export default function Dashboard() {
           return;
         }
         localStorage.setItem('active_unit_id', userUnit.unit_id);
+
+        // Fetch Unit Details and Plan
+        const [unitRes, subRes] = await Promise.all([
+          supabase.from('units').select('name').eq('id', userUnit.unit_id).single(),
+          supabase.from('subscriptions').select('plan_type').eq('unit_id', userUnit.unit_id).single()
+        ]);
+
+        if (unitRes.data) setUnitName(unitRes.data.name);
+        if (subRes.data) setPlanType(subRes.data.plan_type);
       }
     }
     initDashboard();
@@ -128,6 +139,23 @@ export default function Dashboard() {
 
   return (
     <div className="animate-fade-in" style={{ paddingBottom: '5rem' }}>
+      <header style={{ marginBottom: '2.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.25rem' }}>
+            <h1 style={{ fontSize: '1.875rem', fontWeight: 900 }}>Hola de nuevo 👋</h1>
+            {planType === 'premium' && (
+              <span style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)', color: 'white', padding: '2px 8px', borderRadius: '6px', fontSize: '0.65rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.05em', boxShadow: '0 4px 12px rgba(217, 119, 6, 0.2)' }}>
+                Premium
+              </span>
+            )}
+          </div>
+          <p style={{ color: 'var(--muted-foreground)', fontWeight: 500 }}>Estás supervisando: <strong style={{ color: 'var(--foreground)' }}>{unitName || 'Tu Unidad Acuícola'}</strong></p>
+        </div>
+        <div style={{ padding: '0.5rem 1rem', background: 'var(--secondary)', borderRadius: '12px', border: '1px solid var(--border)', fontSize: '0.85rem', fontWeight: 700 }}>
+          {new Date().toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })}
+        </div>
+      </header>
+
       <div className="dashboard-grid">
         <StatCard 
           title="Biomasa Total" 

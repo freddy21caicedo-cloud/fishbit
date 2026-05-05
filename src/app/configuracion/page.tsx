@@ -381,7 +381,10 @@ const TeamManagement = () => {
     try {
       if (planType === 'basic') {
         const countByRole = members.filter(m => m.role === inviteData.role).length;
-        if (countByRole >= 1) { alert(`El Plan Básico solo permite 1 usuario por rol (${inviteData.role}).`); return; }
+        if (countByRole >= 1) { 
+          alert(`🚫 LÍMITE DE PLAN BÁSICO:\n\nTu plan actual solo permite 1 usuario de tipo ${inviteData.role.toUpperCase()}.\n\nPara gestionar un equipo más grande e invitar a múltiples técnicos y operarios, por favor contacta a soporte para activar tu PLAN PREMIUM.`); 
+          return; 
+        }
       }
       let activeUnitId = localStorage.getItem('active_unit_id');
       
@@ -462,7 +465,23 @@ const TeamManagement = () => {
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2.5rem' }}>
-        <div><h2 style={{ fontSize: '1.25rem', fontWeight: 800 }}>Gestión de Personal</h2><p style={{ fontSize: '0.875rem', color: 'var(--muted-foreground)' }}>{planType === 'basic' ? 'Plan Básico (1 por rol)' : 'Plan Premium (Ilimitado)'}</p></div>
+        <div>
+          <h2 style={{ fontSize: '1.25rem', fontWeight: 800 }}>Gestión de Personal</h2>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.25rem' }}>
+            <span style={{ 
+              padding: '2px 8px', 
+              borderRadius: '20px', 
+              fontSize: '0.65rem', 
+              fontWeight: 900, 
+              background: planType === 'premium' ? 'rgba(245, 158, 11, 0.1)' : 'rgba(37, 99, 235, 0.1)',
+              color: planType === 'premium' ? '#d97706' : 'var(--primary)',
+              border: planType === 'premium' ? '1px solid rgba(245, 158, 11, 0.3)' : '1px solid rgba(37, 99, 235, 0.3)',
+              textTransform: 'uppercase'
+            }}>
+              {planType === 'premium' ? 'Plan Premium: Ilimitado' : 'Plan Básico: 1 por rol'}
+            </span>
+          </div>
+        </div>
         <div style={{ display: 'flex', gap: '0.75rem' }}>
           <button 
             onClick={() => fetchTeam(true)} 

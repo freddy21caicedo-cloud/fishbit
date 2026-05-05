@@ -28,6 +28,7 @@ export default function Sidebar() {
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
 
   const [userRole, setUserRole] = useState<string | null>(null);
+  const [planType, setPlanType] = useState<string>('basic');
 
   useEffect(() => {
     async function checkRole() {
@@ -51,6 +52,24 @@ export default function Sidebar() {
           .single();
 
         setUserRole(userUnit?.role || profile?.role || 'operario');
+
+        // 3. Obtener plan de la unidad activa
+        let activeUnitId = localStorage.getItem('active_unit_id');
+        if (!activeUnitId && userUnit) {
+          activeUnitId = userUnit.unit_id;
+        }
+
+        if (activeUnitId) {
+          const { data: subscription } = await supabase
+            .from('subscriptions')
+            .select('plan_type')
+            .eq('unit_id', activeUnitId)
+            .single();
+          
+          if (subscription) {
+            setPlanType(subscription.plan_type);
+          }
+        }
       }
     }
     checkRole();
@@ -124,7 +143,24 @@ export default function Sidebar() {
             }}>
               {isSuperAdmin ? <Shield size={20} /> : <Fish size={20} />}
             </div>
-            <h2 style={{ fontSize: '1.25rem', fontWeight: 700, margin: 0 }}>FishBit {isSuperAdmin && <span style={{ fontSize: '0.6rem', verticalAlign: 'middle', background: 'rgba(37, 99, 235, 0.1)', color: 'var(--primary)', padding: '2px 6px', borderRadius: '4px', marginLeft: '4px' }}>SA</span>}</h2>
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              <h2 style={{ fontSize: '1.1rem', fontWeight: 700, margin: 0 }}>FishBit {isSuperAdmin && <span style={{ fontSize: '0.6rem', verticalAlign: 'middle', background: 'rgba(37, 99, 235, 0.1)', color: 'var(--primary)', padding: '2px 6px', borderRadius: '4px', marginLeft: '4px' }}>SA</span>}</h2>
+              {!isSuperAdmin && (
+                <span style={{ 
+                  fontSize: '0.6rem', 
+                  fontWeight: 900, 
+                  textTransform: 'uppercase', 
+                  letterSpacing: '0.05em',
+                  color: planType === 'premium' ? '#d97706' : 'var(--muted-foreground)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px'
+                }}>
+                  <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: planType === 'premium' ? '#f59e0b' : 'var(--muted-foreground)' }} />
+                  Plan {planType}
+                </span>
+              )}
+            </div>
           </div>
         </div>
 
