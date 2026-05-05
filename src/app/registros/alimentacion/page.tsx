@@ -98,13 +98,17 @@ export default function AlimentacionPage() {
     const activeUnitId = localStorage.getItem('active_unit_id');
     if (!activeUnitId) return;
 
+    // 0. Obtener Lote actual del estanque
+    const { data: pondData } = await supabase.from('estanques').select('current_batch_id').eq('id', estanqueId).single();
+
     // 1. Insert record
     const { error: regError } = await supabase.from('alimentacion_diaria').insert([{
       estanque_id: estanqueId,
       inventory_id: alimentoId,
       quantity_kg: qty,
       date: fecha,
-      unit_id: activeUnitId
+      unit_id: activeUnitId,
+      batch_id: pondData?.current_batch_id // Trazabilidad por lote
     }]);
 
     if (regError) {

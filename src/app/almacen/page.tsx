@@ -1009,7 +1009,7 @@ export default function AlmacenPage() {
                 </div>
               )}
 
-              {              {/* Items Table Container */}
+              {/* Items Table Container */}
               <div style={{ flex: 1, overflowY: 'auto', marginBottom: '1.5rem', paddingRight: '0.5rem' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                   {/* Header labels (hidden on mobile) */}

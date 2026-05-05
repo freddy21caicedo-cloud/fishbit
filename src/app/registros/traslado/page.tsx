@@ -76,13 +76,31 @@ export default function TrasladoPage() {
 
     const qty = parseInt(cantidad);
     
-    // 1. Log Transfer
+    // 0. Obtener Batch ID y Acumulado de alimentación del origen
+    let batchId = origenPond?.current_batch_id;
+    let feedAccumulated = 0;
+
+    if (batchId) {
+      const { data: feedData } = await supabase
+        .from('alimentacion')
+        .select('cantidad_kilos')
+        .eq('estanque_id', origenId)
+        .eq('batch_id', batchId);
+      
+      if (feedData) {
+        feedAccumulated = feedData.reduce((acc, curr) => acc + (parseFloat(curr.cantidad_kilos) || 0), 0);
+      }
+    }
+
+    // 1. Log Transfer with Batch and Feed
     const { error: logError } = await supabase.from('transfers').insert([{
       origen_id: origenId,
       destino_id: destinoId,
       species_name: especieId,
       quantity: qty,
-      date: fecha
+      date: fecha,
+      batch_id: batchId,
+      accumulated_feed: feedAccumulated
     }]);
 
     if (logError) {
@@ -101,11 +119,11 @@ export default function TrasladoPage() {
     const newSourceCount = (origenPond?.current_count || 0) - qty;
     await supabase.from('estanques').update({
       current_count: newSourceCount,
-      status: newSourceCount <= 0 ? 'vacio' : 'con_peces'
+      status: newSourceCount <= 0 ? 'vacio' : 'con_peces',
+      ...(newSourceCount <= 0 ? { current_batch_id: null } : {})
     }).eq('id', origenId);
 
     // 4. Update Destination Species
-    // Check if species already exists in destination
     const { data: destSpecies } = await supabase.from('pond_species')
       .select('*')
       .eq('estanque_id', destinoId)
@@ -114,14 +132,17 @@ export default function TrasladoPage() {
 
     if (destSpecies) {
       await supabase.from('pond_species')
-        .update({ current_count: destSpecies.current_count + qty })
+        .update({ 
+          current_count: destSpecies.current_count + qty,
+          batch_id: batchId // Heredar lote
+        })
         .eq('id', destSpecies.id);
     } else {
-      // Create it in destination (always using pond_species for consistency if pond is/becomes poly)
       await supabase.from('pond_species').insert([{
         estanque_id: destinoId,
         species_name: especieId,
-        current_count: qty
+        current_count: qty,
+        batch_id: batchId // Heredar lote
       }]);
     }
 
@@ -130,7 +151,7 @@ export default function TrasladoPage() {
     await supabase.from('estanques').update({
       current_count: newDestCount,
       status: 'con_peces',
-      // If destination was empty, set current_species to this one as primary
+      current_batch_id: batchId, // El estanque ahora tiene este lote
       ...( (destinoPond?.current_count || 0) === 0 ? { current_species: especieId } : {} )
     }).eq('id', destinoId);
 

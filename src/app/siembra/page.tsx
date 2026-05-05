@@ -98,7 +98,8 @@ export default function SiembraPage() {
     }
     if (!activeUnitId) { alert("Error: No se detectó unidad vinculada."); return; }
 
-    // 2. Create Seeding Header
+    // 2. Create Seeding Header with Batch ID
+    const batchId = `LOTE-${new Date().toISOString().slice(2,10).replace(/-/g,'')}-${pond.name.replace(/\s+/g,'').toUpperCase()}`;
     const totalQty = rows.reduce((acc, r) => acc + (parseInt(r.cantidad) || 0), 0);
     const { data: siembraData, error: siembraError } = await supabase
       .from('siembras')
@@ -108,7 +109,8 @@ export default function SiembraPage() {
         hour: hora,
         total_quantity: totalQty,
         total_biomass_kg: totalBiomasa,
-        unit_id: activeUnitId
+        unit_id: activeUnitId,
+        batch_id: batchId // Trazabilidad
       }])
       .select();
 
@@ -126,14 +128,16 @@ export default function SiembraPage() {
       const qty = parseInt(row.cantidad) || 0;
       const weight = parseFloat(row.pesoPromedio) || 0;
       const bio = (qty * weight) / 1000;
+      const stockItem = alevinosStock.find(s => s.especie === row.especie);
 
-      // A. Insert siembra detail
+      // A. Insert siembra detail with inventory reference
       await supabase.from('siembra_details').insert([{
         siembra_id: siembraId,
         species_name: row.especie,
         quantity: qty,
         avg_weight_gr: weight,
-        biomass_kg: bio
+        biomass_kg: bio,
+        inventory_item_id: stockItem?.id // Referencia para restauración
       }]);
 
       // B. Update/Insert Pond Species Inventory
@@ -180,7 +184,8 @@ export default function SiembraPage() {
         is_polyculture: isPolyculture,
         current_species: isPolyculture ? 'Policultivo' : rows[0].especie,
         current_count: (pond.current_count || 0) + totalQty,
-        current_biomass_kg: (parseFloat(pond.current_biomass_kg) || 0) + totalBiomasa
+        current_biomass_kg: (parseFloat(pond.current_biomass_kg) || 0) + totalBiomasa,
+        current_batch_id: batchId
       })
       .eq('id', pond.id);
 
