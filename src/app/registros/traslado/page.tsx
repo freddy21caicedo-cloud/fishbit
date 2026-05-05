@@ -8,6 +8,7 @@ import {
   Waves, 
   ArrowLeft,
   ArrowRight,
+  Activity,
   Info,
   ShieldCheck,
   TrendingDown,
