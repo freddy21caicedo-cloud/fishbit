@@ -1009,128 +1009,119 @@ export default function AlmacenPage() {
                 </div>
               )}
 
-              {/* Items Table Container with scroll */}
-              <div style={{ flex: 1, overflow: 'auto', marginBottom: '1.5rem', border: '1px solid var(--border)', borderRadius: '8px' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '800px' }}>
-                  <thead>
-                    <tr style={{ textAlign: 'left', fontSize: '0.7rem', textTransform: 'uppercase', color: 'var(--muted-foreground)', borderBottom: '1px solid var(--border)' }}>
-                      <th style={{ padding: '0.5rem' }}>{activeCat === 'aireadores' ? 'Equipo / Marca' : activeCat === 'alevinos' ? 'Especie' : 'Producto'}</th>
-                      {activeCat === 'alevinos' ? (
-                        <th style={{ padding: '0.5rem', width: '110px' }}>Tipo / Etapa</th>
-                      ) : activeCat === 'insumos' ? (
-                        <th style={{ padding: '0.5rem', width: '100px' }}>Presentación</th>
-                      ) : activeCat === 'aireadores' ? (
-                        <th style={{ padding: '0.5rem', width: '140px' }}>HP / Energía</th>
-                      ) : (
-                        <th style={{ padding: '0.5rem', width: '100px' }}>Lote</th>
-                      )}
-                      <th style={{ padding: '0.5rem', width: '80px' }}>{activeCat === 'aireadores' ? 'AMP' : activeCat === 'alimento' ? 'Cant (BTO)' : 'Cant'}</th>
-                      {activeCat === 'alimento' && <th style={{ padding: '0.5rem', width: '110px' }}>Kilos</th>}
-                      {activeCat === 'aireadores' && <th style={{ padding: '0.5rem', width: '120px' }}>Capacidad (SORT)</th>}
-                      <th style={{ padding: '0.5rem', width: '140px' }}>Vlr. Unit ($)</th>
-                      {activeCat === 'aireadores' && <th style={{ padding: '0.5rem', width: '100px' }}>IVA (%)</th>}
-                      <th style={{ padding: '0.5rem', width: '40px' }}></th>
-                    </tr>
-                    </thead>
-                    <tbody>
-                      {items.map((item) => (
-                        <tr key={item.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                          <td style={{ padding: '0.5rem', position: 'relative' }}>
-                          <div style={{ position: 'relative' }}>
-                            <input 
-                              type="text" 
-                              id={`input-${item.id}`}
-                              value={item.product} 
-                              onChange={(e) => updateItem(item.id, 'product', e.target.value)} 
-                              onFocus={(e) => {
-                                const rect = e.currentTarget.getBoundingClientRect();
-                                setDropdownPos({ top: rect.bottom + 5, left: rect.left, width: rect.width });
-                                setFocusedItemId(`${item.id}-product`);
-                                setFocusedRowId(item.id);
-                              }}
-                              onBlur={() => setTimeout(() => setFocusedItemId(null), 200)}
-                              placeholder="Buscar producto..." 
-                              style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid var(--border)', background: 'transparent', outline: 'none', fontSize: '0.85rem' }} 
-                            />
-                          </div>
-                        </td>
-                        <td style={{ padding: '0.5rem' }}>
-                          {activeCat === 'alevinos' ? (
-                            <select 
-                              value={item.batch} 
-                              onChange={(e) => updateItem(item.id, 'batch', e.target.value)}
-                              style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid var(--border)', outline: 'none', fontSize: '0.85rem' }}
-                            >
-                              <option value="">Seleccionar...</option>
-                              <option value="ova">Ova</option>
-                              <option value="larva">Larva</option>
-                              <option value="alevino">Alevino</option>
-                            </select>
-                          ) : activeCat === 'insumos' ? (
-                            <select 
-                              value={item.batch} 
-                              onChange={(e) => updateItem(item.id, 'batch', e.target.value)}
-                              style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid var(--border)', outline: 'none', fontSize: '0.85rem' }}
-                            >
-                              <option value="gramos">Gramos (g)</option>
-                              <option value="kg">Kilogramos (kg)</option>
-                              <option value="ml">Mililitros (mL)</option>
-                              <option value="litros">Litros (L)</option>
-                              <option value="unidades">Unidades</option>
-                            </select>
-                          ) : activeCat === 'aireadores' ? (
-                            <select 
-                              value={item.hpEnergy} 
-                              onChange={(e) => updateItem(item.id, 'hpEnergy', e.target.value)}
-                              style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid var(--border)', outline: 'none', fontSize: '0.85rem' }}
-                            >
-                              <option value="">Seleccionar HP...</option>
-                              <option value="110V 20A">110V 20 AMP</option>
-                              <option value="220V 10A">220V 10 AMP</option>
-                              <option value="220V 5A">220V 5 AMP (Trif)</option>
-                              <option value="440V 2.5A">440V 2.5 AMP (Trif)</option>
-                            </select>
-                          ) : (
-                            <input type="text" value={item.batch} onChange={(e) => updateItem(item.id, 'batch', e.target.value)} placeholder={activeCat === 'alimento' ? 'Ej: 84199' : 'Nro Lote'} style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid var(--border)', outline: 'none', fontSize: '0.85rem' }} />
-                          )}
-                        </td>
-                        <td style={{ padding: '0.5rem' }}>
-                          <input type="number" value={item.quantity} onChange={(e) => updateItem(item.id, 'quantity', e.target.value)} placeholder="0" style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid var(--border)', outline: 'none', fontSize: '0.85rem', fontWeight: 700 }} />
-                        </td>
+              {              {/* Items Table Container */}
+              <div style={{ flex: 1, overflowY: 'auto', marginBottom: '1.5rem', paddingRight: '0.5rem' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  {/* Header labels (hidden on mobile) */}
+                  <div className="desktop-only" style={{ display: 'grid', gridTemplateColumns: activeCat === 'alimento' ? '2fr 1fr 1fr 1fr 1.5fr' : '2.5fr 1.5fr 1fr 1.5fr', gap: '1rem', padding: '0 0.5rem', marginBottom: '-0.5rem' }}>
+                    <div style={{ fontSize: '0.65rem', fontWeight: 900, color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>{activeCat === 'aireadores' ? 'Equipo / Marca' : activeCat === 'alevinos' ? 'Especie' : 'Producto'}</div>
+                    <div style={{ fontSize: '0.65rem', fontWeight: 900, color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>{activeCat === 'alevinos' ? 'Tipo / Etapa' : activeCat === 'insumos' ? 'Presentación' : activeCat === 'aireadores' ? 'HP / Energía' : 'Lote'}</div>
+                    <div style={{ fontSize: '0.65rem', fontWeight: 900, color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>{activeCat === 'alimento' ? 'Cant (BTO)' : 'Cant'}</div>
+                    {activeCat === 'alimento' && <div style={{ fontSize: '0.65rem', fontWeight: 900, color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>Kilos</div>}
+                    <div style={{ fontSize: '0.65rem', fontWeight: 900, color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>Vlr. Unit ($)</div>
+                  </div>
+                  
+                  {items.map((item) => (
+                    <div key={item.id} className="card-premium" style={{ 
+                      padding: '1rem', 
+                      display: 'grid', 
+                      gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', 
+                      gap: '1rem',
+                      alignItems: 'center',
+                      background: 'var(--secondary)'
+                    }}>
+                      {/* Producto */}
+                      <div style={{ position: 'relative' }}>
+                        <label className="mobile-only" style={{ display: 'block', fontSize: '0.6rem', fontWeight: 900, marginBottom: '0.25rem', color: 'var(--muted-foreground)' }}>PRODUCTO</label>
+                        <input 
+                          type="text" 
+                          id={`input-${item.id}`}
+                          value={item.product} 
+                          onChange={(e) => updateItem(item.id, 'product', e.target.value)} 
+                          onFocus={(e) => {
+                            const rect = e.currentTarget.getBoundingClientRect();
+                            setDropdownPos({ top: rect.bottom + 5, left: rect.left, width: rect.width });
+                            setFocusedItemId(`${item.id}-product`);
+                            setFocusedRowId(item.id);
+                          }}
+                          onBlur={() => setTimeout(() => setFocusedItemId(null), 200)}
+                          placeholder="Buscar..." 
+                          style={{ width: '100%', padding: '0.6rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--card)', outline: 'none', fontSize: '0.85rem', fontWeight: 700 }} 
+                        />
+                      </div>
+
+                      {/* Lote / Tipo */}
+                      <div>
+                        <label className="mobile-only" style={{ display: 'block', fontSize: '0.6rem', fontWeight: 900, marginBottom: '0.25rem', color: 'var(--muted-foreground)' }}>{activeCat === 'alevinos' ? 'TIPO' : 'LOTE'}</label>
+                        {activeCat === 'alevinos' ? (
+                          <select 
+                            value={item.batch} 
+                            onChange={(e) => updateItem(item.id, 'batch', e.target.value)}
+                            style={{ width: '100%', padding: '0.6rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--card)', outline: 'none', fontSize: '0.85rem' }}
+                          >
+                            <option value="">Seleccionar...</option>
+                            <option value="ova">Ova</option>
+                            <option value="larva">Larva</option>
+                            <option value="alevino">Alevino</option>
+                          </select>
+                        ) : activeCat === 'insumos' ? (
+                          <select 
+                            value={item.batch} 
+                            onChange={(e) => updateItem(item.id, 'batch', e.target.value)}
+                            style={{ width: '100%', padding: '0.6rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--card)', outline: 'none', fontSize: '0.85rem' }}
+                          >
+                            <option value="gramos">Gramos (g)</option>
+                            <option value="kg">Kilogramos (kg)</option>
+                            <option value="ml">Mililitros (mL)</option>
+                            <option value="litros">Litros (L)</option>
+                            <option value="unidades">Unidades</option>
+                          </select>
+                        ) : (
+                          <input type="text" value={item.batch} onChange={(e) => updateItem(item.id, 'batch', e.target.value)} placeholder="Ej: Lote" style={{ width: '100%', padding: '0.6rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--card)', outline: 'none', fontSize: '0.85rem' }} />
+                        )}
+                      </div>
+
+                      {/* Cantidad */}
+                      <div style={{ display: 'flex', gap: '0.5rem' }}>
+                        <div style={{ flex: 1 }}>
+                          <label className="mobile-only" style={{ display: 'block', fontSize: '0.6rem', fontWeight: 900, marginBottom: '0.25rem', color: 'var(--muted-foreground)' }}>CANT</label>
+                          <input type="number" value={item.quantity} onChange={(e) => updateItem(item.id, 'quantity', e.target.value)} placeholder="0" style={{ width: '100%', padding: '0.6rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--card)', outline: 'none', fontSize: '0.85rem', fontWeight: 900 }} />
+                        </div>
                         {activeCat === 'alimento' && (
-                          <td style={{ padding: '0.5rem' }}>
-                            <input 
-                              type="text" 
-                              value={(parseFloat(item.kilos) || 0).toLocaleString()} 
-                              readOnly
-                              style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid var(--border)', background: 'var(--secondary)', outline: 'none', fontSize: '0.85rem', fontWeight: 700, textAlign: 'right' }} 
-                            />
-                          </td>
+                          <div style={{ flex: 1.2 }}>
+                            <label className="mobile-only" style={{ display: 'block', fontSize: '0.6rem', fontWeight: 900, marginBottom: '0.25rem', color: 'var(--muted-foreground)' }}>KILOS</label>
+                            <input type="number" value={item.kilos} onChange={(e) => updateItem(item.id, 'kilos', e.target.value)} placeholder="Kg" style={{ width: '100%', padding: '0.6rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--card)', outline: 'none', fontSize: '0.85rem', fontWeight: 900 }} />
+                          </div>
                         )}
-                        {activeCat === 'aireadores' && (
-                          <td style={{ padding: '0.5rem' }}>
-                            <input type="text" value={item.sortCaudal} onChange={(e) => updateItem(item.id, 'sortCaudal', e.target.value)} placeholder="4.3 Kg/h" style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid var(--border)', outline: 'none', fontSize: '0.85rem' }} />
-                          </td>
-                        )}
-                        <td style={{ padding: '0.5rem' }}>
+                      </div>
+
+                      {/* Precio Unitario */}
+                      <div style={{ position: 'relative' }}>
+                        <label className="mobile-only" style={{ display: 'block', fontSize: '0.6rem', fontWeight: 900, marginBottom: '0.25rem', color: 'var(--muted-foreground)' }}>VALOR UNIT</label>
+                        <div style={{ position: 'relative' }}>
+                          <span style={{ position: 'absolute', left: '0.5rem', top: '50%', transform: 'translateY(-50%)', fontSize: '0.75rem', fontWeight: 700, color: 'var(--muted-foreground)' }}>$</span>
                           <input 
                             type="text" 
                             value={item.unitPrice ? parseInt(item.unitPrice).toLocaleString() : ''} 
-                            onChange={(e) => {
-                              const val = e.target.value.replace(/\D/g, '');
-                              updateItem(item.id, 'unitPrice', val);
-                            }} 
+                            onChange={(e) => updateItem(item.id, 'unitPrice', e.target.value.replace(/\D/g, ''))} 
                             placeholder="0" 
-                            style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid var(--border)', outline: 'none', fontSize: '0.85rem', fontWeight: 700, textAlign: 'right' }} 
+                            style={{ width: '100%', padding: '0.6rem 0.6rem 0.6rem 1.2rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--card)', outline: 'none', fontSize: '0.85rem', fontWeight: 800, color: 'var(--primary)' }} 
                           />
-                        </td>
-                        {activeCat === 'aireadores' && (
-                          <td style={{ padding: '0.5rem' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                              <div 
-                                onClick={() => updateItem(item.id, 'hasIva', !item.hasIva ? 'true' : 'false')}
-                                style={{ width: '32px', height: '18px', borderRadius: '10px', background: item.hasIva ? 'var(--primary)' : 'var(--border)', cursor: 'pointer', position: 'relative', transition: '0.3s' }}
-                              >
+                        </div>
+                      </div>
+
+                      {/* Botón Eliminar */}
+                      <div style={{ width: '40px', display: 'flex', justifyContent: 'center' }}>
+                        <button 
+                          onClick={() => removeItem(item.id)}
+                          style={{ background: 'rgba(239, 68, 68, 0.1)', border: 'none', color: '#ef4444', padding: '0.5rem', borderRadius: '8px', cursor: 'pointer' }}
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
                                 <div style={{ width: '14px', height: '14px', borderRadius: '50%', background: 'white', position: 'absolute', top: '2px', left: item.hasIva ? '16px' : '2px', transition: '0.3s' }} />
                               </div>
                               {item.hasIva && (

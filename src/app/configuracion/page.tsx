@@ -453,7 +453,9 @@ const TeamManagement = () => {
   };
 
   const handleUpdateRole = async (userId: string, newRole: string) => {
-    setRefreshing(true);
+    // Actualización Optimista: Cambiamos el estado local primero para que el usuario lo vea YA
+    setMembers(prev => prev.map(m => m.id === userId ? { ...m, role: newRole } : m));
+    
     try {
       const activeUnitId = localStorage.getItem('active_unit_id');
       const { error } = await supabase
@@ -462,12 +464,14 @@ const TeamManagement = () => {
         .eq('user_id', userId)
         .eq('unit_id', activeUnitId);
       
-      if (error) throw error;
+      if (error) {
+        // Si hay error, revertimos el cambio local
+        fetchTeam(true);
+        throw error;
+      }
       alert("¡Rol actualizado con éxito!");
-      fetchTeam(true);
     } catch (err: any) { 
       alert("Error al cambiar rol: " + err.message); 
-      setRefreshing(false); 
     }
   };
 
