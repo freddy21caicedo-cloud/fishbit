@@ -9,7 +9,8 @@ import {
   Activity, 
   TrendingUp, 
   Info,
-  History
+  History,
+  AlertCircle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';

@@ -8,7 +8,8 @@ import {
   ArrowLeft, 
   History, 
   TrendingUp,
-  Plus
+  Plus,
+  AlertCircle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
@@ -72,6 +73,30 @@ export default function AlimentacionPage() {
       .eq('category', 'alimento')
       .eq('unit_id', activeUnitId);
     setFoodStock(invData || []);
+  };
+
+  const fetchSpecies = async (pondId: string) => {
+    const activeUnitId = localStorage.getItem('active_unit_id');
+    const { data } = await supabase
+      .from('pond_species')
+      .select('*')
+      .eq('estanque_id', pondId)
+      .eq('unit_id', activeUnitId);
+
+    if (data && data.length > 0) {
+      setAlimentaciones(data.map(s => ({
+        speciesId: s.id,
+        speciesName: s.species_name,
+        quantity: ''
+      })));
+    } else {
+      const p = ponds.find(pond => pond.id === pondId);
+      setAlimentaciones([{
+        speciesId: null,
+        speciesName: p?.current_species && p.current_species !== 'Policultivo' ? p.current_species : '',
+        quantity: ''
+      }]);
+    }
   };
 
   const fetchPondDetails = async (id: string) => {
@@ -275,6 +300,24 @@ export default function AlimentacionPage() {
               >
                 <h3 style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--muted-foreground)', textTransform: 'uppercase', marginBottom: '1.5rem', borderTop: '1px solid var(--border)', paddingTop: '1.5rem' }}>Detalle de Alimentación por Especie</h3>
                 
+                {ponds.find(p => p.id === estanqueId)?.is_polyculture && alimentaciones.some(a => !a.speciesId) && (
+                  <div style={{ 
+                    padding: '1rem', 
+                    borderRadius: '12px', 
+                    background: 'rgba(245, 158, 11, 0.1)', 
+                    border: '1px solid rgba(245, 158, 11, 0.2)',
+                    display: 'flex',
+                    gap: '0.75rem',
+                    alignItems: 'center',
+                    marginBottom: '1rem'
+                  }}>
+                    <AlertCircle size={20} style={{ color: '#f59e0b' }} />
+                    <div style={{ fontSize: '0.85rem', color: '#92400e', lineHeight: 1.4 }}>
+                      <strong>Aviso:</strong> No hay desglose de especies para este policultivo. Puede definirlas a continuación o en Siembra.
+                    </div>
+                  </div>
+                )}
+
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '2rem' }}>
                   {alimentaciones.map((alim, index) => (
                     <div key={index} style={{ 

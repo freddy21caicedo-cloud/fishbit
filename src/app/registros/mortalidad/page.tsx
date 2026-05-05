@@ -15,7 +15,8 @@ import {
   ShieldCheck,
   Info,
   Bug,
-  History
+  History,
+  AlertCircle
 } from 'lucide-react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
