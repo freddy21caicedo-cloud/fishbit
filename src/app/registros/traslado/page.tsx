@@ -17,7 +17,9 @@ import {
   Box,
   CornerRightDown,
   History,
-  ChevronRight
+  ChevronRight,
+  Plus,
+  AlertCircle
 } from 'lucide-react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
@@ -254,6 +256,24 @@ export default function TrasladoPage() {
                 >
                   <h3 style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--muted-foreground)', textTransform: 'uppercase', marginBottom: '1.5rem', borderTop: '1px solid var(--border)', paddingTop: '1.5rem' }}>Especies a Trasladar</h3>
                   
+                  {ponds.find(p => p.id === origenId)?.is_polyculture && traslados.some(t => !t.speciesId) && (
+                    <div style={{ 
+                      padding: '1rem', 
+                      borderRadius: '12px', 
+                      background: 'rgba(245, 158, 11, 0.1)', 
+                      border: '1px solid rgba(245, 158, 11, 0.2)',
+                      display: 'flex',
+                      gap: '0.75rem',
+                      alignItems: 'center',
+                      marginBottom: '1rem'
+                    }}>
+                      <AlertCircle size={20} style={{ color: '#f59e0b' }} />
+                      <div style={{ fontSize: '0.85rem', color: '#92400e', lineHeight: 1.4 }}>
+                        <strong>Aviso:</strong> No hay desglose de especies para este policultivo en origen. Puede definirlas a continuación.
+                      </div>
+                    </div>
+                  )}
+
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '2.5rem' }}>
                     {traslados.map((t, index) => (
                       <div key={index} style={{ 
