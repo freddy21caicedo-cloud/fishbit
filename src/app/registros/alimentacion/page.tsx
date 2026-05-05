@@ -28,9 +28,26 @@ export default function AlimentacionPage() {
   const [lastBiometryData, setLastBiometryData] = useState<any>(null);
   const [totalFoodSinceLastBio, setTotalFoodSinceLastBio] = useState(0);
 
+  const [history, setHistory] = useState<any[]>([]);
+
   useEffect(() => {
     fetchBasicData();
+    fetchHistory();
   }, []);
+
+  const fetchHistory = async () => {
+    const activeUnitId = localStorage.getItem('active_unit_id');
+    if (!activeUnitId) return;
+
+    const { data } = await supabase
+      .from('alimentacion_diaria')
+      .select('*, estanques(name), inventory(name)')
+      .eq('unit_id', activeUnitId)
+      .order('date', { ascending: false })
+      .limit(10);
+    
+    if (data) setHistory(data);
+  };
 
   useEffect(() => {
     if (estanqueId) {
@@ -341,6 +358,52 @@ export default function AlimentacionPage() {
             <div>
               <div style={{ fontWeight: 700, fontSize: '0.9rem' }}>Ahorro Proyectado</div>
               <p style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)' }}>Cada 0.1 de mejora en F.C.A. representa un ahorro del 8% en alimento.</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Full Width History Table */}
+        <div style={{ gridColumn: '1 / -1', marginTop: '3rem' }}>
+          <div className="card-premium" style={{ padding: '2rem' }}>
+            <h3 style={{ fontSize: '1.1rem', fontWeight: 800, marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <History size={20} style={{ color: 'var(--primary)' }} />
+              Bitácora de Alimentación Diaria
+            </h3>
+            
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '700px' }}>
+                <thead>
+                  <tr style={{ borderBottom: '2px solid var(--border)' }}>
+                    <th style={{ textAlign: 'left', padding: '1rem', fontSize: '0.8rem', color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>Especie</th>
+                    <th style={{ textAlign: 'left', padding: '1rem', fontSize: '0.8rem', color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>Cantidad (kg)</th>
+                    <th style={{ textAlign: 'left', padding: '1rem', fontSize: '0.8rem', color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>Alimento</th>
+                    <th style={{ textAlign: 'left', padding: '1rem', fontSize: '0.8rem', color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>Estanque</th>
+                    <th style={{ textAlign: 'left', padding: '1rem', fontSize: '0.8rem', color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>Fecha</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {history.map((h) => (
+                    <tr key={h.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                      <td style={{ padding: '1rem', fontWeight: 700 }}>{h.species_name || 'Especie'}</td>
+                      <td style={{ padding: '1rem', fontWeight: 800, color: '#10b981' }}>{h.quantity_kg} kg</td>
+                      <td style={{ padding: '1rem', fontSize: '0.9rem' }}>{h.inventory?.name}</td>
+                      <td style={{ padding: '1rem' }}>
+                        <span style={{ padding: '0.25rem 0.6rem', background: 'var(--secondary)', borderRadius: '6px', fontSize: '0.85rem', fontWeight: 600 }}>
+                          {h.estanques?.name}
+                        </span>
+                      </td>
+                      <td style={{ padding: '1rem', fontSize: '0.85rem', color: 'var(--muted-foreground)' }}>
+                        {new Date(h.date).toLocaleDateString()}
+                      </td>
+                    </tr>
+                  ))}
+                  {history.length === 0 && (
+                    <tr>
+                      <td colSpan={5} style={{ padding: '3rem', textAlign: 'center', color: 'var(--muted-foreground)' }}>No hay registros de alimentación recientes.</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
             </div>
           </div>
         </div>

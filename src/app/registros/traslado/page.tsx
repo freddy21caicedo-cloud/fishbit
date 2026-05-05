@@ -15,7 +15,9 @@ import {
   TrendingUp,
   Zap,
   Box,
-  CornerRightDown
+  CornerRightDown,
+  History,
+  ChevronRight
 } from 'lucide-react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
@@ -28,9 +30,26 @@ export default function TrasladoPage() {
   const [ponds, setPonds] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
+  const [history, setHistory] = useState<any[]>([]);
+
   useEffect(() => {
     fetchPonds();
+    fetchHistory();
   }, []);
+
+  const fetchHistory = async () => {
+    const activeUnitId = localStorage.getItem('active_unit_id');
+    if (!activeUnitId) return;
+
+    const { data } = await supabase
+      .from('transfers')
+      .select('*, origen:estanques!origen_id(name), destino:estanques!destino_id(name)')
+      .eq('unit_id', activeUnitId)
+      .order('date', { ascending: false })
+      .limit(10);
+    
+    if (data) setHistory(data);
+  };
 
   const fetchPonds = async () => {
     const activeUnitId = localStorage.getItem('active_unit_id');
@@ -282,6 +301,56 @@ export default function TrasladoPage() {
                 <span>Si el destino está vacío, heredará automáticamente las propiedades de las especies trasladadas.</span>
               </li>
             </ul>
+          </div>
+        </div>
+
+        {/* Full Width History Table */}
+        <div style={{ gridColumn: '1 / -1', marginTop: '3rem' }}>
+          <div className="card-premium" style={{ padding: '2rem' }}>
+            <h3 style={{ fontSize: '1.1rem', fontWeight: 800, marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <History size={20} style={{ color: 'var(--primary)' }} />
+              Historial de Traslados Recientes
+            </h3>
+            
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '700px' }}>
+                <thead>
+                  <tr style={{ borderBottom: '2px solid var(--border)' }}>
+                    <th style={{ textAlign: 'left', padding: '1rem', fontSize: '0.8rem', color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>Especie</th>
+                    <th style={{ textAlign: 'left', padding: '1rem', fontSize: '0.8rem', color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>Cantidad</th>
+                    <th style={{ textAlign: 'left', padding: '1rem', fontSize: '0.8rem', color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>Flujo (Origen → Destino)</th>
+                    <th style={{ textAlign: 'left', padding: '1rem', fontSize: '0.8rem', color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>Fecha</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {history.map((h) => (
+                    <tr key={h.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                      <td style={{ padding: '1rem', fontWeight: 700 }}>{h.species_name}</td>
+                      <td style={{ padding: '1rem', fontWeight: 800, color: '#f59e0b' }}>{h.quantity}</td>
+                      <td style={{ padding: '1rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <span style={{ padding: '0.25rem 0.6rem', background: 'rgba(245, 158, 11, 0.1)', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 600, color: '#f59e0b' }}>
+                            {h.origen?.name}
+                          </span>
+                          <ChevronRight size={14} style={{ color: 'var(--muted-foreground)' }} />
+                          <span style={{ padding: '0.25rem 0.6rem', background: 'rgba(59, 130, 246, 0.1)', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 600, color: '#3b82f6' }}>
+                            {h.destino?.name}
+                          </span>
+                        </div>
+                      </td>
+                      <td style={{ padding: '1rem', fontSize: '0.85rem', color: 'var(--muted-foreground)' }}>
+                        {new Date(h.date).toLocaleDateString()}
+                      </td>
+                    </tr>
+                  ))}
+                  {history.length === 0 && (
+                    <tr>
+                      <td colSpan={4} style={{ padding: '3rem', textAlign: 'center', color: 'var(--muted-foreground)' }}>No hay movimientos registrados.</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       </div>

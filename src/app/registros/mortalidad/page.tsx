@@ -36,9 +36,26 @@ export default function MortalidadPage() {
   const [ponds, setPonds] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
+  const [history, setHistory] = useState<any[]>([]);
+
   useEffect(() => {
     fetchPonds();
+    fetchHistory();
   }, []);
+
+  const fetchHistory = async () => {
+    const activeUnitId = localStorage.getItem('active_unit_id');
+    if (!activeUnitId) return;
+
+    const { data } = await supabase
+      .from('mortality')
+      .select('*, estanques(name)')
+      .eq('unit_id', activeUnitId)
+      .order('date', { ascending: false })
+      .limit(10);
+    
+    if (data) setHistory(data);
+  };
 
   const fetchPonds = async () => {
     const activeUnitId = localStorage.getItem('active_unit_id');
@@ -408,6 +425,50 @@ export default function MortalidadPage() {
             <p style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)', lineHeight: 1.5 }}>
               Un registro oportuno de bajas permite detectar brotes de enfermedades en etapas tempranas.
             </p>
+          </div>
+        </div>
+
+        {/* Full Width History Table */}
+        <div style={{ gridColumn: '1 / -1', marginTop: '3rem' }}>
+          <div className="card-premium" style={{ padding: '2rem' }}>
+            <h3 style={{ fontSize: '1.1rem', fontWeight: 800, marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <History size={20} style={{ color: 'var(--primary)' }} />
+              Historial de Bajas Recientes
+            </h3>
+            
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '600px' }}>
+                <thead>
+                  <tr style={{ borderBottom: '2px solid var(--border)' }}>
+                    <th style={{ textAlign: 'left', padding: '1rem', fontSize: '0.8rem', color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>Especie</th>
+                    <th style={{ textAlign: 'left', padding: '1rem', fontSize: '0.8rem', color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>Cantidad</th>
+                    <th style={{ textAlign: 'left', padding: '1rem', fontSize: '0.8rem', color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>Estanque</th>
+                    <th style={{ textAlign: 'left', padding: '1rem', fontSize: '0.8rem', color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>Fecha</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {history.map((h) => (
+                    <tr key={h.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                      <td style={{ padding: '1rem', fontWeight: 700 }}>{h.species_name}</td>
+                      <td style={{ padding: '1rem', fontWeight: 800, color: '#ef4444' }}>{h.quantity}</td>
+                      <td style={{ padding: '1rem' }}>
+                        <span style={{ padding: '0.25rem 0.6rem', background: 'var(--secondary)', borderRadius: '6px', fontSize: '0.85rem', fontWeight: 600 }}>
+                          {h.estanques?.name}
+                        </span>
+                      </td>
+                      <td style={{ padding: '1rem', fontSize: '0.85rem', color: 'var(--muted-foreground)' }}>
+                        {new Date(h.date).toLocaleDateString()}
+                      </td>
+                    </tr>
+                  ))}
+                  {history.length === 0 && (
+                    <tr>
+                      <td colSpan={4} style={{ padding: '3rem', textAlign: 'center', color: 'var(--muted-foreground)' }}>No hay registros recientes.</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       </div>

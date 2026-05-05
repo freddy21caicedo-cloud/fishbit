@@ -97,7 +97,7 @@ export default function RegistrosPage() {
     // 2. Fetch Activity from all tables
     const [alimentacion, biometrias, calidadAgua, mortalidad, traslados] = await Promise.all([
       supabase.from('alimentacion_diaria').select('*, estanques(name)').eq('unit_id', activeUnitId).order('created_at', { ascending: false }).limit(5),
-      supabase.from('biometrias').select('*, estanques(name)').eq('unit_id', activeUnitId).order('created_at', { ascending: false }).limit(5),
+      supabase.from('biometria').select('*, estanques(name)').eq('unit_id', activeUnitId).order('created_at', { ascending: false }).limit(5),
       supabase.from('water_quality').select('*, estanques(name)').eq('unit_id', activeUnitId).order('created_at', { ascending: false }).limit(5),
       supabase.from('mortality').select('*, estanques(name)').eq('unit_id', activeUnitId).order('created_at', { ascending: false }).limit(5),
       supabase.from('transfers').select('*, origen:estanques!origen_id(name), destino:estanques!destino_id(name)').eq('unit_id', activeUnitId).order('created_at', { ascending: false }).limit(5),
@@ -108,7 +108,8 @@ export default function RegistrosPage() {
         id: `ali-${a.id}`,
         type: 'alimentacion',
         pond: a.estanques?.name,
-        detail: `Suministro de ${a.quantity_kg}kg`,
+        species: a.species_name,
+        detail: `Suministro de ${a.quantity_kg}kg (${a.species_name})`,
         time: new Date(a.created_at).toLocaleString(),
         rawDate: a.created_at
       })),
@@ -116,7 +117,8 @@ export default function RegistrosPage() {
         id: `bio-${b.id}`,
         type: 'biometria',
         pond: b.estanques?.name,
-        detail: `Peso promedio: ${b.avg_weight_gr}g`,
+        species: b.species_name,
+        detail: `Peso: ${b.avg_weight_gr || b.average_weight_g}g (${b.species_name})`,
         time: new Date(b.created_at).toLocaleString(),
         rawDate: b.created_at
       })),
@@ -124,6 +126,7 @@ export default function RegistrosPage() {
         id: `cal-${c.id}`,
         type: 'calidad-agua',
         pond: c.estanques?.name,
+        species: 'N/A',
         detail: `O2: ${c.o2_mg_l}mg/L | pH: ${c.ph}`,
         time: new Date(c.created_at).toLocaleString(),
         rawDate: c.created_at
@@ -132,7 +135,8 @@ export default function RegistrosPage() {
         id: `mor-${m.id}`,
         type: 'mortalidad',
         pond: m.estanques?.name,
-        detail: `Baja de ${m.quantity} individuos (${m.cause})`,
+        species: m.species_name,
+        detail: `Baja de ${m.quantity} (${m.species_name})`,
         time: new Date(m.created_at).toLocaleString(),
         rawDate: m.created_at
       })),
@@ -140,7 +144,8 @@ export default function RegistrosPage() {
         id: `tra-${t.id}`,
         type: 'traslado',
         pond: t.origen?.name,
-        detail: `Traslado de ${t.quantity} hacia ${t.destino?.name}`,
+        species: t.species_name,
+        detail: `Traslado de ${t.quantity} (${t.species_name}) hacia ${t.destino?.name}`,
         time: new Date(t.created_at).toLocaleString(),
         rawDate: t.created_at
       })),
@@ -249,6 +254,9 @@ export default function RegistrosPage() {
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.125rem' }}>
                       <span style={{ fontWeight: 700, fontSize: '0.95rem' }}>{type?.label}</span>
                       <span style={{ fontSize: '0.75rem', padding: '0.125rem 0.375rem', background: 'var(--secondary)', borderRadius: '4px', color: 'var(--muted-foreground)', fontWeight: 600 }}>{activity.pond}</span>
+                      {activity.species && activity.species !== 'N/A' && (
+                        <span style={{ fontSize: '0.75rem', padding: '0.125rem 0.375rem', background: 'rgba(59, 130, 246, 0.1)', borderRadius: '4px', color: '#3b82f6', fontWeight: 800 }}>{activity.species}</span>
+                      )}
                     </div>
                     <div style={{ fontSize: '0.875rem', color: 'var(--muted-foreground)' }}>{activity.detail}</div>
                   </div>
