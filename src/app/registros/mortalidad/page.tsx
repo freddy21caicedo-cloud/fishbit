@@ -356,8 +356,8 @@ export default function MortalidadPage() {
 
             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '1rem', background: 'var(--secondary)', borderRadius: '12px' }}>
               <div style={{ textAlign: 'left' }}>
-                <div style={{ fontSize: '0.7rem', color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>Población Anterior ({selectedPond?.is_polyculture ? especieId : 'Total'})</div>
-                <div style={{ fontWeight: 800 }}>{(selectedPond?.is_polyculture ? (selectedSpeciesData?.current_count || 0) : (selectedPond?.current_count || 0)).toLocaleString()}</div>
+                <div style={{ fontSize: '0.7rem', color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>Población Anterior</div>
+                <div style={{ fontWeight: 800 }}>{(ponds.find(p => p.id === estanqueId)?.current_count || 0).toLocaleString()}</div>
               </div>
               <div style={{ textAlign: 'right' }}>
                 <div style={{ fontSize: '0.7rem', color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>Población Proyectada</div>
