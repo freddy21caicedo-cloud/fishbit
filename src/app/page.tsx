@@ -246,9 +246,11 @@ export default function Dashboard() {
         const feedMap: any = {};
         let totalFeed = 0;
         feed?.forEach(f => {
-          const kg = parseFloat(f.quantity_kg) || 0;
+          const kg = Number(f.quantity_kg) || 0;
           totalFeed += kg;
-          const name = f.inventory?.name || 'Desconocido';
+          // Handle cases where relationship might return an array or an object
+          const invData: any = f.inventory;
+          const name = (Array.isArray(invData) ? invData[0]?.name : invData?.name) || 'Desconocido';
           feedMap[name] = (feedMap[name] || 0) + kg;
         });
         const feedDetails = Object.entries(feedMap).map(([name, val]: any) => ({ label: name, value: val.toFixed(0), unit: 'kg' }));
@@ -260,9 +262,10 @@ export default function Dashboard() {
         const mortMap: any = {};
         let totalMort = 0;
         mortData?.forEach(m => {
-          const qty = parseInt(m.quantity) || 0;
+          const qty = Number(m.quantity) || 0;
           totalMort += qty;
-          const pName = m.estanques?.name || 'Desconocido';
+          const estData: any = m.estanques;
+          const pName = (Array.isArray(estData) ? estData[0]?.name : estData?.name) || 'Desconocido';
           mortMap[pName] = (mortMap[pName] || 0) + qty;
         });
         const mortDetails = Object.entries(mortMap).map(([name, val]: any) => ({ 
@@ -275,7 +278,7 @@ export default function Dashboard() {
         const { data: inv } = await supabase.from('inventory').select('name, current_stock').eq('unit_id', unitId).eq('category', 'alimento');
         let totalInv = 0;
         const invDetails = inv?.map(i => {
-          const stock = parseFloat(i.current_stock as string) || 0;
+          const stock = Number(i.current_stock) || 0;
           totalInv += stock;
           return { label: i.name, value: stock.toFixed(0), unit: 'kg' };
         }) || [];
