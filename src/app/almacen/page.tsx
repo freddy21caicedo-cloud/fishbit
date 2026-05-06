@@ -1256,7 +1256,10 @@ export default function AlmacenPage() {
                                   onClick={async () => {
                                     const { error } = await supabase.from('invoices').update({ status: 'pagada' }).eq('id', inv.id);
                                     if (error) toast.error('Error: ' + error.message);
-                                    else fetchInvoices();
+                                    else {
+                                      const activeUnitId = localStorage.getItem('active_unit_id');
+                                      if (activeUnitId) fetchInvoices(activeUnitId);
+                                    }
                                   }}
                                   style={{ padding: '0.5rem 1rem', borderRadius: '8px', border: '1px solid #10b981', background: 'rgba(16, 185, 129, 0.05)', color: '#10b981', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
                                 >
