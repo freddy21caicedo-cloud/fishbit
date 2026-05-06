@@ -138,6 +138,9 @@ export default function Dashboard() {
     mortality: { total: 0, percent: 0, details: [] },
     inventory: { total: 0, details: [] }
   });
+  const [ticketSubject, setTicketSubject] = useState('');
+  const [ticketMessage, setTicketMessage] = useState('');
+  const [sendingTicket, setSendingTicket] = useState(false);
   const [ponds, setPonds] = useState<any[]>([]);
   const [selectedPond, setSelectedPond] = useState<string>('');
   const [selectedParam, setSelectedParam] = useState<string>('oxigeno');
