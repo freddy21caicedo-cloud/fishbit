@@ -365,10 +365,10 @@ export default function Dashboard() {
           .eq('unit_id', unitId);
         
         if (invoices) {
-          const total = invoices.reduce((acc, inv) => acc + (parseFloat(inv.total) || 0), 0);
-          const food = invoices.filter(inv => inv.category === 'alimento').reduce((acc, inv) => acc + (parseFloat(inv.total) || 0), 0);
-          const seeds = invoices.filter(inv => inv.category === 'alevinos').reduce((acc, inv) => acc + (parseFloat(inv.total) || 0), 0);
-          const pending = invoices.filter(inv => inv.status === 'pendiente').reduce((acc, inv) => acc + (parseFloat(inv.total) || 0), 0);
+          const total = invoices.reduce((acc, inv) => acc + (Number(inv.total) || 0), 0);
+          const food = invoices.filter(inv => inv.category === 'alimento').reduce((acc, inv) => acc + (Number(inv.total) || 0), 0);
+          const seeds = invoices.filter(inv => inv.category === 'alevinos').reduce((acc, inv) => acc + (Number(inv.total) || 0), 0);
+          const pending = invoices.filter(inv => inv.status === 'pendiente').reduce((acc, inv) => acc + (Number(inv.total) || 0), 0);
           
           setFinanceData({ total, food, seeds, pending });
         }
@@ -461,7 +461,7 @@ export default function Dashboard() {
       <div className="responsive-grid-4" style={{ marginBottom: '2.5rem' }}>
         <FlipCard 
           title="Biomasa Total" 
-          value={stats.biomass.total >= 1000 ? (stats.biomass.total/1000).toFixed(1) : stats.biomass.total} 
+          value={stats.biomass.total >= 1000 ? (Number(stats.biomass.total/1000).toFixed(1)) : stats.biomass.total} 
           unit={stats.biomass.total >= 1000 ? "Ton" : "kg"}
           change="+3.2%" 
           icon={Fish} 
@@ -470,7 +470,7 @@ export default function Dashboard() {
         />
         <FlipCard 
           title="Consumo Alimento" 
-          value={stats.consumption.total.toFixed(0)} 
+          value={Number(stats.consumption.total).toFixed(0)} 
           unit="kg"
           change="Mes" 
           icon={Utensils} 
@@ -488,7 +488,7 @@ export default function Dashboard() {
         />
         <FlipCard 
           title="Stock Concentrado" 
-          value={stats.inventory.total.toFixed(0)} 
+          value={Number(stats.inventory.total)} 
           unit="kg"
           change="Suficiente" 
           icon={ShoppingBag} 

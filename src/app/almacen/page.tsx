@@ -190,7 +190,7 @@ export default function AlmacenPage() {
       icon: ShoppingBag, 
       color: '#10b981', 
       bg: 'rgba(16, 185, 129, 0.1)', 
-      stock: inventory.filter(i => i.category === 'alimento').reduce((sum, i) => sum + (parseFloat(i.current_stock) || 0), 0),
+      stock: inventory.filter(i => i.category === 'alimento').reduce((sum, i) => sum + (Number(i.current_stock) || 0), 0),
       unit: 'Btos'
     },
     { 
@@ -199,7 +199,7 @@ export default function AlmacenPage() {
       icon: FlaskConical, 
       color: '#8b5cf6', 
       bg: 'rgba(139, 92, 246, 0.1)', 
-      stock: inventory.filter(i => i.category === 'farmacia').reduce((sum, i) => sum + (parseFloat(i.current_stock) || 0), 0),
+      stock: inventory.filter(i => i.category === 'farmacia').reduce((sum, i) => sum + (Number(i.current_stock) || 0), 0),
       unit: 'Und'
     },
     { 
@@ -208,7 +208,7 @@ export default function AlmacenPage() {
       icon: Beaker, 
       color: '#3b82f6', 
       bg: 'rgba(59, 130, 246, 0.1)', 
-      stock: inventory.filter(i => i.category === 'insumos').reduce((sum, i) => sum + (parseFloat(i.current_stock) || 0), 0),
+      stock: inventory.filter(i => i.category === 'insumos').reduce((sum, i) => sum + (Number(i.current_stock) || 0), 0),
       unit: 'Reg'
     },
     { 
@@ -217,7 +217,7 @@ export default function AlmacenPage() {
       icon: Fish, 
       color: '#06b6d4', 
       bg: 'rgba(6, 182, 212, 0.1)', 
-      stock: inventory.filter(i => i.category === 'alevinos').reduce((sum, i) => sum + (parseFloat(i.current_stock) || 0), 0),
+      stock: inventory.filter(i => i.category === 'alevinos').reduce((sum, i) => sum + (Number(i.current_stock) || 0), 0),
       unit: 'Und'
     },
     { 
@@ -226,7 +226,7 @@ export default function AlmacenPage() {
       icon: Wind, 
       color: '#f59e0b', 
       bg: 'rgba(245, 158, 11, 0.1)', 
-      stock: inventory.filter(i => i.category === 'aireadores').reduce((sum, i) => sum + (parseFloat(i.current_stock) || 0), 0),
+      stock: inventory.filter(i => i.category === 'aireadores').reduce((sum, i) => sum + (Number(i.current_stock) || 0), 0),
       unit: 'Equip'
     },
   ], [inventory]);
@@ -380,7 +380,7 @@ export default function AlmacenPage() {
           
           if (existing) {
             await supabase.from('inventory').update({ 
-              current_stock: (parseFloat(existing.current_stock as string) || 0) + qtyToAdd, 
+              current_stock: (Number(existing.current_stock) || 0) + qtyToAdd, 
               last_entry: new Date().toISOString()
             }).eq('id', existing.id);
           } else {
@@ -439,7 +439,7 @@ export default function AlmacenPage() {
         
         if (inventoryItem) {
           const qtyToRemove = category === 'alimento' ? (parseFloat(item.kilos) || 0) : (parseFloat(item.quantity) || 0);
-          const newStock = Math.max(0, (parseFloat(inventoryItem.current_stock as string) || 0) - qtyToRemove);
+          const newStock = Math.max(0, (Number(inventoryItem.current_stock) || 0) - qtyToRemove);
           await supabase
             .from('inventory')
             .update({ current_stock: newStock })

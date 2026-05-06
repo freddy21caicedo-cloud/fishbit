@@ -101,7 +101,7 @@ export default function BiometriaPage() {
     
     const stockingWeights: Record<string, number> = {};
     siembraData?.[0]?.siembra_details?.forEach((sd: any) => {
-      stockingWeights[sd.species_name] = parseFloat(sd.avg_weight_gr) || 0;
+      stockingWeights[sd.species_name] = Number(sd.avg_weight_gr) || 0;
     });
 
     if (data && data.length > 0) {
@@ -111,8 +111,8 @@ export default function BiometriaPage() {
         pesoCaptura: '',
         pecesCapturados: '',
         poblacionTotal: s.current_count || 0,
-        biomasaInicial: parseFloat(s.current_biomass_kg) || 0,
-        pesoSiembra: stockingWeights[s.species_name] || parseFloat(s.avg_weight_gr) || 0
+        biomasaInicial: Number(s.current_biomass_kg) || 0,
+        pesoSiembra: stockingWeights[s.species_name] || Number(s.avg_weight_gr) || 0
       })));
     } else {
       const pond = estanquesList.find(p => p.id === pondId);
@@ -123,7 +123,7 @@ export default function BiometriaPage() {
         pesoCaptura: '',
         pecesCapturados: '',
         poblacionTotal: pond?.current_count || 0,
-        biomasaInicial: parseFloat(pond?.current_biomass_kg) || 0,
+        biomasaInicial: Number(pond?.current_biomass_kg) || 0,
         pesoSiembra: stockingWeights[spName] || 0
       }]);
     }
