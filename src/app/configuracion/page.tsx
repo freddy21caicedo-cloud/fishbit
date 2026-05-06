@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Settings, 
   Bell, 
@@ -16,9 +16,13 @@ import {
   Mail,
   UserCircle,
   Info,
-  RefreshCw
+  RefreshCw,
+  X,
+  ChevronRight,
+  Shield
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { toast } from 'react-hot-toast';
 
 export default function ConfiguracionPage() {
   const [userRole, setUserRole] = useState<string | null>(null);
@@ -31,7 +35,6 @@ export default function ConfiguracionPage() {
     async function checkRole() {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
-        // 1. Verificar si es SuperAdmin
         const { data: profile } = await supabase
           .from('profiles')
           .select('is_superadmin, role')
@@ -41,7 +44,6 @@ export default function ConfiguracionPage() {
         const superStatus = profile?.is_superadmin || false;
         setIsSuperAdmin(superStatus);
 
-        // 2. Obtener rol de la unidad
         const { data: userUnit } = await supabase
           .from('user_units')
           .select('role')
@@ -52,7 +54,6 @@ export default function ConfiguracionPage() {
         const finalRole = userUnit?.role || profile?.role || 'operario';
         setUserRole(finalRole);
 
-        // Redirección inicial basada en rol
         if (superStatus) {
           setActiveTab('negocio');
         } else if (finalRole === 'admin') {
@@ -66,27 +67,25 @@ export default function ConfiguracionPage() {
     checkRole();
   }, []);
 
-  // ASIGNACIÓN DE VISTAS POR ROL
   const getTabs = () => {
     if (isSuperAdmin) {
       return [
-        { id: 'negocio', label: 'Tarifas y Planes', icon: DollarSign },
+        { id: 'negocio', label: 'Planes', icon: DollarSign },
         { id: 'general', label: 'Sistema', icon: Settings },
       ];
     }
 
     const baseTabs = [
-      { id: 'parametros', label: 'Límites de Alerta', icon: Activity },
+      { id: 'parametros', label: 'Alertas', icon: Activity },
       { id: 'notificaciones', label: 'Notificaciones', icon: Bell },
     ];
 
     if (userRole === 'admin') {
-      baseTabs.push({ id: 'equipo', label: 'Gestión de Equipo', icon: Users });
+      baseTabs.push({ id: 'equipo', label: 'Equipo', icon: Users });
     }
 
-    // El Operario solo ve parámetros (lectura)
     if (userRole === 'operario') {
-      return [{ id: 'parametros', label: 'Estado de Alertas', icon: Activity }];
+      return [{ id: 'parametros', label: 'Estado', icon: Activity }];
     }
 
     return baseTabs;
@@ -94,40 +93,50 @@ export default function ConfiguracionPage() {
 
   const tabs = getTabs();
 
-  if (loading) return <div style={{ padding: '2rem', textAlign: 'center' }}>Cargando configuración...</div>;
-
-  const inputStyle = { width: '100%', padding: '0.625rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--secondary)', outline: 'none' };
+  if (loading) {
+    return (
+      <div style={{ minHeight: '80vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <Loader2 className="animate-spin" size={48} color="#0d9488" />
+      </div>
+    );
+  }
 
   return (
-    <div className="animate-fade-in">
-      <header style={{ marginBottom: '2.5rem' }}>
-        <h1 style={{ fontSize: '1.875rem', fontWeight: 700, marginBottom: '0.5rem' }}>
-          {isSuperAdmin ? 'Configuración de Negocio' : 'Configuración'}
-        </h1>
-        <p style={{ color: 'var(--muted-foreground)' }}>
+    <div className="animate-fade-in page-container">
+      <header style={{ marginBottom: '3rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.5rem' }}>
+          <div style={{ width: '48px', height: '48px', background: 'var(--primary)', borderRadius: '14px', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+             <Settings size={24} />
+          </div>
+          <h1 style={{ fontWeight: 900, letterSpacing: '-0.04em' }}>
+            {isSuperAdmin ? 'Panel de Control FishBit' : 'Configuración'}
+          </h1>
+        </div>
+        <p style={{ color: 'var(--muted-foreground)', fontWeight: 600 }}>
           {isSuperAdmin 
-            ? 'Administra los precios de los planes y parámetros globales de la plataforma.' 
-            : 'Personaliza el comportamiento y los parámetros técnicos de FishBit.'}
+            ? 'Gestión global de la plataforma y modelos de negocio.' 
+            : 'Personaliza los parámetros técnicos de tu unidad acuícola.'}
         </p>
       </header>
 
-      <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '2rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.5rem' }}>
+      <div style={{ display: 'flex', gap: '0.4rem', padding: '0.4rem', background: 'var(--secondary)', borderRadius: '18px', width: 'fit-content', marginBottom: '2.5rem', flexWrap: 'wrap' }}>
         {tabs.map(tab => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
             style={{
-              padding: '0.75rem 1.25rem',
-              borderRadius: '8px',
-              background: activeTab === tab.id ? 'var(--secondary)' : 'transparent',
-              color: activeTab === tab.id ? 'var(--primary)' : 'var(--muted-foreground)',
+              padding: '0.75rem 1.4rem',
+              borderRadius: '14px',
+              background: activeTab === tab.id ? 'var(--primary)' : 'transparent',
+              color: activeTab === tab.id ? 'white' : 'var(--muted-foreground)',
               border: 'none',
               cursor: 'pointer',
-              fontWeight: 600,
+              fontWeight: 800,
               display: 'flex',
               alignItems: 'center',
-              gap: '0.625rem',
-              transition: 'all 0.2s ease'
+              gap: '0.6rem',
+              transition: 'all 0.25s ease',
+              fontSize: '0.85rem'
             }}
           >
             <tab.icon size={18} />
@@ -136,106 +145,131 @@ export default function ConfiguracionPage() {
         ))}
       </div>
 
-      <div className="card-premium" style={{ padding: '2rem', background: 'var(--card)' }}>
-        {isSuperAdmin && activeTab === 'negocio' && (
-          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-            <div style={{ marginBottom: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div className="card-premium" style={{ padding: '2.5rem' }}>
+        <AnimatePresence mode="wait">
+          <motion.div 
+            key={activeTab}
+            initial={{ opacity: 0, x: 10 }} 
+            animate={{ opacity: 1, x: 0 }} 
+            exit={{ opacity: 0, x: -10 }}
+            transition={{ duration: 0.2 }}
+          >
+            {isSuperAdmin && activeTab === 'negocio' && (
               <div>
-                <h2 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '0.25rem' }}>Ajuste de Precios de Planes</h2>
-                <p style={{ fontSize: '0.875rem', color: 'var(--muted-foreground)' }}>Define cuánto cobrarás por cada nivel de servicio.</p>
+                <div style={{ marginBottom: '2.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+                  <div>
+                    <h2 style={{ fontSize: '1.4rem', fontWeight: 900, letterSpacing: '-0.02em', marginBottom: '0.25rem' }}>Estructura de Precios</h2>
+                    <p style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>Ajusta las suscripciones globales.</p>
+                  </div>
+                  <button className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: '#0d9488' }}>
+                    <Save size={18} /> Guardar Tarifas
+                  </button>
+                </div>
+                <div className="responsive-grid-2">
+                  <PriceCard title="Suscripción Básica" icon={CreditCard} value={prices.basic} onChange={(v: number) => setPrices({...prices, basic: v})} />
+                  <PriceCard title="Suscripción Premium" icon={DollarSign} value={prices.premium} onChange={(v: number) => setPrices({...prices, premium: v})} color="#f59e0b" />
+                </div>
               </div>
-              <button className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><Save size={18} /> Guardar Tarifas</button>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem' }}>
-              <PriceCard title="Plan Básico" icon={CreditCard} value={prices.basic} onChange={(v: number) => setPrices({...prices, basic: v})} />
-              <PriceCard title="Plan Premium" icon={DollarSign} value={prices.premium} onChange={(v: number) => setPrices({...prices, premium: v})} color="#f59e0b" />
-            </div>
-          </motion.div>
-        )}
+            )}
 
-        {isSuperAdmin && activeTab === 'general' && (
-          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-            <div style={{ marginBottom: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            {isSuperAdmin && activeTab === 'general' && (
               <div>
-                <h2 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '0.25rem' }}>Parámetros del Sistema</h2>
-                <p style={{ fontSize: '0.875rem', color: 'var(--muted-foreground)' }}>Configura las reglas globales de FishBit.</p>
+                <div style={{ marginBottom: '2.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+                  <div>
+                    <h2 style={{ fontSize: '1.4rem', fontWeight: 900, letterSpacing: '-0.02em', marginBottom: '0.25rem' }}>Sistema Maestro</h2>
+                    <p style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>Reglas de negocio y soporte.</p>
+                  </div>
+                  <button className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: '#0d9488' }}>
+                    <Save size={18} /> Aplicar Cambios
+                  </button>
+                </div>
+                <div className="responsive-grid-3">
+                  <SystemInput label="Moneda de Transacción" type="select" options={['COP', 'USD', 'MXN']} />
+                  <SystemInput label="WhatsApp Central" type="text" placeholder="+57 300 000 0000" />
+                  <SystemInput label="Gracia (Días)" type="number" defaultValue="3" />
+                </div>
               </div>
-              <button className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><Save size={18} /> Guardar Configuración</button>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem' }}>
-              <SystemInput label="Moneda Principal" type="select" options={['COP', 'USD']} />
-              <SystemInput label="WhatsApp de Soporte" type="text" placeholder="+57 300 000 0000" />
-              <SystemInput label="Días de Gracia" type="number" defaultValue="3" />
-            </div>
-          </motion.div>
-        )}
+            )}
 
-        {!isSuperAdmin && activeTab === 'parametros' && (
-          <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}>
-            <div style={{ marginBottom: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            {!isSuperAdmin && activeTab === 'parametros' && (
               <div>
-                <h2 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '0.25rem' }}>Rangos Óptimos de Calidad de Agua</h2>
-                <p style={{ fontSize: '0.875rem', color: 'var(--muted-foreground)' }}>Define los límites técnicos de tu granja.</p>
+                <div style={{ marginBottom: '2.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+                  <div>
+                    <h2 style={{ fontSize: '1.4rem', fontWeight: 900, letterSpacing: '-0.02em', marginBottom: '0.25rem' }}>Umbrales de Calidad</h2>
+                    <p style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>Define los límites de alerta para tu producción.</p>
+                  </div>
+                  <button onClick={() => toast.success("Umbrales actualizados.")} className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <Save size={18} /> Guardar Rangos
+                  </button>
+                </div>
+                <div className="responsive-grid-2">
+                  <ParamInput label="Oxígeno Crítico (mg/L)" icon={Wind} color="#3b82f6" min="4.5" max="9.0" />
+                  <ParamInput label="Temperatura Límite (°C)" icon={Thermometer} color="#ef4444" min="26.0" max="31.0" />
+                </div>
               </div>
-              <button className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><Save size={18} /> Guardar Cambios</button>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem' }}>
-              <ParamInput label="Oxígeno Disuelto (mg/L)" icon={Wind} color="#3b82f6" min="4.5" max="9.0" />
-              <ParamInput label="Temperatura (°C)" icon={Thermometer} color="#ef4444" min="26.0" max="31.0" />
-            </div>
+            )}
+
+            {!isSuperAdmin && activeTab === 'equipo' && <TeamManagement />}
+
+            {(activeTab === 'notificaciones') && (
+              <div style={{ padding: '6rem 2rem', textAlign: 'center' }}>
+                <Bell size={48} style={{ margin: '0 auto 1.5rem', opacity: 0.1, color: 'var(--primary)' }} />
+                <h3 style={{ fontWeight: 900, color: 'var(--muted-foreground)' }}>Canales de Notificación</h3>
+                <p style={{ fontSize: '0.9rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>Próximamente: Integración con WhatsApp y Push Notifications.</p>
+              </div>
+            )}
           </motion.div>
-        )}
-
-        {!isSuperAdmin && activeTab === 'equipo' && <TeamManagement />}
-
-        {(activeTab === 'notificaciones') && (
-          <div style={{ padding: '4rem 2rem', textAlign: 'center', color: 'var(--muted-foreground)' }}>
-            <p>Sección de configuración adicional en desarrollo...</p>
-          </div>
-        )}
+        </AnimatePresence>
       </div>
     </div>
   );
 }
 
 const PriceCard = ({ title, icon: Icon, value, onChange, color }: any) => (
-  <div style={{ padding: '1.5rem', borderRadius: '16px', border: '1px solid var(--border)', background: 'var(--secondary)' }}>
-    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.25rem', color: color || 'var(--primary)' }}>
-      <Icon size={20} /> <span style={{ fontWeight: 800 }}>{title}</span>
+  <div className="glass" style={{ padding: '2rem', borderRadius: '20px' }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem', color: color || 'var(--primary)' }}>
+      <Icon size={24} /> <span style={{ fontWeight: 900, fontSize: '1.1rem' }}>{title}</span>
     </div>
-    <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 800, color: 'var(--muted-foreground)', marginBottom: '0.5rem', textTransform: 'uppercase' }}>Precio Mensual (USD)</label>
+    <label className="premium-label">Valor Mensual (USD)</label>
     <div style={{ position: 'relative' }}>
-      <span style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', fontWeight: 700, color: 'var(--muted-foreground)' }}>$</span>
-      <input type="number" value={value} onChange={e => onChange(Number(e.target.value))} style={{ width: '100%', padding: '0.75rem 0.75rem 0.75rem 2rem', borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--card)', outline: 'none', fontWeight: 800, fontSize: '1.1rem' }} />
+      <span style={{ position: 'absolute', left: '1.25rem', top: '50%', transform: 'translateY(-50%)', fontWeight: 900, color: 'var(--muted-foreground)' }}>$</span>
+      <input type="number" value={value} onChange={e => onChange(Number(e.target.value))} className="premium-input" style={{ paddingLeft: '2.5rem', fontSize: '1.25rem', fontWeight: 900 }} />
     </div>
   </div>
 );
 
 const SystemInput = ({ label, type, options, placeholder, defaultValue }: any) => (
-  <div style={{ padding: '1.5rem', borderRadius: '16px', border: '1px solid var(--border)', background: 'var(--secondary)' }}>
-    <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 800, color: 'var(--muted-foreground)', marginBottom: '0.5rem', textTransform: 'uppercase' }}>{label}</label>
+  <div className="glass" style={{ padding: '1.5rem', borderRadius: '18px' }}>
+    <label className="premium-label">{label}</label>
     {type === 'select' ? (
-      <select style={{ width: '100%', padding: '0.75rem', borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--card)', outline: 'none', fontWeight: 600 }}>
+      <select className="premium-input" style={{ fontWeight: 700 }}>
         {options.map((o: any) => <option key={o} value={o}>{o}</option>)}
       </select>
     ) : (
-      <input type={type} placeholder={placeholder} defaultValue={defaultValue} style={{ width: '100%', padding: '0.75rem', borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--card)', outline: 'none', fontWeight: 600 }} />
+      <input type={type} placeholder={placeholder} defaultValue={defaultValue} className="premium-input" style={{ fontWeight: 700 }} />
     )}
   </div>
 );
 
 const ParamInput = ({ label, icon: Icon, color, min, max }: any) => (
-  <div style={{ padding: '1.5rem', borderRadius: '12px', border: '1px solid var(--border)', background: `${color}05` }}>
-    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.25rem', color }}>
-      <Icon size={20} /> <span style={{ fontWeight: 700 }}>{label}</span>
+  <div style={{ padding: '2rem', borderRadius: '20px', background: `${color}05`, border: `1px solid ${color}20` }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem', color }}>
+      <Icon size={22} /> <span style={{ fontWeight: 900 }}>{label}</span>
     </div>
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-      <input type="number" defaultValue={min} style={{ width: '100%', padding: '0.625rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--secondary)', outline: 'none' }} />
-      <input type="number" defaultValue={max} style={{ width: '100%', padding: '0.625rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--secondary)', outline: 'none' }} />
+    <div className="responsive-grid-2">
+      <div>
+        <label className="premium-label">Mínimo</label>
+        <input type="number" defaultValue={min} className="premium-input" style={{ fontWeight: 800 }} />
+      </div>
+      <div>
+        <label className="premium-label">Máximo</label>
+        <input type="number" defaultValue={max} className="premium-input" style={{ fontWeight: 800 }} />
+      </div>
     </div>
   </div>
 );
 
+const Loader2 = ({ className, size, color }: any) => <RefreshCw className={className} size={size} color={color} />;
 
 const TeamManagement = () => {
   const [members, setMembers] = useState<any[]>([]);
@@ -252,13 +286,10 @@ const TeamManagement = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // --- AUTO-REPARACIÓN PARA EL ADMIN ---
-      // Si el Admin logueado no tiene email en su perfil, lo guardamos ahora
       const { data: myProfile } = await supabase.from('profiles').select('email').eq('id', user.id).single();
       if (myProfile && !myProfile.email && user.email) {
         await supabase.from('profiles').update({ email: user.email }).eq('id', user.id);
       }
-      // -------------------------------------
 
       let activeUnitId = localStorage.getItem('active_unit_id');
       
@@ -275,7 +306,6 @@ const TeamManagement = () => {
         return;
       }
 
-      // Carga paralela para máxima velocidad
       const [subRes, uuRes] = await Promise.all([
         supabase.from('subscriptions').select('plan_type').eq('unit_id', activeUnitId).single(),
         supabase.from('user_units').select('user_id, role').eq('unit_id', activeUnitId)
@@ -286,7 +316,7 @@ const TeamManagement = () => {
 
       const userUnits = uuRes.data || [];
 
-      if (!userUnits || userUnits.length === 0) {
+      if (userUnits.length === 0) {
         setMembers([]);
         return;
       }
@@ -297,16 +327,13 @@ const TeamManagement = () => {
         .select('*')
         .in('id', userIds);
 
-      if (pError) console.error("Error al cargar perfiles (Posible RLS):", pError);
-
-      // Procesamiento blindado contra nulos y variantes de columnas
       const processedMembers = userUnits.map((uu: any) => {
         const profile = profiles?.find(p => p.id === uu.user_id) || {};
         return {
           ...profile,
           id: uu.user_id,
           full_name: profile.full_name || profile.nombre || (uu.role === 'admin' ? 'Administrador' : 'Miembro Invitado'),
-          email: profile.email || profile.correo || profile.mail || 'Pendiente de registro',
+          email: profile.email || profile.correo || 'Pendiente de registro',
           role: uu.role || profile.role || 'operario',
           isGhost: !profile.id
         };
@@ -314,53 +341,18 @@ const TeamManagement = () => {
 
       setMembers(processedMembers);
     } catch (err: any) { 
-      console.error("Error en Auditoría de Equipo:", err.message); 
+      toast.error("Error al cargar equipo.");
     } finally { 
       setLoading(false); 
       setRefreshing(false);
     }
   }, []);
 
-  const handleRepairProfile = async (member: any) => {
-    const name = prompt("Corregir Nombre:", member.full_name === 'Miembro Invitado' ? '' : member.full_name);
-    const email = prompt("Corregir Correo:", member.email.includes('N/A') || member.email.includes('Pendiente') ? '' : member.email);
-    
-    if (name && email) {
-      setRefreshing(true);
-      try {
-        const { error } = await supabase.from('profiles').upsert({
-          id: member.id,
-          full_name: name,
-          email: email,
-          role: member.role,
-          is_superadmin: false
-        }, { onConflict: 'id' });
-
-        if (error) {
-          if (error.message.includes('schema cache')) {
-            alert("Base de datos actualizada. Por favor, recarga la página completa (F5) para que el sistema reconozca los nuevos cambios.");
-          } else {
-            throw error;
-          }
-        } else {
-          alert("¡Perfil actualizado con éxito!");
-          window.location.reload(); // Forzar recarga para limpiar caché de esquema
-        }
-      } catch (err: any) {
-        alert("Error al actualizar: " + err.message);
-      } finally {
-        setRefreshing(false);
-      }
-    }
-  };
-
   useEffect(() => {
     fetchTeam();
-    
     const activeUnitId = localStorage.getItem('active_unit_id');
     if (!activeUnitId) return;
 
-    // Sincronización en tiempo real para actualizaciones instantáneas
     const channel = supabase.channel(`team_sync_${activeUnitId}`)
       .on('postgres_changes', { 
         event: '*', 
@@ -370,39 +362,22 @@ const TeamManagement = () => {
       }, () => fetchTeam(true))
       .subscribe();
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return () => { supabase.removeChannel(channel); };
   }, [fetchTeam]);
 
   const handleInvite = async (e: React.FormEvent) => {
     e.preventDefault();
     setInviting(true);
-    try {
+    const invitePromise = async () => {
       if (planType === 'basic') {
         const countByRole = members.filter(m => m.role === inviteData.role).length;
         if (countByRole >= 1) { 
-          alert(`🚫 LÍMITE DE PLAN BÁSICO:\n\nTu plan actual solo permite 1 usuario de tipo ${inviteData.role.toUpperCase()}.\n\nPara gestionar un equipo más grande e invitar a múltiples técnicos y operarios, por favor contacta a soporte para activar tu PLAN PREMIUM.`); 
-          return; 
+          throw new Error("Límite de Plan Básico: Solo 1 usuario por rol.");
         }
       }
       let activeUnitId = localStorage.getItem('active_unit_id');
-      
-      // Fallback para obtener la unidad si no está en localStorage
-      if (!activeUnitId) {
-        const { data: { user: currentUser } } = await supabase.auth.getUser();
-        if (currentUser) {
-          const { data: uu } = await supabase.from('user_units').select('unit_id').eq('user_id', currentUser.id).limit(1).single();
-          if (uu) activeUnitId = uu.unit_id;
-        }
-      }
+      if (!activeUnitId) throw new Error("Unidad no identificada.");
 
-      if (!activeUnitId) {
-        alert("Error: No se pudo determinar tu unidad de producción. Por favor, vuelve al Dashboard e intenta de nuevo.");
-        return;
-      }
-
-      // Registro en Auth
       const { data, error: authError } = await supabase.auth.signUp({ 
         email: inviteData.email, 
         password: 'FishBit2026!', 
@@ -412,51 +387,53 @@ const TeamManagement = () => {
       if (authError) throw authError;
 
       if (data.user) {
-        // 1. Crear Perfil
-        const { error: pError } = await supabase.from('profiles').insert([{ 
+        await supabase.from('profiles').insert([{ 
           id: data.user.id, 
           full_name: inviteData.fullName, 
           email: inviteData.email, 
           role: inviteData.role, 
           is_superadmin: false 
         }]);
-        if (pError) console.warn("Aviso: El perfil podría requerir permisos RLS adicionales:", pError.message);
 
-        // 2. Vincular a Unidad (CRÍTICO)
-        const { error: uuError } = await supabase.from('user_units').insert([{ 
+        await supabase.from('user_units').insert([{ 
           user_id: data.user.id, 
           unit_id: activeUnitId,
           role: inviteData.role 
         }]);
         
-        if (uuError) {
-          alert("Error al vincular el usuario a la granja: " + uuError.message);
-          return;
-        }
-
-        alert(`¡Invitación Exitosa para ${inviteData.fullName}!\n\nDatos de acceso:\nCorreo: ${inviteData.email}\nClave: FishBit2026!\n\nYa puedes ver al nuevo miembro en la lista.`);
         setShowInviteModal(false);
         setInviteData({ email: '', fullName: '', role: 'tecnico' });
         fetchTeam(true);
       }
-    } catch (err: any) { alert(err.message); } finally { setInviting(false); }
+    };
+
+    toast.promise(invitePromise(), {
+      loading: 'Enviando invitación...',
+      success: 'Miembro invitado correctamente.',
+      error: (err) => err.message
+    }).finally(() => setInviting(false));
   };
 
   const handleDelete = async (userId: string) => {
-    if (!confirm("¿Estás seguro de eliminar a este miembro?")) return;
-    setRefreshing(true);
-    try {
+    if (!confirm("¿Eliminar acceso para este miembro?")) return;
+    
+    const deletePromise = async () => {
       const activeUnitId = localStorage.getItem('active_unit_id');
       await supabase.from('user_units').delete().eq('user_id', userId).eq('unit_id', activeUnitId);
       fetchTeam(true);
-    } catch (err) { alert("Error al eliminar"); setRefreshing(false); }
+    };
+
+    toast.promise(deletePromise(), {
+      loading: 'Eliminando...',
+      success: 'Acceso revocado.',
+      error: 'Error al eliminar.'
+    });
   };
 
   const handleUpdateRole = async (userId: string, newRole: string) => {
-    // Actualización Optimista: Cambiamos el estado local primero para que el usuario lo vea YA
     setMembers(prev => prev.map(m => m.id === userId ? { ...m, role: newRole } : m));
     
-    try {
+    const updatePromise = async () => {
       const activeUnitId = localStorage.getItem('active_unit_id');
       const { error } = await supabase
         .from('user_units')
@@ -464,36 +441,33 @@ const TeamManagement = () => {
         .eq('user_id', userId)
         .eq('unit_id', activeUnitId);
       
-      if (error) {
-        // Si hay error, revertimos el cambio local
-        fetchTeam(true);
-        throw error;
-      }
-      alert("¡Rol actualizado con éxito!");
-    } catch (err: any) { 
-      alert("Error al cambiar rol: " + err.message); 
-    }
+      if (error) throw error;
+    };
+
+    toast.promise(updatePromise(), {
+      loading: 'Actualizando rol...',
+      success: 'Rol actualizado.',
+      error: 'Error al cambiar rol.'
+    });
   };
 
-  if (loading) return <div style={{ padding: '2rem', textAlign: 'center' }}>Cargando equipo...</div>;
-
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2.5rem' }}>
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2.5rem', flexWrap: 'wrap', gap: '1.5rem' }}>
         <div>
-          <h2 style={{ fontSize: '1.25rem', fontWeight: 800 }}>Gestión de Personal</h2>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.25rem' }}>
+          <h2 style={{ fontSize: '1.4rem', fontWeight: 900, letterSpacing: '-0.02em' }}>Gestión de Personal</h2>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginTop: '0.4rem' }}>
             <span style={{ 
-              padding: '2px 8px', 
+              padding: '4px 12px', 
               borderRadius: '20px', 
               fontSize: '0.65rem', 
               fontWeight: 900, 
-              background: planType === 'premium' ? 'rgba(245, 158, 11, 0.1)' : 'rgba(37, 99, 235, 0.1)',
-              color: planType === 'premium' ? '#d97706' : 'var(--primary)',
-              border: planType === 'premium' ? '1px solid rgba(245, 158, 11, 0.3)' : '1px solid rgba(37, 99, 235, 0.3)',
-              textTransform: 'uppercase'
+              background: planType === 'premium' ? 'rgba(245, 158, 11, 0.1)' : 'rgba(13, 148, 136, 0.1)',
+              color: planType === 'premium' ? '#d97706' : '#0d9488',
+              textTransform: 'uppercase',
+              letterSpacing: '0.05em'
             }}>
-              {planType === 'premium' ? 'Plan Premium: Ilimitado' : 'Plan Básico: 1 por rol'}
+              {planType === 'premium' ? 'Premium: Ilimitado' : 'Básico: 1 por rol'}
             </span>
           </div>
         </div>
@@ -501,75 +475,79 @@ const TeamManagement = () => {
           <button 
             onClick={() => fetchTeam(true)} 
             disabled={refreshing}
-            style={{ padding: '0.75rem', borderRadius: '12px', border: '1px solid var(--border)', background: 'var(--secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-            title="Actualizar lista"
+            style={{ padding: '0.8rem', borderRadius: '12px', border: '1px solid var(--border)', background: 'var(--secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
           >
-            <RefreshCw size={18} className={refreshing ? 'animate-spin' : ''} />
+            <RefreshCw size={20} className={refreshing ? 'animate-spin' : ''} />
           </button>
-          <button onClick={() => setShowInviteModal(true)} className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><Users size={18} /> Invitar</button>
+          <button onClick={() => setShowInviteModal(true)} className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', borderRadius: '12px', padding: '0.8rem 1.4rem' }}>
+            <Users size={20} /> Invitar Miembro
+          </button>
         </div>
       </div>
       
-      <div style={{ display: 'grid', gap: '1rem', opacity: refreshing ? 0.6 : 1, transition: 'opacity 0.2s' }}>
+      <div className="responsive-grid-2" style={{ opacity: refreshing ? 0.6 : 1, transition: 'opacity 0.2s' }}>
         {members.map(member => (
-          <div key={member.id} className="card-premium" style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', padding: '1.25rem', background: 'var(--secondary)', border: '1px solid var(--border)' }}>
-            <div style={{ width: '48px', height: '48px', borderRadius: '16px', background: 'var(--card)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--primary)' }}><UserCircle size={24} /></div>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontWeight: 800, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                {member.full_name}
-                {member.isGhost && (
-                  <button 
-                    onClick={() => handleRepairProfile(member)} 
-                    style={{ color: '#f59e0b', background: 'none', border: 'none', cursor: 'pointer', display: 'flex' }} 
-                    title="Completar perfil (Faltan datos)"
-                  >
-                    <Info size={14} />
-                  </button>
-                )}
-              </div>
-              <div style={{ fontSize: '0.8rem', color: 'var(--muted-foreground)' }}><Mail size={12} /> {member.email}</div>
+          <div key={member.id} className="glass" style={{ display: 'flex', alignItems: 'center', gap: '1.25rem', padding: '1.5rem', borderRadius: '20px' }}>
+            <div style={{ width: '56px', height: '56px', borderRadius: '16px', background: '#0d9488', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white' }}>
+              <UserCircle size={32} />
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontWeight: 900, fontSize: '1.1rem', letterSpacing: '-0.02em' }}>{member.full_name}</div>
+              <div style={{ fontSize: '0.8rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>{member.email}</div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
               {member.role !== 'admin' ? (
-                <select value={member.role} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleUpdateRole(member.id, e.target.value)} style={{ padding: '0.4rem', borderRadius: '8px', background: 'var(--card)', fontSize: '0.75rem', fontWeight: 700, outline: 'none', cursor: 'pointer' }}>
+                <select value={member.role} onChange={(e) => handleUpdateRole(member.id, e.target.value)} className="premium-input" style={{ width: 'auto', padding: '0.4rem 0.75rem', fontSize: '0.75rem', fontWeight: 800 }}>
                   <option value="tecnico">Técnico</option>
                   <option value="operario">Operario</option>
                 </select>
-              ) : <div style={{ padding: '0.4rem 1rem', borderRadius: '8px', background: 'var(--primary)', color: 'white', fontSize: '0.7rem', fontWeight: 800 }}>ADMIN</div>}
-              {member.role !== 'admin' && <button onClick={() => handleDelete(member.id)} style={{ color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer' }}><Trash2 size={18} /></button>}
+              ) : <div className="glass" style={{ padding: '0.4rem 1rem', borderRadius: '8px', background: '#0d9488', color: 'white', fontSize: '0.65rem', fontWeight: 900 }}>OWNER</div>}
+              {member.role !== 'admin' && (
+                <button onClick={() => handleDelete(member.id)} style={{ color: '#ef4444', background: 'rgba(239, 68, 68, 0.05)', border: 'none', borderRadius: '10px', padding: '0.6rem', cursor: 'pointer' }}>
+                  <Trash2 size={18} />
+                </button>
+              )}
             </div>
           </div>
         ))}
       </div>
-      {showInviteModal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.4)', backdropFilter: 'blur(10px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
-          <div className="card-premium" style={{ width: '100%', maxWidth: '420px', padding: '2.5rem' }}>
-            <h3 style={{ fontWeight: 900, fontSize: '1.5rem', marginBottom: '1.5rem' }}>Nuevo Miembro</h3>
-            <form onSubmit={handleInvite} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-              <InputGroup label="Nombre" placeholder="Nombre completo" value={inviteData.fullName} onChange={(v:any) => setInviteData({...inviteData, fullName: v})} />
-              <InputGroup label="Email" placeholder="correo@ejemplo.com" value={inviteData.email} onChange={(v:any) => setInviteData({...inviteData, email: v})} />
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                <label style={{ fontSize: '0.75rem', fontWeight: 900, textTransform: 'uppercase' }}>Rol</label>
-                <select value={inviteData.role} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setInviteData({...inviteData, role: e.target.value})} style={{ width: '100%', padding: '0.875rem', borderRadius: '12px', background: 'var(--secondary)', outline: 'none', fontWeight: 600 }}>
-                  <option value="tecnico">Técnico</option>
-                  <option value="operario">Operario</option>
-                </select>
-              </div>
-              <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
-                <button type="button" onClick={() => setShowInviteModal(false)} style={{ flex: 1, padding: '0.875rem', borderRadius: '12px', border: '1px solid var(--border)', background: 'none' }}>Cancelar</button>
-                <button type="submit" disabled={inviting} className="btn-primary" style={{ flex: 1 }}>Invitar</button>
-              </div>
-            </form>
+
+      <AnimatePresence>
+        {showInviteModal && (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(2, 6, 23, 0.7)', backdropFilter: 'blur(16px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '1.5rem' }}>
+            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="card-premium" style={{ width: '100%', maxWidth: '460px', padding: '3rem', borderRadius: '32px', position: 'relative' }}>
+              <button onClick={() => setShowInviteModal(false)} style={{ position: 'absolute', top: '1.5rem', right: '1.5rem', background: 'none', border: 'none', color: 'var(--muted-foreground)', cursor: 'pointer', padding: '0.5rem' }}>
+                <X size={24} />
+              </button>
+              <h3 style={{ fontWeight: 900, fontSize: '1.75rem', marginBottom: '2.5rem', letterSpacing: '-0.04em' }}>Invitar Miembro</h3>
+              <form onSubmit={handleInvite} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                <InputGroup label="Nombre Completo" placeholder="Ej. Juan Pérez" value={inviteData.fullName} onChange={(v:any) => setInviteData({...inviteData, fullName: v})} />
+                <InputGroup label="Correo Electrónico" placeholder="juan@fishbit.app" value={inviteData.email} onChange={(v:any) => setInviteData({...inviteData, email: v})} />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                  <label className="premium-label">Rol Asignado</label>
+                  <select value={inviteData.role} onChange={(e) => setInviteData({...inviteData, role: e.target.value})} className="premium-input" style={{ fontWeight: 700 }}>
+                    <option value="tecnico">Técnico Operativo</option>
+                    <option value="operario">Personal de Campo</option>
+                  </select>
+                </div>
+                <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
+                  <button type="button" onClick={() => setShowInviteModal(false)} className="glass" style={{ flex: 1, padding: '1.1rem', borderRadius: '16px', fontWeight: 800, border: '1px solid var(--border)' }}>Cancelar</button>
+                  <button type="submit" disabled={inviting} className="btn-primary" style={{ flex: 1, background: '#0d9488', borderRadius: '16px' }}>
+                    {inviting ? 'Invitando...' : 'Confirmar'}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
           </div>
-        </div>
-      )}
-    </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
   );
 };
 
 const InputGroup = ({ label, placeholder, value, onChange }: any) => (
-  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-    <label style={{ fontSize: '0.75rem', fontWeight: 900, color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>{label}</label>
-    <input required placeholder={placeholder} value={value} onChange={e => onChange(e.target.value)} style={{ width: '100%', padding: '0.75rem', borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--secondary)', outline: 'none' }} />
+  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+    <label className="premium-label">{label}</label>
+    <input required placeholder={placeholder} value={value} onChange={e => onChange(e.target.value)} className="premium-input" style={{ fontWeight: 600 }} />
   </div>
 );

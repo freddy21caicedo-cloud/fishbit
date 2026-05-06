@@ -16,11 +16,13 @@ import {
   Activity
 } from 'lucide-react';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
+import { toast } from 'react-hot-toast';
 import { supabase } from '@/lib/supabase';
 
 export default function AireacionPage() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const estanqueParam = searchParams.get('estanque');
 
   const [fecha, setFecha] = useState(new Date().toISOString().split('T')[0]);
@@ -29,253 +31,372 @@ export default function AireacionPage() {
   
   const [ponds, setPonds] = useState<any[]>([]);
   const [inventory, setInventory] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const [activeAireadores, setActiveAireadores] = useState<any[]>([]);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  const fetchData = async () => {
+    try {
+      const activeUnitId = localStorage.getItem('active_unit_id');
+      const { data: pondData } = await supabase.from('estanques').select('*').eq('unit_id', activeUnitId);
+      setPonds(pondData || []);
+
+      const { data: invData } = await supabase.from('inventory').select('*').eq('category', 'aireadores').eq('unit_id', activeUnitId);
+      setInventory(invData || []);
+
+      // Load persistent configuration
+      if (estanqueId) {
+        const savedConfig = localStorage.getItem(`aireadores_config_${estanqueId}`);
+        if (savedConfig) {
+          setActiveAireadores(JSON.parse(savedConfig));
+        } else {
+          // Demo data only if nothing saved
+          const demo = [
+            { id: 'd1', inventory_id: null, nombre: 'Aireador 01 - Splash 1HP', status: 'ON', hours: '12', consumption: '0.75' },
+            { id: 'd2', inventory_id: null, nombre: 'Aireador 02 - Inyector 2HP', status: 'OFF', hours: '0', consumption: '1.5' },
+          ];
+          setActiveAireadores(demo);
+        }
+      }
+    } catch (error: any) {
+      toast.error("Error al cargar datos: " + error.message);
+    }
+  };
 
   useEffect(() => {
     fetchData();
-  }, []);
-
-  const fetchData = async () => {
-    const { data: pondData } = await supabase.from('estanques').select('*');
-    setPonds(pondData || []);
-
-    const { data: invData } = await supabase.from('inventory').select('*').eq('category', 'aireadores');
-    setInventory(invData || []);
-  };
+  }, [estanqueId]);
 
   const selectedPond = useMemo(() => ponds.find(p => p.id === estanqueId), [estanqueId, ponds]);
 
-  const [activeAireadores, setActiveAireadores] = useState([
-    { id: '1', inventory_id: '', nombre: 'Aireador 01 - Splash 1HP', status: 'ON', hours: '12', consumption: '0.75' },
-    { id: '2', inventory_id: '', nombre: 'Aireador 02 - Inyector 2HP', status: 'OFF', hours: '0', consumption: '1.5' },
-  ]);
+  const projectedCost = useMemo(() => {
+    const kwhPrice = 650; // Precio ref
+    const totalKwh = activeAireadores.reduce((sum, a) => {
+      if (a.status === 'OFF') return sum;
+      return sum + (parseFloat(a.consumption) || 0) * (parseFloat(a.hours) || 24);
+    }, 0);
+    return totalKwh * kwhPrice;
+  }, [activeAireadores]);
 
   const handleToggle = (id: string) => {
     setActiveAireadores(activeAireadores.map(a => a.id === id ? { ...a, status: a.status === 'ON' ? 'OFF' : 'ON' } : a));
   };
 
-  const handleRemoveEquipment = async (id: string) => {
-    const equipment = activeAireadores.find(a => a.id === id);
-    if (!equipment) return;
+  const handleRemoveEquipment = (id: string) => {
+    setActiveAireadores(prev => prev.filter(a => a.id !== id));
+    toast.success("Equipo desvinculado de la sesión.");
+  };
 
-    // 1. Find in inventory to restore stock
-    // Since mock equipment might not have real inventory_id, we'll try to find by name
-    const { data: invItem } = await supabase
-      .from('inventory')
-      .select('*')
-      .ilike('name', `%${equipment.nombre.split(' - ')[1] || equipment.nombre}%`)
-      .limit(1)
-      .single();
+  const handleAddFromInventory = (item: any) => {
+    const hpMatch = item.name.match(/(\d+\.?\d*)\s*HP/i);
+    const hp = hpMatch ? parseFloat(hpMatch[1]) : 1;
+    const consumption = (hp * 0.745).toFixed(2); // HP to kW approx
 
-    if (invItem) {
-      await supabase
-        .from('inventory')
-        .update({ current_stock: (parseFloat(invItem.current_stock) || 0) + 1 })
-        .eq('id', invItem.id);
-      
-      alert(`Equipo "${equipment.nombre}" desvinculado y devuelto al inventario.`);
-    }
-
-    setActiveAireadores(activeAireadores.filter(a => a.id !== id));
+    setActiveAireadores([...activeAireadores, {
+      id: Math.random().toString(),
+      inventory_id: item.id,
+      nombre: item.name,
+      status: 'OFF',
+      hours: '0',
+      consumption: consumption
+    }]);
+    setIsModalOpen(false);
+    toast.success(`${item.name} asignado.`);
   };
 
   const handleRegisterAeration = async () => {
     if (!estanqueId) {
-      alert("Por favor seleccione un estanque.");
+      toast.error("Por favor seleccione un estanque.");
       return;
     }
 
-    // 1. Create Aeration Logs for each equipment state
-    for (const air of activeAireadores) {
-      await supabase.from('aireacion_logs').insert([{
-        estanque_id: estanqueId,
-        action: air.status,
-        observations: `Equipo: ${air.nombre}. Consumo: ${air.consumption}kW. Horas: ${air.hours}h`,
-        date: fecha,
-        hour: hora
-      }]);
-    }
+    setLoading(true);
+    const registerPromise = async () => {
+      const activeUnitId = localStorage.getItem('active_unit_id');
+      
+      // Persist configuration locally
+      localStorage.setItem(`aireadores_config_${estanqueId}`, JSON.stringify(activeAireadores));
 
-    alert("¡Configuración de aireación guardada y registrada en el historial!");
-    window.location.href = '/estanques';
+      const operations = activeAireadores.map(async (air) => {
+        const { error } = await supabase.from('aireacion_logs').insert([{
+          estanque_id: estanqueId,
+          unit_id: activeUnitId,
+          action: air.status,
+          observations: `Equipo: ${air.nombre}. Consumo: ${air.consumption}kW. Horas: ${air.hours}h`,
+          date: fecha,
+          hour: hora
+        }]);
+        if (error) throw error;
+      });
+
+      await Promise.all(operations);
+    };
+
+    toast.promise(registerPromise(), {
+      loading: 'Guardando configuración...',
+      success: () => {
+        router.push('/registros');
+        return "¡Configuración de aireación guardada!";
+      },
+      error: (err) => `Error: ${err.message}`
+    }).finally(() => setLoading(false));
   };
 
   return (
-    <div className="animate-fade-in" style={{ maxWidth: '1000px', margin: '0 auto', paddingBottom: '4rem' }}>
-      <header style={{ marginBottom: '2.5rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
-        <Link href="/estanques" style={{ color: 'var(--muted-foreground)', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '40px', height: '40px', borderRadius: '50%', background: 'var(--card)', border: '1px solid var(--border)' }}>
-          <ArrowLeft size={20} />
+    <div className="animate-fade-in page-container">
+      <header style={{ marginBottom: '2.5rem', display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
+        <Link href="/registros" className="btn-secondary" style={{ width: '48px', height: '48px', borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <ArrowLeft size={24} />
         </Link>
         <div>
-          <h1 style={{ fontSize: '1.875rem', fontWeight: 700 }}>Control de Aireación</h1>
-          <p style={{ color: 'var(--muted-foreground)' }}>Gestión de equipos y suministro de oxígeno disuelto.</p>
+          <h1 style={{ fontSize: '2.2rem', fontWeight: 900, letterSpacing: '-0.02em' }}>Control de Aireación</h1>
+          <p style={{ color: 'var(--muted-foreground)', fontSize: '1rem' }}>Gestión de equipos y suministro de oxígeno disuelto.</p>
         </div>
       </header>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '2rem' }}>
-        {/* Contextual Info Card */}
-        <div className="card-premium" style={{ padding: '2rem', display: 'grid', gridTemplateColumns: '1.5fr 1fr 1fr', gap: '1.5rem', alignItems: 'center' }}>
-          <div>
-            <div style={{ fontSize: '0.75rem', fontWeight: 700, marginBottom: '0.5rem', textTransform: 'uppercase', color: 'var(--muted-foreground)' }}>Estanque Destino</div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.75rem', background: 'rgba(6, 182, 212, 0.05)', borderRadius: '8px', border: '1px solid rgba(6, 182, 212, 0.1)' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+        <div className="card-premium" style={{ padding: '2rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.5rem', alignItems: 'center' }}>
+          <div className="premium-input-group">
+            <label className="premium-label">Estanque Destino</label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.75rem', background: 'rgba(6, 182, 212, 0.05)', borderRadius: '12px', border: '1px solid rgba(6, 182, 212, 0.1)', height: '56px' }}>
               <Waves size={20} style={{ color: '#06b6d4' }} />
               <span style={{ fontSize: '1.1rem', fontWeight: 800, color: '#06b6d4' }}>
-                {selectedPond ? selectedPond.name : 'Seleccionado'}
+                {selectedPond ? selectedPond.name : '---'}
               </span>
             </div>
           </div>
-          <div>
-            <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, marginBottom: '0.5rem', textTransform: 'uppercase', color: 'var(--muted-foreground)' }}>Fecha</label>
-            <input 
-              type="date" 
-              value={fecha} 
-              onChange={(e) => setFecha(e.target.value)}
-              style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--secondary)', outline: 'none' }} 
-            />
+          <div className="premium-input-group">
+            <label className="premium-label">Fecha de Registro</label>
+            <input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} className="premium-input" />
           </div>
-          <div>
-            <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, marginBottom: '0.5rem', textTransform: 'uppercase', color: 'var(--muted-foreground)' }}>Hora</label>
-            <input 
-              type="time" 
-              value={hora} 
-              onChange={(e) => setHora(e.target.value)}
-              style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--secondary)', outline: 'none' }} 
-            />
+          <div className="premium-input-group">
+            <label className="premium-label">Hora de Inicio</label>
+            <input type="time" value={hora} onChange={(e) => setHora(e.target.value)} className="premium-input" />
           </div>
         </div>
 
-        {/* Equipment Grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
-          {activeAireadores.map((a) => (
-            <div key={a.id} className="card-premium" style={{ padding: '1.5rem', position: 'relative' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem' }}>
-                <div style={{ 
-                  width: '48px', 
-                  height: '48px', 
-                  borderRadius: '12px', 
-                  background: a.status === 'ON' ? 'rgba(6, 182, 212, 0.1)' : 'var(--secondary)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: a.status === 'ON' ? '#06b6d4' : 'var(--muted-foreground)',
-                  transition: 'all 0.3s ease'
-                }}>
-                  <Wind size={24} className={a.status === 'ON' ? 'animate-spin-slow' : ''} />
-                </div>
-                <div style={{ display: 'flex', gap: '0.5rem' }}>
-                  <button 
-                    onClick={() => handleRemoveEquipment(a.id)}
-                    style={{ background: 'rgba(239, 68, 68, 0.1)', border: 'none', color: '#ef4444', padding: '0.4rem', borderRadius: '8px', cursor: 'pointer' }}
-                    title="Quitar equipo y devolver al almacén"
-                  >
-                    <Trash2 size={16} />
-                  </button>
+        <div className="responsive-grid-2">
+          <AnimatePresence>
+            {activeAireadores.map((a) => (
+              <motion.div 
+                key={a.id} 
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.9, x: -20 }}
+                className="card-premium" 
+                style={{ padding: '1.5rem', position: 'relative', border: a.status === 'ON' ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid var(--border)' }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem' }}>
                   <div style={{ 
-                    padding: '0.35rem 0.75rem', 
-                    borderRadius: '50px', 
-                    fontSize: '0.7rem', 
-                    fontWeight: 800, 
-                    background: a.status === 'ON' ? '#10b981' : '#64748b', 
-                    color: 'white' 
+                    width: '56px', 
+                    height: '56px', 
+                    borderRadius: '16px', 
+                    background: a.status === 'ON' ? 'rgba(16, 185, 129, 0.1)' : 'var(--secondary)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: a.status === 'ON' ? '#10b981' : 'var(--muted-foreground)',
+                    boxShadow: a.status === 'ON' ? '0 0 20px rgba(16, 185, 129, 0.2)' : 'none'
                   }}>
-                    {a.status}
+                    <Wind size={28} className={a.status === 'ON' ? 'animate-spin-slow' : ''} />
+                  </div>
+                  <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+                    <button 
+                      onClick={() => handleRemoveEquipment(a.id)} 
+                      style={{ background: 'rgba(239, 68, 68, 0.1)', border: 'none', color: '#ef4444', width: '36px', height: '36px', borderRadius: '10px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                    >
+                      <Trash2 size={18} />
+                    </button>
+                    <div style={{ padding: '0.4rem 1rem', borderRadius: '50px', fontSize: '0.75rem', fontWeight: 900, background: a.status === 'ON' ? '#10b981' : '#64748b', color: 'white', letterSpacing: '0.05em' }}>
+                      {a.status}
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '0.5rem' }}>{a.nombre}</h3>
-              
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
-                <div style={{ padding: '0.75rem', background: 'var(--secondary)', borderRadius: '8px' }}>
-                  <div style={{ fontSize: '0.65rem', color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>Consumo</div>
-                  <div style={{ fontWeight: 700 }}>{a.consumption} kW/h</div>
+                <h3 style={{ fontSize: '1.2rem', fontWeight: 900, marginBottom: '0.75rem' }}>{a.nombre}</h3>
+                
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
+                  <div className="premium-input-group" style={{ background: 'var(--secondary)', borderRadius: '12px', padding: '0.75rem' }}>
+                    <label className="premium-label" style={{ position: 'static', marginBottom: '0.25rem', fontSize: '0.65rem' }}>Consumo</label>
+                    <div style={{ fontWeight: 900, fontSize: '1.1rem' }}>{a.consumption} <span style={{ fontSize: '0.8rem', color: 'var(--muted-foreground)' }}>kW/h</span></div>
+                  </div>
+                  <div className="premium-input-group" style={{ background: 'var(--secondary)', borderRadius: '12px', padding: '0.75rem' }}>
+                    <label className="premium-label" style={{ position: 'static', marginBottom: '0.25rem', fontSize: '0.65rem' }}>Tiempo Uso</label>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                      <input 
+                        type="number" 
+                        value={a.hours} 
+                        onChange={(e) => setActiveAireadores(activeAireadores.map(item => item.id === a.id ? {...item, hours: e.target.value} : item))} 
+                        style={{ background: 'transparent', border: 'none', fontWeight: 900, width: '50px', outline: 'none', fontSize: '1.1rem' }} 
+                      />
+                      <span style={{ fontWeight: 900, fontSize: '0.9rem' }}>h</span>
+                    </div>
+                  </div>
                 </div>
-                <div style={{ padding: '0.75rem', background: 'var(--secondary)', borderRadius: '8px' }}>
-                  <div style={{ fontSize: '0.65rem', color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>Tiempo Uso</div>
-                  <input 
-                    type="number" 
-                    value={a.hours} 
-                    onChange={(e) => setActiveAireadores(activeAireadores.map(item => item.id === a.id ? {...item, hours: e.target.value} : item))}
-                    style={{ background: 'transparent', border: 'none', fontWeight: 700, width: '40px', outline: 'none' }}
-                  /> h
-                </div>
-              </div>
 
-              <button 
-                onClick={() => handleToggle(a.id)}
-                style={{ 
-                  width: '100%', 
-                  padding: '0.75rem', 
-                  borderRadius: '10px', 
-                  border: 'none', 
-                  background: a.status === 'ON' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(16, 185, 129, 0.1)',
-                  color: a.status === 'ON' ? '#ef4444' : '#10b981',
-                  fontWeight: 700,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '0.5rem',
-                  cursor: 'pointer'
-                }}
-              >
-                <Power size={18} />
-                {a.status === 'ON' ? 'Detener Equipo' : 'Arrancar Equipo'}
-              </button>
+                <button 
+                  onClick={() => handleToggle(a.id)} 
+                  className="btn-secondary" 
+                  style={{ 
+                    width: '100%', 
+                    padding: '0.85rem', 
+                    borderRadius: '14px', 
+                    border: '1px solid var(--border)',
+                    color: a.status === 'ON' ? '#ef4444' : '#10b981', 
+                    fontWeight: 900, 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center', 
+                    gap: '0.75rem',
+                    background: 'var(--card)'
+                  }}
+                >
+                  <Power size={20} />
+                  {a.status === 'ON' ? 'Detener Equipo' : 'Arrancar Equipo'}
+                </button>
+              </motion.div>
+            ))}
+          </AnimatePresence>
+
+          <button 
+            onClick={() => setIsModalOpen(true)}
+            className="card-premium" 
+            style={{ 
+              border: '2px dashed var(--border)', 
+              borderRadius: '28px', 
+              background: 'rgba(6, 182, 212, 0.02)', 
+              display: 'flex', 
+              flexDirection: 'column', 
+              alignItems: 'center', 
+              justifyContent: 'center', 
+              gap: '1.25rem', 
+              color: 'var(--muted-foreground)', 
+              cursor: 'pointer', 
+              padding: '3rem',
+              transition: 'all 0.3s ease'
+            }}
+          >
+            <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: 'var(--card)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid var(--border)' }}>
+              <Plus size={32} />
             </div>
-          ))}
-
-          {/* Add Equipment Placeholder */}
-          <button style={{ 
-            border: '2px dashed var(--border)', 
-            borderRadius: '24px', 
-            background: 'transparent',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '1rem',
-            color: 'var(--muted-foreground)',
-            cursor: 'pointer',
-            padding: '2rem'
-          }}>
-            <Plus size={32} />
-            <span style={{ fontWeight: 600 }}>Asignar Aireador del Almacén</span>
+            <span style={{ fontWeight: 900, fontSize: '1.1rem' }}>Asignar Aireador</span>
           </button>
         </div>
 
-        {/* Global Action */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem', marginTop: '1rem' }}>
-          <div className="card-premium" style={{ padding: '1.5rem', display: 'flex', alignItems: 'center', gap: '1.25rem', borderLeft: '5px solid #06b6d4' }}>
-            <Zap size={32} style={{ color: '#06b6d4' }} />
+        <div className="responsive-grid-2" style={{ marginTop: '1rem', alignItems: 'center' }}>
+          <div className="card-premium" style={{ padding: '1.5rem', display: 'flex', alignItems: 'center', gap: '1.5rem', borderLeft: '6px solid #06b6d4', background: 'linear-gradient(to right, rgba(6, 182, 212, 0.05), transparent)' }}>
+            <div style={{ width: '56px', height: '56px', borderRadius: '16px', background: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#06b6d4', boxShadow: 'var(--shadow-sm)' }}>
+              <Zap size={32} />
+            </div>
             <div>
-              <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--muted-foreground)' }}>Impacto Energético Proyectado</div>
-              <div style={{ fontSize: '1.25rem', fontWeight: 800 }}>$12,450.00 / día</div>
+              <div style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--muted-foreground)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Impacto Energético Proyectado</div>
+              <div style={{ fontSize: '1.6rem', fontWeight: 950, color: '#06b6d4' }}>
+                ${projectedCost.toLocaleString('es-CO', { minimumFractionDigits: 2 })} 
+                <span style={{ fontSize: '0.9rem', color: 'var(--muted-foreground)', fontWeight: 700 }}> / día</span>
+              </div>
             </div>
           </div>
           <button 
-            onClick={handleRegisterAeration}
+            onClick={handleRegisterAeration} 
+            disabled={loading} 
             className="btn-primary" 
-            style={{ padding: '1.5rem', borderRadius: '24px', fontSize: '1.1rem', fontWeight: 800, background: '#06b6d4' }}
+            style={{ 
+              padding: '1.5rem', 
+              borderRadius: '24px', 
+              fontSize: '1.2rem', 
+              fontWeight: 900, 
+              background: '#06b6d4',
+              boxShadow: '0 10px 25px -5px rgba(6, 182, 212, 0.4)'
+            }}
           >
+            {loading ? <Activity className="animate-spin" size={24} /> : <Activity size={24} />}
             Guardar Configuración
           </button>
         </div>
 
-        {/* Info Banner */}
         <div style={{ 
-          padding: '1.25rem', 
-          borderRadius: '20px', 
-          background: 'rgba(6, 182, 212, 0.05)', 
-          border: '1px solid rgba(6, 182, 212, 0.1)',
+          padding: '1.5rem', 
+          borderRadius: '28px', 
+          background: 'var(--card)', 
+          border: '1px solid var(--border)', 
           display: 'flex', 
-          gap: '1rem', 
-          alignItems: 'center'
+          gap: '1.5rem', 
+          alignItems: 'center' 
         }}>
-          <Activity size={24} style={{ color: '#06b6d4' }} />
-          <p style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)', lineHeight: 1.5 }}>
-            La aireación mecánica aumenta la capacidad de carga del estanque hasta en un <strong>300%</strong>. Asegúrese de mantener los equipos limpios de algas para máxima eficiencia.
+          <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: 'rgba(6, 182, 212, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <Activity size={32} style={{ color: '#06b6d4' }} />
+          </div>
+          <p style={{ fontSize: '0.95rem', color: 'var(--muted-foreground)', lineHeight: 1.6 }}>
+            La aireación mecánica aumenta la capacidad de carga del estanque hasta en un <strong>300%</strong>. Asegúrese de realizar mantenimiento preventivo cada 500 horas de uso.
           </p>
         </div>
       </div>
+
+      {/* Inventory Modal */}
+      <AnimatePresence>
+        {isModalOpen && (
+          <div style={{ position: 'fixed', inset: 0, zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+            <motion.div 
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={() => setIsModalOpen(false)}
+              style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)' }}
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="card-premium"
+              style={{ position: 'relative', width: '100%', maxWidth: '500px', padding: '2rem', maxHeight: '80vh', overflowY: 'auto' }}
+            >
+              <h2 style={{ fontSize: '1.5rem', fontWeight: 900, marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <Wind size={28} style={{ color: '#06b6d4' }} />
+                Aireadores Disponibles
+              </h2>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                {inventory.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--muted-foreground)' }}>
+                    No hay aireadores disponibles en el almacén.
+                  </div>
+                ) : (
+                  inventory.map(item => (
+                    <button 
+                      key={item.id}
+                      onClick={() => handleAddFromInventory(item)}
+                      style={{ 
+                        display: 'flex', 
+                        justifyContent: 'space-between', 
+                        alignItems: 'center', 
+                        padding: '1.25rem', 
+                        background: 'var(--secondary)', 
+                        border: '1px solid var(--border)', 
+                        borderRadius: '16px',
+                        cursor: 'pointer',
+                        textAlign: 'left'
+                      }}
+                    >
+                      <div>
+                        <div style={{ fontWeight: 800, fontSize: '1rem' }}>{item.name}</div>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)' }}>Marca: {item.brand || '---'}</div>
+                      </div>
+                      <div style={{ background: '#06b6d4', color: 'white', padding: '0.4rem 0.8rem', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 900 }}>
+                        STOCK: {item.current_stock}
+                      </div>
+                    </button>
+                  ))
+                )}
+              </div>
+              <button 
+                onClick={() => setIsModalOpen(false)}
+                className="btn-secondary" 
+                style={{ width: '100%', marginTop: '2rem', padding: '1rem', borderRadius: '14px', fontWeight: 800 }}
+              >
+                Cancelar
+              </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
       
       <style jsx>{`
         @keyframes spin-slow {

@@ -18,6 +18,7 @@ import {
   FlaskConical
 } from 'lucide-react';
 import Link from 'next/link';
+import { toast } from 'react-hot-toast';
 import { supabase } from '@/lib/supabase';
 
 // Mock Ranges for Safety
@@ -41,6 +42,8 @@ export default function CalidadAguaPage() {
   const [amonia, setAmonia] = useState('');
   const [nitrito, setNitrito] = useState('');
   const [nitrato, setNitrato] = useState('');
+  const [temperatura, setTemperatura] = useState('');
+  const [alcalinidad, setAlcalinidad] = useState('');
 
   useEffect(() => {
     fetchPonds();
@@ -58,37 +61,47 @@ export default function CalidadAguaPage() {
 
   const handleSave = async () => {
     if (!estanqueId) {
-      alert("Por favor seleccione un estanque.");
+      toast.error("Por favor seleccione un estanque.");
       return;
     }
 
     const activeUnitId = localStorage.getItem('active_unit_id');
 
-    const { error } = await supabase.from('water_quality').insert([{
-      estanque_id: estanqueId,
-      unit_id: activeUnitId,
-      date: fecha,
-      hour: hora,
-      o2_mg_l: parseFloat(oxigeno) || 0,
-      o2_perc: parseFloat(oxigenoPorc) || 0,
-      ph: parseFloat(ph) || 0,
-      ammonia_mg_l: parseFloat(amonia) || 0,
-      nitrite_mg_l: parseFloat(nitrito) || 0,
-      nitrate_mg_l: parseFloat(nitrato) || 0
-    }]);
+    toast.promise(
+      (async () => {
+        const { error } = await supabase.from('water_quality').insert([{
+          estanque_id: estanqueId,
+          unit_id: activeUnitId,
+          date: fecha,
+          hour: hora,
+          o2_mg_l: parseFloat(oxigeno) || 0,
+          o2_perc: parseFloat(oxigenoPorc) || 0,
+          ph: parseFloat(ph) || 0,
+          temperature_c: parseFloat(temperatura) || 0,
+          alkalinity: parseFloat(alcalinidad) || 0,
+          ammonia_mg_l: parseFloat(amonia) || 0,
+          nitrite_mg_l: parseFloat(nitrito) || 0,
+          nitrate_mg_l: parseFloat(nitrato) || 0
+        }]);
 
-    if (error) {
-      alert("Error al guardar: " + error.message);
-    } else {
-      alert("¡Registro de calidad de agua guardado con éxito!");
-      // Reset fields
-      setOxigeno('');
-      setOxigenoPorc('');
-      setPh('');
-      setAmonia('');
-      setNitrito('');
-      setNitrato('');
-    }
+        if (error) throw error;
+        
+        // Reset fields
+        setOxigeno('');
+        setOxigenoPorc('');
+        setPh('');
+        setAmonia('');
+        setNitrito('');
+        setNitrato('');
+        setTemperatura('');
+        setAlcalinidad('');
+      })(),
+      {
+        loading: 'Guardando registro...',
+        success: '¡Calidad de agua registrada con éxito!',
+        error: (err) => `Error: ${err.message}`
+      }
+    );
   };
 
   // Status Analysis
@@ -119,150 +132,78 @@ export default function CalidadAguaPage() {
   }, [oxigeno, ph, nitrito]);
 
   return (
-    <div className="animate-fade-in" style={{ maxWidth: '1200px', margin: '0 auto', paddingBottom: '4rem' }}>
-      <header style={{ marginBottom: '2.5rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
+    <div className="animate-fade-in page-container">
+      <header style={{ marginBottom: '2rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
         <Link href="/registros" style={{ color: 'var(--muted-foreground)', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '40px', height: '40px', borderRadius: '50%', background: 'var(--card)', border: '1px solid var(--border)' }}>
           <ArrowLeft size={20} />
         </Link>
         <div>
-          <h1 style={{ fontSize: '1.875rem', fontWeight: 700 }}>Calidad de Agua</h1>
-          <p style={{ color: 'var(--muted-foreground)' }}>Monitoreo de parámetros físico-químicos del cultivo.</p>
+          <h1 style={{ fontWeight: 800 }}>Calidad de Agua</h1>
+          <p style={{ color: 'var(--muted-foreground)', fontSize: '0.9rem' }}>Monitoreo de parámetros físico-químicos.</p>
         </div>
       </header>
 
-      <div className="responsive-container">
-        {/* Main Form Section */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem', flex: 1.5 }}>
-          <div className="card-premium" style={{ padding: '2.5rem' }}>
-            {/* Header Info */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '1.5rem', marginBottom: '2.5rem' }}>
+      <div className="responsive-grid-2">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          <div className="card-premium" style={{ padding: '1.5rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
               <div className="premium-input-group">
-                <label className="premium-label">Estanque</label>
-                <div className="premium-input-wrapper">
-                  <select
-                    value={estanqueId}
-                    onChange={(e) => setEstanqueId(e.target.value)}
-                    style={{ width: '100%', background: 'transparent', border: 'none', outline: 'none', fontWeight: 700 }}
-                  >
-                    <option value="">Seleccionar...</option>
-                    {pondsList.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                  </select>
-                </div>
+                <label className="premium-label"><Waves size={14} /> Estanque</label>
+                <select value={estanqueId} onChange={(e) => setEstanqueId(e.target.value)} className="premium-input" style={{ fontWeight: 700 }}>
+                  <option value="">Seleccionar...</option>
+                  {pondsList.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
               </div>
               <div className="premium-input-group">
-                <label className="premium-label">
-                  <Calendar size={14} /> Fecha
-                </label>
-                <div className="premium-input-wrapper">
-                  <input 
-                    type="date" 
-                    value={fecha} 
-                    onChange={(e) => setFecha(e.target.value)} 
-                    className="premium-date-input"
-                  />
-                </div>
+                <label className="premium-label"><Calendar size={14} /> Fecha</label>
+                <input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} className="premium-input" />
               </div>
               <div className="premium-input-group">
-                <label className="premium-label">
-                  <Clock size={14} /> Hora
-                </label>
-                <div className="premium-input-wrapper">
-                  <input 
-                    type="time" 
-                    value={hora} 
-                    onChange={(e) => setHora(e.target.value)} 
-                    className="premium-date-input"
-                  />
-                </div>
+                <label className="premium-label"><Clock size={14} /> Hora</label>
+                <input type="time" value={hora} onChange={(e) => setHora(e.target.value)} className="premium-input" />
               </div>
             </div>
 
-            {/* Parameters Grid */}
-            <h2 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <FlaskConical size={20} style={{ color: 'var(--primary)' }} />
-              Mediciones Técnicas
-            </h2>
-
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '2rem' }}>
-              {/* Column 1: Oxygen & pH */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-                <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                    <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>Oxígeno Disuelto (mg/L)</label>
-                    <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#3b82f6' }}>Rango: 5.0 - 8.0</span>
-                  </div>
-                  <input
-                    type="number"
-                    value={oxigeno}
-                    onChange={(e) => setOxigeno(e.target.value)}
-                    placeholder="0.0"
-                    style={{ width: '100%', padding: '1rem', fontSize: '1.25rem', borderRadius: '12px', border: '1px solid', borderColor: parseFloat(oxigeno) < ranges.oxigeno.min ? '#ef4444' : 'var(--border)', background: 'var(--secondary)', outline: 'none', fontWeight: 800 }}
-                  />
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, marginBottom: '0.5rem', textTransform: 'uppercase', color: 'var(--muted-foreground)' }}>Concentración O2 (%)</label>
-                  <input
-                    type="number"
-                    value={oxigenoPorc}
-                    onChange={(e) => setOxigenoPorc(e.target.value)}
-                    placeholder="0.0"
-                    style={{ width: '100%', padding: '1rem', fontSize: '1.25rem', borderRadius: '12px', border: '1px solid var(--border)', background: 'var(--secondary)', outline: 'none', fontWeight: 800 }}
-                  />
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, marginBottom: '0.5rem', textTransform: 'uppercase', color: 'var(--muted-foreground)' }}>Nivel de pH</label>
-                  <input
-                    type="number"
-                    value={ph}
-                    onChange={(e) => setPh(e.target.value)}
-                    placeholder="7.0"
-                    style={{ width: '100%', padding: '1rem', fontSize: '1.25rem', borderRadius: '12px', border: '1px solid', borderColor: (parseFloat(ph) < ranges.ph.min || parseFloat(ph) > ranges.ph.max) ? '#f59e0b' : 'var(--border)', background: 'var(--secondary)', outline: 'none', fontWeight: 800 }}
-                  />
-                </div>
-              </div>
-
-              {/* Column 2: Nitrogen Compounds */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, marginBottom: '0.5rem', textTransform: 'uppercase', color: 'var(--muted-foreground)' }}>Amonia / Amonio (mg/L)</label>
-                  <input
-                    type="number"
-                    value={amonia}
-                    onChange={(e) => setAmonia(e.target.value)}
-                    placeholder="0.00"
-                    style={{ width: '100%', padding: '1rem', fontSize: '1.25rem', borderRadius: '12px', border: '1px solid var(--border)', background: 'var(--secondary)', outline: 'none', fontWeight: 800 }}
-                  />
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, marginBottom: '0.5rem', textTransform: 'uppercase', color: 'var(--muted-foreground)' }}>Nitrito (mg/L)</label>
-                  <input
-                    type="number"
-                    value={nitrito}
-                    onChange={(e) => setNitrito(e.target.value)}
-                    placeholder="0.00"
-                    style={{ width: '100%', padding: '1rem', fontSize: '1.25rem', borderRadius: '12px', border: '1px solid', borderColor: parseFloat(nitrito) > ranges.nitrito.max ? '#ef4444' : 'var(--border)', background: 'var(--secondary)', outline: 'none', fontWeight: 800 }}
-                  />
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, marginBottom: '0.5rem', textTransform: 'uppercase', color: 'var(--muted-foreground)' }}>Nitrato (mg/L)</label>
-                  <input
-                    type="number"
-                    value={nitrato}
-                    onChange={(e) => setNitrato(e.target.value)}
-                    placeholder="0.00"
-                    style={{ width: '100%', padding: '1rem', fontSize: '1.25rem', borderRadius: '12px', border: '1px solid var(--border)', background: 'var(--secondary)', outline: 'none', fontWeight: 800 }}
-                  />
-                </div>
+            <div className="responsive-grid-2">
+              <div className="premium-input-group">
+                <label className="premium-label"><Droplets size={14} /> Oxígeno (mg/L)</label>
+                <input type="number" step="0.1" value={oxigeno} onChange={(e) => setOxigeno(e.target.value)} placeholder="0.0" className="premium-input" />
               </div>
             </div>
 
-            <button
-              onClick={handleSave}
-              className="btn-primary"
-              style={{ width: '100%', marginTop: '3rem', padding: '1.25rem', borderRadius: '16px', background: 'var(--primary)', fontSize: '1.1rem', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.75rem' }}
-            >
-              <Droplets size={22} />
-              Guardar Registro de Agua
+            <div className="responsive-grid-3">
+              <div className="premium-input-group">
+                <label className="premium-label">pH</label>
+                <input type="number" step="0.1" value={ph} onChange={(e) => setPh(e.target.value)} placeholder="7.0" className="premium-input" />
+              </div>
+              <div className="premium-input-group">
+                <label className="premium-label">Temperatura (°C)</label>
+                <input type="number" step="0.1" value={temperatura} onChange={(e) => setTemperatura(e.target.value)} placeholder="28.5" className="premium-input" />
+              </div>
+              <div className="premium-input-group">
+                <label className="premium-label">Alcalinidad</label>
+                <input type="number" value={alcalinidad} onChange={(e) => setAlcalinidad(e.target.value)} placeholder="120" className="premium-input" />
+              </div>
+            </div>
+
+            <div className="responsive-grid-3" style={{ marginTop: '1.5rem', marginBottom: '1.5rem' }}>
+              <div className="premium-input-group">
+                <label className="premium-label">Amonio (mg/L)</label>
+                <input type="number" step="0.01" value={amonia} onChange={(e) => setAmonia(e.target.value)} placeholder="0.00" className="premium-input" />
+              </div>
+              <div className="premium-input-group">
+                <label className="premium-label">Nitrito (mg/L)</label>
+                <input type="number" step="0.01" value={nitrito} onChange={(e) => setNitrito(e.target.value)} placeholder="0.00" className="premium-input" />
+              </div>
+              <div className="premium-input-group">
+                <label className="premium-label">Nitrato (mg/L)</label>
+                <input type="number" step="0.01" value={nitrato} onChange={(e) => setNitrato(e.target.value)} placeholder="0.00" className="premium-input" />
+              </div>
+            </div>
+
+            <button onClick={handleSave} className="btn-primary" style={{ width: '100%', padding: '1rem', borderRadius: '12px', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
+              <ShieldCheck size={18} />
+              Guardar Registro
             </button>
           </div>
         </div>

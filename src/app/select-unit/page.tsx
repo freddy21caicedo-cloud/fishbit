@@ -1,15 +1,16 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '@/lib/supabase';
 import { 
   Navigation, 
   ArrowRight, 
   Loader2,
   LogOut,
+  Building2,
   Waves,
-  Building2
+  ChevronRight
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
@@ -41,7 +42,6 @@ export default function SelectUnitPage() {
   };
 
   const handleSelectUnit = (unitId: string) => {
-    // Store selected unit in local storage or cookie
     localStorage.setItem('active_unit_id', unitId);
     router.refresh();
     router.push('/');
@@ -54,8 +54,8 @@ export default function SelectUnitPage() {
 
   if (loading) {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--background)' }}>
-        <Loader2 className="animate-spin" size={40} color="var(--primary)" />
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f8fafc' }}>
+        <Loader2 className="animate-spin" size={48} color="#0d9488" />
       </div>
     );
   }
@@ -65,82 +65,93 @@ export default function SelectUnitPage() {
       minHeight: '100vh', 
       display: 'flex', 
       flexDirection: 'column',
-      background: 'radial-gradient(circle at top right, #f8fafc, #eff6ff)',
+      background: 'radial-gradient(circle at 0% 0%, #f0fdfa 0%, #f8fafc 100%)',
       padding: '2rem'
     }}>
-      <div style={{ maxWidth: '600px', margin: 'auto', width: '100%' }}>
-        <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
-          <div style={{ 
-            width: '64px', 
-            height: '64px', 
-            background: 'var(--primary)', 
-            borderRadius: '16px', 
-            display: 'flex', 
-            alignItems: 'center', 
-            justifyContent: 'center',
-            margin: '0 auto 1.5rem',
-            boxShadow: '0 10px 25px rgba(37, 99, 235, 0.2)'
-          }}>
-            <Building2 color="white" size={32} />
-          </div>
-          <h1 style={{ fontSize: '2rem', fontWeight: 800, color: '#1e293b', marginBottom: '0.5rem' }}>Selecciona tu Unidad</h1>
-          <p style={{ color: 'var(--muted-foreground)' }}>Tienes acceso a múltiples unidades acuícolas. Por favor elige una para continuar.</p>
+      <div style={{ maxWidth: '500px', margin: 'auto', width: '100%' }}>
+        <div style={{ textAlign: 'center', marginBottom: '3.5rem' }}>
+          <motion.div 
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            style={{ 
+              width: '80px', 
+              height: '80px', 
+              background: '#0d9488', 
+              borderRadius: '24px', 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'center',
+              margin: '0 auto 2rem',
+              boxShadow: '0 20px 40px rgba(13, 148, 136, 0.2)',
+              color: 'white'
+            }}
+          >
+            <Building2 size={40} />
+          </motion.div>
+          <h1 style={{ fontSize: '2.5rem', fontWeight: 950, color: '#0f172a', marginBottom: '1rem', letterSpacing: '-0.04em' }}>Tus Unidades</h1>
+          <p style={{ color: 'var(--muted-foreground)', fontWeight: 600, fontSize: '1.1rem' }}>Selecciona la granja que deseas gestionar hoy.</p>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          {units.map((unit, index) => (
-            <motion.button
-              key={unit.id}
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: index * 0.1 }}
-              onClick={() => handleSelectUnit(unit.id)}
-              className="card-premium"
-              style={{ 
-                width: '100%', 
-                padding: '1.5rem', 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: '1.5rem', 
-                textAlign: 'left',
-                cursor: 'pointer',
-                border: '1px solid transparent',
-                transition: 'all 0.2s ease'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.borderColor = 'var(--primary)';
-                e.currentTarget.style.transform = 'translateY(-2px)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.borderColor = 'transparent';
-                e.currentTarget.style.transform = 'translateY(0)';
-              }}
-            >
-              <div style={{ 
-                width: '48px', 
-                height: '48px', 
-                background: 'rgba(37, 99, 235, 0.05)', 
-                borderRadius: '12px', 
-                display: 'flex', 
-                alignItems: 'center', 
-                justifyContent: 'center', 
-                color: 'var(--primary)' 
-              }}>
-                <Navigation size={24} />
-              </div>
-              <div style={{ flex: 1 }}>
-                <h3 style={{ fontSize: '1.125rem', fontWeight: 700, marginBottom: '0.25rem' }}>{unit.name}</h3>
-                <p style={{ fontSize: '0.875rem', color: 'var(--muted-foreground)' }}>{unit.location || 'Sin ubicación registrada'}</p>
-              </div>
-              <ArrowRight size={20} style={{ color: 'var(--muted-foreground)' }} />
-            </motion.button>
-          ))}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+          <AnimatePresence>
+            {units.map((unit, index) => (
+              <motion.button
+                key={unit.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.1 }}
+                onClick={() => handleSelectUnit(unit.id)}
+                className="card-premium"
+                style={{ 
+                  width: '100%', 
+                  padding: '1.75rem', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '1.5rem', 
+                  textAlign: 'left',
+                  cursor: 'pointer',
+                  border: '1px solid var(--border)',
+                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                  position: 'relative',
+                  overflow: 'hidden'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.borderColor = '#0d9488';
+                  e.currentTarget.style.transform = 'translateY(-4px)';
+                  e.currentTarget.style.boxShadow = '0 20px 40px rgba(0,0,0,0.05)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = 'var(--border)';
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = 'var(--shadow-sm)';
+                }}
+              >
+                <div style={{ 
+                  width: '56px', 
+                  height: '56px', 
+                  background: 'rgba(13, 148, 136, 0.1)', 
+                  borderRadius: '16px', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center', 
+                  color: '#0d9488' 
+                }}>
+                  <Navigation size={28} />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <h3 style={{ fontSize: '1.25rem', fontWeight: 900, marginBottom: '0.25rem', letterSpacing: '-0.02em' }}>{unit.name}</h3>
+                  <p style={{ fontSize: '0.9rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>{unit.location || 'Sede Principal'}</p>
+                </div>
+                <ChevronRight size={24} style={{ color: 'var(--border)' }} />
+              </motion.button>
+            ))}
+          </AnimatePresence>
         </div>
 
         <button 
           onClick={handleLogout}
           style={{ 
-            marginTop: '3rem', 
+            marginTop: '4rem', 
             width: '100%', 
             padding: '1rem', 
             display: 'flex', 
@@ -150,12 +161,13 @@ export default function SelectUnitPage() {
             background: 'none', 
             border: 'none', 
             color: 'var(--muted-foreground)', 
-            fontWeight: 700, 
-            cursor: 'pointer' 
+            fontWeight: 800, 
+            cursor: 'pointer',
+            fontSize: '0.95rem'
           }}
         >
           <LogOut size={20} />
-          Cerrar Sesión
+          Cerrar Sesión Activa
         </button>
       </div>
     </div>

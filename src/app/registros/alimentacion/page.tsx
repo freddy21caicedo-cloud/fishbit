@@ -15,6 +15,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
+import { toast } from 'react-hot-toast';
 
 export default function AlimentacionPage() {
   const searchParams = useSearchParams();
@@ -29,8 +30,6 @@ export default function AlimentacionPage() {
   const [foodStock, setFoodStock] = useState<any[]>([]);
   const [lastBiometryData, setLastBiometryData] = useState<any>(null);
   const [totalFoodSinceLastBio, setTotalFoodSinceLastBio] = useState(0);
-  const [alimentaciones, setAlimentaciones] = useState<any[]>([]);
-
   const [history, setHistory] = useState<any[]>([]);
 
   useEffect(() => {
@@ -76,52 +75,6 @@ export default function AlimentacionPage() {
     setFoodStock(invData || []);
   };
 
-  const fetchSpecies = async (pondId: string) => {
-    const activeUnitId = localStorage.getItem('active_unit_id');
-    const { data } = await supabase
-      .from('pond_species')
-      .select('*')
-      .eq('estanque_id', pondId)
-      .eq('unit_id', activeUnitId);
-
-    if (data && data.length > 0) {
-      setAlimentaciones(data.map(s => ({
-        speciesId: s.id,
-        speciesName: s.species_name,
-        quantity: ''
-      })));
-    } else {
-      const p = ponds.find(pond => pond.id === pondId);
-      setAlimentaciones([{
-        speciesId: null,
-        speciesName: p?.current_species && p.current_species !== 'Policultivo' ? p.current_species : '',
-        quantity: ''
-      }]);
-    }
-  };
-
-  const addNewSpeciesRow = () => {
-    setAlimentaciones([...alimentaciones, {
-      speciesId: null,
-      speciesName: '',
-      quantity: ''
-    }]);
-  };
-
-  const removeSpeciesRow = (index: number) => {
-    if (alimentaciones.length > 1) {
-      const newAlims = [...alimentaciones];
-      newAlims.splice(index, 1);
-      setAlimentaciones(newAlims);
-    }
-  };
-
-  const updateAlimentacion = (index: number, field: string, value: string) => {
-    const newAlims = [...alimentaciones];
-    newAlims[index] = { ...newAlims[index], [field]: value };
-    setAlimentaciones(newAlims);
-  };
-
   const fetchPondDetails = async (id: string) => {
     // 0. Get Pond Current Batch
     const { data: pondData } = await supabase.from('estanques').select('current_batch_id').eq('id', id).single();
@@ -160,63 +113,65 @@ export default function AlimentacionPage() {
   useEffect(() => {
     if (estanqueId) {
       fetchPondDetails(estanqueId);
-      fetchSpecies(estanqueId);
-    } else {
-      setAlimentaciones([]);
     }
   }, [estanqueId, ponds]);
 
   const handleRegisterAlimentacion = async () => {
-    if (!estanqueId || !alimentoId || alimentaciones.every(a => !a.quantity || parseFloat(a.quantity) <= 0)) {
-      alert("Por favor complete todos los campos obligatorios.");
+    if (!estanqueId || !alimentoId || !cantidad || parseFloat(cantidad) <= 0) {
+      toast.error("Por favor complete todos los campos obligatorios.");
       return;
     }
 
-    const totalQty = alimentaciones.reduce((sum, a) => sum + (parseFloat(a.quantity) || 0), 0);
+    const totalQty = parseFloat(cantidad);
     const selectedFood = foodStock.find(f => f.id === alimentoId);
 
     if (selectedFood && parseFloat(selectedFood.current_stock) < totalQty) {
-      alert("No hay suficiente alimento en inventario.");
+      toast.error("No hay suficiente alimento en inventario.");
       return;
     }
 
-    const activeUnitId = localStorage.getItem('active_unit_id');
-    if (!activeUnitId) return;
-
-    const { data: pondData } = await supabase.from('estanques').select('current_batch_id').eq('id', estanqueId).single();
-
     try {
-      for (const alim of alimentaciones) {
-        const qty = parseFloat(alim.quantity) || 0;
-        if (qty <= 0) continue;
+      const activeUnitId = localStorage.getItem('active_unit_id');
+      if (!activeUnitId) throw new Error("No hay unidad activa");
 
+      const registerPromise = async () => {
+        const { data: pondData } = await supabase.from('estanques').select('current_batch_id').eq('id', estanqueId).single();
+        
         const { error: regError } = await supabase.from('alimentacion_diaria').insert([{
           estanque_id: estanqueId,
           inventory_id: alimentoId,
-          quantity_kg: qty,
-          species_name: alim.speciesName,
+          quantity_kg: totalQty,
           date: fecha,
           unit_id: activeUnitId,
           batch_id: pondData?.current_batch_id
         }]);
 
         if (regError) throw regError;
-      }
 
-      if (selectedFood) {
-        await supabase
-          .from('inventory')
-          .update({ current_stock: parseFloat(selectedFood.current_stock) - totalQty })
-          .eq('id', selectedFood.id);
-      }
+        if (selectedFood) {
+          const { error: invError } = await supabase
+            .from('inventory')
+            .update({ current_stock: parseFloat(selectedFood.current_stock) - totalQty })
+            .eq('id', selectedFood.id);
+          if (invError) throw invError;
+        }
+        return true;
+      };
 
-      alert("¡Alimentación registrada con éxito!");
-      setEstanqueId('');
-      setAlimentoId('');
-      fetchBasicData();
-      fetchHistory();
+      toast.promise(registerPromise(), {
+        loading: 'Registrando alimentación...',
+        success: () => {
+          setEstanqueId('');
+          setAlimentoId('');
+          setCantidad('');
+          fetchBasicData();
+          fetchHistory();
+          return "¡Alimentación registrada con éxito!";
+        },
+        error: (err) => `Error: ${err.message}`
+      });
     } catch (err: any) {
-      alert("Error: " + err.message);
+      toast.error("Error: " + err.message);
     }
   };
 
@@ -250,183 +205,84 @@ export default function AlimentacionPage() {
   }, [estanqueId, cantidad, lastBiometryData, totalFoodSinceLastBio]);
 
   return (
-    <div className="animate-fade-in" style={{ maxWidth: '1200px', margin: '0 auto', paddingBottom: '4rem' }}>
-      <header style={{ marginBottom: '2.5rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
+    <div className="animate-fade-in page-container">
+      <header style={{ marginBottom: '2rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
         <Link href="/registros" style={{ color: 'var(--muted-foreground)', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '40px', height: '40px', borderRadius: '50%', background: 'var(--card)', border: '1px solid var(--border)' }}>
           <ArrowLeft size={20} />
         </Link>
         <div>
-          <h1 style={{ fontSize: '1.875rem', fontWeight: 700 }}>Registro de Alimentación</h1>
-          <p style={{ color: 'var(--muted-foreground)' }}>Control nutricional y seguimiento de conversión alimenticia.</p>
+          <h1 style={{ fontWeight: 800 }}>Registro de Alimentación</h1>
+          <p style={{ color: 'var(--muted-foreground)', fontSize: '0.9rem' }}>Bitácora diaria de nutrición por estanque.</p>
         </div>
       </header>
 
-      <div className="responsive-container">
-        {/* Main Form Card */}
-        <div className="card-premium" style={{ flex: 1.4, padding: 'clamp(1.5rem, 5vw, 2.5rem)', position: 'relative', overflow: 'hidden' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
+      <div className="responsive-grid-2">
+        {/* Registration Form */}
+        <div className="card-premium" style={{ padding: '1.5rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem', marginBottom: '1.5rem' }}>
             <div className="premium-input-group">
-              <label className="premium-label">
-                <Calendar size={14} /> Fecha de Suministro
-              </label>
-              <div className="premium-input-wrapper">
-                <input 
-                  type="date" 
-                  value={fecha}
-                  onChange={(e) => setFecha(e.target.value)}
-                  className="premium-date-input"
-                />
-              </div>
+              <label className="premium-label"><Calendar size={14} /> Fecha</label>
+              <input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} className="premium-input" />
             </div>
             <div className="premium-input-group">
-              <label className="premium-label">
-                <Waves size={14} /> Estanque Seleccionado
-              </label>
-              <div className="premium-input-wrapper">
-                <select 
-                  value={estanqueId}
-                  onChange={(e) => setEstanqueId(e.target.value)}
-                  style={{ width: '100%', background: 'transparent', border: 'none', outline: 'none', fontWeight: 700 }}
-                >
-                  <option value="">Seleccionar Estanque...</option>
-                  {ponds.map(p => <option key={p.id} value={p.id}>{p.name} {p.is_polyculture ? '(Policultivo)' : `(${p.current_species})`}</option>)}
-                </select>
-              </div>
-            </div>
-          </div>
-
-          <div className="premium-input-group" style={{ marginBottom: '2rem' }}>
-            <label className="premium-label">
-              <Package size={14} /> Alimento Disponible en Bodega
-            </label>
-            <div className="premium-input-wrapper" style={{ opacity: !estanqueId ? 0.5 : 1 }}>
-              <select 
-                value={alimentoId}
-                onChange={(e) => setAlimentoId(e.target.value)}
-                disabled={!estanqueId}
-                style={{ width: '100%', background: 'transparent', border: 'none', outline: 'none', fontWeight: 700 }}
-              >
-                <option value="">-- Seleccionar Alimento --</option>
-                {foodStock.map(f => (
-                  <option key={f.id} value={f.id}>{f.name} ({parseFloat(f.current_stock).toLocaleString()} kg)</option>
-                ))}
+              <label className="premium-label"><Waves size={14} /> Estanque</label>
+              <select value={estanqueId} onChange={(e) => setEstanqueId(e.target.value)} className="premium-input" style={{ fontWeight: 700 }}>
+                <option value="">Seleccionar...</option>
+                {ponds.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
             </div>
           </div>
+          <div className="premium-input-group" style={{ marginBottom: '1.5rem' }}>
+            <label className="premium-label"><Package size={14} /> Tipo de Alimento</label>
+            <select value={alimentoId} onChange={(e) => setAlimentoId(e.target.value)} className="premium-input" style={{ fontWeight: 700 }}>
+              <option value="">Seleccionar...</option>
+              {foodStock.map(f => (
+                <option key={f.id} value={f.id}>{f.name} ({f.current_stock} kg)</option>
+              ))}
+            </select>
+          </div>
 
-          <AnimatePresence>
-            {estanqueId && (
-              <motion.div 
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                exit={{ opacity: 0, height: 0 }}
-              >
-                <h3 style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--muted-foreground)', textTransform: 'uppercase', marginBottom: '1.5rem', borderTop: '1px solid var(--border)', paddingTop: '1.5rem' }}>Detalle de Alimentación por Especie</h3>
-                
-                {ponds.find(p => p.id === estanqueId)?.is_polyculture && alimentaciones.some(a => !a.speciesId) && (
-                  <div style={{ 
-                    padding: '1rem', 
-                    borderRadius: '12px', 
-                    background: 'rgba(245, 158, 11, 0.1)', 
-                    border: '1px solid rgba(245, 158, 11, 0.2)',
-                    display: 'flex',
-                    gap: '0.75rem',
-                    alignItems: 'center',
-                    marginBottom: '1rem'
-                  }}>
-                    <AlertCircle size={20} style={{ color: '#f59e0b' }} />
-                    <div style={{ fontSize: '0.85rem', color: '#92400e', lineHeight: 1.4 }}>
-                      <strong>Aviso:</strong> No hay desglose de especies para este policultivo. Puede definirlas a continuación o en Siembra.
-                    </div>
-                  </div>
-                )}
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '2rem' }}>
-                  {alimentaciones.map((alim, index) => (
-                    <div key={index} style={{ 
-                      padding: '1.25rem', 
-                      background: 'var(--secondary)', 
-                      borderRadius: '12px', 
-                      border: '1px solid var(--border)',
-                      display: 'grid',
-                      gridTemplateColumns: '2fr 1fr 40px',
-                      gap: '1rem',
-                      alignItems: 'center',
-                      position: 'relative'
-                    }}>
-                      {alimentaciones.length > 1 && (
-                        <button 
-                          onClick={() => removeSpeciesRow(index)}
-                          style={{ position: 'absolute', top: '0.5rem', right: '0.5rem', color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.65rem', fontWeight: 800 }}
-                        >
-                          X
-                        </button>
-                      )}
-                      <div>
-                        {alim.speciesId ? (
-                          <div style={{ fontWeight: 800, fontSize: '0.95rem' }}>{alim.speciesName}</div>
-                        ) : (
-                          <input 
-                            type="text"
-                            value={alim.speciesName}
-                            onChange={(e) => updateAlimentacion(index, 'speciesName', e.target.value)}
-                            placeholder="Especie"
-                            style={{ width: '100%', padding: '0.4rem', borderRadius: '6px', border: '1px solid var(--border)', fontSize: '0.85rem', fontWeight: 700 }}
-                          />
-                        )}
-                        <div style={{ fontSize: '0.7rem', color: 'var(--muted-foreground)' }}>Asignar kg para esta especie</div>
-                      </div>
-                      <div>
-                        <input 
-                          type="number" 
-                          value={alim.quantity}
-                          onChange={(e) => updateAlimentacion(index, 'quantity', e.target.value)}
-                          placeholder="kg"
-                          style={{ width: '100%', padding: '0.5rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'white', outline: 'none', fontWeight: 800, fontSize: '1.1rem' }}
-                        />
-                      </div>
-                      <div style={{ textAlign: 'center' }}>
-                        <Utensils size={18} style={{ color: alim.quantity > 0 ? '#10b981' : 'var(--border)' }} />
-                      </div>
-                    </div>
-                  ))}
-
-                  {ponds.find(p => p.id === estanqueId)?.is_polyculture && (
-                    <button 
-                      onClick={addNewSpeciesRow}
-                      style={{ 
-                        width: '100%', 
-                        padding: '0.75rem', 
-                        borderRadius: '10px', 
-                        border: '2px dashed var(--border)', 
-                        background: 'none', 
-                        color: 'var(--muted-foreground)', 
-                        fontWeight: 700, 
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '0.5rem',
-                        fontSize: '0.85rem'
-                      }}
-                    >
-                      <Plus size={14} /> Agregar otra especie al registro
-                    </button>
-                  )}
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+          <div className="premium-input-group" style={{ marginBottom: '1.5rem' }}>
+            <label className="premium-label"><Utensils size={14} /> Cantidad Total Suministrada</label>
+            <div style={{ position: 'relative' }}>
+              <input 
+                type="number" 
+                value={cantidad} 
+                onChange={(e) => setCantidad(e.target.value)} 
+                className="premium-input" 
+                placeholder="0.0" 
+                style={{ paddingRight: '3rem' }}
+              />
+              <span style={{ position: 'absolute', right: '1rem', top: '50%', transform: 'translateY(-50%)', fontWeight: 700, color: 'var(--muted-foreground)' }}>kg</span>
+            </div>
+          </div>
 
           <button 
-            onClick={handleRegisterAlimentacion}
+            onClick={handleRegisterAlimentacion} 
             className="btn-primary" 
-            style={{ width: '100%', padding: '1.25rem', borderRadius: '16px', fontSize: '1.1rem', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.75rem', marginBottom: '1.5rem' }}
+            style={{ width: '100%', marginTop: '1rem', padding: '1rem', borderRadius: '12px', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
           >
-            <Utensils size={22} />
+            <Utensils size={18} />
             Registrar Alimentación
           </button>
+        </div>
 
+        {/* Info & Metrics */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+          {fcaInfo && (
+            <div className="card-premium" style={{ padding: '1.5rem', borderLeft: `5px solid ${fcaInfo.color}` }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div>
+                  <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--muted-foreground)', textTransform: 'uppercase', marginBottom: '0.5rem' }}>FCA Proyectado</div>
+                  <div style={{ fontSize: '2.5rem', fontWeight: 900, color: fcaInfo.color }}>{fcaInfo.value}</div>
+                </div>
+                <div style={{ background: `${fcaInfo.color}15`, color: fcaInfo.color, padding: '0.4rem 0.75rem', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 800 }}>
+                  {fcaInfo.status}
+                </div>
+              </div>
+              <p style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)', marginTop: '0.5rem' }}>ConversiÃ³n Alimenticia estimada segÃºn Ãºltima biometrÃ­a.</p>
+            </div>
+          )}
           {/* Static Detailed Fish Silhouette in corner */}
           <div style={{ position: 'absolute', bottom: '-10px', right: '-10px', opacity: 0.05, pointerEvents: 'none' }}>
             <svg width="200" height="120" viewBox="0 0 200 120" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -444,7 +300,7 @@ export default function AlimentacionPage() {
         <div className="responsive-side-panel" style={{ display: 'flex', flexDirection: 'column', gap: '2rem', flex: 1 }}>
           {/* FCA Gauge Card */}
           <div className="card-premium" style={{ padding: '2rem', textAlign: 'center' }}>
-            <h3 style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--muted-foreground)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '1.5rem' }}>Factor de Conversión (F.C.A.)</h3>
+            <h3 style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--muted-foreground)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '1.5rem' }}>Factor de ConversiÃ³n (F.C.A.)</h3>
             
             <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1rem' }}>
               <motion.div 
@@ -471,7 +327,7 @@ export default function AlimentacionPage() {
                 <div style={{ padding: '0.4rem 1.25rem', borderRadius: '50px', background: fcaInfo.color, color: 'white', fontWeight: 800, fontSize: '0.85rem' }}>
                   {fcaInfo.status}
                 </div>
-                <span style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)' }}>Basado en biometría del {lastBiometryData?.date}</span>
+                <span style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)' }}>Basado en biometrÃ­a del {lastBiometryData?.date}</span>
               </div>
             )}
           </div>
@@ -489,7 +345,7 @@ export default function AlimentacionPage() {
                 </div>
               ) : (
                 <div style={{ fontSize: '0.8rem', color: 'var(--muted-foreground)', textAlign: 'center', padding: '1rem' }}>
-                  {estanqueId ? 'No hay biometrías previas' : 'Seleccione un estanque'}
+                  {estanqueId ? 'No hay biometrÃ­as previas' : 'Seleccione un estanque'}
                 </div>
               )}
             </div>
@@ -518,14 +374,13 @@ export default function AlimentacionPage() {
           <div className="card-premium" style={{ padding: '2rem' }}>
             <h3 style={{ fontSize: '1.1rem', fontWeight: 800, marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
               <History size={20} style={{ color: 'var(--primary)' }} />
-              Bitácora de Alimentación Diaria
+              BitÃ¡cora de AlimentaciÃ³n Diaria
             </h3>
             
             <div style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '700px' }}>
                 <thead>
                   <tr style={{ borderBottom: '2px solid var(--border)' }}>
-                    <th style={{ textAlign: 'left', padding: '1rem', fontSize: '0.8rem', color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>Especie</th>
                     <th style={{ textAlign: 'left', padding: '1rem', fontSize: '0.8rem', color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>Cantidad (kg)</th>
                     <th style={{ textAlign: 'left', padding: '1rem', fontSize: '0.8rem', color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>Alimento</th>
                     <th style={{ textAlign: 'left', padding: '1rem', fontSize: '0.8rem', color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>Estanque</th>
@@ -535,7 +390,6 @@ export default function AlimentacionPage() {
                 <tbody>
                   {history.map((h) => (
                     <tr key={h.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                      <td style={{ padding: '1rem', fontWeight: 700 }}>{h.species_name || 'Especie'}</td>
                       <td style={{ padding: '1rem', fontWeight: 800, color: '#10b981' }}>{h.quantity_kg} kg</td>
                       <td style={{ padding: '1rem', fontSize: '0.9rem' }}>{h.inventory?.name}</td>
                       <td style={{ padding: '1rem' }}>
@@ -550,7 +404,7 @@ export default function AlimentacionPage() {
                   ))}
                   {history.length === 0 && (
                     <tr>
-                      <td colSpan={5} style={{ padding: '3rem', textAlign: 'center', color: 'var(--muted-foreground)' }}>No hay registros de alimentación recientes.</td>
+                      <td colSpan={5} style={{ padding: '3rem', textAlign: 'center', color: 'var(--muted-foreground)' }}>No hay registros de alimentaciÃ³n recientes.</td>
                     </tr>
                   )}
                 </tbody>

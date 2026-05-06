@@ -1,8 +1,10 @@
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useRouter } from 'next/navigation';
+import { toast } from 'react-hot-toast';
 import { supabase } from '@/lib/supabase';
+import { motion, AnimatePresence } from 'framer-motion';
 import { 
   ShoppingBag, 
   FlaskConical, 
@@ -23,19 +25,24 @@ import {
   Users,
   UserPlus,
   Trash2,
-  Calendar
+  Calendar,
+  ArrowDown,
+  ArrowUp
 } from 'lucide-react';
 
+interface InventoryItem {
+  id: string;
+  name: string;
+  category: string;
+  current_stock: string | number;
+  unit: string;
+  min_stock?: number;
+  brand?: string;
+  last_entry?: string;
+}
 
-const mockData: any = {
-  alimento: [
-    { id: 1, name: 'Purina Crecimiento 45%', brand: 'Agribrands', quantity: '850 Kg', lastEntry: 'Hoy', status: 'In-Stock' },
-    { id: 2, name: 'Purina Engorde 32%', brand: 'Agribrands', quantity: '350 Kg', lastEntry: 'Hace 3 días', status: 'In-Stock' },
-  ],
-  farmacia: [
-    { id: 3, name: 'Oxitetraciclina 50%', brand: 'Vet-Tech', quantity: '12 Unidades', lastEntry: 'Hace 1 semana', status: 'Bajo Stock' },
-  ]
-};
+
+
 
 export default function AlmacenPage() {
   const [activeCat, setActiveCat] = useState('alimento');
@@ -52,7 +59,7 @@ export default function AlmacenPage() {
   // Providers & Invoices State
   const [providers, setProviders] = useState<any[]>([]);
   const [invoices, setInvoices] = useState<any[]>([]);
-  const [inventory, setInventory] = useState<any[]>([]);
+  const [inventory, setInventory] = useState<InventoryItem[]>([]);
 
   const [newProvider, setNewProvider] = useState({ name: '', nit: '', types: [] as string[] });
   const [newInvoice, setNewInvoice] = useState({ 
@@ -63,97 +70,53 @@ export default function AlmacenPage() {
   });
 
   useEffect(() => {
-    fetchProviders();
-    fetchInvoices();
-    fetchInventory();
+    const activeUnitId = typeof window !== 'undefined' ? localStorage.getItem('active_unit_id') : null;
+    if (activeUnitId) {
+      fetchProviders(activeUnitId);
+      fetchInvoices(activeUnitId);
+      fetchInventory(activeUnitId);
+    }
   }, []);
 
-  const saveProvider = async () => {
-    if (!newProvider.name) return;
-    let activeUnitId = localStorage.getItem('active_unit_id');
-    
-    if (!activeUnitId) {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const { data: uu } = await supabase.from('user_units').select('unit_id').eq('user_id', user.id).single();
-        if (uu) activeUnitId = uu.unit_id;
-      }
-    }
-
-    if (!activeUnitId) {
-      alert("Error: No se detectó unidad vinculada.");
-      return;
-    }
-
-    const payload = {
-      name: newProvider.name,
-      nit: newProvider.nit,
-      types: newProvider.types,   // array text[]
-      unit_id: activeUnitId
-    };
-
-    console.log("Payload enviado a providers:", JSON.stringify(payload));
-
+  const fetchProviders = async (unitId: string) => {
     try {
-      const { data, error } = await supabase.from('providers').insert([payload]).select();
-      if (error) {
-        console.error("Código:", error.code, "| Mensaje:", error.message);
-        if (error.code === '23505') {
-          alert("Conflicto de Registro [23505]: Ya existe un proveedor con este NIT en su unidad productiva. Verifique los datos o use un NIT diferente.");
-        } else {
-          alert("Error al guardar proveedor: " + error.message);
-        }
-        return;
-      }
-      setProviders([...providers, ...(data || [])]);
-      setNewProvider({ name: '', nit: '', types: [] });
-      setIsProviderModalOpen(false);
-      alert("¡Proveedor registrado con éxito!");
-    } catch (e: any) {
-      console.error("Error inesperado:", e);
-      alert("Error inesperado: " + e.message);
+      const { data, error } = await supabase
+        .from('providers')
+        .select('*')
+        .eq('unit_id', unitId)
+        .order('name');
+      
+      if (error) throw error;
+      setProviders(data || []);
+    } catch (error: any) {
+      toast.error("Error al cargar proveedores: " + error.message);
     }
   };
 
-  const fetchProviders = async () => {
-    let activeUnitId = localStorage.getItem('active_unit_id');
-    if (!activeUnitId) {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const { data: uu } = await supabase.from('user_units').select('unit_id').eq('user_id', user.id).single();
-        if (uu) activeUnitId = uu.unit_id;
-      }
+  const fetchInventory = async (unitId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('inventory')
+        .select('*')
+        .eq('unit_id', unitId);
+      
+      if (error) throw error;
+      setInventory(data || []);
+    } catch (error: any) {
+      toast.error("Error al cargar inventario: " + error.message);
     }
-    
-    if (!activeUnitId) return;
-    const { data, error } = await supabase.from('providers').select('*').eq('unit_id', activeUnitId).order('name');
-    if (error) console.error('Error fetching providers:', error);
-    else setProviders(data || []);
   };
 
-  const fetchInventory = async () => {
-    const activeUnitId = localStorage.getItem('active_unit_id');
-    if (!activeUnitId) return;
-    const { data, error } = await supabase.from('inventory').select('*').eq('unit_id', activeUnitId);
-    if (error) console.error('Error fetching inventory:', error);
-    else setInventory(data || []);
-  };
-
-
-  const fetchInvoices = async () => {
-    const activeUnitId = localStorage.getItem('active_unit_id');
-    if (!activeUnitId) return;
-    const { data, error } = await supabase
-      .from('invoices')
-      .select(`
-        *,
-        providers (name)
-      `)
-      .eq('unit_id', activeUnitId)
-      .order('date', { ascending: false });
-    
-    if (error) console.error('Error fetching invoices:', error);
-    else {
+  const fetchInvoices = async (unitId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('invoices')
+        .select(`*, providers (name)`)
+        .eq('unit_id', unitId)
+        .order('date', { ascending: false });
+      
+      if (error) throw error;
+      
       const formatted = (data || []).map(inv => ({
         ...inv,
         nro: inv.invoice_number,
@@ -163,21 +126,60 @@ export default function AlmacenPage() {
         status: inv.status === 'pagada' ? 'Pagada' : 'Pendiente'
       }));
       setInvoices(formatted);
+    } catch (error: any) {
+      toast.error("Error al cargar facturas: " + error.message);
+    }
+  };
+
+  const saveProvider = async () => {
+    if (!newProvider.name || !newProvider.nit) {
+      toast.error("Por favor complete nombre y NIT.");
+      return;
+    }
+
+    const activeUnitId = typeof window !== 'undefined' ? localStorage.getItem('active_unit_id') : null;
+    if (!activeUnitId) {
+      toast.error("No se detectó unidad activa.");
+      return;
+    }
+
+    const payload = {
+      ...newProvider,
+      unit_id: activeUnitId
+    };
+
+    try {
+      const { data, error } = await supabase.from('providers').insert([payload]).select();
+      if (error) {
+        if (error.code === '23505') {
+          toast.error("Ya existe un proveedor con este NIT.");
+        } else {
+          throw error;
+        }
+        return;
+      }
+      setProviders(prev => [...prev, ...(data || [])]);
+      setNewProvider({ name: '', nit: '', types: [] });
+      setIsProviderModalOpen(false);
+      toast.success("¡Proveedor registrado!");
+    } catch (error: any) {
+      toast.error("Error al guardar: " + error.message);
     }
   };
 
   const handleCreateProvider = async () => {
     if (!newProvider.name || !newProvider.nit) {
-      alert("Por favor complete nombre y NIT.");
+      toast.error("Por favor complete nombre y NIT.");
       return;
     }
     const { data, error } = await supabase.from('providers').insert([newProvider]).select();
-    if (error) alert('Error al crear proveedor: ' + error.message);
-    else {
+    if (error) {
+      toast.error('Error al crear proveedor: ' + error.message);
+    } else {
       setProviders([...providers, ...(data || [])]);
       setNewProvider({ name: '', nit: '', types: [] });
       setIsProviderModalOpen(false);
-      alert('¡Proveedor registrado con éxito!');
+      toast.success('¡Proveedor registrado con éxito!');
     }
   };
 
@@ -289,7 +291,7 @@ export default function AlmacenPage() {
   const fletePorBulto = totalBultos > 0 ? fleteNum / totalBultos : 0;
 
   const totalFactura = useMemo(() => {
-    // Each item: qty * unitPrice (sin flete — flete es externo)
+    // Each item: qty * unitPrice (sin flete â€” flete es externo)
     const subtotal = items.reduce((sum, item) => {
       const qty = parseFloat(item.quantity) || 0;
       const price = parseFloat(item.unitPrice) || 0;
@@ -312,111 +314,111 @@ export default function AlmacenPage() {
 
   const handleRegisterInvoice = async () => {
     const providerObj = providers.find(p => p.name === proveedor);
-    if (!providerObj) { alert("Por favor seleccione un proveedor válido."); return; }
-    if (!nroFactura) { alert("Por favor ingrese el número de factura."); return; }
+    if (!providerObj) { toast.error("Por favor seleccione un proveedor válido."); return; }
+    if (!nroFactura) { toast.error("Por favor ingrese el número de factura."); return; }
 
-    let activeUnitId = localStorage.getItem('active_unit_id');
-    if (!activeUnitId) {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const { data: uu } = await supabase.from('user_units').select('unit_id').eq('user_id', user.id).single();
-        if (uu) { activeUnitId = uu.unit_id; localStorage.setItem('active_unit_id', uu.unit_id); }
-      }
-    }
-    if (!activeUnitId) { alert("Error: No se detectó unidad vinculada."); return; }
+    const activeUnitId = typeof window !== 'undefined' ? localStorage.getItem('active_unit_id') : null;
+    if (!activeUnitId) { toast.error("No se detectó unidad activa."); return; }
 
-    const { data: invData, error: invError } = await supabase
-      .from('invoices')
-      .insert([{
-        invoice_number: nroFactura,
-        provider_id: providerObj.id,
-        category: activeCat,
-        date: fechaFactura,
-        total: totalFactura,
-        flete: fleteNum,
-        is_credit: isCredit,
-        credit_days: parseInt(diasCredito) || 0,
-        status: isCredit ? 'pendiente' : 'pagada',
-        unit_id: activeUnitId
-      }])
-      .select();
+    const registerPromise = async () => {
+      // 1. Insert Invoice
+      const { data: invData, error: invError } = await supabase
+        .from('invoices')
+        .insert([{
+          invoice_number: nroFactura,
+          provider_id: providerObj.id,
+          category: activeCat,
+          date: fechaFactura,
+          total: totalFactura,
+          flete: fleteNum,
+          is_credit: isCredit,
+          credit_days: parseInt(diasCredito) || 0,
+          status: isCredit ? 'pendiente' : 'pagada',
+          unit_id: activeUnitId
+        }])
+        .select();
 
-    if (invError) {
-      alert('Error al registrar factura: ' + invError.message);
-      return;
-    }
+      if (invError || !invData) throw invError || new Error("Error al registrar cabecera de factura");
 
-    const invoiceId = invData[0].id;
-    const ivaRate = activeCat === 'alimento' ? 5 : 0;
-    const itemsToInsert = items.map(item => {
-      const qty = parseFloat(item.quantity) || 0;
-      const price = parseFloat(item.unitPrice) || 0;
-      const ivaP = activeCat === 'alimento' ? 5 : (item.hasIva ? parseFloat(item.ivaPercent) || 0 : 0);
-      return {
-        invoice_id: invoiceId,
-        unit_id: activeUnitId,
-        product_name: item.product,
-        batch: item.batch,
-        quantity: qty,
-        kilos: parseFloat(item.kilos) || 0,
-        unit_price: price,
-        flete_per_unit: fletePorBulto,
-        total_price: qty * price,
-        hp_energy: item.hpEnergy,
-        sort_caudal: item.sortCaudal,
-        has_iva: activeCat === 'alimento' ? true : item.hasIva,
-        iva_percent: ivaP
-      };
-    });
-
-    const { error: itemsError } = await supabase.from('invoice_items').insert(itemsToInsert);
-    if (itemsError) {
-      alert('Error al registrar ítems: ' + itemsError.message);
-    } else {
-      await updateInventoryStock(items, activeCat, activeUnitId);
-      alert(`¡Factura de ${activeCat.toUpperCase()} registrada con éxito!`);
-      fetchInvoices();
-      fetchInventory();
-      resetForm();
-    }
-  };
-
-  const updateInventoryStock = async (invoiceItems: any[], category: string, unitId: string) => {
-    for (const item of invoiceItems) {
-      if (!item.product) continue;
-      const { data: existing } = await supabase
-        .from('inventory')
-        .select('*')
-        .eq('category', category)
-        .eq('name', item.product)
-        .eq('unit_id', unitId)
-        .single();
+      const invoiceId = invData[0].id;
       
-      // Si es alimento, guardamos KILOS. Si es otra cosa, unidades.
-      const qtyToAdd = category === 'alimento' ? (parseFloat(item.kilos) || 0) : (parseFloat(item.quantity) || 0);
-      
-      if (existing) {
-        await supabase.from('inventory').update({ 
-          current_stock: (parseFloat(existing.current_stock) || 0) + qtyToAdd, 
-          last_entry: new Date().toISOString()
-        }).eq('id', existing.id);
-      } else {
-        await supabase.from('inventory').insert([{
-          category,
-          name: item.product,
-          current_stock: qtyToAdd,
-          unit: category === 'alimento' ? 'kg' : category === 'alevinos' ? 'unidades' : 'bultos',
-          unit_id: unitId,
-          last_entry: new Date().toISOString()
+      // 2. Prepare items and inventory updates
+      const operations = items.map(async (item) => {
+        const qty = parseFloat(item.quantity) || 0;
+        const price = parseFloat(item.unitPrice) || 0;
+        const ivaP = activeCat === 'alimento' ? 5 : (item.hasIva ? parseFloat(item.ivaPercent) || 0 : 0);
+        
+        // A. Insert Item
+        const { error: itemError } = await supabase.from('invoice_items').insert([{
+          invoice_id: invoiceId,
+          unit_id: activeUnitId,
+          product_name: item.product,
+          batch: item.batch,
+          quantity: qty,
+          kilos: parseFloat(item.kilos) || 0,
+          unit_price: price,
+          flete_per_unit: fletePorBulto,
+          total_price: qty * price,
+          hp_energy: item.hpEnergy,
+          sort_caudal: item.sortCaudal,
+          has_iva: activeCat === 'alimento' ? true : item.hasIva,
+          iva_percent: ivaP
         }]);
-      }
-    }
+        if (itemError) throw itemError;
+
+        // B. Update Inventory
+        if (item.product) {
+          const { data: existing } = await supabase
+            .from('inventory')
+            .select('*')
+            .eq('category', activeCat)
+            .eq('name', item.product)
+            .eq('unit_id', activeUnitId)
+            .single();
+          
+          const qtyToAdd = activeCat === 'alimento' ? (parseFloat(item.kilos) || 0) : qty;
+          
+          if (existing) {
+            await supabase.from('inventory').update({ 
+              current_stock: (parseFloat(existing.current_stock as string) || 0) + qtyToAdd, 
+              last_entry: new Date().toISOString()
+            }).eq('id', existing.id);
+          } else {
+            await supabase.from('inventory').insert([{
+              category: activeCat,
+              name: item.product,
+              current_stock: qtyToAdd,
+              unit: activeCat === 'alimento' ? 'kg' : activeCat === 'alevinos' ? 'unidades' : 'uds',
+              unit_id: activeUnitId,
+              last_entry: new Date().toISOString()
+            }]);
+          }
+        }
+      });
+
+      await Promise.all(operations);
+      return true;
+    };
+
+    toast.promise(registerPromise(), {
+      loading: 'Registrando factura e inventario...',
+      success: () => {
+        fetchInvoices(activeUnitId);
+        fetchInventory(activeUnitId);
+        resetForm();
+        return `¡Factura registrada con éxito!`;
+      },
+      error: (err) => `Error: ${err.message}`
+    });
   };
 
   const handleDeleteInvoice = async (invoiceId: string, invoiceNumber: string, category: string) => {
     if (!confirm(`¿Eliminar la factura ${invoiceNumber}? Esta acción restará el stock ingresado y no se puede deshacer.`)) return;
 
-    try {
+    const activeUnitId = typeof window !== 'undefined' ? localStorage.getItem('active_unit_id') : null;
+    if (!activeUnitId) { toast.error("No se detectó unidad activa."); return; }
+
+    const deletePromise = async () => {
       // 1. Get items to reverse stock
       const { data: items, error: itemsError } = await supabase
         .from('invoice_items')
@@ -425,17 +427,8 @@ export default function AlmacenPage() {
       
       if (itemsError) throw itemsError;
 
-      let activeUnitId = localStorage.getItem('active_unit_id');
-      if (!activeUnitId) {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          const { data: uu } = await supabase.from('user_units').select('unit_id').eq('user_id', user.id).single();
-          if (uu) activeUnitId = uu.unit_id;
-        }
-      }
-
-      // 2. Reverse stock
-      for (const item of (items || [])) {
+      // 2. Reverse stock in parallel
+      const reverseOps = (items || []).map(async (item) => {
         const { data: inventoryItem } = await supabase
           .from('inventory')
           .select('*')
@@ -445,29 +438,36 @@ export default function AlmacenPage() {
           .single();
         
         if (inventoryItem) {
-          // Si es alimento, restamos KILOS. Si es otra cosa, bultos/unidades.
           const qtyToRemove = category === 'alimento' ? (parseFloat(item.kilos) || 0) : (parseFloat(item.quantity) || 0);
-          const newStock = Math.max(0, (parseFloat(inventoryItem.current_stock) || 0) - qtyToRemove);
+          const newStock = Math.max(0, (parseFloat(inventoryItem.current_stock as string) || 0) - qtyToRemove);
           await supabase
             .from('inventory')
             .update({ current_stock: newStock })
             .eq('id', inventoryItem.id);
         }
-      }
+      });
 
-      // 3. Delete items first (just in case no cascade)
+      await Promise.all(reverseOps);
+
+      // 3. Delete items (handled by DB cascade ideally, but explicit here)
       await supabase.from('invoice_items').delete().eq('invoice_id', invoiceId);
 
       // 4. Delete invoice
       const { error: delError } = await supabase.from('invoices').delete().eq('id', invoiceId);
       if (delError) throw delError;
 
-      fetchInvoices();
-      fetchInventory();
-      alert("Factura eliminada y stock revertido.");
-    } catch (err: any) {
-      alert("Error al eliminar factura: " + err.message);
-    }
+      return true;
+    };
+
+    toast.promise(deletePromise(), {
+      loading: `Eliminando factura ${invoiceNumber}...`,
+      success: () => {
+        fetchInvoices(activeUnitId);
+        fetchInventory(activeUnitId);
+        return "Factura eliminada y stock revertido.";
+      },
+      error: (err) => `Error al eliminar: ${err.message}`
+    });
   };
 
   const handleRegisterAlimento = () => handleRegisterInvoice();
@@ -524,26 +524,35 @@ export default function AlmacenPage() {
   const laboratorios = ['Bayer (Elanco)', 'MSD Animal Health', 'Vet-Tech', 'Pronavet', 'Virbac'];
 
   return (
-    <div className="almacen-page-root" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-      <div className="animate-fade-in" style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '1rem' }}>
-        <header style={{ marginBottom: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-          <div>
-            <h1 style={{ fontSize: '2.25rem', fontWeight: 900, letterSpacing: '-0.05em', color: 'var(--foreground)' }}>Almacén e Inventario</h1>
-            <p style={{ color: 'var(--muted-foreground)', fontSize: '1.1rem' }}>Gestión centralizada de abastecimiento y stock.</p>
-          </div>
+    <div className="animate-fade-in page-container">
+      <header style={{ marginBottom: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+        <div>
+          <h1 style={{ fontWeight: 900 }}>Almacén e Inventario</h1>
+          <p style={{ color: 'var(--muted-foreground)' }}>Gestión centralizada de abastecimiento y stock.</p>
+        </div>
+        <div style={{ display: 'flex', gap: '0.75rem' }}>
           <button 
             onClick={() => setIsProviderModalOpen(true)}
-            className="btn-primary" 
-            style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.75rem 1.5rem', background: 'white', color: 'var(--primary)', border: '1px solid var(--border)' }}
+            className="btn-secondary" 
+            style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'var(--card)', padding: '0.6rem 1rem', borderRadius: '10px', border: '1px solid var(--border)', fontWeight: 700, cursor: 'pointer' }}
           >
-            <UserPlus size={18} /> Crear Proveedor
+            <UserPlus size={18} />
+            Proveedores
           </button>
-        </header>
+          <button 
+            onClick={openNewInvoice}
+            className="btn-primary" 
+            style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'var(--primary)', color: 'white', padding: '0.6rem 1rem', borderRadius: '10px', border: 'none', fontWeight: 700, cursor: 'pointer' }}
+          >
+            <Plus size={18} />
+            Nueva Factura
+          </button>
+        </div>
+      </header>
 
-      <div className="almacen-layout" style={{ display: 'flex', gap: '2rem', flex: 1 }}>
-        
-        {/* Internal Sidebar */}
-        <div className="almacen-sidebar-categories" style={{ width: '280px', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+      <div className="responsive-grid-2">
+        {/* Internal Sidebar - Navigation Categories */}
+        <div className="almacen-sidebar-categories" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
           <h3 style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--muted-foreground)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.5rem' }}>Categorías de Almacén</h3>
           {categories.map(cat => (
             <button
@@ -774,12 +783,12 @@ export default function AlmacenPage() {
           {/* Search & Table Area */}
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'auto' }}>
             <div style={{ padding: '1rem 1.5rem' }}>
-              <div style={{ position: 'relative' }}>
-                <Search size={18} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--muted-foreground)' }} />
+              <div className="premium-input-wrapper">
+                <Search size={18} className="premium-input-icon" />
                 <input 
                   type="text" 
                   placeholder={`Buscar en ${currentCategory?.label}...`}
-                  style={{ width: '100%', padding: '0.625rem 0.75rem 0.625rem 2.25rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--secondary)', outline: 'none', fontSize: '0.9rem' }}
+                  className="premium-input"
                 />
               </div>
             </div>
@@ -796,32 +805,41 @@ export default function AlmacenPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {inventory.filter(i => i.category === activeCat && (parseFloat(i.current_stock) || 0) > 0).map((item: any) => (
-                    <tr key={item.id} style={{ borderBottom: '1px solid var(--border)', fontSize: '0.9rem' }}>
-                      <td style={{ padding: '1rem 0', fontWeight: 600 }}>{item.name}</td>
-                      <td style={{ padding: '1rem 0', color: 'var(--muted-foreground)' }}>{item.brand || 'Genérico'}</td>
-                      <td style={{ padding: '1rem 0' }}>
-                        <span style={{ 
-                          padding: '0.25rem 0.5rem', 
-                          borderRadius: '4px', 
-                          background: parseFloat(item.current_stock) <= 5 ? 'rgba(239, 68, 68, 0.1)' : 'var(--secondary)',
-                          color: parseFloat(item.current_stock) <= 5 ? '#ef4444' : 'var(--foreground)',
-                          fontWeight: 700,
-                          fontSize: '0.8rem'
-                        }}>
-                          {parseFloat(item.current_stock).toLocaleString()} {item.unit}
-                        </span>
-                      </td>
-                      <td style={{ padding: '1rem 0', color: 'var(--muted-foreground)' }}>
-                        {item.last_entry ? new Date(item.last_entry).toLocaleDateString() : 'N/A'}
-                      </td>
-                      <td style={{ padding: '1rem 0', textAlign: 'right' }}>
-                        <button style={{ background: 'transparent', border: 'none', color: 'var(--border)', cursor: 'pointer' }}>
-                          <MoreVertical size={18} />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                  {inventory
+                    .filter(i => i.category === activeCat && (parseFloat(i.current_stock as string) || 0) > 0)
+                    .map((item) => {
+                      const stockVal = parseFloat(item.current_stock as string) || 0;
+                      const isLowStock = stockVal <= (item.min_stock || 100); // Dynamic threshold
+
+                      return (
+                        <tr key={item.id} style={{ borderBottom: '1px solid var(--border)', fontSize: '0.9rem' }}>
+                          <td style={{ padding: '1rem 0', fontWeight: 600 }}>{item.name}</td>
+                          <td style={{ padding: '1rem 0', color: 'var(--muted-foreground)' }}>{item.brand || 'Genérico'}</td>
+                          <td style={{ padding: '1rem 0' }}>
+                            <span style={{ 
+                              padding: '0.25rem 0.75rem', 
+                              borderRadius: '6px', 
+                              background: isLowStock ? 'rgba(239, 68, 68, 0.1)' : 'rgba(16, 185, 129, 0.1)',
+                              color: isLowStock ? '#ef4444' : '#10b981',
+                              fontWeight: 700,
+                              fontSize: '0.85rem'
+                            }}>
+                              {stockVal.toLocaleString()} {item.unit}
+                              {isLowStock && <AlertCircle size={12} style={{ marginLeft: '4px', display: 'inline' }} />}
+                            </span>
+                          </td>
+                          <td style={{ padding: '1rem 0', color: 'var(--muted-foreground)' }}>
+                            {item.last_entry ? new Date(item.last_entry).toLocaleDateString() : 'N/A'}
+                          </td>
+                          <td style={{ padding: '1rem 0', textAlign: 'right' }}>
+                            <button style={{ background: 'transparent', border: 'none', color: 'var(--muted-foreground)', cursor: 'pointer' }}>
+                              <MoreVertical size={18} />
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  }
                 </tbody>
               </table>
             </div>
@@ -893,7 +911,8 @@ export default function AlmacenPage() {
                         value={nroFactura} 
                         onChange={(e) => setNroFactura(e.target.value)} 
                         placeholder="Ej: BQAE 258328" 
-                        style={{ width: '100%', background: 'transparent', border: 'none', outline: 'none', fontWeight: 700 }} 
+                        className="premium-input"
+                        style={{ fontWeight: 700 }}
                       />
                     </div>
                   </div>
@@ -903,7 +922,8 @@ export default function AlmacenPage() {
                       <select 
                         value={proveedor} 
                         onChange={(e) => setProveedor(e.target.value)} 
-                        style={{ width: '100%', background: 'transparent', border: 'none', outline: 'none', fontWeight: 700 }}
+                        className="premium-input"
+                        style={{ fontWeight: 700 }}
                       >
                         <option value="">Seleccione proveedor...</option>
                         {providers
@@ -956,7 +976,7 @@ export default function AlmacenPage() {
                           boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
                         }} />
                       </div>
-                      <span style={{ fontSize: '0.85rem', fontWeight: 700, color: isCredit ? 'var(--primary)' : 'var(--muted-foreground)' }}>Compra a Crédito</span>
+                       <span style={{ fontSize: '0.85rem', fontWeight: 700, color: isCredit ? 'var(--primary)' : 'var(--muted-foreground)' }}>Compra a Crédito</span>
                     </div>
 
                     <AnimatePresence>
@@ -967,7 +987,7 @@ export default function AlmacenPage() {
                           exit={{ opacity: 0, x: -20 }}
                           style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}
                         >
-                          <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--muted-foreground)' }}>PLAZO (DÍAS):</label>
+                           <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--muted-foreground)' }}>PLAZO (DÍAS):</label>
                           <select 
                             value={diasCredito}
                             onChange={(e) => setDiasCredito(e.target.value)}
@@ -990,7 +1010,7 @@ export default function AlmacenPage() {
               {activeCat === 'alimento' && (
                 <div style={{ background: 'rgba(245, 158, 11, 0.05)', border: '1px solid rgba(245, 158, 11, 0.3)', borderRadius: '12px', padding: '1rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '2rem', flexWrap: 'wrap' }}>
                   <div style={{ flex: 1, minWidth: '180px' }}>
-                    <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 700, marginBottom: '0.4rem', color: '#d97706', textTransform: 'uppercase' }}>🚛 Flete (COP) — Externo, no va en factura</label>
+                    <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 700, marginBottom: '0.4rem', color: '#d97706', textTransform: 'uppercase' }}>🚚 Flete (COP) — Externo, no va en factura</label>
                     <input
                       type="text"
                       value={flete ? parseInt(flete).toLocaleString() : ''}
@@ -1183,7 +1203,7 @@ export default function AlmacenPage() {
                     <FileText size={28} style={{ color: 'var(--primary)' }} />
                     Cuentas por Pagar (Facturas)
                   </h2>
-                  <p style={{ color: 'var(--muted-foreground)' }}>Gestión de vencimientos y pagos a proveedores.</p>
+                   <p style={{ color: 'var(--muted-foreground)' }}>Gestión de vencimientos y pagos a proveedores.</p>
                 </div>
                 <button onClick={() => setIsInvoiceListOpen(false)} style={{ background: 'transparent', border: 'none', color: 'var(--muted-foreground)', cursor: 'pointer', fontSize: '1.5rem' }}>&times;</button>
               </div>
@@ -1235,7 +1255,7 @@ export default function AlmacenPage() {
                                 <button 
                                   onClick={async () => {
                                     const { error } = await supabase.from('invoices').update({ status: 'pagada' }).eq('id', inv.id);
-                                    if (error) alert('Error: ' + error.message);
+                                    if (error) toast.error('Error: ' + error.message);
                                     else fetchInvoices();
                                   }}
                                   style={{ padding: '0.5rem 1rem', borderRadius: '8px', border: '1px solid #10b981', background: 'rgba(16, 185, 129, 0.05)', color: '#10b981', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
@@ -1295,53 +1315,53 @@ export default function AlmacenPage() {
                 <button onClick={() => setIsProviderModalOpen(false)} style={{ background: 'transparent', border: 'none', color: 'var(--muted-foreground)', cursor: 'pointer', fontSize: '1.5rem' }}>&times;</button>
               </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 800, color: 'var(--muted-foreground)', textTransform: 'uppercase', marginBottom: '0.5rem' }}>Nombre de Empresa / Persona</label>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                <div className="premium-input-group">
+                  <label className="premium-label">Nombre de Empresa / Persona</label>
                   <input 
                     type="text" 
                     placeholder="Ej: Italcol S.A."
                     value={newProvider.name}
                     onChange={(e) => setNewProvider({...newProvider, name: e.target.value})}
-                    style={{ width: '100%', padding: '0.8rem 1rem', borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--secondary)', outline: 'none' }}
+                    className="premium-input"
                   />
                 </div>
 
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 800, color: 'var(--muted-foreground)', textTransform: 'uppercase', marginBottom: '0.5rem' }}>NIT o Cédula</label>
+                <div className="premium-input-group">
+                  <label className="premium-label">NIT o Cédula</label>
                   <input 
                     type="text" 
-                    placeholder="Ej: 800.123.456-1"
+                    placeholder="900.123.456-7"
                     value={newProvider.nit}
                     onChange={(e) => setNewProvider({...newProvider, nit: e.target.value})}
-                    style={{ width: '100%', padding: '0.8rem 1rem', borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--secondary)', outline: 'none' }}
+                    className="premium-input"
                   />
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 800, color: 'var(--muted-foreground)', textTransform: 'uppercase', marginBottom: '0.75rem' }}>Tipo de Proveedor</label>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
-                    {['alimento', 'medicamentos', 'insumos', 'alevinos', 'aireadores'].map((type) => (
+                  <label className="premium-label">Categorías que Suministra</label>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem' }}>
+                    {['alimento', 'farmacia', 'insumos', 'alevinos', 'equipos'].map(type => (
                       <button
                         key={type}
                         onClick={() => {
-                          const types = newProvider.types.includes(type) 
+                          const types = newProvider.types.includes(type)
                             ? newProvider.types.filter(t => t !== type)
                             : [...newProvider.types, type];
                           setNewProvider({...newProvider, types});
                         }}
                         style={{
-                          padding: '0.6rem',
-                          borderRadius: '8px',
-                          border: '1px solid',
+                          padding: '0.6rem 1rem',
+                          borderRadius: '10px',
+                          border: '1.5px solid',
                           borderColor: newProvider.types.includes(type) ? 'var(--primary)' : 'var(--border)',
-                          background: newProvider.types.includes(type) ? 'rgba(37, 99, 235, 0.05)' : 'white',
-                          color: newProvider.types.includes(type) ? 'var(--primary)' : 'var(--foreground)',
-                          fontSize: '0.75rem',
-                          fontWeight: 700,
+                          background: newProvider.types.includes(type) ? 'rgba(13, 148, 136, 0.05)' : 'white',
+                          color: newProvider.types.includes(type) ? 'var(--primary)' : 'var(--muted-foreground)',
+                          fontSize: '0.85rem',
+                          fontWeight: 800,
                           cursor: 'pointer',
-                          textTransform: 'capitalize',
-                          transition: 'all 0.2s ease'
+                          transition: 'all 0.2s ease',
+                          textTransform: 'capitalize'
                         }}
                       >
                         {type}
@@ -1349,11 +1369,10 @@ export default function AlmacenPage() {
                     ))}
                   </div>
                 </div>
-
                 <button 
                   onClick={saveProvider}
                   className="btn-primary" 
-                  style={{ width: '100%', padding: '1rem', marginTop: '1rem' }}
+                  style={{ width: '100%', padding: '1rem', marginTop: '0.5rem' }}
                 >
                   Registrar Proveedor
                 </button>
@@ -1362,7 +1381,8 @@ export default function AlmacenPage() {
           </div>
         )}
       </AnimatePresence>
-      </div>
+
+
 
       {/* Persistent Product Catalog (Fixed Position) */}
       <AnimatePresence>

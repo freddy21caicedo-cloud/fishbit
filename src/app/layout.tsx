@@ -4,8 +4,8 @@ import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import "./globals.css";
-import Sidebar from "./components/Sidebar";
-import Header from "./components/Header";
+import AppLayout from "./components/layout/AppLayout";
+import { Toaster } from 'react-hot-toast';
 
 export default function RootLayout({
   children,
@@ -46,18 +46,15 @@ export default function RootLayout({
   return (
     <html lang="es" suppressHydrationWarning>
       <body className="antialiased" suppressHydrationWarning>
+        <Toaster position="top-right" />
         {loading && !isLoginPage ? (
           <div style={{ background: 'var(--background)', display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', width: '100%' }}>
             <div className="animate-spin" style={{ width: '40px', height: '40px', border: '4px solid var(--primary)', borderTopColor: 'transparent', borderRadius: '50%' }}></div>
           </div>
         ) : !isLoginPage && session ? (
-          <div className="layout-container">
-            <Sidebar />
-            <main className="main-content">
-              <Header />
-              {children}
-            </main>
-          </div>
+          <AppLayout>
+            {children}
+          </AppLayout>
         ) : (
           <div style={{ width: '100%' }}>
             {children}

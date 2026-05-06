@@ -150,23 +150,22 @@ export default function Sidebar() {
             }}>
               {isSuperAdmin ? <Shield size={20} /> : <Fish size={20} />}
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column' }}>
-              <h2 style={{ fontSize: '1.1rem', fontWeight: 700, margin: 0 }}>FishBit {isSuperAdmin && <span style={{ fontSize: '0.6rem', verticalAlign: 'middle', background: 'rgba(37, 99, 235, 0.1)', color: 'var(--primary)', padding: '2px 6px', borderRadius: '4px', marginLeft: '4px' }}>SA</span>}</h2>
-              {!isSuperAdmin && (
-                <span style={{ 
-                  fontSize: '0.6rem', 
-                  fontWeight: 900, 
-                  textTransform: 'uppercase', 
-                  letterSpacing: '0.05em',
-                  color: planType === 'premium' ? '#d97706' : 'var(--muted-foreground)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px'
-                }}>
-                  <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: planType === 'premium' ? '#f59e0b' : 'var(--muted-foreground)' }} />
-                  Plan {planType}
-                </span>
-              )}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
+              <h2 style={{ fontSize: '1.4rem', fontWeight: 900, margin: 0, letterSpacing: '-0.03em', lineHeight: 1.1 }}>FishBit {isSuperAdmin && <span style={{ fontSize: '0.6rem', verticalAlign: 'middle', background: 'rgba(37, 99, 235, 0.1)', color: 'var(--primary)', padding: '2px 6px', borderRadius: '4px', marginLeft: '4px' }}>SA</span>}</h2>
+              <span style={{ 
+                fontSize: '0.75rem', 
+                fontWeight: 900, 
+                textTransform: 'uppercase', 
+                letterSpacing: '0.08em',
+                color: (planType || 'premium').toLowerCase() === 'premium' ? '#b45309' : 'var(--muted-foreground)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                marginTop: '0.2rem'
+              }}>
+                <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: (planType || 'premium').toLowerCase() === 'premium' ? '#f59e0b' : 'var(--muted-foreground)' }} />
+                PLAN {(planType || 'PREMIUM').toUpperCase()}
+              </span>
             </div>
           </div>
         </div>

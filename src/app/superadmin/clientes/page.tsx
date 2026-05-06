@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '@/lib/supabase';
+import { toast } from 'react-hot-toast';
 import { 
   Users, 
   Search, 
@@ -64,8 +65,9 @@ export default function ClientsManagementPage() {
     if (!error) {
       setIsAssignModalOpen(false);
       fetchData();
+      toast.success('Unidad asignada correctamente.');
     } else {
-      alert("Error: " + error.message);
+      toast.error("Error: " + error.message);
     }
   };
 
