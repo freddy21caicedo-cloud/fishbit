@@ -755,14 +755,14 @@ export default function AlmacenPage() {
               <Package size={14} style={{ color: 'var(--muted-foreground)' }} />
               <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>
                 <span className="stat-item-text">Total Items: </span>
-                <span style={{ color: 'var(--primary)' }}>{inventory.filter(i => i.category === activeCat && (parseFloat(i.current_stock) || 0) > 0).length}</span>
+                <span style={{ color: 'var(--primary)' }}>{inventory.filter(i => i.category === activeCat && (Number(i.current_stock) || 0) > 0).length}</span>
               </span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               {(() => {
-                const catItems = inventory.filter(i => i.category === activeCat && (parseFloat(i.current_stock) || 0) > 0);
+                const catItems = inventory.filter(i => i.category === activeCat && (Number(i.current_stock) || 0) > 0);
                 const isEmpty = catItems.length === 0;
-                const isLow = catItems.some(i => parseFloat(i.current_stock) <= 5);
+                const isLow = catItems.some(i => Number(i.current_stock) <= 5);
                 
                 const color = isEmpty || isLow ? '#ef4444' : '#10b981';
                 const text = isEmpty ? 'Sin Stock' : (isLow ? 'Bajo Stock' : 'Saludable');
