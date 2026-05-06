@@ -133,7 +133,7 @@ export default function TratamientoPage() {
           }]);
           if (detailError) throw detailError;
 
-          const newStock = (parseFloat(prod.current_stock) || 0) - dosageValue;
+          const newStock = (Number(prod.current_stock) || 0) - dosageValue;
           const { error: invError } = await supabase.from('inventory').update({ current_stock: newStock }).eq('id', prod.id);
           if (invError) throw invError;
         }
@@ -232,7 +232,7 @@ export default function TratamientoPage() {
                     <div className="premium-input-group">
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem', position: 'absolute', top: '-25px', right: '5px', width: 'auto' }}>
                         <span style={{ fontSize: '0.7rem', fontWeight: 900, color: stockAvailable < 10 ? '#ef4444' : '#0d9488', background: 'var(--card)', padding: '2px 8px', borderRadius: '4px', border: '1px solid var(--border)' }}>
-                          STOCK: {parseFloat(stockAvailable).toLocaleString()} {unidad}
+                          STOCK: {Number(stockAvailable).toLocaleString()} {unidad}
                         </span>
                       </div>
                       <label className="premium-label">Producto / Insumo</label>
@@ -279,7 +279,7 @@ export default function TratamientoPage() {
             <div>
               <div style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--muted-foreground)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Biomasa de Referencia</div>
               <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#0d9488' }}>
-                {selectedPond ? `${parseFloat(selectedPond.current_biomass_kg).toFixed(2)} kg` : '-- kg'}
+                {selectedPond ? `${Number(selectedPond.current_biomass_kg).toFixed(2)} kg` : '-- kg'}
               </div>
             </div>
           </div>

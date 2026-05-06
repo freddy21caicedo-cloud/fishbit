@@ -75,13 +75,13 @@ export default function SiembraPage() {
       const formatted: InventoryItem[] = (data || []).map(i => ({
         ...i,
         especie: i.name,
-        stock: parseFloat(i.current_stock as string) || 0,
+        stock: Number(i.current_stock) || 0,
         unidad: i.unit || 'uds'
       }));
       setAlevinosStock(formatted);
       
       if (formatted.length > 0 && rows.length === 1 && (!rows[0].especie)) {
-        setRows([{ ...rows[0], especie: formatted[0].especie }]);
+        setRows([{ ...rows[0], especie: formatted[0].especie || '' }]);
       }
     } catch (error: any) {
       toast.error("Error al cargar stock: " + error.message);

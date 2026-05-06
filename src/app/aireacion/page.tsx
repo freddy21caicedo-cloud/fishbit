@@ -74,7 +74,7 @@ export default function AireacionPage() {
     const kwhPrice = 650; // Precio ref
     const totalKwh = activeAireadores.reduce((sum, a) => {
       if (a.status === 'OFF') return sum;
-      return sum + (parseFloat(a.consumption) || 0) * (parseFloat(a.hours) || 24);
+      return sum + (Number(a.consumption) || 0) * (Number(a.hours) || 24);
     }, 0);
     return totalKwh * kwhPrice;
   }, [activeAireadores]);
@@ -90,7 +90,7 @@ export default function AireacionPage() {
 
   const handleAddFromInventory = (item: any) => {
     const hpMatch = item.name.match(/(\d+\.?\d*)\s*HP/i);
-    const hp = hpMatch ? parseFloat(hpMatch[1]) : 1;
+    const hp = hpMatch ? Number(hpMatch[1]) : 1;
     const consumption = (hp * 0.745).toFixed(2); // HP to kW approx
 
     setActiveAireadores([...activeAireadores, {
