@@ -91,25 +91,54 @@ export default function LoginPage() {
   };
 
   return (
-    <div style={{ 
-      minHeight: '100vh', 
-      display: 'flex', 
-      background: 'radial-gradient(circle at top right, #f8fafc, #f0fdfa)',
-      position: 'relative',
-      overflow: 'hidden'
-    }}>
-      <div style={{ position: 'absolute', top: '-10%', right: '-10%', width: '40%', height: '40%', background: 'rgba(13, 148, 136, 0.03)', borderRadius: '50%', filter: 'blur(80px)' }} />
-      <div style={{ position: 'absolute', bottom: '-10%', left: '-10%', width: '40%', height: '40%', background: 'rgba(13, 148, 136, 0.03)', borderRadius: '50%', filter: 'blur(80px)' }} />
-
-      <div style={{ 
-        flex: 1, 
+    <div 
+      suppressHydrationWarning={true}
+      style={{ 
+        minHeight: '100vh', 
         display: 'flex', 
-        flexDirection: 'column', 
-        alignItems: 'center', 
-        justifyContent: 'center',
-        padding: '2rem',
-        zIndex: 1
-      }}>
+        position: 'relative',
+        overflow: 'hidden'
+      }}
+    >
+      {/* Capa de Fondo (CSS a prueba de fallos) */}
+      <div 
+        suppressHydrationWarning={true}
+        style={{ 
+          position: 'absolute', 
+          inset: 0, 
+          zIndex: 0,
+          backgroundImage: 'url("/images/login-bg.jpg")',
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat',
+          opacity: 0.5 
+        }} 
+      />
+
+      {/* Overlay de degradado */}
+      <div 
+        suppressHydrationWarning={true}
+        style={{ 
+          position: 'absolute', 
+          inset: 0, 
+          zIndex: 0,
+          background: 'linear-gradient(to bottom, rgba(2, 6, 23, 0.4), rgba(2, 6, 23, 0.9))' 
+        }} 
+      />
+
+      <div 
+        suppressHydrationWarning={true}
+        style={{ 
+          flex: 1, 
+          display: 'flex', 
+          flexDirection: 'column', 
+          alignItems: 'center', 
+          justifyContent: 'center',
+          padding: '2rem',
+          zIndex: 10, 
+          position: 'relative'
+        }}
+      >
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -136,11 +165,17 @@ export default function LoginPage() {
                 style={{ position: 'absolute', inset: -8, border: '2px solid var(--primary)', borderRadius: '20px' }} 
               />
             </div>
-            <h1 style={{ fontSize: '2.25rem', fontWeight: 800, color: '#1e293b', letterSpacing: '-0.02em', marginBottom: '0.5rem' }}>FishBit</h1>
-            <p style={{ color: 'var(--muted-foreground)', fontSize: '0.9rem', fontWeight: 600 }}>Gestión Acuícola de Siguiente Generación</p>
+            <h1 style={{ fontSize: '2.25rem', fontWeight: 800, color: 'white', letterSpacing: '-0.02em', marginBottom: '0.5rem' }}>FishBit</h1>
+            <p style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '0.9rem', fontWeight: 600 }}>Gestión Acuícola de Siguiente Generación</p>
           </div>
 
-          <div className="card-premium" style={{ padding: '2.5rem', boxShadow: '0 20px 50px rgba(0,0,0,0.05)' }}>
+          <div className="card-premium" style={{ 
+            padding: '2.5rem', 
+            background: 'rgba(255, 255, 255, 0.85)', 
+            backdropFilter: 'blur(20px)',
+            border: '1px solid rgba(255, 255, 255, 0.2)',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)' 
+          }}>
             <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                 <label style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--muted-foreground)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Correo Electrónico</label>
@@ -234,8 +269,8 @@ export default function LoginPage() {
             </form>
           </div>
 
-          <p style={{ textAlign: 'center', marginTop: '2rem', color: 'var(--muted-foreground)', fontSize: '0.9rem' }}>
-            ¿No tienes una cuenta? <button onClick={handleContactSupport} style={{ background: 'none', border: 'none', color: 'var(--primary)', fontWeight: 700, cursor: 'pointer', padding: 0 }}>Contactar Soporte</button>
+          <p style={{ textAlign: 'center', marginTop: '2rem', color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem', fontWeight: 600 }}>
+            ¿No tienes una cuenta? <button onClick={handleContactSupport} style={{ background: 'none', border: 'none', color: '#5eead4', fontWeight: 800, cursor: 'pointer', padding: 0 }}>Contactar Soporte</button>
           </p>
         </motion.div>
       </div>
