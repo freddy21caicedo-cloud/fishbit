@@ -447,23 +447,36 @@ export default function EstanquesPage() {
 
       <AnimatePresence>
         {isModalOpen && (
-          <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={resetForm} style={{ position: 'absolute', inset: 0, background: 'rgba(15, 23, 42, 0.4)', backdropFilter: 'blur(8px)' }} />
+          <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', zIndex: 9999, pointerEvents: 'none' }}>
+            {/* Backdrop */}
             <motion.div 
-              initial={{ scale: 0.9, opacity: 0, y: 20 }} 
-              animate={{ scale: 1, opacity: 1, y: 0 }} 
-              exit={{ scale: 0.9, opacity: 0, y: 20 }} 
+              initial={{ opacity: 0 }} 
+              animate={{ opacity: 1 }} 
+              exit={{ opacity: 0 }} 
+              onClick={resetForm} 
+              style={{ position: 'absolute', inset: 0, background: 'rgba(15, 23, 42, 0.5)', backdropFilter: 'blur(8px)', pointerEvents: 'auto' }} 
+            />
+            
+            {/* Modal Centrado */}
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0, x: '-50%', y: '-40%' }} 
+              animate={{ scale: 1, opacity: 1, x: '-50%', y: '-50%' }} 
+              exit={{ scale: 0.9, opacity: 0, x: '-50%', y: '-40%' }} 
               className="card-premium" 
               style={{ 
-                width: '100%', 
+                position: 'absolute',
+                top: '50%',
+                left: '50%',
+                width: '90%', 
                 maxWidth: '450px', 
-                maxHeight: '90vh',
+                maxHeight: '85vh',
                 overflowY: 'auto',
                 padding: '2rem', 
-                position: 'relative',
+                pointerEvents: 'auto',
                 display: 'flex',
                 flexDirection: 'column',
-                gap: '1.5rem'
+                gap: '1.5rem',
+                boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)'
               }}
             >
               <button onClick={resetForm} style={{ position: 'absolute', top: '1rem', right: '1rem', background: 'none', border: 'none', color: 'var(--muted-foreground)', cursor: 'pointer' }}><X size={20} /></button>
