@@ -49,6 +49,17 @@ export default function AlmacenPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(true);
 
+  // Responsive Hook
+  const [width, setWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1200);
+  useEffect(() => {
+    const handleResize = () => setWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const isMobile = width < 768;
+  const isTablet = width >= 768 && width < 1024;
+
   // Providers & Invoices State
   const [providers, setProviders] = useState<any[]>([]);
   const [invoices, setInvoices] = useState<any[]>([]);
@@ -163,15 +174,37 @@ export default function AlmacenPage() {
   }, [inventory, activeCat, searchQuery]);
 
   return (
-    <div className="animate-fade-in page-container" style={{ padding: '1rem' }}>
-      <header style={{ marginBottom: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+    <div className="animate-fade-in page-container" style={{ padding: isMobile ? '0.5rem' : '1rem' }}>
+      <header style={{ 
+        marginBottom: '2rem', 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        alignItems: isMobile ? 'flex-start' : 'center', 
+        flexDirection: isMobile ? 'column' : 'row',
+        gap: '1rem' 
+      }}>
         <div>
           <h1 style={{ fontWeight: 900, fontSize: 'clamp(1.5rem, 5vw, 2.25rem)' }}>Almacén e Inventario</h1>
-          <p style={{ color: 'var(--muted-foreground)' }}>Gestión centralizada de abastecimiento y stock.</p>
+          <p style={{ color: 'var(--muted-foreground)', fontSize: isMobile ? '0.85rem' : '1rem' }}>Gestión centralizada de abastecimiento y stock.</p>
         </div>
-        <div style={{ display: 'flex', gap: '0.75rem' }}>
-          <button onClick={() => setIsProviderModalOpen(true)} className="glass" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.6rem 1rem', borderRadius: '10px', border: '1px solid var(--border)', fontWeight: 700, cursor: 'pointer' }}>
-            <UserPlus size={18} /> <span className="hidden md:inline">Proveedores</span>
+        <div style={{ display: 'flex', gap: '0.75rem', width: isMobile ? '100%' : 'auto' }}>
+          <button 
+            onClick={() => setIsProviderModalOpen(true)} 
+            className="glass" 
+            style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '0.5rem', 
+              padding: '0.6rem 1rem', 
+              borderRadius: '10px', 
+              border: '1px solid var(--border)', 
+              fontWeight: 700, 
+              cursor: 'pointer',
+              width: isMobile ? '100%' : 'auto',
+              justifyContent: 'center'
+            }}
+          >
+            <UserPlus size={18} /> <span>Proveedores</span>
           </button>
         </div>
       </header>
@@ -179,7 +212,7 @@ export default function AlmacenPage() {
       {/* Responsive Top Tabs (Categories) */}
       <div style={{ 
         display: 'flex', 
-        gap: '1rem', 
+        gap: isMobile ? '0.5rem' : '1rem', 
         marginBottom: '2rem', 
         overflowX: 'auto', 
         paddingBottom: '1rem',
@@ -192,8 +225,8 @@ export default function AlmacenPage() {
             onClick={() => setActiveCat(cat.id)}
             style={{
               flexShrink: 0,
-              padding: '1rem 1.5rem',
-              borderRadius: '20px',
+              padding: isMobile ? '0.75rem' : '1rem 1.5rem',
+              borderRadius: isMobile ? '15px' : '20px',
               border: '2px solid',
               borderColor: activeCat === cat.id ? cat.color : 'var(--border)',
               background: activeCat === cat.id ? 'white' : 'var(--card)',
@@ -201,44 +234,71 @@ export default function AlmacenPage() {
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
-              gap: '1rem',
+              justifyContent: isMobile ? 'center' : 'flex-start',
+              flexDirection: isMobile ? 'column' : 'row',
+              gap: isMobile ? '0.4rem' : '1rem',
               transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-              minWidth: '200px'
+              minWidth: isMobile ? '90px' : '200px'
             }}
           >
-            <div style={{ background: cat.bg, color: cat.color, padding: '0.75rem', borderRadius: '15px' }}>
-              <cat.icon size={24} />
+            <div style={{ 
+              background: cat.bg, 
+              color: cat.color, 
+              padding: isMobile ? '0.5rem' : '0.75rem', 
+              borderRadius: isMobile ? '10px' : '15px' 
+            }}>
+              <cat.icon size={isMobile ? 20 : 24} />
             </div>
-            <div style={{ textAlign: 'left' }}>
-              <div style={{ fontSize: '0.85rem', fontWeight: 800, color: activeCat === cat.id ? 'var(--foreground)' : 'var(--muted-foreground)' }}>{cat.label}</div>
-              <div style={{ fontSize: '1.1rem', fontWeight: 950, color: cat.color }}>{cat.stock.toLocaleString()} <span style={{ fontSize: '0.7rem', opacity: 0.7 }}>{cat.unit}</span></div>
+            <div style={{ textAlign: isMobile ? 'center' : 'left' }}>
+              {!isMobile && (
+                <div style={{ fontSize: '0.85rem', fontWeight: 800, color: activeCat === cat.id ? 'var(--foreground)' : 'var(--muted-foreground)' }}>
+                  {cat.label}
+                </div>
+              )}
+              <div style={{ fontSize: isMobile ? '0.9rem' : '1.1rem', fontWeight: 950, color: cat.color }}>
+                {cat.stock.toLocaleString()} {!isMobile && <span style={{ fontSize: '0.7rem', opacity: 0.7 }}>{cat.unit}</span>}
+              </div>
             </div>
           </button>
         ))}
       </div>
 
       <div className="card-premium" style={{ width: '100%', overflow: 'hidden' }}>
-        <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+        <div style={{ 
+          padding: isMobile ? '1rem' : '1.5rem', 
+          borderBottom: '1px solid var(--border)', 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: isMobile ? 'flex-start' : 'center', 
+          flexDirection: isMobile ? 'column' : 'row',
+          gap: '1rem' 
+        }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
             <div style={{ background: currentCategory?.bg, color: currentCategory?.color, padding: '0.6rem', borderRadius: '12px' }}>
               {currentCategory && <currentCategory.icon size={20} />}
             </div>
-            <h3 style={{ fontSize: '1.25rem', fontWeight: 900 }}>Detalle de {currentCategory?.label}</h3>
+            <h3 style={{ fontSize: isMobile ? '1.1rem' : '1.25rem', fontWeight: 900 }}>Detalle de {currentCategory?.label}</h3>
           </div>
           
-          <div style={{ display: 'flex', gap: '0.75rem', width: '100%', maxWidth: 'none', justifyContent: 'flex-end' }} className="flex-col md:flex-row">
+          <div style={{ 
+            display: 'flex', 
+            gap: '0.75rem', 
+            width: isMobile ? '100%' : 'auto', 
+            flexDirection: isMobile ? 'column' : 'row',
+            justifyContent: 'flex-end' 
+          }}>
             <button 
               onClick={() => setIsInvoiceModalOpen(true)}
               className="btn-primary"
-              style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.6rem 1.25rem', borderRadius: '10px', fontWeight: 800, fontSize: '0.8rem', justifyContent: 'center' }}
+              style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.6rem 1.25rem', borderRadius: '10px', fontWeight: 800, fontSize: '0.8rem', justifyContent: 'center', width: isMobile ? '100%' : 'auto' }}
             >
-              <Plus size={18} /> Nueva Factura de {currentCategory?.label}
+              <Plus size={18} /> Nueva Factura {isMobile ? '' : `de ${currentCategory?.label}`}
             </button>
             
             <button 
               onClick={() => setViewMode(viewMode === 'inventory' ? 'invoices' : 'inventory')}
               className="glass" 
-              style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.6rem 1.25rem', borderRadius: '10px', border: '1px solid var(--border)', fontWeight: 800, fontSize: '0.8rem', background: viewMode === 'invoices' ? 'rgba(37, 99, 235, 0.1)' : 'white', color: viewMode === 'invoices' ? 'var(--primary)' : 'var(--foreground)', position: 'relative', justifyContent: 'center' }}
+              style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.6rem 1.25rem', borderRadius: '10px', border: '1px solid var(--border)', fontWeight: 800, fontSize: '0.8rem', background: viewMode === 'invoices' ? 'rgba(37, 99, 235, 0.1)' : 'white', color: viewMode === 'invoices' ? 'var(--primary)' : 'var(--foreground)', position: 'relative', justifyContent: 'center', width: isMobile ? '100%' : 'auto' }}
             >
               {viewMode === 'inventory' ? <FileText size={18} /> : <Package size={18} />}
               {viewMode === 'inventory' ? 'Mis Facturas' : 'Ver Inventario'}
@@ -269,19 +329,21 @@ export default function AlmacenPage() {
           </div>
         </div>
 
-        {viewMode === 'inventory' ? (
-          <>
-            <div style={{ padding: '1rem 1.5rem' }}>
-              <PremiumInput label={`Buscar en ${currentCategory?.label}...`} icon={Search} value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
-            </div>
-            <InventoryTable items={filteredInventory} category={activeCat} />
-          </>
-        ) : (
-          <InvoicesTable 
-            invoices={invoices.filter(i => i.category === activeCat)} 
-            onRefresh={() => activeUnitId && fetchInvoices(activeUnitId)} 
-          />
-        )}
+        <div style={{ width: '100%', overflowX: 'auto' }} className="no-scrollbar">
+          {viewMode === 'inventory' ? (
+            <>
+              <div style={{ padding: '1rem 1.5rem', minWidth: isMobile ? '300px' : 'auto' }}>
+                <PremiumInput label={`Buscar en ${currentCategory?.label}...`} icon={Search} value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+              </div>
+              <InventoryTable items={filteredInventory} category={activeCat} />
+            </>
+          ) : (
+            <InvoicesTable 
+              invoices={invoices.filter(i => i.category === activeCat)} 
+              onRefresh={() => activeUnitId && fetchInvoices(activeUnitId)} 
+            />
+          )}
+        </div>
       </div>
 
       <InvoiceModal 
