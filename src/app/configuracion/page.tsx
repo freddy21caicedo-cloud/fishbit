@@ -67,39 +67,38 @@ export default function ConfiguracionPage() {
 
   const handleThresholdChange = (key: string, value: string) => {
     setThresholds(prev => ({ ...prev, [key]: value }));
-  };
-
-  const fetchSettings = useCallback(async () => {
+  };  const fetchSettings = useCallback(async () => {
     const activeUnitId = localStorage.getItem('active_unit_id');
     if (!activeUnitId) return;
 
     try {
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from('unit_settings')
-        .select('*')
+        .select('thresholds')
         .eq('unit_id', activeUnitId)
         .single();
 
-      if (data) {
+      if (data?.thresholds) {
+        const t = data.thresholds;
         setThresholds({
-          o2_mg_l_min: data.o2_mg_l_min?.toString() || '4.5',
-          o2_mg_l_max: data.o2_mg_l_max?.toString() || '9.0',
-          o2_perc_min: data.o2_perc_min?.toString() || '80',
-          o2_perc_max: data.o2_perc_max?.toString() || '120',
-          ph_min: data.ph_min?.toString() || '6.5',
-          ph_max: data.ph_max?.toString() || '8.5',
-          temperature_c_min: data.temperature_c_min?.toString() || '26.0',
-          temperature_c_max: data.temperature_c_max?.toString() || '31.0',
-          alkalinity_min: data.alkalinity_min?.toString() || '50',
-          alkalinity_max: data.alkalinity_max?.toString() || '150',
-          ammonia_mg_l_min: data.ammonia_mg_l_min?.toString() || '0',
-          ammonia_mg_l_max: data.ammonia_mg_l_max?.toString() || '0.02',
-          nitrite_mg_l_min: data.nitrite_mg_l_min?.toString() || '0',
-          nitrite_mg_l_max: data.nitrite_mg_l_max?.toString() || '0.1',
-          nitrate_mg_l_min: data.nitrate_mg_l_min?.toString() || '0',
-          nitrate_mg_l_max: data.nitrate_mg_l_max?.toString() || '50',
-          warmMortality: data.warm_mortality_max?.toString() || '5',
-          coldMortality: data.cold_mortality_max?.toString() || '10'
+          o2_mg_l_min: t.o2_mg_l_min?.toString() || '4.5',
+          o2_mg_l_max: t.o2_mg_l_max?.toString() || '9.0',
+          o2_perc_min: t.o2_perc_min?.toString() || '80',
+          o2_perc_max: t.o2_perc_max?.toString() || '120',
+          ph_min: t.ph_min?.toString() || '6.5',
+          ph_max: t.ph_max?.toString() || '8.5',
+          temperature_c_min: t.temperature_c_min?.toString() || '26.0',
+          temperature_c_max: t.temperature_c_max?.toString() || '31.0',
+          alkalinity_min: t.alkalinity_min?.toString() || '50',
+          alkalinity_max: t.alkalinity_max?.toString() || '150',
+          ammonia_mg_l_min: t.ammonia_mg_l_min?.toString() || '0',
+          ammonia_mg_l_max: t.ammonia_mg_l_max?.toString() || '0.02',
+          nitrite_mg_l_min: t.nitrite_mg_l_min?.toString() || '0',
+          nitrite_mg_l_max: t.nitrite_mg_l_max?.toString() || '0.1',
+          nitrate_mg_l_min: t.nitrate_mg_l_min?.toString() || '0',
+          nitrate_mg_l_max: t.nitrate_mg_l_max?.toString() || '50',
+          warmMortality: t.warm_mortality_max?.toString() || '5',
+          coldMortality: t.cold_mortality_max?.toString() || '10',
         });
       }
     } catch (err) {
@@ -115,8 +114,7 @@ export default function ConfiguracionPage() {
     }
 
     const savePromise = async () => {
-      const payload = {
-        unit_id: activeUnitId,
+      const thresholdsPayload = {
         o2_mg_l_min: parseFloat(thresholds.o2_mg_l_min),
         o2_mg_l_max: parseFloat(thresholds.o2_mg_l_max),
         o2_perc_min: parseFloat(thresholds.o2_perc_min),
@@ -135,12 +133,14 @@ export default function ConfiguracionPage() {
         nitrate_mg_l_max: parseFloat(thresholds.nitrate_mg_l_max),
         warm_mortality_max: parseFloat(thresholds.warmMortality),
         cold_mortality_max: parseFloat(thresholds.coldMortality),
-        updated_at: new Date().toISOString()
       };
 
       const { error } = await supabase
         .from('unit_settings')
-        .upsert(payload, { onConflict: 'unit_id' });
+        .upsert(
+          { unit_id: activeUnitId, thresholds: thresholdsPayload, updated_at: new Date().toISOString() },
+          { onConflict: 'unit_id' }
+        );
 
       if (error) throw error;
     };
@@ -148,7 +148,7 @@ export default function ConfiguracionPage() {
     toast.promise(savePromise(), {
       loading: 'Guardando configuración...',
       success: 'Parámetros actualizados correctamente.',
-      error: 'Error al guardar los rangos.'
+      error: 'Error al guardar los rangos.',
     });
   };
 
