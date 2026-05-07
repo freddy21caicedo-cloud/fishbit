@@ -1,4 +1,42 @@
+'use client';
+
 import { useState, useMemo, useEffect, useRef } from 'react';
+import { toast } from 'react-hot-toast';
+import { supabase } from '@/lib/supabase';
+import { useUnit } from '../components/providers/UnitProvider';
+import { motion, AnimatePresence } from 'framer-motion';
+import { 
+  ShoppingBag, 
+  FlaskConical, 
+  Beaker, 
+  Fish, 
+  Wind,
+  Plus,
+  Search,
+  Package,
+  TrendingUp,
+  FileText,
+  UserPlus
+} from 'lucide-react';
+
+// Components
+import { InventoryTable } from './components/InventoryTable';
+import { InvoicesTable } from './components/InvoicesTable';
+import { InvoiceModal } from './components/InvoiceModal';
+import { ProviderModal } from './components/ProviderModal';
+import { PremiumCard } from '../components/ui/PremiumCard';
+import { PremiumInput } from '../components/ui/PremiumInput';
+
+interface InventoryItem {
+  id: string;
+  name: string;
+  category: string;
+  current_stock: string | number;
+  unit: string;
+  last_entry?: string;
+  lote?: string;
+  costo_promedio?: number;
+}
 
 export default function AlmacenPage() {
   const { activeUnitId } = useUnit();
