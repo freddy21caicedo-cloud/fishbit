@@ -219,6 +219,8 @@ const AnimatedWaves = () => (
   </div>
 );
 
+import { PremiumInput } from '../components/ui/PremiumInput';
+
 export default function EstanquesPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [ponds, setPonds] = useState<any[]>([]);
@@ -449,48 +451,78 @@ export default function EstanquesPage() {
         {isModalOpen && (
           <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={resetForm} style={{ position: 'absolute', inset: 0, background: 'rgba(15, 23, 42, 0.4)', backdropFilter: 'blur(8px)' }} />
-            <motion.div initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0, y: 20 }} className="card-premium" style={{ width: '100%', maxWidth: '450px', padding: '2rem', position: 'relative' }}>
-              <button onClick={resetForm} style={{ position: 'absolute', top: '1rem', right: '1rem', background: 'none', border: 'none', color: 'var(--muted-foreground)', cursor: 'pointer' }}><X size={20} /></button>
-              <h2 style={{ fontWeight: 800, marginBottom: '1.5rem' }}>{editingPond ? 'Editar Estanque' : 'Nuevo Estanque'}</h2>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-                <div className="premium-input-group">
-                  <label className="premium-label"><Hash size={14} /> Número de Estanque</label>
-                  <div className="premium-input-wrapper">
-                    <span style={{ fontWeight: 800, color: 'var(--muted-foreground)', marginRight: '0.5rem' }}>Est-</span>
+            <motion.div initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0, y: 20 }} className="card-premium" style={{ width: '100%', maxWidth: '480px', padding: '2.5rem', position: 'relative', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)' }}>
+              <button onClick={resetForm} style={{ position: 'absolute', top: '1.5rem', right: '1.5rem', background: 'none', border: 'none', color: 'var(--muted-foreground)', cursor: 'pointer', opacity: 0.5 }}><X size={24} /></button>
+              
+              <div style={{ marginBottom: '2rem' }}>
+                <h2 style={{ fontWeight: 900, fontSize: '1.75rem', letterSpacing: '-0.02em', marginBottom: '0.5rem' }}>{editingPond ? 'Editar Estanque' : 'Nuevo Estanque'}</h2>
+                <p style={{ fontSize: '0.875rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>Define las dimensiones y el identificador de tu estanque.</p>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                <div style={{ background: 'rgba(37, 99, 235, 0.03)', padding: '1.25rem', borderRadius: '16px', border: '1px dashed var(--border)' }}>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--muted-foreground)', display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    <Hash size={14} /> Identificador del Estanque
+                  </label>
+                  <div style={{ display: 'flex', alignItems: 'center', background: 'white', border: '1px solid var(--border)', borderRadius: '10px', padding: '0 1rem', height: '48px', boxShadow: 'var(--shadow-sm)' }}>
+                    <span style={{ fontWeight: 900, color: 'var(--primary)', opacity: 0.5, marginRight: '0.25rem' }}>Est-</span>
                     <input 
                       type="number" 
                       name="numero" 
                       value={formData.numero} 
                       onChange={handleInputChange} 
                       placeholder="01" 
-                      className="premium-input"
-                      style={{ paddingLeft: 0 }}
+                      style={{ border: 'none', outline: 'none', width: '100%', fontWeight: 900, fontSize: '1.1rem', background: 'transparent' }}
                     />
                   </div>
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.75rem' }}>
-                  <div className="premium-input-group">
-                    <label className="premium-label">Largo (m)</label>
-                    <input type="number" name="largo" value={formData.largo} onChange={handleInputChange} placeholder="0.0" className="premium-input" />
-                  </div>
-                  <div className="premium-input-group">
-                    <label className="premium-label">Ancho (m)</label>
-                    <input type="number" name="ancho" value={formData.ancho} onChange={handleInputChange} placeholder="0.0" className="premium-input" />
-                  </div>
-                  <div className="premium-input-group">
-                    <label className="premium-label">Prof. (m)</label>
-                    <input type="number" name="profundidad" value={formData.profundidad} onChange={handleInputChange} placeholder="0.0" className="premium-input" />
-                  </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
+                  <PremiumInput label="Largo (m)" value={formData.largo} onChange={(e) => setFormData(p => ({ ...p, largo: e.target.value }))} placeholder="0.0" />
+                  <PremiumInput label="Ancho (m)" value={formData.ancho} onChange={(e) => setFormData(p => ({ ...p, ancho: e.target.value }))} placeholder="0.0" />
+                  <PremiumInput label="Prof. (m)" value={formData.profundidad} onChange={(e) => setFormData(p => ({ ...p, profundidad: e.target.value }))} placeholder="0.0" />
                 </div>
-                <div style={{ padding: '1.25rem', background: 'rgba(37, 99, 235, 0.05)', borderRadius: '12px', border: '1px solid rgba(37, 99, 235, 0.1)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', height: '80px' }}>
+
+                <div style={{ 
+                  padding: '1.5rem', 
+                  background: 'linear-gradient(135deg, rgba(37, 99, 235, 0.05) 0%, rgba(37, 99, 235, 0.02) 100%)', 
+                  borderRadius: '16px', 
+                  border: '1px solid rgba(37, 99, 235, 0.1)', 
+                  display: 'flex', 
+                  justifyContent: 'space-between', 
+                  alignItems: 'center', 
+                  boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.02)'
+                }}>
                   <div>
-                    <div style={{ fontSize: '0.65rem', fontWeight: 800, color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>Capacidad Estimada</div>
-                    <div style={{ fontSize: '1.5rem', fontWeight: 900, color: 'var(--primary)' }}>{volumen} <span style={{ fontSize: '0.8rem' }}>m³</span></div>
+                    <div style={{ fontSize: '0.7rem', fontWeight: 800, color: 'var(--muted-foreground)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem' }}>Capacidad Estimada</div>
+                    <div style={{ fontSize: '2rem', fontWeight: 950, color: 'var(--primary)', letterSpacing: '-0.02em' }}>{volumen} <span style={{ fontSize: '1rem', opacity: 0.6 }}>m³</span></div>
                   </div>
-                  <Box size={32} style={{ color: 'var(--primary)', opacity: 0.2 }} />
+                  <div style={{ background: 'white', padding: '0.75rem', borderRadius: '12px', boxShadow: 'var(--shadow-sm)' }}>
+                    <Box size={28} style={{ color: 'var(--primary)', opacity: 0.8 }} />
+                  </div>
                 </div>
-                <button className="btn-primary" disabled={loading} onClick={handleCreateEstanque} style={{ padding: '1rem', fontWeight: 800, height: '56px' }}>
-                  {loading ? 'Procesando...' : editingPond ? 'Guardar Cambios' : 'Crear Estanque'}
+
+                <button 
+                  className="btn-primary" 
+                  disabled={loading} 
+                  onClick={handleCreateEstanque} 
+                  style={{ 
+                    padding: '1.25rem', 
+                    fontWeight: 900, 
+                    fontSize: '1rem', 
+                    height: '64px', 
+                    borderRadius: '16px',
+                    marginTop: '0.5rem',
+                    boxShadow: '0 10px 20px -5px rgba(37, 99, 235, 0.3)'
+                  }}
+                >
+                  {loading ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', justifyContent: 'center' }}>
+                      <RefreshCw className="animate-spin" size={20} /> Procesando...
+                    </div>
+                  ) : (
+                    editingPond ? 'Guardar Cambios' : 'Crear Estanque'
+                  )}
                 </button>
               </div>
             </motion.div>
