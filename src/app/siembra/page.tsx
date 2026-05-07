@@ -291,22 +291,58 @@ export default function SiembraPage() {
 
       <div className="grid-container">
         {/* Global Config Card */}
-        <div className="card-premium" style={{ marginBottom: '2rem' }}>
-          <div className="responsive-grid-3">
-            <div>
-              <label className="premium-label">Estanque de Destino</label>
-              <div style={{ padding: '0.75rem 1.1rem', borderRadius: '12px', background: 'rgba(13, 148, 136, 0.05)', border: '1px solid rgba(13, 148, 136, 0.1)', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                <Waves size={20} style={{ color: '#0d9488' }} />
-                <span style={{ fontWeight: 800, color: '#0f172a' }}>{selectedPondRecord ? selectedPondRecord.name : 'Cargando...'}</span>
+        <div className="card-premium" style={{ marginBottom: '2rem', padding: '1.5rem' }}>
+          <div className="responsive-grid-3" style={{ alignItems: 'flex-end' }}>
+            <div className="premium-input-group">
+              <label className="premium-label" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <Waves size={14} /> Estanque de Destino
+              </label>
+              <div style={{ 
+                height: '56px', 
+                padding: '0 1.25rem', 
+                borderRadius: '12px', 
+                background: 'rgba(13, 148, 136, 0.05)', 
+                border: '1px solid rgba(13, 148, 136, 0.1)', 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '0.75rem',
+                fontSize: '1rem',
+                fontWeight: 800,
+                color: '#0f172a'
+              }}>
+                <Waves size={20} style={{ color: '#0d9488', opacity: 0.7 }} />
+                {selectedPondRecord ? selectedPondRecord.name : 'Cargando...'}
               </div>
             </div>
-            <div>
-              <label className="premium-label">Fecha de Siembra</label>
-              <input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} className="premium-input" />
-            </div>
+
             <div className="premium-input-group">
-              <label className="premium-label">Hora de Registro</label>
-              <input type="time" value={hora} onChange={(e) => setHora(e.target.value)} className="premium-input" />
+              <label className="premium-label" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <Calendar size={14} /> Fecha de Siembra
+              </label>
+              <div className="premium-input-wrapper">
+                <input 
+                  type="date" 
+                  value={fecha} 
+                  onChange={(e) => setFecha(e.target.value)} 
+                  className="premium-input" 
+                  style={{ height: '56px' }}
+                />
+              </div>
+            </div>
+
+            <div className="premium-input-group">
+              <label className="premium-label" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <Clock size={14} /> Hora de Registro
+              </label>
+              <div className="premium-input-wrapper">
+                <input 
+                  type="time" 
+                  value={hora} 
+                  onChange={(e) => setHora(e.target.value)} 
+                  className="premium-input" 
+                  style={{ height: '56px' }}
+                />
+              </div>
             </div>
           </div>
         </div>
