@@ -8,7 +8,7 @@
   --card: #ffffff;
   --card-foreground: #0f172a;
   
-  --primary: #2563eb;
+  --primary: #0d9488;
   --primary-foreground: #ffffff;
   
   --secondary: #f1f5f9;
@@ -17,7 +17,7 @@
   --muted: #f1f5f9;
   --muted-foreground: #64748b;
   
-  --accent: #3b82f6;
+  --accent: #14b8a6;
   --accent-foreground: #ffffff;
   
   --destructive: #ef4444;
@@ -25,9 +25,9 @@
 
   --border: #e2e8f0;
   --input: #e2e8f0;
-  --ring: #3b82f6;
+  --ring: #0d9488;
 
-  --radius: 0.75rem;
+  --radius: 1rem;
 
   /* Fonts */
   --font-sans: 'Inter', system-ui, sans-serif;
@@ -43,6 +43,13 @@
   --glass-bg: rgba(255, 255, 255, 0.7);
   --glass-border: rgba(255, 255, 255, 0.4);
   --glass-blur: blur(12px);
+  
+  /* Material Design 3 (MD3) Compatibility */
+  --md-primary: var(--primary);
+  --md-outline: var(--border);
+  --md-surface: var(--card);
+  --md-on-surface: var(--foreground);
+  --md-on-surface-variant: var(--muted-foreground);
 }
 
 .dark {
@@ -52,7 +59,7 @@
   --card: #0f172a;
   --card-foreground: #f8fafc;
   
-  --primary: #3b82f6;
+  --primary: #14b8a6;
   --primary-foreground: #ffffff;
   
   --secondary: #1e293b;
@@ -66,7 +73,7 @@
   
   --border: #1e293b;
   --input: #1e293b;
-  --ring: #3b82f6;
+  --ring: #14b8a6;
   
   --glass-bg: rgba(15, 23, 42, 0.7);
   --glass-border: rgba(30, 41, 59, 0.4);
@@ -534,17 +541,15 @@ textarea.premium-input {
 
 /* Material Floating Label */
 .premium-label {
-  position: absolute;
-  left: 0.75rem;
-  top: -0.5rem;
-  padding: 0 0.4rem;
-  background: white;
+  position: static;
+  margin-bottom: 0.4rem;
+  padding: 0;
+  background: transparent;
   color: var(--md-primary);
   font-size: 0.75rem;
-  font-weight: 700;
-  pointer-events: none;
+  font-weight: 800;
+  pointer-events: auto;
   transition: all 0.2s ease;
-  z-index: 1;
   display: flex;
   align-items: center;
   gap: 0.4rem;

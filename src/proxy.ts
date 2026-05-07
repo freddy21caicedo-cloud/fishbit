@@ -57,18 +57,14 @@ export async function proxy(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
 
   // 1. PUBLIC -> LOGIN
-  if (!user && !request.nextUrl.pathname.startsWith('/login')) {
-    return NextResponse.redirect(new URL('/login', request.url))
+  const isPublicPath = request.nextUrl.pathname === '/' || request.nextUrl.pathname === '/signup'
+  if (!user && !isPublicPath) {
+    return NextResponse.redirect(new URL('/', request.url))
   }
 
   // 2. LOGGED IN -> Check Roles for sensitive routes
   if (user) {
-    // If on login, go to home
-    if (request.nextUrl.pathname.startsWith('/login')) {
-      return NextResponse.redirect(new URL('/', request.url))
-    }
-
-    // Role-based protection for /superadmin
+    // Role-based protection for /superadmin - ONLY query DB if trying to access superadmin
     if (request.nextUrl.pathname.startsWith('/superadmin')) {
       const { data: profile } = await supabase
         .from('profiles')

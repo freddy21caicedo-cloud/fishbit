@@ -1,65 +1,38 @@
-'use client';
-
-import { useEffect, useState } from "react";
-import { usePathname, useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
-import AppLayout from "./components/layout/AppLayout";
-import { Toaster } from 'react-hot-toast';
+import { Providers } from "./components/providers/Providers";
+import { RouteGuard } from "./components/layout/RouteGuard";
+
+export const metadata: Metadata = {
+  title: "FishBit | Gestión Acuícola Premium",
+  description: "Plataforma premium para la gestión y monitoreo de granjas acuícolas.",
+  manifest: "/manifest.json",
+  icons: {
+    icon: "/favicon.ico",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#2563eb",
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+};
 
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const pathname = usePathname();
-  const router = useRouter();
-  const [session, setSession] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    document.title = "FishBit | Gestión Acuícola Premium";
-    const checkSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      setSession(session);
-      setLoading(false);
-      
-      if (!session && pathname !== '/login') {
-        router.push('/login');
-      }
-    };
-
-    checkSession();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      if (!session && pathname !== '/login') {
-        router.push('/login');
-      }
-    });
-
-    return () => subscription.unsubscribe();
-  }, [pathname, router]);
-
-  const isLoginPage = pathname === '/login';
-
   return (
     <html lang="es" suppressHydrationWarning>
       <body className="antialiased" suppressHydrationWarning>
-        <Toaster position="top-right" />
-        {loading && !isLoginPage ? (
-          <div style={{ background: 'var(--background)', display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', width: '100%' }}>
-            <div className="animate-spin" style={{ width: '40px', height: '40px', border: '4px solid var(--primary)', borderTopColor: 'transparent', borderRadius: '50%' }}></div>
-          </div>
-        ) : !isLoginPage && session ? (
-          <AppLayout>
+        <Providers>
+          <RouteGuard>
             {children}
-          </AppLayout>
-        ) : (
-          <div style={{ width: '100%' }}>
-            {children}
-          </div>
-        )}
+          </RouteGuard>
+        </Providers>
       </body>
     </html>
   );

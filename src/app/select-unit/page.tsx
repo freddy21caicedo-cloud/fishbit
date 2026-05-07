@@ -26,7 +26,7 @@ export default function SelectUnitPage() {
   const fetchUserUnits = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
-      router.push('/login');
+      router.push('/');
       return;
     }
 
@@ -44,12 +44,12 @@ export default function SelectUnitPage() {
   const handleSelectUnit = (unitId: string) => {
     localStorage.setItem('active_unit_id', unitId);
     router.refresh();
-    router.push('/');
+    router.push('/dashboard');
   };
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
-    router.push('/login');
+    router.push('/');
   };
 
   if (loading) {

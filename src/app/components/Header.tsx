@@ -53,7 +53,7 @@ export default function Header() {
     await supabase.auth.signOut();
     localStorage.removeItem('active_unit_id');
     router.refresh();
-    router.push('/login');
+    router.push('/');
   };
 
   const hiddenPages = ['/estanques', '/siembra', '/tratamiento', '/mantenimiento', '/aireacion', '/biometria', '/mortalidad', '/traslado', '/almacen', '/finanzas', '/configuracion', '/ayuda'];

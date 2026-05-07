@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Settings, 
@@ -19,10 +19,31 @@ import {
   RefreshCw,
   X,
   ChevronRight,
-  Shield
+  Shield,
+  Droplets,
+  AlertTriangle,
+  Package,
+  ShoppingBag,
+  Loader2
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'react-hot-toast';
+
+// Official Feed Catalog based on Invoices
+const FEED_CATALOG = [
+  'Aquatilapia Preiniciador 48% ME 20kg',
+  'Aquatilapia 45% E 40kg',
+  'Aquatilapia 38% E 40kg',
+  'Aquatilapia 34% E 40kg',
+  'Aquatilapia 32% E 40kg',
+  'Aquatilapia 30% E 40kg',
+  'Aquatilapia 25% E 40kg',
+  'Aquatilapia 20% E 40kg',
+  'Aquatropico 22% E 40 kg',
+  'Aquatrucha Super Iniciación 50% E 40 kg',
+  'Aquatrucha Levante 45% E Pig 40 kg',
+  'Aquatrucha Finalización 45% E Pig 40 kg'
+];
 
 export default function ConfiguracionPage() {
   const [userRole, setUserRole] = useState<string | null>(null);
@@ -30,6 +51,106 @@ export default function ConfiguracionPage() {
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
   const [prices, setPrices] = useState({ basic: 18, premium: 30 });
+
+  // Thresholds state (mock for UI)
+  const [thresholds, setThresholds] = useState({
+    o2_mg_l_min: '4.5', o2_mg_l_max: '9.0',
+    o2_perc_min: '80', o2_perc_max: '120',
+    ph_min: '6.5', ph_max: '8.5',
+    temperature_c_min: '26.0', temperature_c_max: '31.0',
+    alkalinity_min: '50', alkalinity_max: '150',
+    ammonia_mg_l_min: '0', ammonia_mg_l_max: '0.02',
+    nitrite_mg_l_min: '0', nitrite_mg_l_max: '0.1',
+    nitrate_mg_l_min: '0', nitrate_mg_l_max: '50',
+    warmMortality: '5', coldMortality: '10'
+  });
+
+  const handleThresholdChange = (key: string, value: string) => {
+    setThresholds(prev => ({ ...prev, [key]: value }));
+  };
+
+  const fetchSettings = useCallback(async () => {
+    const activeUnitId = localStorage.getItem('active_unit_id');
+    if (!activeUnitId) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('unit_settings')
+        .select('*')
+        .eq('unit_id', activeUnitId)
+        .single();
+
+      if (data) {
+        setThresholds({
+          o2_mg_l_min: data.o2_mg_l_min?.toString() || '4.5',
+          o2_mg_l_max: data.o2_mg_l_max?.toString() || '9.0',
+          o2_perc_min: data.o2_perc_min?.toString() || '80',
+          o2_perc_max: data.o2_perc_max?.toString() || '120',
+          ph_min: data.ph_min?.toString() || '6.5',
+          ph_max: data.ph_max?.toString() || '8.5',
+          temperature_c_min: data.temperature_c_min?.toString() || '26.0',
+          temperature_c_max: data.temperature_c_max?.toString() || '31.0',
+          alkalinity_min: data.alkalinity_min?.toString() || '50',
+          alkalinity_max: data.alkalinity_max?.toString() || '150',
+          ammonia_mg_l_min: data.ammonia_mg_l_min?.toString() || '0',
+          ammonia_mg_l_max: data.ammonia_mg_l_max?.toString() || '0.02',
+          nitrite_mg_l_min: data.nitrite_mg_l_min?.toString() || '0',
+          nitrite_mg_l_max: data.nitrite_mg_l_max?.toString() || '0.1',
+          nitrate_mg_l_min: data.nitrate_mg_l_min?.toString() || '0',
+          nitrate_mg_l_max: data.nitrate_mg_l_max?.toString() || '50',
+          warmMortality: data.warm_mortality_max?.toString() || '5',
+          coldMortality: data.cold_mortality_max?.toString() || '10'
+        });
+      }
+    } catch (err) {
+      console.error("Error loading settings:", err);
+    }
+  }, []);
+
+  const saveSettings = async () => {
+    const activeUnitId = localStorage.getItem('active_unit_id');
+    if (!activeUnitId) {
+      toast.error("No se identificó la unidad activa.");
+      return;
+    }
+
+    const savePromise = async () => {
+      const payload = {
+        unit_id: activeUnitId,
+        o2_mg_l_min: parseFloat(thresholds.o2_mg_l_min),
+        o2_mg_l_max: parseFloat(thresholds.o2_mg_l_max),
+        o2_perc_min: parseFloat(thresholds.o2_perc_min),
+        o2_perc_max: parseFloat(thresholds.o2_perc_max),
+        ph_min: parseFloat(thresholds.ph_min),
+        ph_max: parseFloat(thresholds.ph_max),
+        temperature_c_min: parseFloat(thresholds.temperature_c_min),
+        temperature_c_max: parseFloat(thresholds.temperature_c_max),
+        alkalinity_min: parseFloat(thresholds.alkalinity_min),
+        alkalinity_max: parseFloat(thresholds.alkalinity_max),
+        ammonia_mg_l_min: parseFloat(thresholds.ammonia_mg_l_min),
+        ammonia_mg_l_max: parseFloat(thresholds.ammonia_mg_l_max),
+        nitrite_mg_l_min: parseFloat(thresholds.nitrite_mg_l_min),
+        nitrite_mg_l_max: parseFloat(thresholds.nitrite_mg_l_max),
+        nitrate_mg_l_min: parseFloat(thresholds.nitrate_mg_l_min),
+        nitrate_mg_l_max: parseFloat(thresholds.nitrate_mg_l_max),
+        warm_mortality_max: parseFloat(thresholds.warmMortality),
+        cold_mortality_max: parseFloat(thresholds.coldMortality),
+        updated_at: new Date().toISOString()
+      };
+
+      const { error } = await supabase
+        .from('unit_settings')
+        .upsert(payload, { onConflict: 'unit_id' });
+
+      if (error) throw error;
+    };
+
+    toast.promise(savePromise(), {
+      loading: 'Guardando configuración...',
+      success: 'Parámetros actualizados correctamente.',
+      error: 'Error al guardar los rangos.'
+    });
+  };
 
   useEffect(() => {
     async function checkRole() {
@@ -46,13 +167,18 @@ export default function ConfiguracionPage() {
 
         const { data: userUnit } = await supabase
           .from('user_units')
-          .select('role')
+          .select('unit_id, role')
           .eq('user_id', user.id)
           .limit(1)
           .single();
 
         const finalRole = userUnit?.role || profile?.role || 'operario';
         setUserRole(finalRole);
+        
+        if (userUnit?.unit_id) {
+           localStorage.setItem('active_unit_id', userUnit.unit_id);
+           fetchSettings();
+        }
 
         if (superStatus) {
           setActiveTab('negocio');
@@ -65,7 +191,7 @@ export default function ConfiguracionPage() {
       setLoading(false);
     }
     checkRole();
-  }, []);
+  }, [fetchSettings]);
 
   const getTabs = () => {
     if (isSuperAdmin) {
@@ -96,7 +222,7 @@ export default function ConfiguracionPage() {
   if (loading) {
     return (
       <div style={{ minHeight: '80vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <Loader2 className="animate-spin" size={48} color="#0d9488" />
+        <RefreshCw className="animate-spin" size={48} color="#0d9488" />
       </div>
     );
   }
@@ -145,7 +271,7 @@ export default function ConfiguracionPage() {
         ))}
       </div>
 
-      <div className="card-premium" style={{ padding: '2.5rem' }}>
+      <div className="card-premium" style={{ padding: 'clamp(1rem, 3vw, 2.5rem)' }}>
         <AnimatePresence mode="wait">
           <motion.div 
             key={activeTab}
@@ -195,16 +321,109 @@ export default function ConfiguracionPage() {
               <div>
                 <div style={{ marginBottom: '2.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
                   <div>
-                    <h2 style={{ fontSize: '1.4rem', fontWeight: 900, letterSpacing: '-0.02em', marginBottom: '0.25rem' }}>Umbrales de Calidad</h2>
-                    <p style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>Define los límites de alerta para tu producción.</p>
+                    <h2 style={{ fontSize: '1.4rem', fontWeight: 950, letterSpacing: '-0.03em', marginBottom: '0.25rem' }}>Configuración de Alertas y Umbrales</h2>
+                    <p style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>Personaliza los límites operativos de tu producción.</p>
                   </div>
-                  <button onClick={() => toast.success("Umbrales actualizados.")} className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <button onClick={saveSettings} className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                     <Save size={18} /> Guardar Rangos
                   </button>
                 </div>
-                <div className="responsive-grid-2">
-                  <ParamInput label="Oxígeno Crítico (mg/L)" icon={Wind} color="#3b82f6" min="4.5" max="9.0" />
-                  <ParamInput label="Temperatura Límite (°C)" icon={Thermometer} color="#ef4444" min="26.0" max="31.0" />
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '3rem' }}>
+                  {/* Bloque 1: Calidad de Agua */}
+                  <ThresholdSection title="Calidad de Agua (Físico-Químicos y Nitrógeno)" icon={Droplets} color="#3b82f6">
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem' }}>
+                      <ParamInput 
+                        label="Oxígeno Disuelto (mg/L)" icon={Wind} color="#3b82f6" 
+                        min={thresholds.o2_mg_l_min} max={thresholds.o2_mg_l_max}
+                        onMinChange={(v: string) => handleThresholdChange('o2_mg_l_min', v)}
+                        onMaxChange={(v: string) => handleThresholdChange('o2_mg_l_max', v)}
+                      />
+                      <ParamInput 
+                        label="Saturación O2 (%)" icon={Activity} color="#0ea5e9" 
+                        min={thresholds.o2_perc_min} max={thresholds.o2_perc_max}
+                        onMinChange={(v: string) => handleThresholdChange('o2_perc_min', v)}
+                        onMaxChange={(v: string) => handleThresholdChange('o2_perc_max', v)}
+                      />
+                      <ParamInput 
+                        label="Temperatura (°C)" icon={Thermometer} color="#ef4444" 
+                        min={thresholds.temperature_c_min} max={thresholds.temperature_c_max}
+                        onMinChange={(v: string) => handleThresholdChange('temperature_c_min', v)}
+                        onMaxChange={(v: string) => handleThresholdChange('temperature_c_max', v)}
+                      />
+                      <ParamInput 
+                        label="pH" icon={Activity} color="#8b5cf6" 
+                        min={thresholds.ph_min} max={thresholds.ph_max}
+                        onMinChange={(v: string) => handleThresholdChange('ph_min', v)}
+                        onMaxChange={(v: string) => handleThresholdChange('ph_max', v)}
+                      />
+                      <ParamInput 
+                        label="Alcalinidad (mg/L)" icon={Shield} color="#10b981" 
+                        min={thresholds.alkalinity_min} max={thresholds.alkalinity_max}
+                        onMinChange={(v: string) => handleThresholdChange('alkalinity_min', v)}
+                        onMaxChange={(v: string) => handleThresholdChange('alkalinity_max', v)}
+                      />
+                      <ParamInput 
+                        label="Amonio (mg/L)" icon={AlertTriangle} color="#f59e0b" 
+                        min={thresholds.ammonia_mg_l_min} max={thresholds.ammonia_mg_l_max}
+                        onMinChange={(v: string) => handleThresholdChange('ammonia_mg_l_min', v)}
+                        onMaxChange={(v: string) => handleThresholdChange('ammonia_mg_l_max', v)}
+                      />
+                      <ParamInput 
+                        label="Nitrito (mg/L)" icon={AlertTriangle} color="#f97316" 
+                        min={thresholds.nitrite_mg_l_min} max={thresholds.nitrite_mg_l_max}
+                        onMinChange={(v: string) => handleThresholdChange('nitrite_mg_l_min', v)}
+                        onMaxChange={(v: string) => handleThresholdChange('nitrite_mg_l_max', v)}
+                      />
+                      <ParamInput 
+                        label="Nitrato (mg/L)" icon={AlertTriangle} color="#ea580c" 
+                        min={thresholds.nitrate_mg_l_min} max={thresholds.nitrate_mg_l_max}
+                        onMinChange={(v: string) => handleThresholdChange('nitrate_mg_l_min', v)}
+                        onMaxChange={(v: string) => handleThresholdChange('nitrate_mg_l_max', v)}
+                      />
+                    </div>
+                  </ThresholdSection>
+
+                  {/* Bloque 2: Mortalidad Aceptable */}
+                  <ThresholdSection title="Límites de Mortalidad (%)" icon={AlertTriangle} color="#ef4444">
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1.5rem' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                        <label className="premium-label" style={{ position: 'static', fontWeight: 700 }}>Especies Cálidas (Cachama/Tilapia) %</label>
+                        <input 
+                          type="number"
+                          className="premium-input" 
+                          value={thresholds.warmMortality} 
+                          onChange={(e) => handleThresholdChange('warmMortality', e.target.value)}
+                          style={{ fontWeight: 800 }} 
+                        />
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                        <label className="premium-label" style={{ position: 'static', fontWeight: 700 }}>Especies Frías (Trucha) %</label>
+                        <input 
+                          type="number"
+                          className="premium-input" 
+                          value={thresholds.coldMortality} 
+                          onChange={(e) => handleThresholdChange('coldMortality', e.target.value)}
+                          style={{ fontWeight: 800 }} 
+                        />
+                      </div>
+                    </div>
+                  </ThresholdSection>
+
+                  {/* Bloque 3: Alerta de Desabastecimiento (Inventario) */}
+                  <ThresholdSection title="Alertas de Desabastecimiento de Alimento" icon={ShoppingBag} color="#10b981">
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1.5rem' }}>
+                      {FEED_CATALOG.map((item) => (
+                        <div key={item} style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }} className="glass p-4 rounded-xl border border-slate-200">
+                          <label className="premium-label">{item}</label>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                             <span style={{ fontSize: '0.65rem', fontWeight: 900, color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>Stock Mínimo (Bultos)</span>
+                             <input type="number" defaultValue="10" className="premium-input" style={{ fontWeight: 900, width: '100%' }} />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </ThresholdSection>
                 </div>
               </div>
             )}
@@ -225,51 +444,96 @@ export default function ConfiguracionPage() {
   );
 }
 
-const PriceCard = ({ title, icon: Icon, value, onChange, color }: any) => (
-  <div className="glass" style={{ padding: '2rem', borderRadius: '20px' }}>
-    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem', color: color || 'var(--primary)' }}>
-      <Icon size={24} /> <span style={{ fontWeight: 900, fontSize: '1.1rem' }}>{title}</span>
+// --- Corrected Structural Components ---
+
+const ThresholdSection = ({ title, icon: Icon, color, children }: any) => (
+  <div className="glass" style={{ padding: 'clamp(1rem, 3vw, 2.5rem)', borderRadius: '24px', border: `1px solid ${color}15` }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '2rem' }}>
+      <div style={{ background: `${color}15`, color, padding: '0.75rem', borderRadius: '14px' }}>
+        <Icon size={24} />
+      </div>
+      <h3 style={{ fontSize: '1.25rem', fontWeight: 950, letterSpacing: '-0.02em', color: 'var(--foreground)' }}>{title}</h3>
     </div>
-    <label className="premium-label">Valor Mensual (USD)</label>
-    <div style={{ position: 'relative' }}>
-      <span style={{ position: 'absolute', left: '1.25rem', top: '50%', transform: 'translateY(-50%)', fontWeight: 900, color: 'var(--muted-foreground)' }}>$</span>
-      <input type="number" value={value} onChange={e => onChange(Number(e.target.value))} className="premium-input" style={{ paddingLeft: '2.5rem', fontSize: '1.25rem', fontWeight: 900 }} />
+    {children}
+  </div>
+);
+
+const ParamInput = ({ label, icon: Icon, color, min, max, onMinChange, onMaxChange }: any) => (
+  <div className="glass" style={{ padding: '1.5rem', borderRadius: '16px', border: `1px solid ${color}15`, display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color }}>
+      <Icon size={18} /> <span style={{ fontWeight: 900, fontSize: '0.9rem' }}>{label}</span>
+    </div>
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+      {/* Contenedor Mínimo */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+        <label className="premium-label" style={{ position: 'static', color: 'var(--muted-foreground)', fontWeight: 700, fontSize: '0.65rem', textTransform: 'uppercase' }}>Mínimo</label>
+        <input 
+          type="number" 
+          step="0.01"
+          value={min} 
+          onChange={(e) => onMinChange(e.target.value)}
+          className="premium-input" 
+          style={{ fontWeight: 800, width: '100%', fontSize: '0.9rem' }} 
+        />
+      </div>
+      {/* Contenedor Máximo */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+        <label className="premium-label" style={{ position: 'static', color: 'var(--muted-foreground)', fontWeight: 700, fontSize: '0.65rem', textTransform: 'uppercase' }}>Máximo</label>
+        <input 
+          type="number" 
+          step="0.01"
+          value={max} 
+          onChange={(e) => onMaxChange(e.target.value)}
+          className="premium-input" 
+          style={{ fontWeight: 800, width: '100%', fontSize: '0.9rem' }} 
+        />
+      </div>
+    </div>
+  </div>
+);
+
+const PriceCard = ({ title, icon: Icon, value, onChange, color }: any) => (
+  <div className="glass" style={{ padding: '2rem', borderRadius: '24px' }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem', color: color || 'var(--primary)' }}>
+      <Icon size={24} /> <span style={{ fontWeight: 950, fontSize: '1.1rem' }}>{title}</span>
+    </div>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+      <label className="premium-label" style={{ position: 'static', fontWeight: 700 }}>Valor Mensual (USD)</label>
+      <div style={{ position: 'relative' }}>
+        <span style={{ position: 'absolute', left: '1.25rem', top: '50%', transform: 'translateY(-50%)', fontWeight: 900, color: 'var(--muted-foreground)' }}>$</span>
+        <input type="number" value={value} onChange={e => onChange(Number(e.target.value))} className="premium-input" style={{ paddingLeft: '2.5rem', fontSize: '1.25rem', fontWeight: 950 }} />
+      </div>
     </div>
   </div>
 );
 
 const SystemInput = ({ label, type, options, placeholder, defaultValue }: any) => (
-  <div className="glass" style={{ padding: '1.5rem', borderRadius: '18px' }}>
-    <label className="premium-label">{label}</label>
+  <div className="glass" style={{ padding: '1.5rem', borderRadius: '20px', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+    <label className="premium-label" style={{ position: 'static', fontWeight: 700 }}>{label}</label>
     {type === 'select' ? (
-      <select className="premium-input" style={{ fontWeight: 700 }}>
+      <select className="premium-input" style={{ fontWeight: 800 }}>
         {options.map((o: any) => <option key={o} value={o}>{o}</option>)}
       </select>
     ) : (
-      <input type={type} placeholder={placeholder} defaultValue={defaultValue} className="premium-input" style={{ fontWeight: 700 }} />
+      <input type={type} placeholder={placeholder} defaultValue={defaultValue} className="premium-input" style={{ fontWeight: 800 }} />
     )}
   </div>
 );
 
-const ParamInput = ({ label, icon: Icon, color, min, max }: any) => (
-  <div style={{ padding: '2rem', borderRadius: '20px', background: `${color}05`, border: `1px solid ${color}20` }}>
-    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem', color }}>
-      <Icon size={22} /> <span style={{ fontWeight: 900 }}>{label}</span>
-    </div>
-    <div className="responsive-grid-2">
-      <div>
-        <label className="premium-label">Mínimo</label>
-        <input type="number" defaultValue={min} className="premium-input" style={{ fontWeight: 800 }} />
-      </div>
-      <div>
-        <label className="premium-label">Máximo</label>
-        <input type="number" defaultValue={max} className="premium-input" style={{ fontWeight: 800 }} />
-      </div>
-    </div>
+const InputGroup = ({ label, placeholder, value, onChange, defaultValue }: any) => (
+  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+    <label className="premium-label" style={{ position: 'static', fontWeight: 700 }}>{label}</label>
+    <input 
+      required 
+      placeholder={placeholder} 
+      value={value} 
+      defaultValue={defaultValue}
+      onChange={e => onChange?.(e.target.value)} 
+      className="premium-input" 
+      style={{ fontWeight: 800, width: '100%' }} 
+    />
   </div>
 );
-
-const Loader2 = ({ className, size, color }: any) => <RefreshCw className={className} size={size} color={color} />;
 
 const TeamManagement = () => {
   const [members, setMembers] = useState<any[]>([]);
@@ -544,10 +808,3 @@ const TeamManagement = () => {
     </div>
   );
 };
-
-const InputGroup = ({ label, placeholder, value, onChange }: any) => (
-  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-    <label className="premium-label">{label}</label>
-    <input required placeholder={placeholder} value={value} onChange={e => onChange(e.target.value)} className="premium-input" style={{ fontWeight: 600 }} />
-  </div>
-);

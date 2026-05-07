@@ -79,7 +79,7 @@ export default function Sidebar() {
   const handleSignOut = async () => {
     await supabase.auth.signOut();
     localStorage.removeItem('active_unit_id');
-    window.location.href = '/login';
+    window.location.href = '/';
   };
 
   const toggleSidebar = () => setIsOpen(!isOpen);

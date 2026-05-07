@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react';
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { supabase } from '@/lib/supabase';
+import { useAuth } from '../providers/AuthProvider';
+import { useUnit } from '../providers/UnitProvider';
 import { 
   LayoutDashboard, 
   Waves, 
@@ -14,8 +16,7 @@ import {
   Fish,
   Package,
   Shield,
-  LogOut,
-  Home
+  LogOut
 } from "lucide-react";
 
 interface AppLayoutProps {
@@ -24,45 +25,62 @@ interface AppLayoutProps {
 
 export default function AppLayout({ children }: AppLayoutProps) {
   const pathname = usePathname();
+  const { session } = useAuth();
+  const { activeUnit } = useUnit();
   const [width, setWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1200);
   const [userRole, setUserRole] = useState<string | null>(null);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
-  const [planType, setPlanType] = useState('basic');
 
   useEffect(() => {
-    const handleResize = () => setWidth(window.innerWidth);
+    let timeoutId: NodeJS.Timeout;
+    const handleResize = () => {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => setWidth(window.innerWidth), 150);
+    };
     window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      clearTimeout(timeoutId);
+    };
   }, []);
+  
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    localStorage.removeItem('active_unit_id');
+    localStorage.removeItem('fishbit_last_active');
+    window.location.href = '/';
+  };
 
   useEffect(() => {
-    async function checkRole() {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const { data: profile } = await supabase.from('profiles').select('is_superadmin, role').eq('id', user.id).single();
-        setIsSuperAdmin(profile?.is_superadmin || false);
-        
-        const { data: userUnit } = await supabase.from('user_units').select('role, unit_id').eq('user_id', user.id).limit(1).single();
-        setUserRole(userUnit?.role || profile?.role || 'operario');
+    if (!session?.user) return;
 
-        const activeUnitId = localStorage.getItem('active_unit_id') || userUnit?.unit_id;
-        if (activeUnitId) {
-          const { data: sub } = await supabase.from('subscriptions').select('plan_type').eq('unit_id', activeUnitId).single();
-          if (sub) setPlanType(sub.plan_type);
-        }
+    async function checkRole() {
+      const userId = session.user.id;
+      const [profileRes, unitRes] = await Promise.all([
+        supabase.from('profiles').select('is_superadmin, role').eq('id', userId).single(),
+        supabase.from('user_units').select('role').eq('user_id', userId).limit(1).single()
+      ]);
+
+      if (profileRes.data) {
+        setIsSuperAdmin(profileRes.data.is_superadmin || false);
+      }
+      
+      if (unitRes.data) {
+        setUserRole(unitRes.data.role || profileRes.data?.role || 'operario');
       }
     }
     checkRole();
-  }, []);
+  }, [session?.user?.id]);
 
   const isMobile = width < 768;
   const isTablet = width >= 768 && width <= 1024;
   const isDesktop = width > 1024;
 
   const sidebarWidth = isDesktop ? '240px' : isTablet ? '64px' : '0px';
+  const planType = activeUnit?.subscriptions?.plan_type || 'premium';
 
   const menuItems = [
-    { label: 'Panel', icon: LayoutDashboard, href: '/', roles: ['admin', 'tecnico'] },
+    { label: 'Panel', icon: LayoutDashboard, href: '/dashboard', roles: ['admin', 'tecnico'] },
     { label: 'Estanques', icon: Waves, href: '/estanques', roles: ['admin', 'tecnico'] },
     { label: 'Registros', icon: ClipboardList, href: '/registros', roles: ['admin', 'tecnico', 'operario'] },
     { label: 'Almacén', icon: Package, href: '/almacen', roles: ['admin', 'tecnico'] },
@@ -81,12 +99,6 @@ export default function AppLayout({ children }: AppLayoutProps) {
   const filteredSecondary = isSuperAdmin
     ? [{ label: 'Configuración', icon: Settings, href: '/configuracion' }]
     : secondaryItems.filter(item => item.roles.includes(userRole || ''));
-
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    localStorage.removeItem('active_unit_id');
-    window.location.href = '/login';
-  };
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--background)' }}>
@@ -116,14 +128,14 @@ export default function AppLayout({ children }: AppLayoutProps) {
                   fontWeight: 900, 
                   textTransform: 'uppercase', 
                   letterSpacing: '0.08em',
-                  color: (planType || 'premium').toLowerCase() === 'premium' ? '#b45309' : 'var(--muted-foreground)',
+                  color: planType.toLowerCase() === 'premium' ? '#b45309' : 'var(--muted-foreground)',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '6px',
                   marginTop: '0.2rem'
                 }}>
-                  <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: (planType || 'premium').toLowerCase() === 'premium' ? '#f59e0b' : 'var(--muted-foreground)' }} />
-                  PLAN {(planType || 'PREMIUM').toUpperCase()}
+                  <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: planType.toLowerCase() === 'premium' ? '#f59e0b' : 'var(--muted-foreground)' }} />
+                  PLAN {planType.toUpperCase()}
                 </span>
                 {isSuperAdmin && <span style={{ fontSize: '0.6rem', fontWeight: 900, color: 'var(--primary)', textTransform: 'uppercase', marginTop: '0.25rem' }}>SuperAdmin Hub</span>}
               </div>

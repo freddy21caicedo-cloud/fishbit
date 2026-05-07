@@ -12,9 +12,7 @@ import {
   Plus,
   History,
   ChevronDown,
-  Waves,
-  ChevronRight,
-  Wind
+  ChevronRight
 } from 'lucide-react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
@@ -25,40 +23,55 @@ const recordTypes = [
   { id: 'calidad-agua', label: 'Calidad de Agua', icon: Droplets, color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.1)' },
   { id: 'mortalidad', label: 'Mortalidad', icon: AlertTriangle, color: '#ef4444', bg: 'rgba(239, 68, 68, 0.1)' },
   { id: 'traslado', label: 'Traslado', icon: ArrowRightLeft, color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.1)' },
-  { id: 'aireacion', label: 'Aireación', icon: Wind, color: '#06b6d4', bg: 'rgba(6, 182, 212, 0.1)' },
 ];
 
 const ActionCard = ({ type }: any) => (
   <Link href={`/registros/${type.id}`} style={{ textDecoration: 'none' }}>
     <motion.div
-      whileHover={{ y: -5 }}
+      whileHover={{ scale: 1.02, x: 5 }}
+      whileTap={{ scale: 0.98 }}
       className="card-premium"
       style={{
-        padding: '1.5rem',
+        padding: '1rem 1.25rem',
         display: 'flex',
-        flexDirection: 'column',
+        flexDirection: 'row',
         alignItems: 'center',
-        gap: '0.75rem',
+        justifyContent: 'space-between',
         cursor: 'pointer',
-        textAlign: 'center',
+        border: '1px solid var(--border)',
+        transition: 'all 0.2s ease'
       }}
     >
-      <div style={{
-        width: '56px',
-        height: '56px',
-        borderRadius: '16px',
-        background: type.bg,
-        color: type.color,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center'
-      }}>
-        <type.icon size={28} />
+      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+        <div style={{
+          width: '44px',
+          height: '44px',
+          borderRadius: '12px',
+          background: type.bg,
+          color: type.color,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          flexShrink: 0
+        }}>
+          <type.icon size={22} />
+        </div>
+        <span style={{ fontWeight: 800, fontSize: '0.95rem', color: 'var(--foreground)', letterSpacing: '-0.02em' }}>
+          {type.label}
+        </span>
       </div>
-      <span style={{ fontWeight: 800, fontSize: '1rem', color: 'var(--foreground)' }}>{type.label}</span>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.7rem', color: 'var(--primary)', fontWeight: 800, textTransform: 'uppercase' }}>
-        <Plus size={12} />
-        Registrar
+      
+      <div style={{ 
+        width: '32px', 
+        height: '32px', 
+        borderRadius: '50%', 
+        background: 'var(--secondary)', 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'center',
+        color: 'var(--primary)'
+      }}>
+        <Plus size={18} strokeWidth={3} />
       </div>
     </motion.div>
   </Link>
@@ -91,13 +104,12 @@ export default function RegistrosPage() {
     }
 
     // 2. Fetch Activity from all tables
-    const [alimentacion, biometrias, calidadAgua, mortalidad, traslados, aireacion] = await Promise.all([
+    const [alimentacion, biometrias, calidadAgua, mortalidad, traslados] = await Promise.all([
       supabase.from('alimentacion_diaria').select('*, estanques(name)').eq('unit_id', activeUnitId).order('created_at', { ascending: false }).limit(5),
       supabase.from('biometrias').select('*, estanques(name)').eq('unit_id', activeUnitId).order('created_at', { ascending: false }).limit(5),
       supabase.from('water_quality').select('*, estanques(name)').eq('unit_id', activeUnitId).order('created_at', { ascending: false }).limit(5),
       supabase.from('mortality').select('*, estanques(name)').eq('unit_id', activeUnitId).order('created_at', { ascending: false }).limit(5),
       supabase.from('transfers').select('*, origen:estanques!origen_id(name), destino:estanques!destino_id(name)').eq('unit_id', activeUnitId).order('created_at', { ascending: false }).limit(5),
-      supabase.from('aireacion_logs').select('*, estanques(name)').eq('unit_id', activeUnitId).order('created_at', { ascending: false }).limit(5),
     ]);
 
     const combined: any[] = [
@@ -146,15 +158,6 @@ export default function RegistrosPage() {
         time: new Date(t.created_at).toLocaleString(),
         rawDate: t.created_at
       })),
-      ...(aireacion.data || []).map((a: any) => ({
-        id: `air-${a.id}`,
-        type: 'aireacion',
-        pond: a.estanques?.name,
-        species: 'Aireación',
-        detail: `${a.action === 'ON' ? 'Encendido' : 'Apagado'}: ${a.observations}`,
-        time: new Date(a.created_at).toLocaleString(),
-        rawDate: a.created_at
-      })),
     ].sort((a, b) => new Date(b.rawDate).getTime() - new Date(a.rawDate).getTime());
 
     setActivities(combined);
@@ -172,14 +175,20 @@ export default function RegistrosPage() {
         <p style={{ color: 'var(--muted-foreground)' }}>Selecciona el tipo de registro que deseas ingresar hoy.</p>
       </header>
 
-      <div className="responsive-grid-4" style={{ marginBottom: '3rem' }}>
+      {/* Modern Compact Grid */}
+      <div style={{ 
+        display: 'grid', 
+        gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', 
+        gap: '1rem', 
+        marginBottom: '3.5rem' 
+      }}>
         {recordTypes.map(type => (
           <ActionCard key={type.id} type={type} />
         ))}
       </div>
 
       {/* Recent Activity Section */}
-      <div style={{ marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div style={{ marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
           <History size={20} style={{ color: 'var(--primary)' }} />
           <h2 style={{ fontSize: '1.25rem', fontWeight: 600 }}>Actividad Reciente</h2>
