@@ -27,7 +27,7 @@ export function CostosPorEstanque({ unitId }: { unitId: string }) {
       const jornalesGenerales = (jornalesRes.data || []).filter((j: any) => !j.estanque_id).reduce((s: number, j: any) => s + parseFloat(j.total || 0), 0);
 
       // Calcular costo promedio ponderado por kg de cada producto desde facturas
-      const costoPorProductoKg: Record<string, number> = {};
+      const costoPorProductoKg: Record<string, { base: number, flete: number, iva: number }> = {};
       (invItemsRes.data || []).forEach((r: any) => {
         const productName = r.product_name;
         const qty = parseFloat(r.quantity) || 0;
@@ -36,17 +36,27 @@ export function CostosPorEstanque({ unitId }: { unitId: string }) {
         const unitPrice = parseFloat(r.unit_price) || 0;
         const flete = parseFloat(r.flete_per_unit) || 0;
         const iva = parseFloat(r.iva_percent) || 0;
-        const costoTotalItem = qty * (unitPrice + flete) * (1 + iva / 100);
-        // costo por kg de este producto
-        if (!costoPorProductoKg[productName]) costoPorProductoKg[productName] = costoTotalItem / kilos;
-        else costoPorProductoKg[productName] = (costoPorProductoKg[productName] + costoTotalItem / kilos) / 2;
+        
+        const baseItem = (qty * unitPrice) / kilos;
+        const fleteItem = (qty * flete) / kilos;
+        const ivaItem = (qty * (unitPrice + flete) * (iva / 100)) / kilos;
+
+        if (!costoPorProductoKg[productName]) {
+          costoPorProductoKg[productName] = { base: baseItem, flete: fleteItem, iva: ivaItem };
+        } else {
+          costoPorProductoKg[productName].base = (costoPorProductoKg[productName].base + baseItem) / 2;
+          costoPorProductoKg[productName].flete = (costoPorProductoKg[productName].flete + fleteItem) / 2;
+          costoPorProductoKg[productName].iva = (costoPorProductoKg[productName].iva + ivaItem) / 2;
+        }
       });
 
       // kg consumidos por estanque × costo/kg del producto
       // Como alimentacion_diaria no siempre tiene product_name directo, usamos costo promedio general
-      const costoKgPromedio = Object.values(costoPorProductoKg).length > 0
-        ? Object.values(costoPorProductoKg).reduce((s, v) => s + v, 0) / Object.values(costoPorProductoKg).length
-        : 0;
+      const numProductos = Object.keys(costoPorProductoKg).length;
+      const costoKgPromedioBase = numProductos > 0 ? Object.values(costoPorProductoKg).reduce((s, v) => s + v.base, 0) / numProductos : 0;
+      const costoKgPromedioFlete = numProductos > 0 ? Object.values(costoPorProductoKg).reduce((s, v) => s + v.flete, 0) / numProductos : 0;
+      const costoKgPromedioIva = numProductos > 0 ? Object.values(costoPorProductoKg).reduce((s, v) => s + v.iva, 0) / numProductos : 0;
+      const costoKgPromedio = costoKgPromedioBase + costoKgPromedioFlete + costoKgPromedioIva;
 
       const kgByPond: Record<string, number> = {};
       (alimentRes.data || []).forEach((r: any) => { kgByPond[r.estanque_id] = (kgByPond[r.estanque_id] || 0) + (parseFloat(r.quantity_kg) || 0); });
@@ -55,7 +65,11 @@ export function CostosPorEstanque({ unitId }: { unitId: string }) {
         const biomasa = parseFloat(p.current_biomass_kg || 0);
         const fraccionBiomasa = totalBiomasa > 0 ? biomasa / totalBiomasa : 0;
 
-        const costoAlimento = (kgByPond[p.id] || 0) * costoKgPromedio;
+        const costoAlimentoBase = (kgByPond[p.id] || 0) * costoKgPromedioBase;
+        const costoAlimentoFlete = (kgByPond[p.id] || 0) * costoKgPromedioFlete;
+        const costoAlimentoIva = (kgByPond[p.id] || 0) * costoKgPromedioIva;
+        const costoAlimento = costoAlimentoBase + costoAlimentoFlete + costoAlimentoIva;
+        
         const nominaProrr = totalNomina * fraccionBiomasa;
         const jornalesProrr = jornalesGenerales * fraccionBiomasa;
         const jornalesDirectos = (jornalesRes.data || []).filter((j: any) => j.estanque_id === p.id).reduce((s: number, j: any) => s + parseFloat(j.total || 0), 0);
@@ -75,7 +89,7 @@ export function CostosPorEstanque({ unitId }: { unitId: string }) {
           });
         }
 
-        return { ...p, biomasa, costoAlimento, nominaProrr, jornalesProrr, jornalesDirectos, totalCosto, costoPorKg, especies };
+        return { ...p, biomasa, costoAlimento, costoAlimentoBase, costoAlimentoFlete, costoAlimentoIva, nominaProrr, jornalesProrr, jornalesDirectos, totalCosto, costoPorKg, especies };
       });
 
       setCards(result);
@@ -99,7 +113,9 @@ export function CostosPorEstanque({ unitId }: { unitId: string }) {
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginBottom: '1rem' }}>
             {[
-              { label: 'Alimento', value: p.costoAlimento, color: '#8b5cf6' },
+              { label: 'Alimento (Base)', value: p.costoAlimentoBase, color: '#8b5cf6' },
+              { label: 'Alimento (Flete)', value: p.costoAlimentoFlete, color: '#a78bfa' },
+              { label: 'Alimento (IVA)', value: p.costoAlimentoIva, color: '#c4b5fd' },
               { label: 'Nómina (prorr.)', value: p.nominaProrr, color: '#3b82f6' },
               { label: 'Jornales generales', value: p.jornalesProrr, color: '#f59e0b' },
               { label: 'Jornales directos', value: p.jornalesDirectos, color: '#ef4444' },

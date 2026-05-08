@@ -25,22 +25,31 @@ export function PanelGeneral({ unitId }: { unitId: string }) {
       const totalNomina = (nominaRes.data || []).reduce((s: number, n: any) => s + (parseFloat(n.monto) || 0), 0);
       const totalJornales = (jornalesRes.data || []).reduce((s: number, j: any) => s + (parseFloat(j.total) || 0), 0);
 
-      // Costo alimento = suma de (bultos × precio_bulto_con_iva_y_flete) por cada item de factura
-      let costoAlimento = 0;
+      let costoAlimentoBase = 0;
+      let costoAlimentoFlete = 0;
+      let costoAlimentoIva = 0;
       (invoiceItemsRes.data || []).forEach((r: any) => {
         const qty = parseFloat(r.quantity) || 0;
         const unitPrice = parseFloat(r.unit_price) || 0;
         const flete = parseFloat(r.flete_per_unit) || 0;
         const iva = parseFloat(r.iva_percent) || 0;
-        costoAlimento += qty * (unitPrice + flete) * (1 + iva / 100);
+        
+        const base = qty * unitPrice;
+        const fleteTotal = qty * flete;
+        const ivaTotal = (base + fleteTotal) * (iva / 100);
+
+        costoAlimentoBase += base;
+        costoAlimentoFlete += fleteTotal;
+        costoAlimentoIva += ivaTotal;
       });
+      const costoAlimento = costoAlimentoBase + costoAlimentoFlete + costoAlimentoIva;
 
       const totalBiomasa = (pondsRes.data || []).reduce((s: number, p: any) => s + (parseFloat(p.current_biomass_kg) || 0), 0);
       const totalCostos = costoAlimento + totalNomina + totalJornales;
       const margen = ingresos - totalCostos;
       const flujoCaja = ingresos - porCobrar - totalCostos;
 
-      setData({ ingresos, totalCostos, margen, flujoCaja, porCobrar, totalBiomasa, costoAlimento, totalNomina, totalJornales });
+      setData({ ingresos, totalCostos, margen, flujoCaja, porCobrar, totalBiomasa, costoAlimento, costoAlimentoBase, costoAlimentoFlete, costoAlimentoIva, totalNomina, totalJornales });
     })();
   }, [unitId]);
 
@@ -72,7 +81,9 @@ export function PanelGeneral({ unitId }: { unitId: string }) {
         <h3 style={{ fontWeight: 800, fontSize: '0.9rem', marginBottom: '1rem', textTransform: 'uppercase', color: 'var(--muted-foreground)' }}>Desglose de Costos</h3>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
           {[
-            { label: 'Alimento', value: data.costoAlimento, pct: data.totalCostos > 0 ? (data.costoAlimento / data.totalCostos) * 100 : 0, color: '#8b5cf6' },
+            { label: 'Alimento (Base)', value: data.costoAlimentoBase, pct: data.totalCostos > 0 ? (data.costoAlimentoBase / data.totalCostos) * 100 : 0, color: '#8b5cf6' },
+            { label: 'Alimento (Flete)', value: data.costoAlimentoFlete, pct: data.totalCostos > 0 ? (data.costoAlimentoFlete / data.totalCostos) * 100 : 0, color: '#a78bfa' },
+            { label: 'Alimento (IVA)', value: data.costoAlimentoIva, pct: data.totalCostos > 0 ? (data.costoAlimentoIva / data.totalCostos) * 100 : 0, color: '#c4b5fd' },
             { label: 'Nómina', value: data.totalNomina, pct: data.totalCostos > 0 ? (data.totalNomina / data.totalCostos) * 100 : 0, color: '#3b82f6' },
             { label: 'Jornales', value: data.totalJornales, pct: data.totalCostos > 0 ? (data.totalJornales / data.totalCostos) * 100 : 0, color: '#f59e0b' },
           ].map((item) => (
