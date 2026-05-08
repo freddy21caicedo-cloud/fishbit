@@ -18,7 +18,8 @@ import {
   Hash,
   Dna,
   Pencil,
-  Trash2
+  Trash2,
+  BadgeDollarSign
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
@@ -219,6 +220,146 @@ const AnimatedWaves = () => (
   </div>
 );
 
+const PondCard = ({ pond, handleDeleteSiembra, handleEditClick }: any) => {
+  const [isFlipped, setIsFlipped] = useState(false);
+
+  const density = pond.status === 'con_peces' && pond.volume > 0
+    ? (pond.current_count / pond.volume).toFixed(2)
+    : null;
+
+  const proyectada = pond.status === 'con_peces' ? (pond.current_biomass_kg * 1.2).toFixed(2) : '0.00';
+  const diasLote = pond.status === 'con_peces' ? 'Activo' : 'N/A';
+
+  const stopProp = (e: React.MouseEvent) => e.stopPropagation();
+
+  return (
+    <div 
+      style={{ perspective: '1000px', cursor: 'pointer', height: '100%', display: 'flex', flexDirection: 'column' }}
+      onClick={() => setIsFlipped(!isFlipped)}
+    >
+      <motion.div
+        animate={{ rotateY: isFlipped ? 180 : 0 }}
+        transition={{ duration: 0.6, type: 'spring', stiffness: 260, damping: 20 }}
+        style={{ 
+          position: 'relative', 
+          transformStyle: 'preserve-3d',
+          flex: 1,
+          display: 'flex',
+          flexDirection: 'column'
+        }}
+      >
+        {/* Front */}
+        <div style={{
+          backfaceVisibility: 'hidden',
+          WebkitBackfaceVisibility: 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
+          height: '100%',
+          ... (isFlipped ? { position: 'absolute', top: 0, left: 0, width: '100%' } : { position: 'relative' })
+        }}>
+          <motion.div whileHover={{ y: -4 }} className="card-premium" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', border: `2px solid ${pond.color}`, borderRadius: '16px', height: '100%' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={{ fontSize: '1.25rem', fontWeight: 800 }}>{pond.name}</h3>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                {pond.status === 'con_peces' && <div onClick={stopProp}><DeleteTooltip label="Borrar Siembra" onClick={() => handleDeleteSiembra(pond)} /></div>}
+                <div onClick={stopProp}><EditTooltip label="Editar" onClick={() => handleEditClick(pond)} /></div>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.7rem', fontWeight: 900, color: pond.color, background: `${pond.color}18`, padding: '4px 10px', borderRadius: '20px', alignSelf: 'flex-start' }}>
+              <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: pond.color }}></span>
+              {pond.statusLabel.toUpperCase()}
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', margin: '0.5rem 0' }}>
+              <div>
+                <div style={{ fontSize: '0.65rem', fontWeight: 800, color: 'var(--muted-foreground)' }}>VOLUMEN</div>
+                <div style={{ fontWeight: 800, fontSize: '1.1rem' }}>{pond.volume} <span style={{ fontSize: '0.7rem' }}>m³</span></div>
+              </div>
+              <div>
+                <div style={{ fontSize: '0.65rem', fontWeight: 800, color: 'var(--muted-foreground)' }}>BIOMASA</div>
+                <div style={{ fontWeight: 800, fontSize: '1.1rem' }}>{pond.current_biomass_kg} <span style={{ fontSize: '0.7rem' }}>kg</span></div>
+              </div>
+            </div>
+
+            <div style={{ background: 'var(--secondary)', borderRadius: '12px', padding: '1rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                <span style={{ fontSize: '0.65rem', fontWeight: 800, color: 'var(--muted-foreground)' }}>ESPECIE / CANTIDAD</span>
+                {pond.is_polyculture && <span style={{ fontSize: '0.6rem', background: 'var(--primary)', color: 'white', padding: '2px 6px', borderRadius: '4px' }}>POLI</span>}
+              </div>
+              <div style={{ fontWeight: 700, fontSize: '0.9rem' }}>{pond.especie}</div>
+              <div style={{ fontSize: '1.25rem', fontWeight: 900, color: 'var(--primary)', marginTop: '0.25rem' }}>
+                {pond.current_count.toLocaleString()} <span style={{ fontSize: '0.8rem', color: 'var(--muted-foreground)' }}>uds</span>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '0.5rem', borderTop: '1px solid var(--border)', paddingTop: '1rem', marginTop: 'auto', flexWrap: 'wrap' }}>
+              <div onClick={stopProp}><Link href={`/siembra?estanque=${pond.id}`}><ActionButton icon={Fish} label="Siembra" color="#10b981" /></Link></div>
+              <div onClick={stopProp}><Link href={`/tratamiento?estanque=${pond.id}`}><ActionButton icon={FlaskConical} label="Tratamiento" color="#f59e0b" /></Link></div>
+              <div onClick={stopProp}><Link href={`/mantenimiento?estanque=${pond.id}`}><ActionButton icon={Settings} label="Mantenimiento" color="#3b82f6" /></Link></div>
+              <div onClick={stopProp}><Link href={`/aireacion?estanque=${pond.id}`}><ActionButton icon={Wind} label="Aireación" color="#06b6d4" /></Link></div>
+            </div>
+          </motion.div>
+        </div>
+
+        {/* Back */}
+        <div style={{
+          backfaceVisibility: 'hidden',
+          WebkitBackfaceVisibility: 'hidden',
+          transform: 'rotateY(180deg)',
+          display: 'flex',
+          flexDirection: 'column',
+          height: '100%',
+          ... (!isFlipped ? { position: 'absolute', top: 0, left: 0, width: '100%' } : { position: 'relative' })
+        }}>
+          <motion.div whileHover={{ y: -4 }} className="card-premium" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', border: `2px solid ${pond.color}`, borderRadius: '16px', height: '100%' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--primary)' }}>Info Productiva</h3>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.7rem', fontWeight: 900, color: pond.color, background: `${pond.color}18`, padding: '4px 10px', borderRadius: '20px' }}>
+                <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: pond.color }}></span>
+                {pond.statusLabel.toUpperCase()}
+              </div>
+            </div>
+
+            <div style={{ background: 'var(--secondary)', borderRadius: '12px', padding: '1rem', marginTop: '1rem' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <div>
+                  <div style={{ fontSize: '0.65rem', fontWeight: 800, color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>Densidad de Siembra</div>
+                  <div style={{ fontSize: '1.25rem', fontWeight: 900 }}>{density || '0.00'} <span style={{ fontSize: '0.8rem', color: 'var(--muted-foreground)' }}>uds/m³</span></div>
+                </div>
+                <div style={{ height: '1px', background: 'var(--border)' }}></div>
+                <div>
+                  <div style={{ fontSize: '0.65rem', fontWeight: 800, color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>Biomasa Proyectada</div>
+                  <div style={{ fontSize: '1.25rem', fontWeight: 900 }}>{proyectada} <span style={{ fontSize: '0.8rem', color: 'var(--muted-foreground)' }}>kg</span></div>
+                </div>
+                <div style={{ height: '1px', background: 'var(--border)' }}></div>
+                <div>
+                  <div style={{ fontSize: '0.65rem', fontWeight: 800, color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>Días de Lote</div>
+                  <div style={{ fontSize: '1.25rem', fontWeight: 900 }}>{diasLote}</div>
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', borderTop: '1px solid var(--border)', paddingTop: '1rem', marginTop: 'auto' }}>
+              <div onClick={stopProp}>
+                {pond.status === 'con_peces' ? (
+                  <Link href={`/liquidacion?estanque=${pond.id}`}>
+                    <ActionButton icon={BadgeDollarSign} label="Liquidar" color="#8b5cf6" />
+                  </Link>
+                ) : (
+                  <div onClick={() => toast.error(`"${pond.name}" no tiene peces activos. Realiza una siembra antes de liquidar.`, { duration: 3500 })}>
+                    <ActionButton icon={BadgeDollarSign} label="Liquidar" color="#94a3b8" />
+                  </div>
+                )}
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      </motion.div>
+    </div>
+  );
+};
+
 export default function EstanquesPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [ponds, setPonds] = useState<any[]>([]);
@@ -399,49 +540,12 @@ export default function EstanquesPage() {
 
       <div className="responsive-grid-3">
         {ponds.map((pond) => (
-          <motion.div key={pond.id} whileHover={{ y: -4 }} className="card-premium" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', position: 'relative' }}>
-            <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '4px', background: pond.color }} />
-
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3 style={{ fontSize: '1.25rem', fontWeight: 800 }}>{pond.name}</h3>
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
-                {pond.status === 'con_peces' && <DeleteTooltip label="Borrar Siembra" onClick={() => handleDeleteSiembra(pond)} />}
-                <EditTooltip label="Editar" onClick={() => handleEditClick(pond)} />
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.7rem', fontWeight: 900, color: pond.color, background: `${pond.color}10`, padding: '4px 10px', borderRadius: '20px', alignSelf: 'flex-start' }}>
-              <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: pond.color }}></span>
-              {pond.statusLabel.toUpperCase()}
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', margin: '0.5rem 0' }}>
-              <div>
-                <div style={{ fontSize: '0.65rem', fontWeight: 800, color: 'var(--muted-foreground)' }}>VOLUMEN</div>
-                <div style={{ fontWeight: 800, fontSize: '1.1rem' }}>{pond.volume} <span style={{ fontSize: '0.7rem' }}>m³</span></div>
-              </div>
-              <div>
-                <div style={{ fontSize: '0.65rem', fontWeight: 800, color: 'var(--muted-foreground)' }}>BIOMASA</div>
-                <div style={{ fontWeight: 800, fontSize: '1.1rem' }}>{pond.current_biomass_kg} <span style={{ fontSize: '0.7rem' }}>kg</span></div>
-              </div>
-            </div>
-
-            <div style={{ background: 'var(--secondary)', borderRadius: '12px', padding: '1rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                <span style={{ fontSize: '0.65rem', fontWeight: 800, color: 'var(--muted-foreground)' }}>ESPECIE / CANTIDAD</span>
-                {pond.is_polyculture && <span style={{ fontSize: '0.6rem', background: 'var(--primary)', color: 'white', padding: '2px 6px', borderRadius: '4px' }}>POLI</span>}
-              </div>
-              <div style={{ fontWeight: 700, fontSize: '0.9rem' }}>{pond.especie}</div>
-              <div style={{ fontSize: '1.25rem', fontWeight: 900, color: 'var(--primary)', marginTop: '0.25rem' }}>{pond.current_count.toLocaleString()} <span style={{ fontSize: '0.8rem', color: 'var(--muted-foreground)' }}>uds</span></div>
-            </div>
-
-            <div style={{ display: 'flex', gap: '0.5rem', borderTop: '1px solid var(--border)', paddingTop: '1rem', marginTop: 'auto' }}>
-              <Link href={`/siembra?estanque=${pond.id}`}><ActionButton icon={Fish} label="Siembra" color="#10b981" /></Link>
-              <Link href={`/tratamiento?estanque=${pond.id}`}><ActionButton icon={FlaskConical} label="Tratamiento" color="#f59e0b" /></Link>
-              <Link href={`/mantenimiento?estanque=${pond.id}`}><ActionButton icon={Settings} label="Mantenimiento" color="#3b82f6" /></Link>
-              <Link href={`/aireacion?estanque=${pond.id}`}><ActionButton icon={Wind} label="Aireación" color="#06b6d4" /></Link>
-            </div>
-          </motion.div>
+          <PondCard 
+            key={pond.id} 
+            pond={pond} 
+            handleDeleteSiembra={handleDeleteSiembra} 
+            handleEditClick={handleEditClick} 
+          />
         ))}
       </div>
 
