@@ -53,9 +53,10 @@ export default function AppLayout({ children }: AppLayoutProps) {
 
   useEffect(() => {
     if (!session?.user) return;
+    const user = session.user;
 
     async function checkRole() {
-      const userId = session.user.id;
+      const userId = user.id;
       const [profileRes, unitRes] = await Promise.all([
         supabase.from('profiles').select('is_superadmin, role').eq('id', userId).single(),
         supabase.from('user_units').select('role').eq('user_id', userId).limit(1).single()
