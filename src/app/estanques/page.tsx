@@ -222,41 +222,79 @@ const AnimatedWaves = () => (
 
 const PondCard = ({ pond, handleDeleteSiembra, handleEditClick }: any) => {
   const [isFlipped, setIsFlipped] = useState(false);
+  const [kpis, setKpis] = useState<{ diasLote: string; consumo: string; fca: string; mortalidad: string } | null>(null);
+  const [loadingKpis, setLoadingKpis] = useState(false);
 
   const density = pond.status === 'con_peces' && pond.volume > 0
     ? (pond.current_count / pond.volume).toFixed(2)
     : null;
 
-  const proyectada = pond.status === 'con_peces' ? (pond.current_biomass_kg * 1.2).toFixed(2) : '0.00';
-  const diasLote = pond.status === 'con_peces' ? 'Activo' : 'N/A';
-
   const stopProp = (e: React.MouseEvent) => e.stopPropagation();
 
+  const handleFlip = async () => {
+    const next = !isFlipped;
+    setIsFlipped(next);
+    if (next && !kpis && pond.status === 'con_peces') {
+      setLoadingKpis(true);
+      try {
+        const { data: siembra } = await supabase
+          .from('siembras')
+          .select('id, fecha_siembra')
+          .eq('estanque_id', pond.id)
+          .order('fecha_siembra', { ascending: false })
+          .limit(1)
+          .single();
+
+        let diasLote = '0 días';
+        let consumoTotal = 0;
+        let mortalidadTotal = 0;
+
+        if (siembra?.fecha_siembra) {
+          const diff = Math.floor((Date.now() - new Date(siembra.fecha_siembra).getTime()) / 86400000);
+          diasLote = `${diff} días`;
+          const [alimentRes, mortRes] = await Promise.all([
+            supabase.from('alimentacion_diaria').select('quantity_kg').eq('estanque_id', pond.id),
+            supabase.from('mortalidad').select('quantity').eq('estanque_id', pond.id)
+          ]);
+          consumoTotal = (alimentRes.data || []).reduce((s: number, r: any) => s + parseFloat(r.quantity_kg || 0), 0);
+          mortalidadTotal = (mortRes.data || []).reduce((s: number, r: any) => s + parseInt(r.quantity || 0), 0);
+        }
+
+        const biomasa = pond.current_biomass_kg || 1;
+        const fca = consumoTotal > 0 ? (consumoTotal / biomasa).toFixed(2) : '0.00';
+        const totalPeces = pond.current_count + mortalidadTotal;
+        const mortPct = totalPeces > 0 ? ((mortalidadTotal / totalPeces) * 100).toFixed(2) : '0.00';
+
+        setKpis({
+          diasLote,
+          consumo: consumoTotal.toLocaleString('es-CO', { maximumFractionDigits: 2 }) + ' kg',
+          fca,
+          mortalidad: mortPct + '%'
+        });
+      } catch {
+        setKpis({ diasLote: 'Error', consumo: 'Error', fca: 'Error', mortalidad: 'Error' });
+      } finally {
+        setLoadingKpis(false);
+      }
+    }
+  };
+
+  const kpiItems = [
+    { label: 'DÍAS DE LOTE', value: kpis?.diasLote ?? '—', color: '#3b82f6' },
+    { label: 'CONSUMO TOTAL', value: kpis?.consumo ?? '—', color: '#8b5cf6' },
+    { label: 'FCA', value: kpis?.fca ?? '—', color: '#f59e0b' },
+    { label: 'MORTALIDAD', value: kpis?.mortalidad ?? '—', color: '#ef4444' },
+  ];
+
   return (
-    <div 
-      style={{ perspective: '1000px', cursor: 'pointer', height: '100%', display: 'flex', flexDirection: 'column' }}
-      onClick={() => setIsFlipped(!isFlipped)}
-    >
+    <div style={{ perspective: '1000px', cursor: 'pointer', height: '100%', display: 'flex', flexDirection: 'column' }} onClick={handleFlip}>
       <motion.div
         animate={{ rotateY: isFlipped ? 180 : 0 }}
         transition={{ duration: 0.6, type: 'spring', stiffness: 260, damping: 20 }}
-        style={{ 
-          position: 'relative', 
-          transformStyle: 'preserve-3d',
-          flex: 1,
-          display: 'flex',
-          flexDirection: 'column'
-        }}
+        style={{ position: 'relative', transformStyle: 'preserve-3d', flex: 1, display: 'flex', flexDirection: 'column' }}
       >
-        {/* Front */}
-        <div style={{
-          backfaceVisibility: 'hidden',
-          WebkitBackfaceVisibility: 'hidden',
-          display: 'flex',
-          flexDirection: 'column',
-          height: '100%',
-          ... (isFlipped ? { position: 'absolute', top: 0, left: 0, width: '100%' } : { position: 'relative' })
-        }}>
+        {/* FRENTE */}
+        <div style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden', display: 'flex', flexDirection: 'column', height: '100%', ...(isFlipped ? { position: 'absolute', top: 0, left: 0, width: '100%' } : { position: 'relative' }) }}>
           <motion.div whileHover={{ y: -4 }} className="card-premium" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', border: `2px solid ${pond.color}`, borderRadius: '16px', height: '100%' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <h3 style={{ fontSize: '1.25rem', fontWeight: 800 }}>{pond.name}</h3>
@@ -265,12 +303,10 @@ const PondCard = ({ pond, handleDeleteSiembra, handleEditClick }: any) => {
                 <div onClick={stopProp}><EditTooltip label="Editar" onClick={() => handleEditClick(pond)} /></div>
               </div>
             </div>
-
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.7rem', fontWeight: 900, color: pond.color, background: `${pond.color}18`, padding: '4px 10px', borderRadius: '20px', alignSelf: 'flex-start' }}>
               <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: pond.color }}></span>
               {pond.statusLabel.toUpperCase()}
             </div>
-
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', margin: '0.5rem 0' }}>
               <div>
                 <div style={{ fontSize: '0.65rem', fontWeight: 800, color: 'var(--muted-foreground)' }}>VOLUMEN</div>
@@ -281,7 +317,6 @@ const PondCard = ({ pond, handleDeleteSiembra, handleEditClick }: any) => {
                 <div style={{ fontWeight: 800, fontSize: '1.1rem' }}>{pond.current_biomass_kg} <span style={{ fontSize: '0.7rem' }}>kg</span></div>
               </div>
             </div>
-
             <div style={{ background: 'var(--secondary)', borderRadius: '12px', padding: '1rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
                 <span style={{ fontSize: '0.65rem', fontWeight: 800, color: 'var(--muted-foreground)' }}>ESPECIE / CANTIDAD</span>
@@ -291,8 +326,13 @@ const PondCard = ({ pond, handleDeleteSiembra, handleEditClick }: any) => {
               <div style={{ fontSize: '1.25rem', fontWeight: 900, color: 'var(--primary)', marginTop: '0.25rem' }}>
                 {pond.current_count.toLocaleString()} <span style={{ fontSize: '0.8rem', color: 'var(--muted-foreground)' }}>uds</span>
               </div>
+              {density !== null && (
+                <div style={{ marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <span style={{ fontSize: '0.65rem', fontWeight: 800, color: 'var(--muted-foreground)' }}>DENSIDAD:</span>
+                  <span style={{ fontSize: '0.85rem', fontWeight: 900, color: '#8b5cf6' }}>{density} <span style={{ fontSize: '0.65rem', color: 'var(--muted-foreground)' }}>uds/m³</span></span>
+                </div>
+              )}
             </div>
-
             <div style={{ display: 'flex', gap: '0.5rem', borderTop: '1px solid var(--border)', paddingTop: '1rem', marginTop: 'auto', flexWrap: 'wrap' }}>
               <div onClick={stopProp}><Link href={`/siembra?estanque=${pond.id}`}><ActionButton icon={Fish} label="Siembra" color="#10b981" /></Link></div>
               <div onClick={stopProp}><Link href={`/tratamiento?estanque=${pond.id}`}><ActionButton icon={FlaskConical} label="Tratamiento" color="#f59e0b" /></Link></div>
@@ -302,52 +342,42 @@ const PondCard = ({ pond, handleDeleteSiembra, handleEditClick }: any) => {
           </motion.div>
         </div>
 
-        {/* Back */}
-        <div style={{
-          backfaceVisibility: 'hidden',
-          WebkitBackfaceVisibility: 'hidden',
-          transform: 'rotateY(180deg)',
-          display: 'flex',
-          flexDirection: 'column',
-          height: '100%',
-          ... (!isFlipped ? { position: 'absolute', top: 0, left: 0, width: '100%' } : { position: 'relative' })
-        }}>
+        {/* REVERSO */}
+        <div style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden', transform: 'rotateY(180deg)', display: 'flex', flexDirection: 'column', height: '100%', ...(!isFlipped ? { position: 'absolute', top: 0, left: 0, width: '100%' } : { position: 'relative' }) }}>
           <motion.div whileHover={{ y: -4 }} className="card-premium" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', border: `2px solid ${pond.color}`, borderRadius: '16px', height: '100%' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--primary)' }}>Info Productiva</h3>
+              <h3 style={{ fontSize: '1.1rem', fontWeight: 900, color: 'var(--primary)' }}>{pond.name} · KPIs</h3>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.7rem', fontWeight: 900, color: pond.color, background: `${pond.color}18`, padding: '4px 10px', borderRadius: '20px' }}>
                 <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: pond.color }}></span>
                 {pond.statusLabel.toUpperCase()}
               </div>
             </div>
 
-            <div style={{ background: 'var(--secondary)', borderRadius: '12px', padding: '1rem', marginTop: '1rem' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                <div>
-                  <div style={{ fontSize: '0.65rem', fontWeight: 800, color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>Densidad de Siembra</div>
-                  <div style={{ fontSize: '1.25rem', fontWeight: 900 }}>{density || '0.00'} <span style={{ fontSize: '0.8rem', color: 'var(--muted-foreground)' }}>uds/m³</span></div>
-                </div>
-                <div style={{ height: '1px', background: 'var(--border)' }}></div>
-                <div>
-                  <div style={{ fontSize: '0.65rem', fontWeight: 800, color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>Biomasa Proyectada</div>
-                  <div style={{ fontSize: '1.25rem', fontWeight: 900 }}>{proyectada} <span style={{ fontSize: '0.8rem', color: 'var(--muted-foreground)' }}>kg</span></div>
-                </div>
-                <div style={{ height: '1px', background: 'var(--border)' }}></div>
-                <div>
-                  <div style={{ fontSize: '0.65rem', fontWeight: 800, color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>Días de Lote</div>
-                  <div style={{ fontSize: '1.25rem', fontWeight: 900 }}>{diasLote}</div>
-                </div>
+            {loadingKpis ? (
+              <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <div style={{ width: '32px', height: '32px', border: `3px solid ${pond.color}`, borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
               </div>
-            </div>
+            ) : pond.status !== 'con_peces' ? (
+              <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--muted-foreground)', fontWeight: 700, fontSize: '0.85rem', textAlign: 'center' }}>
+                Sin producción activa.<br />Realiza una siembra para ver KPIs.
+              </div>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', flex: 1 }}>
+                {kpiItems.map((item) => (
+                  <div key={item.label} className="glass" style={{ padding: '1rem', borderRadius: '12px', border: `1px solid ${item.color}22`, background: `${item.color}08` }}>
+                    <div style={{ fontSize: '0.6rem', fontWeight: 900, color: 'var(--muted-foreground)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.4rem' }}>{item.label}</div>
+                    <div style={{ fontSize: '1.1rem', fontWeight: 900, color: item.color, lineHeight: 1.1 }}>{item.value}</div>
+                  </div>
+                ))}
+              </div>
+            )}
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', borderTop: '1px solid var(--border)', paddingTop: '1rem', marginTop: 'auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', borderTop: '1px solid var(--border)', paddingTop: '1rem' }}>
               <div onClick={stopProp}>
                 {pond.status === 'con_peces' ? (
-                  <Link href={`/liquidacion?estanque=${pond.id}`}>
-                    <ActionButton icon={BadgeDollarSign} label="Liquidar" color="#8b5cf6" />
-                  </Link>
+                  <Link href={`/liquidacion?estanque=${pond.id}`}><ActionButton icon={BadgeDollarSign} label="Liquidar" color="#8b5cf6" /></Link>
                 ) : (
-                  <div onClick={() => toast.error(`"${pond.name}" no tiene peces activos. Realiza una siembra antes de liquidar.`, { duration: 3500 })}>
+                  <div onClick={() => toast.error(`"${pond.name}" no tiene peces activos.`, { duration: 3500 })}>
                     <ActionButton icon={BadgeDollarSign} label="Liquidar" color="#94a3b8" />
                   </div>
                 )}
