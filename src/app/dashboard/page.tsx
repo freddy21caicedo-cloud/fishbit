@@ -184,31 +184,29 @@ export default function Dashboard() {
         unit: 'kg'
       }));
 
-      // --- CONSUMPTION: sum alimentacion_diaria per pond (current month) ---
+      // --- CONSUMPTION: sum alimentacion_diaria per product reference (current month) ---
       const startOfMonth = new Date();
       startOfMonth.setDate(1);
       startOfMonth.setHours(0, 0, 0, 0);
 
       const { data: alimentData } = await supabase
         .from('alimentacion_diaria')
-        .select('estanque_id, quantity_kg, estanques(name)')
+        .select('quantity_kg, inventory_id, inventory(name)')
         .eq('unit_id', unitId)
         .gte('date', startOfMonth.toISOString().split('T')[0]);
 
-      // Group by pond
-      const consumptionByPond: Record<string, { name: string; total: number }> = {};
-      // Initialize all active ponds with 0
-      activePonds.forEach(p => {
-        consumptionByPond[p.id] = { name: p.name, total: 0 };
-      });
+      // Group by product reference
+      const consumptionByProduct: Record<string, { name: string; total: number }> = {};
       (alimentData || []).forEach((r: any) => {
-        if (!consumptionByPond[r.estanque_id]) {
-          consumptionByPond[r.estanque_id] = { name: r.estanques?.name || r.estanque_id, total: 0 };
+        const key = r.inventory_id || 'sin_ref';
+        const productName = (r.inventory as any)?.name || 'Sin referencia';
+        if (!consumptionByProduct[key]) {
+          consumptionByProduct[key] = { name: productName, total: 0 };
         }
-        consumptionByPond[r.estanque_id].total += parseFloat(r.quantity_kg) || 0;
+        consumptionByProduct[key].total += parseFloat(r.quantity_kg) || 0;
       });
-      const consumptionTotal = Object.values(consumptionByPond).reduce((s, v) => s + v.total, 0);
-      const consumptionDetails = Object.values(consumptionByPond).map(v => ({
+      const consumptionTotal = Object.values(consumptionByProduct).reduce((s, v) => s + v.total, 0);
+      const consumptionDetails = Object.values(consumptionByProduct).map(v => ({
         label: v.name,
         value: parseFloat(v.total.toFixed(1)),
         unit: 'kg'
