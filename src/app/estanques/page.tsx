@@ -254,7 +254,7 @@ const PondCard = ({ pond, handleDeleteSiembra, handleEditClick }: any) => {
           diasLote = `${diff} días`;
           const [alimentRes, mortRes] = await Promise.all([
             supabase.from('alimentacion_diaria').select('quantity_kg').eq('estanque_id', pond.id),
-            supabase.from('mortalidad').select('quantity').eq('estanque_id', pond.id)
+            supabase.from('mortality').select('quantity').eq('estanque_id', pond.id)
           ]);
           consumoTotal = (alimentRes.data || []).reduce((s: number, r: any) => s + parseFloat(r.quantity_kg || 0), 0);
           mortalidadTotal = (mortRes.data || []).reduce((s: number, r: any) => s + parseInt(r.quantity || 0), 0);
