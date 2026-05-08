@@ -13,12 +13,12 @@ export function ExportarReporte({ unitId }: { unitId: string }) {
     setLoading(true);
     try {
       const [pondsRes, ventasRes, nominaRes, jornalesRes, alimentRes, invItemsRes, invRes] = await Promise.all([
-        supabase.from('estanques').select('id, name, current_biomass_kg').eq('unit_id', unitId).eq('status', 'con_peces'),
+        supabase.from('estanques').select('id, name, current_biomass_kg, current_count').eq('unit_id', unitId).eq('status', 'con_peces'),
         supabase.from('ventas').select('*, estanques(name)').eq('unit_id', unitId),
         supabase.from('nomina').select('monto').eq('unit_id', unitId),
         supabase.from('jornales').select('total, estanque_id').eq('unit_id', unitId),
         supabase.from('alimentacion_diaria').select('quantity_kg, estanque_id').eq('unit_id', unitId),
-        supabase.from('invoice_items').select('product_name, unit_price, flete_per_unit, iva_percent, quantity, kilos').eq('unit_id', unitId),
+        supabase.from('invoice_items').select('product_name, unit_price, flete_per_unit, iva_percent, quantity, kilos, invoices!inner(category)').eq('unit_id', unitId),
         supabase.from('inventory').select('name, current_stock, costo_por_bulto, category').eq('unit_id', unitId).eq('category', 'alimento'),
       ]);
 
@@ -28,33 +28,58 @@ export function ExportarReporte({ unitId }: { unitId: string }) {
       const jornalesGenerales = (jornalesRes.data || []).filter((j: any) => !j.estanque_id).reduce((s: number, j: any) => s + parseFloat(j.total || 0), 0);
 
       // Costo promedio por kg de alimento desde facturas
+      let costoAlevinosGlobal = 0;
+      let costoFarmaciaGlobal = 0;
+      let costoInsumosGlobal = 0;
+      let costoAireadoresGlobal = 0;
+
       let costoKgTotal = 0; let costoKgCount = 0;
       (invItemsRes.data || []).forEach((r: any) => {
-        const kilos = parseFloat(r.kilos) || 0;
-        if (kilos === 0) return;
         const qty = parseFloat(r.quantity) || 0;
         const unitPrice = parseFloat(r.unit_price) || 0;
         const flete = parseFloat(r.flete_per_unit) || 0;
         const iva = parseFloat(r.iva_percent) || 0;
-        costoKgTotal += (qty * (unitPrice + flete) * (1 + iva / 100)) / kilos;
-        costoKgCount++;
+        const cat = r.invoices?.category;
+
+        if (cat === 'alimento') {
+          const kilos = parseFloat(r.kilos) || 0;
+          if (kilos === 0) return;
+          costoKgTotal += (qty * (unitPrice + flete) * (1 + iva / 100)) / kilos;
+          costoKgCount++;
+        } else {
+          const base = qty * unitPrice;
+          const fleteTotal = qty * flete;
+          const ivaTotal = (base + fleteTotal) * (iva / 100);
+          const totalItem = base + fleteTotal + ivaTotal;
+          if (cat === 'alevinos') costoAlevinosGlobal += totalItem;
+          else if (cat === 'farmacia') costoFarmaciaGlobal += totalItem;
+          else if (cat === 'insumos') costoInsumosGlobal += totalItem;
+          else if (cat === 'aireadores') costoAireadoresGlobal += totalItem;
+        }
       });
       const costoKgPromedio = costoKgCount > 0 ? costoKgTotal / costoKgCount : 0;
 
       const kgByPond: Record<string, number> = {};
       (alimentRes.data || []).forEach((r: any) => { kgByPond[r.estanque_id] = (kgByPond[r.estanque_id] || 0) + (parseFloat(r.quantity_kg) || 0); });
 
+      const totalCountGlobal = ponds.reduce((s: number, p: any) => s + parseFloat(p.current_count || 0), 0);
+
       // SHEET 1: Rentabilidad por estanque
       const hoja1 = ponds.map((p: any) => {
         const biomasa = parseFloat(p.current_biomass_kg || 0);
         const frac = totalBiomasa > 0 ? biomasa / totalBiomasa : 0;
-        const costoAlim = alimentByPond[p.id] || 0;
-        const costoProrr = (totalNomina + jornalesGenerales) * frac;
+        const currentCount = parseFloat(p.current_count || 0);
+        const fracCount = totalCountGlobal > 0 ? currentCount / totalCountGlobal : 0;
+
+        const costoAlim = (kgByPond[p.id] || 0) * costoKgPromedio;
+        const costoProrr = (totalNomina + jornalesGenerales + costoFarmaciaGlobal + costoInsumosGlobal + costoAireadoresGlobal) * frac;
+        const costoAlevProrr = costoAlevinosGlobal * fracCount;
         const jornDir = (jornalesRes.data || []).filter((j: any) => j.estanque_id === p.id).reduce((s: number, j: any) => s + parseFloat(j.total || 0), 0);
-        const totalCosto = costoAlim + costoProrr + jornDir;
+        
+        const totalCosto = costoAlim + costoProrr + costoAlevProrr + jornDir;
         const ingresos = (ventasRes.data || []).filter((v: any) => v.estanque_id === p.id).reduce((s: number, v: any) => s + parseFloat(v.total || 0), 0);
         const margen = ingresos - totalCosto;
-        return { Estanque: p.name, 'Biomasa (kg)': biomasa.toFixed(1), 'Costo Alimento': cop(costoAlim), 'Costo Nómina/Jornales': cop(costoProrr + jornDir), 'Costo Total': cop(totalCosto), 'Ingresos Ventas': cop(ingresos), 'Margen': cop(margen), '% Margen': ingresos > 0 ? ((margen / ingresos) * 100).toFixed(1) + '%' : '—' };
+        return { Estanque: p.name, 'Biomasa (kg)': biomasa.toFixed(1), 'Costo Alimento': cop(costoAlim), 'Costos Operativos/Insumos/Semilla': cop(costoProrr + costoAlevProrr + jornDir), 'Costo Total': cop(totalCosto), 'Ingresos Ventas': cop(ingresos), 'Margen': cop(margen), '% Margen': ingresos > 0 ? ((margen / ingresos) * 100).toFixed(1) + '%' : '—' };
       });
 
       // SHEET 2: Eficiencia FCA
@@ -73,10 +98,15 @@ export function ExportarReporte({ unitId }: { unitId: string }) {
       const hoja3 = ponds.map((p: any) => {
         const biomasa = parseFloat(p.current_biomass_kg || 0);
         const frac = totalBiomasa > 0 ? biomasa / totalBiomasa : 0;
-        const costoAlim = alimentByPond[p.id] || 0;
-        const costoProrr = (totalNomina + jornalesGenerales) * frac;
+        const currentCount = parseFloat(p.current_count || 0);
+        const fracCount = totalCountGlobal > 0 ? currentCount / totalCountGlobal : 0;
+
+        const costoAlim = (kgByPond[p.id] || 0) * costoKgPromedio;
+        const costoProrr = (totalNomina + jornalesGenerales + costoFarmaciaGlobal + costoInsumosGlobal + costoAireadoresGlobal) * frac;
+        const costoAlevProrr = costoAlevinosGlobal * fracCount;
         const jornDir = (jornalesRes.data || []).filter((j: any) => j.estanque_id === p.id).reduce((s: number, j: any) => s + parseFloat(j.total || 0), 0);
-        const totalCosto = costoAlim + costoProrr + jornDir;
+        
+        const totalCosto = costoAlim + costoProrr + costoAlevProrr + jornDir;
         const precioMin = biomasa > 0 ? totalCosto / biomasa : 0;
         return { Estanque: p.name, 'Biomasa Actual (kg)': biomasa.toFixed(1), 'Costo Total Acumulado': cop(totalCosto), 'Precio Mínimo/kg': cop(precioMin), 'Nota': 'Precio mínimo para cubrir costos actuales' };
       });

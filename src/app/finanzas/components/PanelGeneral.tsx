@@ -17,7 +17,7 @@ export function PanelGeneral({ unitId }: { unitId: string }) {
         supabase.from('nomina').select('monto').eq('unit_id', unitId),
         supabase.from('jornales').select('total').eq('unit_id', unitId),
         supabase.from('alimentacion_diaria').select('quantity_kg').eq('unit_id', unitId),
-        supabase.from('invoice_items').select('product_name, unit_price, flete_per_unit, iva_percent, quantity, kilos').eq('unit_id', unitId),
+        supabase.from('invoice_items').select('product_name, unit_price, flete_per_unit, iva_percent, quantity, kilos, invoices!inner(category)').eq('unit_id', unitId),
       ]);
 
       const ingresos = (ventasRes.data || []).reduce((s: number, v: any) => s + (parseFloat(v.total) || 0), 0);
@@ -28,28 +28,50 @@ export function PanelGeneral({ unitId }: { unitId: string }) {
       let costoAlimentoBase = 0;
       let costoAlimentoFlete = 0;
       let costoAlimentoIva = 0;
+      let costoAlevinos = 0;
+      let costoFarmacia = 0;
+      let costoInsumos = 0;
+      let costoAireadores = 0;
+
       (invoiceItemsRes.data || []).forEach((r: any) => {
         const qty = parseFloat(r.quantity) || 0;
         const unitPrice = parseFloat(r.unit_price) || 0;
         const flete = parseFloat(r.flete_per_unit) || 0;
         const iva = parseFloat(r.iva_percent) || 0;
+        const cat = r.invoices?.category;
         
         const base = qty * unitPrice;
         const fleteTotal = qty * flete;
         const ivaTotal = (base + fleteTotal) * (iva / 100);
+        const totalItem = base + fleteTotal + ivaTotal;
 
-        costoAlimentoBase += base;
-        costoAlimentoFlete += fleteTotal;
-        costoAlimentoIva += ivaTotal;
+        if (cat === 'alimento') {
+          costoAlimentoBase += base;
+          costoAlimentoFlete += fleteTotal;
+          costoAlimentoIva += ivaTotal;
+        } else if (cat === 'alevinos') {
+          costoAlevinos += totalItem;
+        } else if (cat === 'farmacia') {
+          costoFarmacia += totalItem;
+        } else if (cat === 'insumos') {
+          costoInsumos += totalItem;
+        } else if (cat === 'aireadores') {
+          costoAireadores += totalItem;
+        }
       });
       const costoAlimento = costoAlimentoBase + costoAlimentoFlete + costoAlimentoIva;
 
       const totalBiomasa = (pondsRes.data || []).reduce((s: number, p: any) => s + (parseFloat(p.current_biomass_kg) || 0), 0);
-      const totalCostos = costoAlimento + totalNomina + totalJornales;
+      const totalCostos = costoAlimento + totalNomina + totalJornales + costoAlevinos + costoFarmacia + costoInsumos + costoAireadores;
       const margen = ingresos - totalCostos;
       const flujoCaja = ingresos - porCobrar - totalCostos;
 
-      setData({ ingresos, totalCostos, margen, flujoCaja, porCobrar, totalBiomasa, costoAlimento, costoAlimentoBase, costoAlimentoFlete, costoAlimentoIva, totalNomina, totalJornales });
+      setData({ 
+        ingresos, totalCostos, margen, flujoCaja, porCobrar, totalBiomasa, 
+        costoAlimento, costoAlimentoBase, costoAlimentoFlete, costoAlimentoIva, 
+        costoAlevinos, costoFarmacia, costoInsumos, costoAireadores,
+        totalNomina, totalJornales 
+      });
     })();
   }, [unitId]);
 
@@ -81,12 +103,16 @@ export function PanelGeneral({ unitId }: { unitId: string }) {
         <h3 style={{ fontWeight: 800, fontSize: '0.9rem', marginBottom: '1rem', textTransform: 'uppercase', color: 'var(--muted-foreground)' }}>Desglose de Costos</h3>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
           {[
+            { label: 'Alevinos (Semilla)', value: data.costoAlevinos, pct: data.totalCostos > 0 ? (data.costoAlevinos / data.totalCostos) * 100 : 0, color: '#f43f5e' },
             { label: 'Alimento (Base)', value: data.costoAlimentoBase, pct: data.totalCostos > 0 ? (data.costoAlimentoBase / data.totalCostos) * 100 : 0, color: '#8b5cf6' },
             { label: 'Alimento (Flete)', value: data.costoAlimentoFlete, pct: data.totalCostos > 0 ? (data.costoAlimentoFlete / data.totalCostos) * 100 : 0, color: '#a78bfa' },
             { label: 'Alimento (IVA)', value: data.costoAlimentoIva, pct: data.totalCostos > 0 ? (data.costoAlimentoIva / data.totalCostos) * 100 : 0, color: '#c4b5fd' },
+            { label: 'Farmacia', value: data.costoFarmacia, pct: data.totalCostos > 0 ? (data.costoFarmacia / data.totalCostos) * 100 : 0, color: '#ec4899' },
+            { label: 'Insumos', value: data.costoInsumos, pct: data.totalCostos > 0 ? (data.costoInsumos / data.totalCostos) * 100 : 0, color: '#0ea5e9' },
+            { label: 'Aireadores', value: data.costoAireadores, pct: data.totalCostos > 0 ? (data.costoAireadores / data.totalCostos) * 100 : 0, color: '#14b8a6' },
             { label: 'Nómina', value: data.totalNomina, pct: data.totalCostos > 0 ? (data.totalNomina / data.totalCostos) * 100 : 0, color: '#3b82f6' },
             { label: 'Jornales', value: data.totalJornales, pct: data.totalCostos > 0 ? (data.totalJornales / data.totalCostos) * 100 : 0, color: '#f59e0b' },
-          ].map((item) => (
+          ].filter(i => i.value > 0).sort((a, b) => b.value - a.value).map((item) => (
             <div key={item.label}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
                 <span style={{ fontSize: '0.8rem', fontWeight: 700 }}>{item.label}</span>

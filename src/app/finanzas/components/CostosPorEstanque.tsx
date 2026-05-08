@@ -18,7 +18,7 @@ export function CostosPorEstanque({ unitId }: { unitId: string }) {
         supabase.from('jornales').select('total, estanque_id').eq('unit_id', unitId),
         supabase.from('alimentacion_diaria').select('quantity_kg, estanque_id, inventory_id').eq('unit_id', unitId),
         supabase.from('pond_species').select('estanque_id, species_name, current_biomass_kg').eq('unit_id', unitId),
-        supabase.from('invoice_items').select('product_name, unit_price, flete_per_unit, iva_percent, quantity, kilos').eq('unit_id', unitId),
+        supabase.from('invoice_items').select('product_name, unit_price, flete_per_unit, iva_percent, quantity, kilos, invoices!inner(category)').eq('unit_id', unitId),
       ]);
 
       const ponds = pondsRes.data || [];
@@ -26,27 +26,44 @@ export function CostosPorEstanque({ unitId }: { unitId: string }) {
       const totalNomina = (nominaRes.data || []).reduce((s: number, n: any) => s + parseFloat(n.monto || 0), 0);
       const jornalesGenerales = (jornalesRes.data || []).filter((j: any) => !j.estanque_id).reduce((s: number, j: any) => s + parseFloat(j.total || 0), 0);
 
-      // Calcular costo promedio ponderado por kg de cada producto desde facturas
+      // Calcular costo promedio ponderado por kg de cada producto desde facturas (solo alimento)
+      let costoAlevinosGlobal = 0;
+      let costoFarmaciaGlobal = 0;
+      let costoInsumosGlobal = 0;
+      let costoAireadoresGlobal = 0;
+
       const costoPorProductoKg: Record<string, { base: number, flete: number, iva: number }> = {};
       (invItemsRes.data || []).forEach((r: any) => {
-        const productName = r.product_name;
         const qty = parseFloat(r.quantity) || 0;
-        const kilos = parseFloat(r.kilos) || 0;
-        if (kilos === 0) return;
         const unitPrice = parseFloat(r.unit_price) || 0;
         const flete = parseFloat(r.flete_per_unit) || 0;
         const iva = parseFloat(r.iva_percent) || 0;
-        
-        const baseItem = (qty * unitPrice) / kilos;
-        const fleteItem = (qty * flete) / kilos;
-        const ivaItem = (qty * (unitPrice + flete) * (iva / 100)) / kilos;
+        const cat = r.invoices?.category;
 
-        if (!costoPorProductoKg[productName]) {
-          costoPorProductoKg[productName] = { base: baseItem, flete: fleteItem, iva: ivaItem };
+        if (cat === 'alimento') {
+          const kilos = parseFloat(r.kilos) || 0;
+          if (kilos === 0) return;
+          const productName = r.product_name;
+          const baseItem = (qty * unitPrice) / kilos;
+          const fleteItem = (qty * flete) / kilos;
+          const ivaItem = (qty * (unitPrice + flete) * (iva / 100)) / kilos;
+
+          if (!costoPorProductoKg[productName]) {
+            costoPorProductoKg[productName] = { base: baseItem, flete: fleteItem, iva: ivaItem };
+          } else {
+            costoPorProductoKg[productName].base = (costoPorProductoKg[productName].base + baseItem) / 2;
+            costoPorProductoKg[productName].flete = (costoPorProductoKg[productName].flete + fleteItem) / 2;
+            costoPorProductoKg[productName].iva = (costoPorProductoKg[productName].iva + ivaItem) / 2;
+          }
         } else {
-          costoPorProductoKg[productName].base = (costoPorProductoKg[productName].base + baseItem) / 2;
-          costoPorProductoKg[productName].flete = (costoPorProductoKg[productName].flete + fleteItem) / 2;
-          costoPorProductoKg[productName].iva = (costoPorProductoKg[productName].iva + ivaItem) / 2;
+          const base = qty * unitPrice;
+          const fleteTotal = qty * flete;
+          const ivaTotal = (base + fleteTotal) * (iva / 100);
+          const totalItem = base + fleteTotal + ivaTotal;
+          if (cat === 'alevinos') costoAlevinosGlobal += totalItem;
+          else if (cat === 'farmacia') costoFarmaciaGlobal += totalItem;
+          else if (cat === 'insumos') costoInsumosGlobal += totalItem;
+          else if (cat === 'aireadores') costoAireadoresGlobal += totalItem;
         }
       });
 
@@ -61,9 +78,14 @@ export function CostosPorEstanque({ unitId }: { unitId: string }) {
       const kgByPond: Record<string, number> = {};
       (alimentRes.data || []).forEach((r: any) => { kgByPond[r.estanque_id] = (kgByPond[r.estanque_id] || 0) + (parseFloat(r.quantity_kg) || 0); });
 
+      const totalCountGlobal = ponds.reduce((s: number, p: any) => s + parseFloat(p.current_count || 0), 0);
+
       const result = ponds.map((p: any) => {
         const biomasa = parseFloat(p.current_biomass_kg || 0);
         const fraccionBiomasa = totalBiomasa > 0 ? biomasa / totalBiomasa : 0;
+        
+        const currentCount = parseFloat(p.current_count || 0);
+        const fraccionCount = totalCountGlobal > 0 ? currentCount / totalCountGlobal : 0;
 
         const costoAlimentoBase = (kgByPond[p.id] || 0) * costoKgPromedioBase;
         const costoAlimentoFlete = (kgByPond[p.id] || 0) * costoKgPromedioFlete;
@@ -73,7 +95,13 @@ export function CostosPorEstanque({ unitId }: { unitId: string }) {
         const nominaProrr = totalNomina * fraccionBiomasa;
         const jornalesProrr = jornalesGenerales * fraccionBiomasa;
         const jornalesDirectos = (jornalesRes.data || []).filter((j: any) => j.estanque_id === p.id).reduce((s: number, j: any) => s + parseFloat(j.total || 0), 0);
-        const totalCosto = costoAlimento + nominaProrr + jornalesProrr + jornalesDirectos;
+        
+        const costoAlevinosProrr = costoAlevinosGlobal * fraccionCount;
+        const costoFarmaciaProrr = costoFarmaciaGlobal * fraccionBiomasa;
+        const costoInsumosProrr = costoInsumosGlobal * fraccionBiomasa;
+        const costoAireadoresProrr = costoAireadoresGlobal * fraccionBiomasa;
+
+        const totalCosto = costoAlimento + nominaProrr + jornalesProrr + jornalesDirectos + costoAlevinosProrr + costoFarmaciaProrr + costoInsumosProrr + costoAireadoresProrr;
         const costoPorKg = biomasa > 0 ? totalCosto / biomasa : 0;
 
         // Per-species breakdown for polycultures
@@ -89,7 +117,12 @@ export function CostosPorEstanque({ unitId }: { unitId: string }) {
           });
         }
 
-        return { ...p, biomasa, costoAlimento, costoAlimentoBase, costoAlimentoFlete, costoAlimentoIva, nominaProrr, jornalesProrr, jornalesDirectos, totalCosto, costoPorKg, especies };
+        return { 
+          ...p, biomasa, totalCosto, costoPorKg, especies,
+          costoAlimento, costoAlimentoBase, costoAlimentoFlete, costoAlimentoIva, 
+          nominaProrr, jornalesProrr, jornalesDirectos,
+          costoAlevinosProrr, costoFarmaciaProrr, costoInsumosProrr, costoAireadoresProrr
+        };
       });
 
       setCards(result);
@@ -113,13 +146,17 @@ export function CostosPorEstanque({ unitId }: { unitId: string }) {
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginBottom: '1rem' }}>
             {[
+              { label: 'Alevinos (prorr.)', value: p.costoAlevinosProrr, color: '#f43f5e' },
               { label: 'Alimento (Base)', value: p.costoAlimentoBase, color: '#8b5cf6' },
               { label: 'Alimento (Flete)', value: p.costoAlimentoFlete, color: '#a78bfa' },
               { label: 'Alimento (IVA)', value: p.costoAlimentoIva, color: '#c4b5fd' },
+              { label: 'Farmacia (prorr.)', value: p.costoFarmaciaProrr, color: '#ec4899' },
+              { label: 'Insumos (prorr.)', value: p.costoInsumosProrr, color: '#0ea5e9' },
+              { label: 'Aireadores (prorr.)', value: p.costoAireadoresProrr, color: '#14b8a6' },
               { label: 'Nómina (prorr.)', value: p.nominaProrr, color: '#3b82f6' },
               { label: 'Jornales generales', value: p.jornalesProrr, color: '#f59e0b' },
               { label: 'Jornales directos', value: p.jornalesDirectos, color: '#ef4444' },
-            ].map(item => (
+            ].filter(i => i.value > 0).map(item => (
               <div key={item.label} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem' }}>
                 <span style={{ color: 'var(--muted-foreground)', fontWeight: 600 }}>{item.label}</span>
                 <span style={{ fontWeight: 800, color: item.color }}>{cop(item.value)}</span>
