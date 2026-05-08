@@ -12,12 +12,13 @@ export function ExportarReporte({ unitId }: { unitId: string }) {
   const generate = async () => {
     setLoading(true);
     try {
-      const [pondsRes, ventasRes, nominaRes, jornalesRes, alimentRes, invRes] = await Promise.all([
+      const [pondsRes, ventasRes, nominaRes, jornalesRes, alimentRes, invItemsRes, invRes] = await Promise.all([
         supabase.from('estanques').select('id, name, current_biomass_kg').eq('unit_id', unitId).eq('status', 'con_peces'),
         supabase.from('ventas').select('*, estanques(name)').eq('unit_id', unitId),
         supabase.from('nomina').select('monto').eq('unit_id', unitId),
         supabase.from('jornales').select('total, estanque_id').eq('unit_id', unitId),
-        supabase.from('alimentacion_diaria').select('quantity_kg, inventory_id, estanque_id, inventory(costo_por_bulto, name)').eq('unit_id', unitId),
+        supabase.from('alimentacion_diaria').select('quantity_kg, estanque_id').eq('unit_id', unitId),
+        supabase.from('invoice_items').select('product_name, unit_price, flete_per_unit, iva_percent, quantity, kilos').eq('unit_id', unitId),
         supabase.from('inventory').select('name, current_stock, costo_por_bulto, category').eq('unit_id', unitId).eq('category', 'alimento'),
       ]);
 
@@ -26,14 +27,22 @@ export function ExportarReporte({ unitId }: { unitId: string }) {
       const totalNomina = (nominaRes.data || []).reduce((s: number, n: any) => s + parseFloat(n.monto || 0), 0);
       const jornalesGenerales = (jornalesRes.data || []).filter((j: any) => !j.estanque_id).reduce((s: number, j: any) => s + parseFloat(j.total || 0), 0);
 
-      const alimentByPond: Record<string, number> = {};
-      (alimentRes.data || []).forEach((r: any) => {
-        const inv = r.inventory as any;
-        const costoBulto = parseFloat(inv?.costo_por_bulto || 0);
-        if (costoBulto === 0) return;
-        const bagW = parseInt((inv?.name || '').match(/(\d+)\s*kg/i)?.[1] || '40');
-        alimentByPond[r.estanque_id] = (alimentByPond[r.estanque_id] || 0) + (parseFloat(r.quantity_kg) || 0) * (costoBulto / bagW);
+      // Costo promedio por kg de alimento desde facturas
+      let costoKgTotal = 0; let costoKgCount = 0;
+      (invItemsRes.data || []).forEach((r: any) => {
+        const kilos = parseFloat(r.kilos) || 0;
+        if (kilos === 0) return;
+        const qty = parseFloat(r.quantity) || 0;
+        const unitPrice = parseFloat(r.unit_price) || 0;
+        const flete = parseFloat(r.flete_per_unit) || 0;
+        const iva = parseFloat(r.iva_percent) || 0;
+        costoKgTotal += (qty * (unitPrice + flete) * (1 + iva / 100)) / kilos;
+        costoKgCount++;
       });
+      const costoKgPromedio = costoKgCount > 0 ? costoKgTotal / costoKgCount : 0;
+
+      const kgByPond: Record<string, number> = {};
+      (alimentRes.data || []).forEach((r: any) => { kgByPond[r.estanque_id] = (kgByPond[r.estanque_id] || 0) + (parseFloat(r.quantity_kg) || 0); });
 
       // SHEET 1: Rentabilidad por estanque
       const hoja1 = ponds.map((p: any) => {
@@ -55,7 +64,7 @@ export function ExportarReporte({ unitId }: { unitId: string }) {
         const consumoKg = alimentQtyByPond[p.id] || 0;
         const biomasa = parseFloat(p.current_biomass_kg || 0);
         const fca = biomasa > 0 ? (consumoKg / biomasa).toFixed(2) : '—';
-        const costoAlim = alimentByPond[p.id] || 0;
+        const costoAlim = (kgByPond[p.id] || 0) * costoKgPromedio;
         const costoPorKgProducido = biomasa > 0 ? costoAlim / biomasa : 0;
         return { Estanque: p.name, 'Consumo Total (kg)': consumoKg.toFixed(1), 'Biomasa Actual (kg)': biomasa.toFixed(1), 'FCA': fca, 'Costo Alimento/kg Prod.': cop(costoPorKgProducido) };
       });

@@ -11,13 +11,13 @@ export function PanelGeneral({ unitId }: { unitId: string }) {
   useEffect(() => {
     if (!unitId) return;
     (async () => {
-      const [pondsRes, ventasRes, nominaRes, jornalesRes, alimentRes, invRes] = await Promise.all([
+      const [pondsRes, ventasRes, nominaRes, jornalesRes, alimentRes, invoiceItemsRes] = await Promise.all([
         supabase.from('estanques').select('id, name, current_biomass_kg').eq('unit_id', unitId).eq('status', 'con_peces'),
         supabase.from('ventas').select('total, estado_pago').eq('unit_id', unitId),
         supabase.from('nomina').select('monto').eq('unit_id', unitId),
         supabase.from('jornales').select('total').eq('unit_id', unitId),
-        supabase.from('alimentacion_diaria').select('quantity_kg, inventory_id, inventory(costo_por_bulto, name)').eq('unit_id', unitId),
-        supabase.from('inventory').select('current_stock, costo_por_bulto, name').eq('unit_id', unitId).eq('category', 'alimento'),
+        supabase.from('alimentacion_diaria').select('quantity_kg').eq('unit_id', unitId),
+        supabase.from('invoice_items').select('product_name, unit_price, flete_per_unit, iva_percent, quantity, kilos').eq('unit_id', unitId),
       ]);
 
       const ingresos = (ventasRes.data || []).reduce((s: number, v: any) => s + (parseFloat(v.total) || 0), 0);
@@ -25,17 +25,17 @@ export function PanelGeneral({ unitId }: { unitId: string }) {
       const totalNomina = (nominaRes.data || []).reduce((s: number, n: any) => s + (parseFloat(n.monto) || 0), 0);
       const totalJornales = (jornalesRes.data || []).reduce((s: number, j: any) => s + (parseFloat(j.total) || 0), 0);
 
+      // Costo alimento = suma de (bultos × precio_bulto_con_iva_y_flete) por cada item de factura
       let costoAlimento = 0;
-      (alimentRes.data || []).forEach((r: any) => {
-        const inv = r.inventory as any;
-        if (inv?.costo_por_bulto) {
-          const bagWeight = parseInt((inv.name || '').match(/(\d+)\s*kg/i)?.[1] || '40');
-          costoAlimento += (parseFloat(r.quantity_kg) || 0) * ((parseFloat(inv.costo_por_bulto) || 0) / bagWeight);
-        }
+      (invoiceItemsRes.data || []).forEach((r: any) => {
+        const qty = parseFloat(r.quantity) || 0;
+        const unitPrice = parseFloat(r.unit_price) || 0;
+        const flete = parseFloat(r.flete_per_unit) || 0;
+        const iva = parseFloat(r.iva_percent) || 0;
+        costoAlimento += qty * (unitPrice + flete) * (1 + iva / 100);
       });
 
-      const costoInventarioVivo = (pondsRes.data || []).reduce((s: number, p: any) => s + (parseFloat(p.current_biomass_kg) || 0), 0);
-      const totalBiomasa = costoInventarioVivo;
+      const totalBiomasa = (pondsRes.data || []).reduce((s: number, p: any) => s + (parseFloat(p.current_biomass_kg) || 0), 0);
       const totalCostos = costoAlimento + totalNomina + totalJornales;
       const margen = ingresos - totalCostos;
       const flujoCaja = ingresos - porCobrar - totalCostos;

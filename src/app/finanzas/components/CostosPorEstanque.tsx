@@ -12,12 +12,13 @@ export function CostosPorEstanque({ unitId }: { unitId: string }) {
     if (!unitId) return;
     (async () => {
       setLoading(true);
-      const [pondsRes, nominaRes, jornalesRes, alimentRes, speciesRes] = await Promise.all([
+      const [pondsRes, nominaRes, jornalesRes, alimentRes, speciesRes, invItemsRes] = await Promise.all([
         supabase.from('estanques').select('id, name, current_biomass_kg, current_count, current_species, is_polyculture').eq('unit_id', unitId).eq('status', 'con_peces'),
         supabase.from('nomina').select('monto').eq('unit_id', unitId),
         supabase.from('jornales').select('total, estanque_id').eq('unit_id', unitId),
-        supabase.from('alimentacion_diaria').select('quantity_kg, inventory_id, estanque_id, inventory(costo_por_bulto, name)').eq('unit_id', unitId),
+        supabase.from('alimentacion_diaria').select('quantity_kg, estanque_id, inventory_id').eq('unit_id', unitId),
         supabase.from('pond_species').select('estanque_id, species_name, current_biomass_kg').eq('unit_id', unitId),
+        supabase.from('invoice_items').select('product_name, unit_price, flete_per_unit, iva_percent, quantity, kilos').eq('unit_id', unitId),
       ]);
 
       const ponds = pondsRes.data || [];
@@ -25,22 +26,36 @@ export function CostosPorEstanque({ unitId }: { unitId: string }) {
       const totalNomina = (nominaRes.data || []).reduce((s: number, n: any) => s + parseFloat(n.monto || 0), 0);
       const jornalesGenerales = (jornalesRes.data || []).filter((j: any) => !j.estanque_id).reduce((s: number, j: any) => s + parseFloat(j.total || 0), 0);
 
-      // Food cost per pond
-      const alimentByPond: Record<string, number> = {};
-      (alimentRes.data || []).forEach((r: any) => {
-        const inv = r.inventory as any;
-        const costoPorBulto = parseFloat(inv?.costo_por_bulto || 0);
-        if (costoPorBulto === 0) return;
-        const bagWeight = parseInt((inv?.name || '').match(/(\d+)\s*kg/i)?.[1] || '40');
-        const cost = (parseFloat(r.quantity_kg) || 0) * (costoPorBulto / bagWeight);
-        alimentByPond[r.estanque_id] = (alimentByPond[r.estanque_id] || 0) + cost;
+      // Calcular costo promedio ponderado por kg de cada producto desde facturas
+      const costoPorProductoKg: Record<string, number> = {};
+      (invItemsRes.data || []).forEach((r: any) => {
+        const productName = r.product_name;
+        const qty = parseFloat(r.quantity) || 0;
+        const kilos = parseFloat(r.kilos) || 0;
+        if (kilos === 0) return;
+        const unitPrice = parseFloat(r.unit_price) || 0;
+        const flete = parseFloat(r.flete_per_unit) || 0;
+        const iva = parseFloat(r.iva_percent) || 0;
+        const costoTotalItem = qty * (unitPrice + flete) * (1 + iva / 100);
+        // costo por kg de este producto
+        if (!costoPorProductoKg[productName]) costoPorProductoKg[productName] = costoTotalItem / kilos;
+        else costoPorProductoKg[productName] = (costoPorProductoKg[productName] + costoTotalItem / kilos) / 2;
       });
+
+      // kg consumidos por estanque × costo/kg del producto
+      // Como alimentacion_diaria no siempre tiene product_name directo, usamos costo promedio general
+      const costoKgPromedio = Object.values(costoPorProductoKg).length > 0
+        ? Object.values(costoPorProductoKg).reduce((s, v) => s + v, 0) / Object.values(costoPorProductoKg).length
+        : 0;
+
+      const kgByPond: Record<string, number> = {};
+      (alimentRes.data || []).forEach((r: any) => { kgByPond[r.estanque_id] = (kgByPond[r.estanque_id] || 0) + (parseFloat(r.quantity_kg) || 0); });
 
       const result = ponds.map((p: any) => {
         const biomasa = parseFloat(p.current_biomass_kg || 0);
         const fraccionBiomasa = totalBiomasa > 0 ? biomasa / totalBiomasa : 0;
 
-        const costoAlimento = alimentByPond[p.id] || 0;
+        const costoAlimento = (kgByPond[p.id] || 0) * costoKgPromedio;
         const nominaProrr = totalNomina * fraccionBiomasa;
         const jornalesProrr = jornalesGenerales * fraccionBiomasa;
         const jornalesDirectos = (jornalesRes.data || []).filter((j: any) => j.estanque_id === p.id).reduce((s: number, j: any) => s + parseFloat(j.total || 0), 0);
