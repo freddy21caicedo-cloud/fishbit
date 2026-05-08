@@ -239,9 +239,9 @@ const PondCard = ({ pond, handleDeleteSiembra, handleEditClick }: any) => {
       try {
         const { data: siembra } = await supabase
           .from('siembras')
-          .select('id, fecha_siembra')
+          .select('id, date')
           .eq('estanque_id', pond.id)
-          .order('fecha_siembra', { ascending: false })
+          .order('date', { ascending: false })
           .limit(1)
           .single();
 
@@ -249,8 +249,8 @@ const PondCard = ({ pond, handleDeleteSiembra, handleEditClick }: any) => {
         let consumoTotal = 0;
         let mortalidadTotal = 0;
 
-        if (siembra?.fecha_siembra) {
-          const diff = Math.floor((Date.now() - new Date(siembra.fecha_siembra).getTime()) / 86400000);
+        if (siembra?.date) {
+          const diff = Math.floor((Date.now() - new Date(siembra.date).getTime()) / 86400000);
           diasLote = `${diff} días`;
           const [alimentRes, mortRes] = await Promise.all([
             supabase.from('alimentacion_diaria').select('quantity_kg').eq('estanque_id', pond.id),
