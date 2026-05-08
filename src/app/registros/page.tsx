@@ -12,7 +12,8 @@ import {
   Plus,
   History,
   ChevronDown,
-  ChevronRight
+  ChevronRight,
+  Wind
 } from 'lucide-react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
@@ -23,6 +24,7 @@ const recordTypes = [
   { id: 'calidad-agua', label: 'Calidad de Agua', icon: Droplets, color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.1)' },
   { id: 'mortalidad', label: 'Mortalidad', icon: AlertTriangle, color: '#ef4444', bg: 'rgba(239, 68, 68, 0.1)' },
   { id: 'traslado', label: 'Traslado', icon: ArrowRightLeft, color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.1)' },
+  { id: 'aireacion', label: 'Aireación', icon: Wind, color: '#06b6d4', bg: 'rgba(6, 182, 212, 0.1)' },
 ];
 
 const ActionCard = ({ type }: any) => (
@@ -82,6 +84,8 @@ export default function RegistrosPage() {
   const [ponds, setPonds] = useState<any[]>(['Todos los Estanques']);
   const [activities, setActivities] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [fechaDesde, setFechaDesde] = useState('');
+  const [fechaHasta, setFechaHasta] = useState('');
 
   useEffect(() => {
     fetchInitialData();
@@ -104,59 +108,71 @@ export default function RegistrosPage() {
     }
 
     // 2. Fetch Activity from all tables
-    const [alimentacion, biometrias, calidadAgua, mortalidad, traslados] = await Promise.all([
-      supabase.from('alimentacion_diaria').select('*, estanques(name)').eq('unit_id', activeUnitId).order('created_at', { ascending: false }).limit(5),
-      supabase.from('biometrias').select('*, estanques(name)').eq('unit_id', activeUnitId).order('created_at', { ascending: false }).limit(5),
-      supabase.from('water_quality').select('*, estanques(name)').eq('unit_id', activeUnitId).order('created_at', { ascending: false }).limit(5),
-      supabase.from('mortality').select('*, estanques(name)').eq('unit_id', activeUnitId).order('created_at', { ascending: false }).limit(5),
-      supabase.from('transfers').select('*, origen:estanques!origen_id(name), destino:estanques!destino_id(name)').eq('unit_id', activeUnitId).order('created_at', { ascending: false }).limit(5),
+    const [alimentacion, biometrias, calidadAgua, mortalidad, traslados, aireacion] = await Promise.all([
+      supabase.from('alimentacion_diaria').select('*, estanques(name), inventory(name)').eq('unit_id', activeUnitId).order('date', { ascending: false }).limit(30),
+      supabase.from('biometrias').select('*, estanques(name)').eq('unit_id', activeUnitId).order('date', { ascending: false }).limit(30),
+      supabase.from('water_quality').select('*, estanques(name)').eq('unit_id', activeUnitId).order('date', { ascending: false }).limit(30),
+      supabase.from('mortality').select('*, estanques(name)').eq('unit_id', activeUnitId).order('date', { ascending: false }).limit(30),
+      supabase.from('transfers').select('*, origen:estanques!origen_id(name), destino:estanques!destino_id(name)').eq('unit_id', activeUnitId).order('created_at', { ascending: false }).limit(30),
+      supabase.from('aireacion').select('*, estanques(name)').eq('unit_id', activeUnitId).order('date', { ascending: false }).limit(30),
     ]);
+
+    // Helper: format water quality params
+    const formatWQ = (c: any) => {
+      const params: string[] = [];
+      if (c.o2_mg_l != null) params.push(`O₂: ${c.o2_mg_l} mg/L`);
+      if (c.ph != null) params.push(`pH: ${c.ph}`);
+      if (c.temperature_c != null) params.push(`T°: ${c.temperature_c}°C`);
+      if (c.alkalinity != null) params.push(`Alc: ${c.alkalinity}`);
+      if (c.ammonia_mg_l != null) params.push(`NH₃: ${c.ammonia_mg_l}`);
+      if (c.nitrite_mg_l != null) params.push(`NO₂: ${c.nitrite_mg_l}`);
+      if (c.nitrate_mg_l != null) params.push(`NO₃: ${c.nitrate_mg_l}`);
+      if (params.length <= 3) return params.join(' | ');
+      return params.slice(0, 3).join(' | ') + ` + ${params.length - 3} más`;
+    };
 
     const combined: any[] = [
       ...(alimentacion.data || []).map(a => ({
         id: `ali-${a.id}`,
         type: 'alimentacion',
         pond: a.estanques?.name,
-        species: a.species_name,
-        detail: `Suministro de ${a.quantity_kg}kg (${a.species_name})`,
-        time: new Date(a.created_at).toLocaleString(),
-        rawDate: a.created_at
+        detail: `${(a.inventory as any)?.name || 'Alimento'} · ${a.quantity_kg} kg`,
+        rawDate: a.date || a.created_at
       })),
       ...(biometrias.data || []).map(b => ({
         id: `bio-${b.id}`,
         type: 'biometria',
         pond: b.estanques?.name,
-        species: b.species_name,
-        detail: `Peso: ${b.avg_weight_gr || b.average_weight_g}g (${b.species_name})`,
-        time: new Date(b.created_at).toLocaleString(),
-        rawDate: b.created_at
+        detail: `${b.species_name || 'Esp.'} · ${b.avg_weight_gr || b.average_weight_g || '—'} g/ud · ${b.total_biomass_kg || '—'} kg biomasa`,
+        rawDate: b.date || b.created_at
       })),
       ...(calidadAgua.data || []).map(c => ({
         id: `cal-${c.id}`,
         type: 'calidad-agua',
         pond: c.estanques?.name,
-        species: 'Calidad Agua',
-        detail: `O2: ${c.o2_mg_l}mg/L | pH: ${c.ph}`,
-        time: new Date(c.created_at).toLocaleString(),
-        rawDate: c.created_at
+        detail: formatWQ(c),
+        rawDate: c.date || c.created_at
       })),
       ...(mortalidad.data || []).map(m => ({
         id: `mor-${m.id}`,
         type: 'mortalidad',
         pond: m.estanques?.name,
-        species: m.species_name,
-        detail: `Baja de ${m.quantity} (${m.species_name})`,
-        time: new Date(m.created_at).toLocaleString(),
-        rawDate: m.created_at
+        detail: `${m.species_name || 'Especie'} · ${m.quantity} baja(s) · ${m.cause || ''}`,
+        rawDate: m.date || m.created_at
       })),
       ...(traslados.data || []).map(t => ({
         id: `tra-${t.id}`,
         type: 'traslado',
-        pond: t.origen?.name,
-        species: t.species_name,
-        detail: `Traslado de ${t.quantity} (${t.species_name}) hacia ${t.destino?.name}`,
-        time: new Date(t.created_at).toLocaleString(),
-        rawDate: t.created_at
+        pond: (t.origen as any)?.name,
+        detail: `${t.quantity} ${t.species_name || 'uds'} · de ${(t.origen as any)?.name || '—'} → ${(t.destino as any)?.name || '—'}`,
+        rawDate: t.date || t.created_at
+      })),
+      ...(aireacion.data || []).map(a => ({
+        id: `air-${a.id}`,
+        type: 'aireacion',
+        pond: a.estanques?.name,
+        detail: `${a.num_aerators ?? a.quantity ?? '—'} aireador(es) · ${a.hours_operated ?? a.hours ?? '—'} h`,
+        rawDate: a.date || a.created_at
       })),
     ].sort((a, b) => new Date(b.rawDate).getTime() - new Date(a.rawDate).getTime());
 
@@ -164,9 +180,12 @@ export default function RegistrosPage() {
     setLoading(false);
   };
 
-  const filteredActivity = selectedPond === 'Todos los Estanques' 
-    ? activities 
-    : activities.filter(a => a.pond === selectedPond);
+  const filteredActivity = activities.filter(a => {
+    const matchPond = selectedPond === 'Todos los Estanques' || a.pond === selectedPond;
+    const matchDesde = !fechaDesde || a.rawDate >= fechaDesde;
+    const matchHasta = !fechaHasta || a.rawDate <= fechaHasta + 'T23:59:59';
+    return matchPond && matchDesde && matchHasta;
+  });
 
   return (
     <div className="animate-fade-in page-container">
@@ -194,30 +213,53 @@ export default function RegistrosPage() {
           <h2 style={{ fontSize: '1.25rem', fontWeight: 600 }}>Actividad Reciente</h2>
         </div>
         
-        {/* Pond Selector */}
-        <div style={{ position: 'relative' }}>
-          <select 
-            value={selectedPond}
-            onChange={(e) => setSelectedPond(e.target.value)}
-            style={{ 
-              appearance: 'none',
-              padding: '0.625rem 2.5rem 0.625rem 1rem', 
-              borderRadius: '8px', 
-              border: '1px solid var(--border)', 
-              background: 'var(--card)',
-              outline: 'none',
-              fontSize: '0.875rem',
-              fontWeight: 600,
-              cursor: 'pointer',
-              color: 'var(--foreground)',
-              minWidth: '200px'
-            }}
-          >
-            {ponds.map(pond => (
-              <option key={pond} value={pond}>{pond}</option>
-            ))}
-          </select>
-          <ChevronDown size={16} style={{ position: 'absolute', right: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--muted-foreground)', pointerEvents: 'none' }} />
+        {/* Pond Selector + Date Filters */}
+        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
+          {/* Pond selector */}
+          <div style={{ position: 'relative' }}>
+            <select 
+              value={selectedPond}
+              onChange={(e) => setSelectedPond(e.target.value)}
+              style={{ appearance: 'none', padding: '0.625rem 2.5rem 0.625rem 1rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--card)', outline: 'none', fontSize: '0.875rem', fontWeight: 600, cursor: 'pointer', color: 'var(--foreground)', minWidth: '180px' }}
+            >
+              {ponds.map(pond => (
+                <option key={pond} value={pond}>{pond}</option>
+              ))}
+            </select>
+            <ChevronDown size={16} style={{ position: 'absolute', right: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--muted-foreground)', pointerEvents: 'none' }} />
+          </div>
+
+          {/* Date from */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+            <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--muted-foreground)', whiteSpace: 'nowrap' }}>Desde</span>
+            <input
+              type="date"
+              value={fechaDesde}
+              onChange={(e) => setFechaDesde(e.target.value)}
+              style={{ padding: '0.5rem 0.75rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--card)', fontSize: '0.85rem', fontWeight: 600, color: 'var(--foreground)', outline: 'none', cursor: 'pointer' }}
+            />
+          </div>
+
+          {/* Date to */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+            <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--muted-foreground)', whiteSpace: 'nowrap' }}>Hasta</span>
+            <input
+              type="date"
+              value={fechaHasta}
+              onChange={(e) => setFechaHasta(e.target.value)}
+              style={{ padding: '0.5rem 0.75rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--card)', fontSize: '0.85rem', fontWeight: 600, color: 'var(--foreground)', outline: 'none', cursor: 'pointer' }}
+            />
+          </div>
+
+          {/* Clear button */}
+          {(fechaDesde || fechaHasta) && (
+            <button
+              onClick={() => { setFechaDesde(''); setFechaHasta(''); }}
+              style={{ padding: '0.5rem 0.9rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--card)', fontSize: '0.8rem', fontWeight: 700, color: 'var(--muted-foreground)', cursor: 'pointer' }}
+            >
+              Limpiar
+            </button>
+          )}
         </div>
       </div>
 
@@ -267,9 +309,11 @@ export default function RegistrosPage() {
                       )}
                     </div>
                     <div style={{ fontSize: '0.875rem', color: 'var(--muted-foreground)' }}>{activity.detail}</div>
+                    <div style={{ fontSize: '0.72rem', color: 'var(--muted-foreground)', marginTop: '0.1rem' }}>
+                      {activity.rawDate ? new Date(activity.rawDate).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' }) : ''}
+                    </div>
                   </div>
                   <div style={{ textAlign: 'right', fontSize: '0.75rem', color: 'var(--muted-foreground)' }}>
-                    <div style={{ fontWeight: 600, color: 'var(--foreground)', marginBottom: '0.125rem' }}>{activity.time}</div>
                   </div>
                   <ChevronRight size={18} style={{ marginLeft: '1rem', color: 'var(--border)' }} />
                 </div>
