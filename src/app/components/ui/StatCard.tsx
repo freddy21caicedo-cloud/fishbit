@@ -21,6 +21,16 @@ export function StatCard({ title, value, unit, change, icon: Icon, color, detail
   
   const displayColor = isAlert ? '#ef4444' : 'inherit';
 
+  const formatNumber = (val: string | number) => {
+    if (typeof val === 'number') return val.toLocaleString('es-CO', { maximumFractionDigits: 2 });
+    if (typeof val === 'string' && !isNaN(Number(val)) && val.trim() !== '') {
+      return Number(val).toLocaleString('es-CO', { maximumFractionDigits: 2 });
+    }
+    return val;
+  };
+
+  const displayValue = formatNumber(value);
+
   return (
     <div 
       style={{ perspective: '1000px', cursor: 'pointer', height: '180px' }}
@@ -67,7 +77,7 @@ export function StatCard({ title, value, unit, change, icon: Icon, color, detail
             </div>
             <div>
               <div style={{ fontSize: '1.75rem', fontWeight: 900, marginBottom: '0.1rem', letterSpacing: '-0.02em', color: displayColor, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                {value} 
+                {displayValue} 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                   <span style={{ fontSize: '0.9rem', fontWeight: 700, opacity: 0.6, color: isAlert ? '#ef4444' : 'inherit' }}>{unit}</span>
                   {isAlert && (
@@ -111,8 +121,9 @@ export function StatCard({ title, value, unit, change, icon: Icon, color, detail
                     {item.label}
                   </span>
                   <span style={{ fontWeight: 800, whiteSpace: 'nowrap' }}>
-                    {item.value} {item.unit || unit}
+                    {formatNumber(item.value)} {item.unit || unit}
                   </span>
+
                 </div>
               )) : (
                 <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', color: 'var(--muted-foreground)', fontStyle: 'italic' }}>

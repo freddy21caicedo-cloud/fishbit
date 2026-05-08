@@ -47,7 +47,7 @@ const CustomTooltip = ({ active, payload, label, unit }: any) => {
         </div>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.25rem' }}>
           <div style={{ fontSize: '1.5rem', fontWeight: 950, color: payload[0].color }}>
-            {payload[0].value}
+            {typeof payload[0].value === 'number' ? payload[0].value.toLocaleString('es-CO', { maximumFractionDigits: 2 }) : payload[0].value}
           </div>
           <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b' }}>{unit}</div>
         </div>
@@ -275,6 +275,7 @@ export function TrendsChart({
               tickLine={false} 
               tick={{ fontSize: 11, fill: '#94a3b8', fontWeight: 700 }} 
               dx={-10}
+              tickFormatter={(val: any) => typeof val === 'number' ? val.toLocaleString('es-CO', { maximumFractionDigits: 2 }) : val}
               domain={[
                 (dataMin: number) => {
                   const min = currentThresholds ? currentThresholds.min : dataMin;
@@ -307,6 +308,7 @@ export function TrendsChart({
                 dataKey="value" 
                 position="top" 
                 offset={15} 
+                formatter={(val: any) => typeof val === 'number' ? val.toLocaleString('es-CO', { maximumFractionDigits: 2 }) : val}
                 style={{ 
                   fill: '#64748b', 
                   fontSize: '12px', 

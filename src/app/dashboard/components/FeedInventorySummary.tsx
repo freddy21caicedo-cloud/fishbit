@@ -26,8 +26,8 @@ export function FeedInventorySummary({ data, inventoryThresholds }: FeedInventor
       const weightMatch = item.label.match(/(\d+)\s*kg/i);
       const bagWeight = weightMatch ? parseInt(weightMatch[1]) : 40;
       
-      // Calcular bultos con 1 decimal
-      const bultos = (Number(item.value) / bagWeight).toFixed(1);
+      // Calcular bultos como número en lugar de toFixed
+      const bultos = Number((Number(item.value) / bagWeight).toFixed(1));
       
       return {
         ...item,
@@ -78,7 +78,7 @@ export function FeedInventorySummary({ data, inventoryThresholds }: FeedInventor
                   </div>
                   <div style={{ textAlign: 'right' }}>
                     <div style={{ fontSize: '1rem', fontWeight: 950, color: isLow ? '#ef4444' : 'var(--foreground)' }}>
-                      {item.bultos} <span style={{ fontSize: '0.7rem', opacity: 0.7 }}>bultos</span>
+                      {Number(item.bultos).toLocaleString('es-CO', { maximumFractionDigits: 2 })} <span style={{ fontSize: '0.7rem', opacity: 0.7 }}>bultos</span>
                     </div>
                   </div>
                 </div>
@@ -96,7 +96,7 @@ export function FeedInventorySummary({ data, inventoryThresholds }: FeedInventor
                   />
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.65rem', fontWeight: 700, color: 'var(--muted-foreground)' }}>
-                  <span>Stock: {Number(item.value).toLocaleString()} kg (Sacos de {item.bagWeight}kg)</span>
+                  <span>Stock: {Number(item.value).toLocaleString('es-CO', { maximumFractionDigits: 2 })} kg (Sacos de {item.bagWeight}kg)</span>
                   <span>{percentage.toFixed(0)}%</span>
                 </div>
               </div>

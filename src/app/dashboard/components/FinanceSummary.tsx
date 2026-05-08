@@ -37,7 +37,7 @@ export function FinanceSummary({ data, isLoading }: FinanceSummaryProps) {
           </div>
           <div style={{ fontSize: '0.75rem', fontWeight: 700, opacity: 0.9, marginBottom: '0.25rem', textTransform: 'uppercase' }}>Inversión Total Finca</div>
           <div style={{ fontSize: '2rem', fontWeight: 950, letterSpacing: '-0.03em' }}>
-            ${data.total.toLocaleString('es-CO')}
+            {data.total.toLocaleString('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 })}
           </div>
         </div>
 
@@ -52,7 +52,7 @@ export function FinanceSummary({ data, isLoading }: FinanceSummaryProps) {
             </div>
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: '0.8rem', color: 'var(--muted-foreground)', fontWeight: 700 }}>{item.label}</div>
-              <div style={{ fontSize: '1rem', fontWeight: 900 }}>${item.value.toLocaleString('es-CO')}</div>
+              <div style={{ fontSize: '1rem', fontWeight: 900 }}>{item.value.toLocaleString('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 })}</div>
             </div>
             <ArrowUpRight size={16} style={{ color: 'var(--muted-foreground)', opacity: 0.5 }} />
           </div>
