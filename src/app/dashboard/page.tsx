@@ -167,27 +167,98 @@ export default function Dashboard() {
 
   const fetchDetailedStats = async (unitId: string) => {
     try {
-      const { data, error } = await supabase.rpc('get_dashboard_stats', { 
-        p_unit_id: unitId 
+      // Fetch all active ponds for this unit
+      const { data: pondsData } = await supabase
+        .from('estanques')
+        .select('id, name, current_biomass_kg, current_count')
+        .eq('unit_id', unitId)
+        .eq('status', 'con_peces');
+
+      const activePonds = pondsData || [];
+
+      // --- BIOMASS ---
+      const biomassTotal = activePonds.reduce((s, p) => s + (parseFloat(p.current_biomass_kg) || 0), 0);
+      const biomassDetails = activePonds.map(p => ({
+        label: p.name,
+        value: parseFloat((parseFloat(p.current_biomass_kg) || 0).toFixed(1)),
+        unit: 'kg'
+      }));
+
+      // --- CONSUMPTION: sum alimentacion_diaria per pond (current month) ---
+      const startOfMonth = new Date();
+      startOfMonth.setDate(1);
+      startOfMonth.setHours(0, 0, 0, 0);
+
+      const { data: alimentData } = await supabase
+        .from('alimentacion_diaria')
+        .select('estanque_id, quantity_kg, estanques(name)')
+        .eq('unit_id', unitId)
+        .gte('date', startOfMonth.toISOString().split('T')[0]);
+
+      // Group by pond
+      const consumptionByPond: Record<string, { name: string; total: number }> = {};
+      // Initialize all active ponds with 0
+      activePonds.forEach(p => {
+        consumptionByPond[p.id] = { name: p.name, total: 0 };
       });
-      
-      if (error) throw error;
-      
-      if (data) {
-        setStats({
-          biomass:     (data as any).biomass     ?? { total: 0, details: [] },
-          consumption: (data as any).consumption ?? { total: 0, details: [] },
-          mortality:   (data as any).mortality   ?? { total: 0, percent: '0.0', details: [] },
-          inventory:   (data as any).inventory   ?? { total: 0, details: [] },
-        });
-      }
+      (alimentData || []).forEach((r: any) => {
+        if (!consumptionByPond[r.estanque_id]) {
+          consumptionByPond[r.estanque_id] = { name: r.estanques?.name || r.estanque_id, total: 0 };
+        }
+        consumptionByPond[r.estanque_id].total += parseFloat(r.quantity_kg) || 0;
+      });
+      const consumptionTotal = Object.values(consumptionByPond).reduce((s, v) => s + v.total, 0);
+      const consumptionDetails = Object.values(consumptionByPond).map(v => ({
+        label: v.name,
+        value: parseFloat(v.total.toFixed(1)),
+        unit: 'kg'
+      }));
+
+      // --- MORTALITY ---
+      const { data: mortData } = await supabase
+        .from('mortality')
+        .select('estanque_id, quantity, estanques(name)')
+        .eq('unit_id', unitId);
+
+      const mortalityByPond: Record<string, { name: string; total: number }> = {};
+      activePonds.forEach(p => { mortalityByPond[p.id] = { name: p.name, total: 0 }; });
+      (mortData || []).forEach((r: any) => {
+        if (!mortalityByPond[r.estanque_id]) {
+          mortalityByPond[r.estanque_id] = { name: r.estanques?.name || r.estanque_id, total: 0 };
+        }
+        mortalityByPond[r.estanque_id].total += parseInt(r.quantity) || 0;
+      });
+      const mortalityTotal = Object.values(mortalityByPond).reduce((s, v) => s + v.total, 0);
+      const totalFishEver = activePonds.reduce((s, p) => s + (parseInt(p.current_count) || 0), 0) + mortalityTotal;
+      const mortalityPct = totalFishEver > 0 ? ((mortalityTotal / totalFishEver) * 100).toFixed(1) : '0.0';
+      const mortalityDetails = Object.values(mortalityByPond).map(v => ({
+        label: v.name,
+        value: v.total,
+        unit: 'uds'
+      }));
+
+      // --- INVENTORY: total alimento en stock ---
+      const { data: invData } = await supabase
+        .from('inventory')
+        .select('name, current_stock')
+        .eq('unit_id', unitId)
+        .eq('category', 'alimento');
+
+      const inventoryTotal = (invData || []).reduce((s, i) => s + (parseFloat(i.current_stock) || 0), 0);
+      const inventoryDetails = (invData || []).map(i => ({
+        label: i.name,
+        value: parseFloat((parseFloat(i.current_stock) || 0).toFixed(1)),
+        unit: 'kg'
+      }));
+
+      setStats({
+        biomass:     { total: parseFloat(biomassTotal.toFixed(1)),     details: biomassDetails },
+        consumption: { total: parseFloat(consumptionTotal.toFixed(1)), details: consumptionDetails },
+        mortality:   { total: mortalityTotal, percent: mortalityPct,   details: mortalityDetails },
+        inventory:   { total: parseFloat(inventoryTotal.toFixed(1)),   details: inventoryDetails },
+      });
     } catch (error: any) {
-      console.error("RPC Error details (Stats):", {
-        message: error?.message,
-        code: error?.code,
-        details: error?.details,
-        hint: error?.hint,
-      });
+      console.error('fetchDetailedStats error:', error?.message);
     }
   };
 
