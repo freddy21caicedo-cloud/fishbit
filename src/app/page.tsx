@@ -34,7 +34,7 @@ export default function LoginPage() {
       if (authError) throw authError;
 
       // 1. Fetch Profile to check if SuperAdmin
-      let { data: profile } = await supabase
+      const { data: profile } = await supabase
         .from('profiles')
         .select('is_superadmin')
         .eq('id', data.user.id)
@@ -67,11 +67,12 @@ export default function LoginPage() {
         router.push('/select-unit');
       } else {
         localStorage.setItem('active_unit_id', userUnits[0].unit_id);
-        router.refresh();
-        router.push('/dashboard');
+        // Force full page reload to ensure cookies are sent to the middleware
+        window.location.href = '/dashboard';
       }
-    } catch (err: any) {
-      setError(err.message || 'Error al iniciar sesión');
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Error al iniciar sesión';
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -79,15 +80,17 @@ export default function LoginPage() {
 
   const handleForgotPassword = (e: React.MouseEvent) => {
     e.preventDefault();
+    const supportEmail = process.env.NEXT_PUBLIC_SUPPORT_EMAIL || 'especialistaacuicola@gmail.com';
     const subject = encodeURIComponent("Recuperación de Contraseña FishBit");
     const body = encodeURIComponent(`Hola, necesito recuperar mi acceso a FishBit.\n\nMi correo de usuario es: ${email || '[Escribe tu correo aquí]'}`);
-    window.location.href = `mailto:especialistaacuicola@gmail.com?subject=${subject}&body=${body}`;
+    window.location.href = `mailto:${supportEmail}?subject=${subject}&body=${body}`;
   };
 
   const handleContactSupport = (e: React.MouseEvent) => {
     e.preventDefault();
+    const whatsappNumber = process.env.NEXT_PUBLIC_SUPPORT_WHATSAPP || '573000000000';
     const message = encodeURIComponent("Hola FishBit, me gustaría solicitar una cuenta o soporte para mi granja acuícola.");
-    window.open(`https://wa.me/573000000000?text=${message}`, '_blank');
+    window.open(`https://wa.me/${whatsappNumber}?text=${message}`, '_blank');
   };
 
   return (

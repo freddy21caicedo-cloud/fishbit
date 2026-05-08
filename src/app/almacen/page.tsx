@@ -26,6 +26,7 @@ import { InvoiceModal } from './components/InvoiceModal';
 import { ProviderModal } from './components/ProviderModal';
 import { PremiumCard } from '../components/ui/PremiumCard';
 import { PremiumInput } from '../components/ui/PremiumInput';
+import { ProductModal } from './components/ProductModal';
 
 interface InventoryItem {
   id: string;
@@ -43,6 +44,7 @@ export default function AlmacenPage() {
   const [activeCat, setActiveCat] = useState('alimento');
   const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
   const [isProviderModalOpen, setIsProviderModalOpen] = useState(false);
+  const [isProductModalOpen, setIsProductModalOpen] = useState(false);
   const [isBadgeHovered, setIsBadgeHovered] = useState(false);
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -277,24 +279,48 @@ export default function AlmacenPage() {
             <h2 style={{ fontSize: isMobile ? '1.5rem' : '2rem', fontWeight: 900 }}>{currentCategory?.label} — Inventario</h2>
           </div>
           
-          <button 
-            onClick={() => setIsInvoiceModalOpen(true)}
-            className="btn-primary"
-            style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: '0.6rem', 
-              padding: '0.8rem 1.5rem', 
-              borderRadius: '12px', 
-              fontWeight: 900, 
-              fontSize: '0.9rem', 
-              boxShadow: `0 8px 16px ${currentCategory?.bg}`,
-              width: isMobile ? '100%' : 'auto',
-              justifyContent: 'center'
-            }}
-          >
-            <Plus size={20} /> Nueva Factura
-          </button>
+          <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+            {(activeCat === 'farmacia' || activeCat === 'insumos') && (
+              <button
+                onClick={() => setIsProductModalOpen(true)}
+                className="glass"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  padding: '0.8rem 1.25rem',
+                  borderRadius: '12px',
+                  border: `1px solid ${currentCategory?.color}`,
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  fontSize: '0.9rem',
+                  color: currentCategory?.color,
+                  width: isMobile ? '100%' : 'auto',
+                  justifyContent: 'center'
+                }}
+              >
+                <Plus size={18} /> Crear Producto
+              </button>
+            )}
+            <button 
+              onClick={() => setIsInvoiceModalOpen(true)}
+              className="btn-primary"
+              style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '0.6rem', 
+                padding: '0.8rem 1.5rem', 
+                borderRadius: '12px', 
+                fontWeight: 900, 
+                fontSize: '0.9rem', 
+                boxShadow: `0 8px 16px ${currentCategory?.bg}`,
+                width: isMobile ? '100%' : 'auto',
+                justifyContent: 'center'
+              }}
+            >
+              <Plus size={20} /> Nueva Factura
+            </button>
+          </div>
         </div>
 
         <div className="card-premium" style={{ marginBottom: '1.5rem' }}>
@@ -370,6 +396,14 @@ export default function AlmacenPage() {
         onClose={() => setIsProviderModalOpen(false)}
         unitId={activeUnitId || ''}
         onSuccess={() => activeUnitId && fetchProviders(activeUnitId)}
+      />
+
+      <ProductModal
+        isOpen={isProductModalOpen}
+        onClose={() => setIsProductModalOpen(false)}
+        unitId={activeUnitId || ''}
+        activeCat={activeCat as 'farmacia' | 'insumos'}
+        onSuccess={() => activeUnitId && fetchInventory(activeUnitId)}
       />
     </div>
   );

@@ -1,0 +1,16 @@
+{
+  "name": "FishBit",
+  "short_name": "FishBit",
+  "description": "Gestión Acuícola de Siguiente Generación",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#020617",
+  "theme_color": "#0d9488",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "48x48",
+      "type": "image/x-icon"
+    }
+  ]
+}

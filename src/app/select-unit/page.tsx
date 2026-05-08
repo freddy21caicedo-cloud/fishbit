@@ -43,8 +43,8 @@ export default function SelectUnitPage() {
 
   const handleSelectUnit = (unitId: string) => {
     localStorage.setItem('active_unit_id', unitId);
-    router.refresh();
-    router.push('/dashboard');
+    // Force full page reload so middleware receives session cookies correctly
+    window.location.href = '/dashboard';
   };
 
   const handleLogout = async () => {

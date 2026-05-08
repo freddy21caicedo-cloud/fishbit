@@ -9,6 +9,8 @@ interface InventoryItem {
   last_entry?: string;
   lote?: string;
   costo_promedio?: number;
+  laboratorio?: string;
+  presentacion?: string;
 }
 
 interface InventoryTableProps {
@@ -16,13 +18,19 @@ interface InventoryTableProps {
   category: string;
 }
 
+const isPharmacyOrSupplies = (cat: string) => cat === 'farmacia' || cat === 'insumos';
+
 export function InventoryTable({ items, category }: InventoryTableProps) {
+  const showExtra = isPharmacyOrSupplies(category);
+
   return (
     <div style={{ width: '100%', overflowX: 'auto', padding: '0 1.5rem 1.5rem' }} className="no-scrollbar">
       <table className="almacen-table-responsive" style={{ width: '100%', minWidth: '800px', borderCollapse: 'collapse', textAlign: 'left' }}>
         <thead>
           <tr style={{ borderBottom: '1px solid var(--border)', fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--muted-foreground)', letterSpacing: '0.05em' }}>
             <th style={{ padding: '1rem 0.5rem', fontWeight: 800 }}>Producto</th>
+            {showExtra && <th style={{ padding: '1rem 0.5rem', fontWeight: 800 }}>Laboratorio</th>}
+            {showExtra && <th style={{ padding: '1rem 0.5rem', fontWeight: 800 }}>Presentación</th>}
             <th style={{ padding: '1rem 0.5rem', fontWeight: 800 }}>Lote</th>
             <th style={{ padding: '1rem 0.5rem', fontWeight: 800 }}>Stock Actual</th>
             <th style={{ padding: '1rem 0.5rem', fontWeight: 800 }}>Unidad</th>
@@ -32,13 +40,30 @@ export function InventoryTable({ items, category }: InventoryTableProps) {
         </thead>
         <tbody>
           {items.length > 0 ? items.map((item) => (
-            <tr key={item.id} style={{ borderBottom: '1px solid var(--border)', transition: 'background 0.2s' }} onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(2, 6, 23, 0.01)'} onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}>
+            <tr
+              key={item.id}
+              style={{ borderBottom: '1px solid var(--border)', transition: 'background 0.2s' }}
+              onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(2, 6, 23, 0.01)'}
+              onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+            >
               <td style={{ padding: '1.25rem 0.5rem', fontWeight: 800, color: 'var(--foreground)' }}>{item.name}</td>
+              {showExtra && (
+                <td style={{ padding: '1.25rem 0.5rem', color: 'var(--muted-foreground)', fontWeight: 600, fontSize: '0.85rem' }}>
+                  {item.laboratorio || '---'}
+                </td>
+              )}
+              {showExtra && (
+                <td style={{ padding: '1.25rem 0.5rem' }}>
+                  <span style={{ padding: '4px 10px', borderRadius: '6px', background: 'var(--secondary)', fontSize: '0.8rem', fontWeight: 700 }}>
+                    {item.presentacion || item.unit || '---'}
+                  </span>
+                </td>
+              )}
               <td style={{ padding: '1.25rem 0.5rem', color: 'var(--muted-foreground)', fontWeight: 600, fontSize: '0.85rem' }}>{item.lote || '---'}</td>
               <td style={{ padding: '1.25rem 0.5rem' }}>
-                <span style={{ 
-                  padding: '6px 12px', 
-                  borderRadius: '8px', 
+                <span style={{
+                  padding: '6px 12px',
+                  borderRadius: '8px',
                   background: Number(item.current_stock) <= 10 ? 'rgba(239, 68, 68, 0.1)' : 'rgba(16, 185, 129, 0.1)',
                   color: Number(item.current_stock) <= 10 ? '#ef4444' : '#10b981',
                   fontWeight: 900,
@@ -58,7 +83,7 @@ export function InventoryTable({ items, category }: InventoryTableProps) {
             </tr>
           )) : (
             <tr>
-              <td colSpan={6} style={{ padding: '5rem 0', textAlign: 'center', color: 'var(--muted-foreground)', fontWeight: 700 }}>
+              <td colSpan={showExtra ? 8 : 6} style={{ padding: '5rem 0', textAlign: 'center', color: 'var(--muted-foreground)', fontWeight: 700 }}>
                 No hay productos registrados en esta categoría.
               </td>
             </tr>

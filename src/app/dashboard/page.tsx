@@ -1,7 +1,6 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useUnit } from '../components/providers/UnitProvider';
 import { 
@@ -11,64 +10,79 @@ import {
   ShoppingBag,
   Loader2
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { toast } from 'react-hot-toast';
+import { AnimatePresence } from 'framer-motion';
 
 // UI Components
 import { StatCard } from '../components/ui/StatCard';
-import { PremiumInput } from '../components/ui/PremiumInput';
 import { TrendsChart } from './components/TrendsChart';
 import { FinanceSummary } from './components/FinanceSummary';
 import { FeedInventorySummary } from './components/FeedInventorySummary';
 
+import { 
+  Profile, 
+  Pond, 
+  DashboardStats, 
+  AlertThresholds, 
+  FinanceData, 
+  ChartDataPoint,
+} from '@/lib/database.types';
+
 export default function Dashboard() {
-  const router = useRouter();
   const { activeUnitId, activeUnit } = useUnit();
   
-  const [userRole, setUserRole] = useState<string>('cargando...');
-  const [stats, setStats] = useState<any>({
+  const [userRole, setUserRole] = useState<Profile['role'] | null>(null);
+  const [isLoadingRole, setIsLoadingRole] = useState(true);
+  const [stats, setStats] = useState<DashboardStats>({
     biomass: { total: 0, details: [] },
     consumption: { total: 0, details: [] },
-    mortality: { total: 0, percent: 0, details: [] },
+    mortality: { total: 0, percent: '0.0', details: [] },
     inventory: { total: 0, details: [] }
   });
   
-  const [alertThresholds, setAlertThresholds] = useState<any>({
+  const [alertThresholds, setAlertThresholds] = useState<AlertThresholds>({
     oxygenMin: 4.5, oxygenMax: 9.0,
     tempMin: 26.0, tempMax: 31.0,
     phMin: 6.5, phMax: 8.5,
     mortalityMax: 5.0,
-    inventoryMin: {} // Map of reference -> min stock
+    inventoryMin: {}
   });
 
-  const [ponds, setPonds] = useState<any[]>([]);
+  const [ponds, setPonds] = useState<Pond[]>([]);
   const [selectedPond, setSelectedPond] = useState<string>('');
   const [selectedParam, setSelectedParam] = useState<string>('oxigeno');
   const [selectedSpecies, setSelectedSpecies] = useState<string>('Todas');
-  const [pondSpecies, setPondSpecies] = useState<any[]>([]);
+  const [pondSpecies, setPondSpecies] = useState<{ species_name: string }[]>([]);
   
-  const [chartData, setChartData] = useState<any[]>([]);
+  const [chartData, setChartData] = useState<ChartDataPoint[]>([]);
   const [isChartLoading, setIsChartLoading] = useState(false);
   
-  const [financeData, setFinanceData] = useState<any>({ total: 0, food: 0, seeds: 0, pending: 0 });
+  const [financeData, setFinanceData] = useState<FinanceData>({ total: 0, food: 0, seeds: 0, pending: 0 });
   const [isFinanceLoading, setIsFinanceLoading] = useState(false);
 
-  // 1. Initial Load: User Role, Unit Stats, Finance, and Thresholds
+  // 1. Initial Load: User Role
   useEffect(() => {
     const fetchUserRole = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('role')
-          .eq('id', user.id)
-          .single();
-        if (profile) setUserRole(profile.role);
+      setIsLoadingRole(true);
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', user.id)
+            .single();
+          if (profile) setUserRole(profile.role as Profile['role']);
+        }
+      } catch (error) {
+        console.error("Error fetching user role:", error);
+      } finally {
+        setIsLoadingRole(false);
       }
     };
     fetchUserRole();
   }, []);
 
+  // 2. Fetch Unit Data
   useEffect(() => {
     if (!activeUnitId) return;
 
@@ -112,12 +126,12 @@ export default function Dashboard() {
   const fetchPonds = async (unitId: string) => {
     const { data } = await supabase
       .from('estanques')
-      .select('id, name, is_polyculture')
+      .select('id, name, is_polyculture, status')
       .eq('unit_id', unitId)
       .eq('status', 'con_peces');
     
     if (data) {
-      setPonds(data);
+      setPonds(data as Pond[]);
       if (data.length > 0 && !selectedPond) {
         setSelectedPond(data[0].id);
       }
@@ -153,119 +167,47 @@ export default function Dashboard() {
 
   const fetchDetailedStats = async (unitId: string) => {
     try {
-      const [pondsRes, speciesRes] = await Promise.all([
-        supabase.from('estanques').select('id, current_biomass_kg, current_species, is_polyculture').eq('unit_id', unitId),
-        supabase.from('pond_species').select('estanque_id, species_name, current_biomass_kg').eq('unit_id', unitId)
-      ]);
-
-      const biomassMap: any = {};
-      let totalBiomass = 0;
-      const coveredPondIds = new Set();
-
-      speciesRes.data?.forEach(s => {
-        const kg = parseFloat(s.current_biomass_kg) || 0;
-        if (kg <= 0) return;
-        totalBiomass += kg;
-        const sp = s.species_name || 'Desconocida';
-        biomassMap[sp] = (biomassMap[sp] || 0) + kg;
-        coveredPondIds.add(s.estanque_id);
+      const { data, error } = await supabase.rpc('get_dashboard_stats', { 
+        p_unit_id: unitId 
       });
-
-      pondsRes.data?.forEach(p => {
-        if (coveredPondIds.has(p.id)) return;
-        const kg = parseFloat(p.current_biomass_kg) || 0;
-        if (kg <= 0) return;
-        totalBiomass += kg;
-        const sp = p.current_species || 'Sin Especie';
-        if (sp === 'Policultivo') {
-           biomassMap['Otros (Policultivo)'] = (biomassMap['Otros (Policultivo)'] || 0) + kg;
-        } else {
-           biomassMap[sp] = (biomassMap[sp] || 0) + kg;
-        }
-      });
-
-      const biomassDetails = Object.entries(biomassMap).map(([sp, val]: any) => ({ 
-        label: sp, 
-        value: val >= 1000 ? (val/1000).toFixed(1) : val.toFixed(0), 
-        unit: val >= 1000 ? 'Ton' : 'kg' 
-      }));
-
-      const thirtyDaysAgo = new Date();
-      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
       
-      const [feed, mortData, pondsPop, inv] = await Promise.all([
-        supabase.from('alimentacion_diaria').select('quantity_kg, inventory(name)').eq('unit_id', unitId).gte('date', thirtyDaysAgo.toISOString()),
-        supabase.from('mortality').select('quantity, estanques(name)').eq('unit_id', unitId),
-        supabase.from('estanques').select('current_count').eq('unit_id', unitId),
-        supabase.from('inventory').select('name, current_stock').eq('unit_id', unitId).eq('category', 'alimento')
-      ]);
-
-      // Process Feed
-      const feedMap: any = {};
-      let totalFeed = 0;
-      feed.data?.forEach(f => {
-        const kg = Number(f.quantity_kg) || 0;
-        totalFeed += kg;
-        const invData: any = f.inventory;
-        const name = (Array.isArray(invData) ? invData[0]?.name : invData?.name) || 'Desconocido';
-        feedMap[name] = (feedMap[name] || 0) + kg;
+      if (error) throw error;
+      
+      if (data) {
+        setStats({
+          biomass:     (data as any).biomass     ?? { total: 0, details: [] },
+          consumption: (data as any).consumption ?? { total: 0, details: [] },
+          mortality:   (data as any).mortality   ?? { total: 0, percent: '0.0', details: [] },
+          inventory:   (data as any).inventory   ?? { total: 0, details: [] },
+        });
+      }
+    } catch (error: any) {
+      console.error("RPC Error details (Stats):", {
+        message: error?.message,
+        code: error?.code,
+        details: error?.details,
+        hint: error?.hint,
       });
-      const feedDetails = Object.entries(feedMap).map(([name, val]: any) => ({ label: name, value: val.toFixed(0), unit: 'kg' }));
-
-      // Process Mortality
-      const totalPop = pondsPop.data?.reduce((sum, p) => sum + (p.current_count || 0), 0) || 1;
-      const mortMap: any = {};
-      let totalMort = 0;
-      mortData.data?.forEach(m => {
-        const qty = Number(m.quantity) || 0;
-        totalMort += qty;
-        const estData: any = m.estanques;
-        const pName = (Array.isArray(estData) ? estData[0]?.name : estData?.name) || 'Desconocido';
-        mortMap[pName] = (mortMap[pName] || 0) + qty;
-      });
-      const mortDetails = Object.entries(mortMap).map(([name, val]: any) => ({ 
-        label: name, 
-        value: `${val} (${((val/totalPop)*100).toFixed(1)}%)`,
-        unit: 'uds' 
-      }));
-
-      // Process Inventory
-      let totalInv = 0;
-      const invDetails = inv.data?.map(i => {
-        const stock = Number(i.current_stock) || 0;
-        totalInv += stock;
-        return { label: i.name, value: stock.toFixed(0), unit: 'kg' };
-      }) || [];
-
-      setStats({
-        biomass: { total: totalBiomass, details: biomassDetails },
-        consumption: { total: totalFeed, details: feedDetails },
-        mortality: { total: totalMort, percent: (totalMort / totalPop * 100).toFixed(1), details: mortDetails },
-        inventory: { total: totalInv, details: invDetails }
-      });
-    } catch (error) {
-      console.error("Error fetching stats:", error);
     }
   };
 
   const fetchFinanceData = async (unitId: string) => {
     setIsFinanceLoading(true);
     try {
-      const { data: invoices } = await supabase
-        .from('invoices')
-        .select('*')
-        .eq('unit_id', unitId);
+      // Assuming RPC 'get_unit_finance_summary'
+      const { data, error } = await supabase.rpc('get_unit_finance_summary', { p_unit_id: unitId });
       
-      if (invoices) {
-        const total = invoices.reduce((acc, inv) => acc + (Number(inv.total) || 0), 0);
-        const food = invoices.filter(inv => inv.category === 'alimento').reduce((acc, inv) => acc + (Number(inv.total) || 0), 0);
-        const seeds = invoices.filter(inv => inv.category === 'alevinos').reduce((acc, inv) => acc + (Number(inv.total) || 0), 0);
-        const pending = invoices.filter(inv => inv.status === 'pendiente').reduce((acc, inv) => acc + (Number(inv.total) || 0), 0);
-        
-        setFinanceData({ total, food, seeds, pending });
+      if (error) throw error;
+      if (data) {
+        setFinanceData(data as FinanceData);
       }
-    } catch (error) {
-      console.error("Error fetching finance data:", error);
+    } catch (error: any) {
+      console.error("RPC Error details (Finance):", {
+        message: error?.message,
+        code: error?.code,
+        details: error?.details,
+        hint: error?.hint,
+      });
     } finally {
       setIsFinanceLoading(false);
     }
@@ -278,7 +220,7 @@ export default function Dashboard() {
       setIsChartLoading(true);
 
       try {
-        let data: any[] = [];
+        let data: ChartDataPoint[] = [];
         const thirtyDaysAgo = new Date();
         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
@@ -361,7 +303,6 @@ export default function Dashboard() {
   const currentPond = ponds.find(p => p.id === selectedPond);
 
   const isAdminOrOwner = userRole === 'admin' || userRole === 'propietario';
-  const isOperatorOrTech = userRole === 'tecnico' || userRole === 'operario';
 
   // Alert Evaluation for Mortality
   const isMortalityAlert = parseFloat(stats.mortality.percent) > alertThresholds.mortalityMax;
@@ -442,7 +383,7 @@ export default function Dashboard() {
         />
         
         <AnimatePresence mode="wait">
-          {userRole === 'cargando...' ? (
+          {isLoadingRole ? (
             <div className="card-premium" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
               <Loader2 className="animate-spin" color="var(--primary)" size={32} />
             </div>

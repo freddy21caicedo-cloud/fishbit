@@ -3,10 +3,11 @@
 import { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from './AuthProvider';
+import type { Unit } from '@/lib/database.types';
 
 interface UnitContextType {
   activeUnitId: string | null;
-  activeUnit: any;
+  activeUnit: Unit | null;
   loading: boolean;
   setActiveUnitId: (id: string) => void;
   refreshUnitData: () => Promise<void>;
@@ -17,7 +18,7 @@ const UnitContext = createContext<UnitContextType | null>(null);
 export function UnitProvider({ children }: { children: React.ReactNode }) {
   const { session } = useAuth();
   const [activeUnitId, setInternalActiveUnitId] = useState<string | null>(null);
-  const [activeUnit, setActiveUnit] = useState<any>(null);
+  const [activeUnit, setActiveUnit] = useState<Unit | null>(null);
   const [loading, setLoading] = useState(true);
 
   const fetchUnitData = useCallback(async (unitId: string) => {

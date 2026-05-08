@@ -3,14 +3,15 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useRouter, usePathname } from 'next/navigation';
+import type { Session } from '@supabase/supabase-js';
 
 const AuthContext = createContext<{
-  session: any;
+  session: Session | null;
   loading: boolean;
 } | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [session, setSession] = useState<any>(null);
+  const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
   const pathname = usePathname();
@@ -20,24 +21,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setLoading(false);
-      handleAuth(session);
     });
 
-    // Listen for changes
+    // Listen for auth changes. The pathname dependency is intentionally
+    // removed to avoid re-subscribing on every navigation.
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
-      handleAuth(session);
+      const isAuthPage = pathname === '/' || pathname === '/signup';
+      if (!session && !isAuthPage) {
+        router.push('/');
+      }
     });
 
     return () => subscription.unsubscribe();
-  }, [pathname]);
-
-  const handleAuth = (session: any) => {
-    const isAuthPage = pathname === '/' || pathname === '/signup';
-    if (!session && !isAuthPage) {
-      router.push('/');
-    }
-  };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <AuthContext.Provider value={{ session, loading }}>
