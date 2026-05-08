@@ -82,7 +82,7 @@ export default function Dashboard() {
     fetchUserRole();
   }, []);
 
-  // 2. Fetch Unit Data
+  // 2. Fetch Unit Data + Realtime subscription
   useEffect(() => {
     if (!activeUnitId) return;
 
@@ -96,6 +96,21 @@ export default function Dashboard() {
     };
 
     fetchDashboardData();
+
+    // Realtime: re-fetch stats when inventory or alimentacion_diaria changes
+    const channel = supabase
+      .channel(`dashboard-inventory-${activeUnitId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory' }, () => {
+        fetchDetailedStats(activeUnitId);
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'alimentacion_diaria' }, () => {
+        fetchDetailedStats(activeUnitId);
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [activeUnitId]);
 
   const fetchThresholds = async (unitId: string) => {
