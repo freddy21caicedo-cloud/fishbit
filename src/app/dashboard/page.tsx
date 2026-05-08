@@ -184,16 +184,11 @@ export default function Dashboard() {
         unit: 'kg'
       }));
 
-      // --- CONSUMPTION: sum alimentacion_diaria per product reference (current month) ---
-      const startOfMonth = new Date();
-      startOfMonth.setDate(1);
-      startOfMonth.setHours(0, 0, 0, 0);
-
+      // --- CONSUMPTION: total acumulado por referencia de producto (sin límite de fecha) ---
       const { data: alimentData } = await supabase
         .from('alimentacion_diaria')
         .select('quantity_kg, inventory_id, inventory(name)')
-        .eq('unit_id', unitId)
-        .gte('date', startOfMonth.toISOString().split('T')[0]);
+        .eq('unit_id', unitId);
 
       // Group by product reference
       const consumptionByProduct: Record<string, { name: string; total: number }> = {};
@@ -409,7 +404,7 @@ export default function Dashboard() {
           title="Consumo Alimento" 
           value={Number(stats.consumption.total).toFixed(0)} 
           unit="kg"
-          change="Mes" 
+          change="Total" 
           icon={Utensils} 
           color="#8b5cf6" 
           details={stats.consumption.details}
