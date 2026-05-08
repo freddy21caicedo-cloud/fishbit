@@ -12,8 +12,7 @@ import {
   Plus,
   History,
   ChevronDown,
-  ChevronRight,
-  Wind
+  ChevronRight
 } from 'lucide-react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
@@ -24,7 +23,6 @@ const recordTypes = [
   { id: 'calidad-agua', label: 'Calidad de Agua', icon: Droplets, color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.1)' },
   { id: 'mortalidad', label: 'Mortalidad', icon: AlertTriangle, color: '#ef4444', bg: 'rgba(239, 68, 68, 0.1)' },
   { id: 'traslado', label: 'Traslado', icon: ArrowRightLeft, color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.1)' },
-  { id: 'aireacion', label: 'Aireación', icon: Wind, color: '#06b6d4', bg: 'rgba(6, 182, 212, 0.1)' },
 ];
 
 const ActionCard = ({ type }: any) => (
@@ -108,13 +106,12 @@ export default function RegistrosPage() {
     }
 
     // 2. Fetch Activity from all tables
-    const [alimentacion, biometrias, calidadAgua, mortalidad, traslados, aireacion] = await Promise.all([
+    const [alimentacion, biometrias, calidadAgua, mortalidad, traslados] = await Promise.all([
       supabase.from('alimentacion_diaria').select('*, estanques(name), inventory(name)').eq('unit_id', activeUnitId).order('date', { ascending: false }).limit(30),
       supabase.from('biometrias').select('*, estanques(name)').eq('unit_id', activeUnitId).order('date', { ascending: false }).limit(30),
       supabase.from('water_quality').select('*, estanques(name)').eq('unit_id', activeUnitId).order('date', { ascending: false }).limit(30),
       supabase.from('mortality').select('*, estanques(name)').eq('unit_id', activeUnitId).order('date', { ascending: false }).limit(30),
       supabase.from('transfers').select('*, origen:estanques!origen_id(name), destino:estanques!destino_id(name)').eq('unit_id', activeUnitId).order('created_at', { ascending: false }).limit(30),
-      supabase.from('aireacion').select('*, estanques(name)').eq('unit_id', activeUnitId).order('date', { ascending: false }).limit(30),
     ]);
 
     // Helper: format water quality params
@@ -166,13 +163,6 @@ export default function RegistrosPage() {
         pond: (t.origen as any)?.name,
         detail: `${t.quantity} ${t.species_name || 'uds'} · de ${(t.origen as any)?.name || '—'} → ${(t.destino as any)?.name || '—'}`,
         rawDate: t.date || t.created_at
-      })),
-      ...(aireacion.data || []).map(a => ({
-        id: `air-${a.id}`,
-        type: 'aireacion',
-        pond: a.estanques?.name,
-        detail: `${a.num_aerators ?? a.quantity ?? '—'} aireador(es) · ${a.hours_operated ?? a.hours ?? '—'} h`,
-        rawDate: a.date || a.created_at
       })),
     ].sort((a, b) => new Date(b.rawDate).getTime() - new Date(a.rawDate).getTime());
 
