@@ -27,6 +27,7 @@ interface InvoicesTableProps {
 
 export function InvoicesTable({ invoices, onRefresh }: InvoicesTableProps) {
   const [invoiceToView, setInvoiceToView] = useState<Invoice | null>(null);
+  const [activeTab, setActiveTab] = useState<'pendientes' | 'historial'>('pendientes');
 
   // 1. Calcular métricas: Total Pendiente
   const totalPendiente = useMemo(() => {
@@ -34,6 +35,10 @@ export function InvoicesTable({ invoices, onRefresh }: InvoicesTableProps) {
       .filter(inv => inv.status === 'pendiente')
       .reduce((sum, inv) => sum + (inv.total || 0), 0);
   }, [invoices]);
+
+  const displayedInvoices = useMemo(() => {
+    return invoices.filter(inv => activeTab === 'pendientes' ? inv.status === 'pendiente' : inv.status === 'pagada');
+  }, [invoices, activeTab]);
 
   // 2. Función para pagar factura y registrar en histórico
   const handleMarcarComoPagada = async (invoice: Invoice) => {
@@ -60,7 +65,7 @@ export function InvoicesTable({ invoices, onRefresh }: InvoicesTableProps) {
         console.warn("No se pudo registrar en historial_gastos. Verifica si la tabla existe.", historyError);
       }
 
-      toast.success("Factura pagada y registrada en el histórico");
+      toast.success("Factura pagada y movida al historial");
       onRefresh();
     } catch (error: any) {
       toast.error("Error al procesar el pago: " + error.message);
@@ -98,9 +103,9 @@ export function InvoicesTable({ invoices, onRefresh }: InvoicesTableProps) {
   return (
     <div style={{ flex: 1, overflowY: 'auto', padding: '0 1.5rem 1.5rem', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
       
-      {/* Indicador de Total Pendiente */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1.5rem', marginTop: '1rem' }}>
-        <div className="glass" style={{ padding: '1.5rem', borderRadius: '20px', borderLeft: '6px solid #ef4444', display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
+      {/* Indicador de Total Pendiente y Tabs */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.5rem', marginTop: '1rem', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div className="glass" style={{ padding: '1.5rem', borderRadius: '20px', borderLeft: '6px solid #ef4444', display: 'flex', alignItems: 'center', gap: '1.25rem', minWidth: '250px' }}>
           <div style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', padding: '0.75rem', borderRadius: '12px' }}>
             <TrendingUp size={28} />
           </div>
@@ -108,6 +113,47 @@ export function InvoicesTable({ invoices, onRefresh }: InvoicesTableProps) {
             <div style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>Cuentas por Pagar</div>
             <div style={{ fontSize: '1.5rem', fontWeight: 950, color: '#ef4444' }}>${totalPendiente.toLocaleString()}</div>
           </div>
+        </div>
+
+        <div style={{ display: 'flex', background: 'rgba(2, 6, 23, 0.03)', padding: '0.3rem', borderRadius: '16px', border: '1px solid var(--border)' }}>
+          <button 
+            onClick={() => setActiveTab('pendientes')}
+            style={{ 
+              padding: '0.6rem 1.25rem', 
+              borderRadius: '12px', 
+              border: 'none', 
+              background: activeTab === 'pendientes' ? 'white' : 'transparent', 
+              color: activeTab === 'pendientes' ? 'var(--foreground)' : 'var(--muted-foreground)', 
+              fontWeight: 800, 
+              cursor: 'pointer', 
+              transition: 'all 0.2s ease',
+              boxShadow: activeTab === 'pendientes' ? 'var(--shadow-sm)' : 'none',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}
+          >
+            <Clock size={16} /> Pendientes
+          </button>
+          <button 
+            onClick={() => setActiveTab('historial')}
+            style={{ 
+              padding: '0.6rem 1.25rem', 
+              borderRadius: '12px', 
+              border: 'none', 
+              background: activeTab === 'historial' ? 'white' : 'transparent', 
+              color: activeTab === 'historial' ? 'var(--foreground)' : 'var(--muted-foreground)', 
+              fontWeight: 800, 
+              cursor: 'pointer', 
+              transition: 'all 0.2s ease',
+              boxShadow: activeTab === 'historial' ? 'var(--shadow-sm)' : 'none',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}
+          >
+            <CheckCircle2 size={16} /> Historial
+          </button>
         </div>
       </div>
 
@@ -123,17 +169,17 @@ export function InvoicesTable({ invoices, onRefresh }: InvoicesTableProps) {
               </tr>
             </thead>
             <tbody>
-              {invoices.length === 0 ? (
+              {displayedInvoices.length === 0 ? (
                 <tr>
                   <td colSpan={4} style={{ padding: '3rem', textAlign: 'center', color: 'var(--muted-foreground)' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
                       <FileText size={48} opacity={0.2} />
-                      <p style={{ fontWeight: 600 }}>No hay facturas registradas en esta categoría.</p>
+                      <p style={{ fontWeight: 600 }}>No hay facturas en esta vista.</p>
                     </div>
                   </td>
                 </tr>
               ) : (
-                invoices.map((inv) => {
+                displayedInvoices.map((inv) => {
                   const today = new Date();
                   const vDate = new Date(inv.date);
                   if (inv.credit_days) vDate.setDate(vDate.getDate() + inv.credit_days);
@@ -177,7 +223,7 @@ export function InvoicesTable({ invoices, onRefresh }: InvoicesTableProps) {
                               className="btn-primary"
                               style={{ padding: '0.5rem 1rem', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '0.5rem', background: '#10b981', boxShadow: '0 4px 12px rgba(16, 185, 129, 0.2)' }}
                             >
-                              <CheckCircle2 size={14} /> <span className="hidden sm:inline">Pagar</span>
+                              <CheckCircle2 size={14} /> <span className="hidden sm:inline">Marcar como Paga</span>
                             </button>
                           )}
                           <button 

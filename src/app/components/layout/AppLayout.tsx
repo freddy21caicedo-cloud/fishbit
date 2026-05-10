@@ -16,7 +16,9 @@ import {
   Fish,
   Package,
   Shield,
-  LogOut
+  LogOut,
+  Menu,
+  X
 } from "lucide-react";
 
 interface AppLayoutProps {
@@ -30,6 +32,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
   const [width, setWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1200);
   const [userRole, setUserRole] = useState<string | null>(null);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     let timeoutId: NodeJS.Timeout;
@@ -103,25 +106,42 @@ export default function AppLayout({ children }: AppLayoutProps) {
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--background)' }}>
-      {/* Sidebar - Desktop & Tablet */}
-      {!isMobile && (
-        <aside style={{
-          width: sidebarWidth,
-          background: 'var(--card)',
-          borderRight: '1px solid var(--border)',
-          display: 'flex',
-          flexDirection: 'column',
-          position: 'fixed',
-          height: '100vh',
-          zIndex: 100,
-          transition: 'width 0.3s ease',
-          overflow: 'hidden'
-        }}>
-          <div style={{ padding: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
+      {/* Mobile Menu Backdrop */}
+      {isMobile && isMobileMenuOpen && (
+        <div 
+          onClick={() => setIsMobileMenuOpen(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.5)',
+            zIndex: 998,
+            backdropFilter: 'blur(4px)'
+          }}
+        />
+      )}
+
+      {/* Sidebar - Desktop, Tablet & Mobile Drawer */}
+      <aside style={{
+        width: isMobile ? '240px' : sidebarWidth,
+        transform: isMobile ? (isMobileMenuOpen ? 'translateX(0)' : 'translateX(-100%)') : 'none',
+        background: 'var(--card)',
+        borderRight: '1px solid var(--border)',
+        display: 'flex',
+        flexDirection: 'column',
+        position: 'fixed',
+        height: '100vh',
+        zIndex: 999,
+        transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), width 0.3s ease',
+        overflow: 'hidden',
+        left: 0,
+        top: 0
+      }}>
+        <div style={{ padding: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
             <div style={{ background: 'var(--primary)', minWidth: '32px', height: '32px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white' }}>
               <Fish size={20} />
             </div>
-            {isDesktop && (
+            {(isDesktop || isMobile) && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
                 <span style={{ fontWeight: 900, fontSize: '1.4rem', lineHeight: 1.1, letterSpacing: '-0.03em' }}>FishBit</span>
                 <span style={{ 
@@ -142,166 +162,121 @@ export default function AppLayout({ children }: AppLayoutProps) {
               </div>
             )}
           </div>
-
-          <nav style={{ flex: 1, padding: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-            {filteredMenu.map((item) => {
-              const Icon = item.icon;
-              const active = pathname === item.href;
-              return (
-                <Link 
-                  key={item.href} 
-                  href={item.href}
-                  className={`nav-item ${active ? 'active' : ''}`}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.75rem',
-                    padding: '0.75rem',
-                    borderRadius: '8px',
-                    color: active ? 'var(--primary)' : 'var(--muted-foreground)',
-                    background: active ? 'rgba(37, 99, 235, 0.1)' : 'transparent',
-                    textDecoration: 'none',
-                    fontWeight: active ? 700 : 500,
-                    whiteSpace: 'nowrap'
-                  }}
-                  title={isTablet ? item.label : ''}
-                >
-                  <Icon size={20} />
-                  {isDesktop && <span>{item.label}</span>}
-                </Link>
-              );
-            })}
-
-            <div style={{ margin: '1rem 0.5rem', height: '1px', background: 'var(--border)', opacity: 0.5 }} />
-            
-            {filteredSecondary.map((item) => {
-              const Icon = item.icon;
-              const active = pathname === item.href;
-              return (
-                <Link 
-                  key={item.href} 
-                  href={item.href}
-                  className={`nav-item ${active ? 'active' : ''}`}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.75rem',
-                    padding: '0.75rem',
-                    borderRadius: '8px',
-                    color: active ? 'var(--primary)' : 'var(--muted-foreground)',
-                    background: active ? 'rgba(37, 99, 235, 0.1)' : 'transparent',
-                    textDecoration: 'none',
-                    fontWeight: active ? 700 : 500,
-                    whiteSpace: 'nowrap'
-                  }}
-                  title={isTablet ? item.label : ''}
-                >
-                  <Icon size={20} />
-                  {isDesktop && <span>{item.label}</span>}
-                </Link>
-              );
-            })}
-          </nav>
-
-          <div style={{ padding: '0.5rem', borderTop: '1px solid var(--border)' }}>
-            <button
-              onClick={handleLogout}
-              style={{
-                width: '100%',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.75rem',
-                padding: '0.75rem',
-                borderRadius: '8px',
-                color: '#ef4444',
-                background: 'transparent',
-                border: 'none',
-                cursor: 'pointer',
-                fontWeight: 600,
-                whiteSpace: 'nowrap',
-                transition: 'background 0.2s'
-              }}
-              onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.05)'}
-              onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
-            >
-              <LogOut size={20} />
-              {isDesktop && <span>Cerrar Sesión</span>}
+          {isMobile && (
+            <button onClick={() => setIsMobileMenuOpen(false)} style={{ background: 'transparent', border: 'none', color: 'var(--muted-foreground)', cursor: 'pointer' }}>
+              <X size={24} />
             </button>
-          </div>
-        </aside>
-      )}
+          )}
+        </div>
 
-      {/* Main Content */}
-      <main style={{ 
-        flex: 1, 
-        marginLeft: isMobile ? '0' : sidebarWidth,
-        paddingBottom: isMobile ? '70px' : '0',
-        transition: 'margin-left 0.3s ease'
-      }}>
-        {children}
-      </main>
-
-      {/* Bottom Navigation - Mobile Only */}
-      {isMobile && (
-        <nav style={{
-          position: 'fixed',
-          bottom: 0,
-          left: 0,
-          right: 0,
-          height: '64px',
-          background: 'rgba(255, 255, 255, 0.8)',
-          backdropFilter: 'blur(10px)',
-          borderTop: '1px solid var(--border)',
-          display: 'flex',
-          justifyContent: 'space-around',
-          alignItems: 'center',
-          zIndex: 1000,
-          padding: '0 0.5rem'
-        }}>
-          {filteredMenu.slice(0, 4).map((item) => {
+        <nav style={{ flex: 1, padding: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.25rem', overflowY: 'auto' }}>
+          {filteredMenu.map((item) => {
             const Icon = item.icon;
             const active = pathname === item.href;
             return (
               <Link 
                 key={item.href} 
                 href={item.href}
+                onClick={() => isMobile && setIsMobileMenuOpen(false)}
+                className={`nav-item ${active ? 'active' : ''}`}
                 style={{
                   display: 'flex',
-                  flexDirection: 'column',
                   alignItems: 'center',
-                  gap: '4px',
+                  gap: '0.75rem',
+                  padding: '0.75rem',
+                  borderRadius: '8px',
                   color: active ? 'var(--primary)' : 'var(--muted-foreground)',
+                  background: active ? 'rgba(37, 99, 235, 0.1)' : 'transparent',
                   textDecoration: 'none',
-                  fontSize: '0.65rem',
-                  fontWeight: 800,
-                  flex: 1
+                  fontWeight: active ? 700 : 500,
+                  whiteSpace: 'nowrap'
                 }}
+                title={isTablet ? item.label : ''}
               >
                 <Icon size={20} />
-                <span>{item.label.split(' ')[0]}</span>
+                {(isDesktop || isMobile) && <span>{item.label}</span>}
               </Link>
             );
           })}
+
+          <div style={{ margin: '1rem 0.5rem', height: '1px', background: 'var(--border)', opacity: 0.5 }} />
+          
+          {filteredSecondary.map((item) => {
+            const Icon = item.icon;
+            const active = pathname === item.href;
+            return (
+              <Link 
+                key={item.href} 
+                href={item.href}
+                onClick={() => isMobile && setIsMobileMenuOpen(false)}
+                className={`nav-item ${active ? 'active' : ''}`}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.75rem',
+                  padding: '0.75rem',
+                  borderRadius: '8px',
+                  color: active ? 'var(--primary)' : 'var(--muted-foreground)',
+                  background: active ? 'rgba(37, 99, 235, 0.1)' : 'transparent',
+                  textDecoration: 'none',
+                  fontWeight: active ? 700 : 500,
+                  whiteSpace: 'nowrap'
+                }}
+                title={isTablet ? item.label : ''}
+              >
+                <Icon size={20} />
+                {(isDesktop || isMobile) && <span>{item.label}</span>}
+              </Link>
+            );
+          })}
+        </nav>
+
+        <div style={{ padding: '0.5rem', borderTop: '1px solid var(--border)' }}>
           <button
             onClick={handleLogout}
             style={{
+              width: '100%',
               display: 'flex',
-              flexDirection: 'column',
               alignItems: 'center',
-              gap: '4px',
+              gap: '0.75rem',
+              padding: '0.75rem',
+              borderRadius: '8px',
               color: '#ef4444',
               background: 'transparent',
               border: 'none',
-              fontSize: '0.65rem',
-              fontWeight: 800,
-              flex: 1
+              cursor: 'pointer',
+              fontWeight: 600,
+              whiteSpace: 'nowrap',
+              transition: 'background 0.2s'
             }}
+            onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.05)'}
+            onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
           >
             <LogOut size={20} />
-            <span>Salir</span>
+            {(isDesktop || isMobile) && <span>Cerrar Sesión</span>}
           </button>
-        </nav>
-      )}
+        </div>
+      </aside>
+
+      {/* Main Content */}
+      <main style={{ 
+        flex: 1, 
+        marginLeft: isMobile ? '0' : sidebarWidth,
+        transition: 'margin-left 0.3s ease'
+      }}>
+        {/* Mobile menu FAB toggle */}
+        {isMobile && !isMobileMenuOpen && (
+          <button 
+            onClick={() => setIsMobileMenuOpen(true)}
+            className="mobile-menu-fab"
+            title="Abrir Menú"
+          >
+            <Menu size={24} />
+          </button>
+        )}
+        {children}
+      </main>
+
     </div>
   );
 }
