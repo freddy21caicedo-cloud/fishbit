@@ -222,7 +222,7 @@ export default function AlimentacionPage() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', marginBottom: '1.5rem' }}>
             <div className="premium-input-group">
               <label className="premium-label"><Calendar size={14} /> Fecha</label>
-              <input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} className="premium-input" />
+              <input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} className="premium-input" style={{ width: '100%', boxSizing: 'border-box' }} />
             </div>
             <div className="premium-input-group">
               <label className="premium-label"><Waves size={14} /> Estanque</label>

@@ -546,6 +546,8 @@ input[type="number"].premium-input,
 select.premium-input,
 textarea.premium-input {
   width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   min-height: 56px;
   padding: 1rem 1rem;
   font-size: 1rem;
