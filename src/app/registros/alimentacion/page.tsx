@@ -216,15 +216,15 @@ export default function AlimentacionPage() {
         </div>
       </header>
 
-      <div className="responsive-grid-2">
+      <div className="responsive-grid-2" style={{ minWidth: 0 }}>
         {/* Registration Form */}
-        <div className="card-premium" style={{ padding: '1.5rem' }}>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.25rem', marginBottom: '1.5rem' }}>
-            <div className="premium-input-group" style={{ flex: '1 1 200px' }}>
+        <div className="card-premium" style={{ padding: 'clamp(1rem, 3vw, 1.5rem)', minWidth: 0 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '1.25rem', marginBottom: '1.5rem' }}>
+            <div className="premium-input-group">
               <label className="premium-label"><Calendar size={14} /> Fecha</label>
               <input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} className="premium-input" />
             </div>
-            <div className="premium-input-group" style={{ flex: '1 1 200px' }}>
+            <div className="premium-input-group">
               <label className="premium-label"><Waves size={14} /> Estanque</label>
               <select value={estanqueId} onChange={(e) => setEstanqueId(e.target.value)} className="premium-input" style={{ fontWeight: 700 }}>
                 <option value="">Seleccionar...</option>
@@ -370,8 +370,8 @@ export default function AlimentacionPage() {
         </div>
 
         {/* Full Width History Table */}
-        <div style={{ gridColumn: '1 / -1', marginTop: '3rem' }}>
-          <div className="card-premium" style={{ padding: '2rem' }}>
+        <div style={{ gridColumn: '1 / -1', marginTop: '3rem', minWidth: 0 }}>
+          <div className="card-premium" style={{ padding: 'clamp(1rem, 3vw, 2rem)', minWidth: 0 }}>
             <h3 style={{ fontSize: '1.1rem', fontWeight: 800, marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
               <History size={20} style={{ color: 'var(--primary)' }} />
               BitÃ¡cora de AlimentaciÃ³n Diaria
