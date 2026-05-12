@@ -300,8 +300,6 @@ export default function Dashboard() {
 
       try {
         let data: ChartDataPoint[] = [];
-        const thirtyDaysAgo = new Date();
-        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
         const waterQualityParams = [
           'o2_mg_l', 'o2_perc', 'ph', 'temperature_c', 
@@ -314,57 +312,68 @@ export default function Dashboard() {
             .from('water_quality')
             .select('*')
             .eq('estanque_id', selectedPond)
-            .gte('date', thirtyDaysAgo.toISOString())
             .order('date', { ascending: true })
             .order('hour', { ascending: true });
           
-          data = (res as any[])?.map(r => ({ 
-            name: `${r.date.split('-')[2]} ${r.hour}`, 
-            value: parseFloat(parseFloat(r[column]).toFixed(2)) 
+          data = (res as any[])?.filter(r => r.date).map(r => ({ 
+            name: `${r.date.split('-')[2]}/${r.date.split('-')[1]} ${r.hour || ''}`.trim(), 
+            value: parseFloat(parseFloat(r[column] || 0).toFixed(2)) 
           })) || [];
         } else if (selectedParam === 'mortalidad') {
           let query = supabase
             .from('mortality')
             .select('quantity, date')
-            .eq('estanque_id', selectedPond)
-            .gte('date', thirtyDaysAgo.toISOString());
+            .eq('estanque_id', selectedPond);
           
           if (selectedSpecies !== 'Todas') {
             query = query.eq('species_name', selectedSpecies);
           }
 
           const { data: res } = await query.order('date', { ascending: true });
-          data = res?.map(r => ({ 
-            name: r.date.split('-')[2], 
-            value: parseInt(r.quantity) 
-          })) || [];
+          
+          const grouped: Record<string, number> = {};
+          (res || []).forEach(r => {
+            if (!r.date) return;
+            const dateKey = `${r.date.split('-')[2]}/${r.date.split('-')[1]}`;
+            grouped[dateKey] = (grouped[dateKey] || 0) + (parseInt(r.quantity) || 0);
+          });
+          
+          data = Object.entries(grouped).map(([name, value]) => ({ name, value }));
         } else if (selectedParam === 'biomasa') {
           let query = supabase
             .from('biometrias')
             .select('total_biomass_kg, date')
-            .eq('estanque_id', selectedPond)
-            .gte('date', thirtyDaysAgo.toISOString());
+            .eq('estanque_id', selectedPond);
 
           if (selectedSpecies !== 'Todas') {
             query = query.eq('species_name', selectedSpecies);
           }
 
           const { data: res } = await query.order('date', { ascending: true });
-          data = res?.map(r => ({ 
-            name: r.date.split('-')[2], 
-            value: parseFloat(parseFloat(r.total_biomass_kg).toFixed(1)) 
-          })) || [];
+          
+          const grouped: Record<string, number> = {};
+          (res || []).forEach(r => {
+            if (!r.date) return;
+            const dateKey = `${r.date.split('-')[2]}/${r.date.split('-')[1]}`;
+            grouped[dateKey] = (grouped[dateKey] || 0) + (parseFloat(r.total_biomass_kg) || 0);
+          });
+          
+          data = Object.entries(grouped).map(([name, value]) => ({ name, value: parseFloat(value.toFixed(1)) }));
         } else if (selectedParam === 'consumo') {
           const { data: res } = await supabase
             .from('alimentacion_diaria')
             .select('quantity_kg, date')
             .eq('estanque_id', selectedPond)
-            .gte('date', thirtyDaysAgo.toISOString())
             .order('date', { ascending: true });
-          data = res?.map(r => ({ 
-            name: r.date.split('-')[2], 
-            value: parseFloat(parseFloat(r.quantity_kg).toFixed(1)) 
-          })) || [];
+            
+          const grouped: Record<string, number> = {};
+          (res || []).forEach(r => {
+            if (!r.date) return;
+            const dateKey = `${r.date.split('-')[2]}/${r.date.split('-')[1]}`;
+            grouped[dateKey] = (grouped[dateKey] || 0) + (parseFloat(r.quantity_kg) || 0);
+          });
+          
+          data = Object.entries(grouped).map(([name, value]) => ({ name, value: parseFloat(value.toFixed(1)) }));
         }
 
         setChartData(data);

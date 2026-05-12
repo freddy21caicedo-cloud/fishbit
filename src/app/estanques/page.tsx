@@ -287,7 +287,7 @@ const PondCard = ({ pond, handleDeleteSiembra, handleEditClick }: any) => {
   ];
 
   return (
-    <div style={{ perspective: '1000px', cursor: 'pointer', height: '100%', display: 'flex', flexDirection: 'column' }} onClick={handleFlip}>
+    <motion.div whileHover={{ y: -4 }} style={{ perspective: '1000px', cursor: 'pointer', height: '100%', display: 'flex', flexDirection: 'column' }} onClick={handleFlip}>
       <motion.div
         animate={{ rotateY: isFlipped ? 180 : 0 }}
         transition={{ duration: 0.6, type: 'spring', stiffness: 260, damping: 20 }}
@@ -295,7 +295,7 @@ const PondCard = ({ pond, handleDeleteSiembra, handleEditClick }: any) => {
       >
         {/* FRENTE */}
         <div style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden', display: 'flex', flexDirection: 'column', height: '100%', ...(isFlipped ? { position: 'absolute', top: 0, left: 0, width: '100%' } : { position: 'relative' }) }}>
-          <motion.div whileHover={{ y: -4 }} className="card-premium" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', border: `2px solid ${pond.color}`, borderRadius: '16px', height: '100%' }}>
+          <div className="card-premium" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', border: `2px solid ${pond.color}`, borderRadius: '16px', height: '100%', backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <h3 style={{ fontSize: '1.25rem', fontWeight: 800 }}>{pond.name}</h3>
               <div style={{ display: 'flex', gap: '0.5rem' }}>
@@ -339,12 +339,12 @@ const PondCard = ({ pond, handleDeleteSiembra, handleEditClick }: any) => {
               <div onClick={stopProp}><Link href={`/mantenimiento?estanque=${pond.id}`}><ActionButton icon={Settings} label="Mantenimiento" color="#3b82f6" /></Link></div>
               <div onClick={stopProp}><Link href={`/aireacion?estanque=${pond.id}`}><ActionButton icon={Wind} label="Aireación" color="#06b6d4" /></Link></div>
             </div>
-          </motion.div>
+          </div>
         </div>
 
         {/* REVERSO */}
         <div style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden', transform: 'rotateY(180deg)', display: 'flex', flexDirection: 'column', height: '100%', ...(!isFlipped ? { position: 'absolute', top: 0, left: 0, width: '100%' } : { position: 'relative' }) }}>
-          <motion.div whileHover={{ y: -4 }} className="card-premium" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', border: `2px solid ${pond.color}`, borderRadius: '16px', height: '100%' }}>
+          <div className="card-premium" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', border: `2px solid ${pond.color}`, borderRadius: '16px', height: '100%', backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <h3 style={{ fontSize: '1.1rem', fontWeight: 900, color: 'var(--primary)' }}>{pond.name} · KPIs</h3>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.7rem', fontWeight: 900, color: pond.color, background: `${pond.color}18`, padding: '4px 10px', borderRadius: '20px' }}>
@@ -383,10 +383,10 @@ const PondCard = ({ pond, handleDeleteSiembra, handleEditClick }: any) => {
                 )}
               </div>
             </div>
-          </motion.div>
+          </div>
         </div>
       </motion.div>
-    </div>
+    </motion.div>
   );
 };
 

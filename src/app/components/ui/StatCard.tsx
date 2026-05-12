@@ -76,10 +76,10 @@ export function StatCard({ title, value, unit, change, icon: Icon, color, detail
               )}
             </div>
             <div>
-              <div style={{ fontSize: '1.75rem', fontWeight: 900, marginBottom: '0.1rem', letterSpacing: '-0.02em', color: displayColor, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                {displayValue} 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                  <span style={{ fontSize: '0.9rem', fontWeight: 700, opacity: 0.6, color: isAlert ? '#ef4444' : 'inherit' }}>{unit}</span>
+              <div style={{ fontSize: 'clamp(1.3rem, 5vw, 1.75rem)', fontWeight: 900, marginBottom: '0.1rem', letterSpacing: '-0.02em', color: displayColor, display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap', lineHeight: 1.1 }}>
+                <span>{displayValue}</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 'clamp(0.7rem, 2.5vw, 0.9rem)', fontWeight: 700, opacity: 0.6, color: isAlert ? '#ef4444' : 'inherit' }}>{unit}</span>
                   {isAlert && (
                     <span style={{ background: '#ef4444', color: 'white', padding: '2px 6px', borderRadius: '6px', fontSize: '0.6rem', fontWeight: 950, letterSpacing: '0.05em' }}>ALTO</span>
                   )}

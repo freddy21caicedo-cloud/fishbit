@@ -130,14 +130,9 @@ export function TrendsChart({
     return null;
   }, [selectedParam, thresholds]);
 
-    const displayData = useMemo(() => {
-    if (data.length > 0) return data;
-    if (currentThresholds) {
-      // Return a ghost point to force axis rendering
-      return [{ name: 'S/D', value: null }];
-    }
-    return [];
-  }, [data, currentThresholds]);
+  const displayData = useMemo(() => {
+    return data.length > 0 ? data : [];
+  }, [data]);
 
   const showSpeciesFilter = isPolyculture && (selectedParam === 'mortalidad' || selectedParam === 'biomasa');
 
@@ -231,8 +226,8 @@ export function TrendsChart({
           )}
         </AnimatePresence>
         
-        <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={displayData} margin={{ top: 30, right: 10, left: 0, bottom: 0 }}>
+        <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+          <AreaChart data={displayData} margin={{ top: 50, right: 30, left: 10, bottom: 0 }}>
             <defs>
               <linearGradient id="colorGradient" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="5%" stopColor={getParamColor()} stopOpacity={0.3}/>
@@ -271,10 +266,11 @@ export function TrendsChart({
               dy={15}
             />
             <YAxis 
+              width={65}
               axisLine={false} 
               tickLine={false} 
               tick={{ fontSize: 11, fill: '#94a3b8', fontWeight: 700 }} 
-              dx={-10}
+              dx={-5}
               tickFormatter={(val: any) => typeof val === 'number' ? val.toLocaleString('es-CO', { maximumFractionDigits: 2 }) : val}
               domain={[
                 (dataMin: number) => {
@@ -323,7 +319,7 @@ export function TrendsChart({
         {data.length === 0 && !isLoading && (
           <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '0.5rem', pointerEvents: 'none', zIndex: 5 }}>
             <p style={{ color: 'rgba(148, 163, 184, 0.5)', fontWeight: 900, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
-              Sin registros en este periodo
+              Sin registros históricos
             </p>
           </div>
         )}
