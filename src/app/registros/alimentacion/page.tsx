@@ -216,10 +216,10 @@ export default function AlimentacionPage() {
         </div>
       </header>
 
-      <div className="responsive-grid-2" style={{ minWidth: 0 }}>
+      <div className="responsive-grid-2" style={{ minWidth: 0, overflowX: 'hidden' }}>
         {/* Registration Form */}
         <div className="card-premium" style={{ padding: 'clamp(1rem, 3vw, 1.5rem)', minWidth: 0 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '1.25rem', marginBottom: '1.5rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '1.25rem', marginBottom: '1.5rem' }}>
             <div className="premium-input-group">
               <label className="premium-label"><Calendar size={14} /> Fecha</label>
               <input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} className="premium-input" />
@@ -280,7 +280,7 @@ export default function AlimentacionPage() {
                   {fcaInfo.status}
                 </div>
               </div>
-              <p style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)', marginTop: '0.5rem' }}>ConversiÃ³n Alimenticia estimada segÃºn Ãºltima biometrÃ­a.</p>
+              <p style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)', marginTop: '0.5rem' }}>Conversión Alimenticia estimada según última biometría.</p>
             </div>
           )}
           {/* Static Detailed Fish Silhouette in corner */}
@@ -300,7 +300,7 @@ export default function AlimentacionPage() {
         <div className="responsive-side-panel" style={{ display: 'flex', flexDirection: 'column', gap: '2rem', flex: 1 }}>
           {/* FCA Gauge Card */}
           <div className="card-premium" style={{ padding: '2rem', textAlign: 'center' }}>
-            <h3 style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--muted-foreground)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '1.5rem' }}>Factor de ConversiÃ³n (F.C.A.)</h3>
+            <h3 style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--muted-foreground)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '1.5rem' }}>Factor de Conversión (F.C.A.)</h3>
             
             <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1rem' }}>
               <motion.div 
@@ -327,7 +327,7 @@ export default function AlimentacionPage() {
                 <div style={{ padding: '0.4rem 1.25rem', borderRadius: '50px', background: fcaInfo.color, color: 'white', fontWeight: 800, fontSize: '0.85rem' }}>
                   {fcaInfo.status}
                 </div>
-                <span style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)' }}>Basado en biometrÃ­a del {lastBiometryData?.date}</span>
+                <span style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)' }}>Basado en biometría del {lastBiometryData?.date}</span>
               </div>
             )}
           </div>
@@ -345,7 +345,7 @@ export default function AlimentacionPage() {
                 </div>
               ) : (
                 <div style={{ fontSize: '0.8rem', color: 'var(--muted-foreground)', textAlign: 'center', padding: '1rem' }}>
-                  {estanqueId ? 'No hay biometrÃ­as previas' : 'Seleccione un estanque'}
+                  {estanqueId ? 'No hay biometrías previas' : 'Seleccione un estanque'}
                 </div>
               )}
             </div>
@@ -374,7 +374,7 @@ export default function AlimentacionPage() {
           <div className="card-premium" style={{ padding: 'clamp(1rem, 3vw, 2rem)', minWidth: 0 }}>
             <h3 style={{ fontSize: '1.1rem', fontWeight: 800, marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
               <History size={20} style={{ color: 'var(--primary)' }} />
-              BitÃ¡cora de AlimentaciÃ³n Diaria
+              Bitácora de Alimentación Diaria
             </h3>
             
             <div style={{ overflowX: 'auto' }}>
