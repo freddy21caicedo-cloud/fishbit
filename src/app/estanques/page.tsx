@@ -291,10 +291,10 @@ const PondCard = ({ pond, handleDeleteSiembra, handleEditClick }: any) => {
       <motion.div
         animate={{ rotateY: isFlipped ? 180 : 0 }}
         transition={{ duration: 0.6, type: 'spring', stiffness: 260, damping: 20 }}
-        style={{ position: 'relative', transformStyle: 'preserve-3d', flex: 1, display: 'flex', flexDirection: 'column' }}
+        style={{ position: 'relative', transformStyle: 'preserve-3d', flex: 1, display: 'grid' }}
       >
         {/* FRENTE */}
-        <div style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden', display: 'flex', flexDirection: 'column', height: '100%', ...(isFlipped ? { position: 'absolute', top: 0, left: 0, width: '100%' } : { position: 'relative' }) }}>
+        <div style={{ gridArea: '1 / 1', backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden', display: 'flex', flexDirection: 'column', height: '100%', opacity: isFlipped ? 0 : 1, pointerEvents: isFlipped ? 'none' : 'auto', transition: 'opacity 0.3s ease' }}>
           <div className="card-premium" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', border: `2px solid ${pond.color}`, borderRadius: '16px', height: '100%', backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <h3 style={{ fontSize: '1.25rem', fontWeight: 800 }}>{pond.name}</h3>
@@ -343,7 +343,7 @@ const PondCard = ({ pond, handleDeleteSiembra, handleEditClick }: any) => {
         </div>
 
         {/* REVERSO */}
-        <div style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden', transform: 'rotateY(180deg)', display: 'flex', flexDirection: 'column', height: '100%', ...(!isFlipped ? { position: 'absolute', top: 0, left: 0, width: '100%' } : { position: 'relative' }) }}>
+        <div style={{ gridArea: '1 / 1', backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden', transform: 'rotateY(180deg)', display: 'flex', flexDirection: 'column', height: '100%', opacity: !isFlipped ? 0 : 1, pointerEvents: !isFlipped ? 'none' : 'auto', transition: 'opacity 0.3s ease' }}>
           <div className="card-premium" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', border: `2px solid ${pond.color}`, borderRadius: '16px', height: '100%', backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <h3 style={{ fontSize: '1.1rem', fontWeight: 900, color: 'var(--primary)' }}>{pond.name} · KPIs</h3>
