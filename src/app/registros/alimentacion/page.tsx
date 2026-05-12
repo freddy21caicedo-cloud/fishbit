@@ -219,7 +219,7 @@ export default function AlimentacionPage() {
       <div className="responsive-grid-2" style={{ minWidth: 0, overflowX: 'hidden' }}>
         {/* Registration Form */}
         <div className="card-premium" style={{ padding: 'clamp(1rem, 3vw, 1.5rem)', minWidth: 0 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '1.25rem', marginBottom: '1.5rem' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', marginBottom: '1.5rem' }}>
             <div className="premium-input-group">
               <label className="premium-label"><Calendar size={14} /> Fecha</label>
               <input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} className="premium-input" />
