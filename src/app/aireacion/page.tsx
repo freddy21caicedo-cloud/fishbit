@@ -45,19 +45,15 @@ export default function AireacionPage() {
       const { data: invData } = await supabase.from('inventory').select('*').eq('category', 'aireadores').eq('unit_id', activeUnitId);
       setInventory(invData || []);
 
-      // Load persistent configuration
+      // Load persistent configuration from Supabase
       if (estanqueId) {
-        const savedConfig = localStorage.getItem(`aireadores_config_${estanqueId}`);
-        if (savedConfig) {
-          setActiveAireadores(JSON.parse(savedConfig));
-        } else {
-          // Demo data only if nothing saved
-          const demo = [
-            { id: 'd1', inventory_id: null, nombre: 'Aireador 01 - Splash 1HP', status: 'ON', hours: '12', consumption: '0.75' },
-            { id: 'd2', inventory_id: null, nombre: 'Aireador 02 - Inyector 2HP', status: 'OFF', hours: '0', consumption: '1.5' },
-          ];
-          setActiveAireadores(demo);
-        }
+        const { data: configData } = await supabase
+          .from('aireacion_config')
+          .select('aireadores')
+          .eq('estanque_id', estanqueId)
+          .single();
+
+        setActiveAireadores(configData?.aireadores || []);
       }
     } catch (error: any) {
       toast.error("Error al cargar datos: " + error.message);
@@ -115,8 +111,13 @@ export default function AireacionPage() {
     const registerPromise = async () => {
       const activeUnitId = localStorage.getItem('active_unit_id');
       
-      // Persist configuration locally
-      localStorage.setItem(`aireadores_config_${estanqueId}`, JSON.stringify(activeAireadores));
+      // Persist configuration to Supabase
+      await supabase
+        .from('aireacion_config')
+        .upsert(
+          { estanque_id: estanqueId, unit_id: activeUnitId, aireadores: activeAireadores, updated_at: new Date().toISOString() },
+          { onConflict: 'estanque_id' }
+        );
 
       const operations = activeAireadores.map(async (air) => {
         const { error } = await supabase.from('aireacion_logs').insert([{

@@ -113,6 +113,10 @@ export default function SuperAdminHub() {
       setProfiles(processedProfiles);
       setSubscriptions(processedSubs);
       setTickets(processedTickets);
+
+      // Bug #14 fix: compute total revenue from active subscriptions
+      const revenue = subsData.reduce((sum: number, s: any) => sum + (parseFloat(s.price) || 0), 0);
+      setTotalRevenue(revenue);
     } catch (err: any) {
       toast.error("Error al sincronizar datos maestro.");
     } finally {

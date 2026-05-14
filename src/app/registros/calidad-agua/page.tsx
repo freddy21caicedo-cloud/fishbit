@@ -169,6 +169,10 @@ export default function CalidadAguaPage() {
                 <label className="premium-label"><Droplets size={14} /> Oxígeno (mg/L)</label>
                 <input type="number" step="0.1" value={oxigeno} onChange={(e) => setOxigeno(e.target.value)} placeholder="0.0" className="premium-input" />
               </div>
+              <div className="premium-input-group">
+                <label className="premium-label"><Droplets size={14} /> Oxígeno (%)</label>
+                <input type="number" step="0.1" value={oxigenoPorc} onChange={(e) => setOxigenoPorc(e.target.value)} placeholder="0.0" className="premium-input" />
+              </div>
             </div>
 
             <div className="responsive-grid-3">
@@ -255,19 +259,19 @@ export default function CalidadAguaPage() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.5rem' }}>
                 <span>Oxígeno (mg/L)</span>
-                <span style={{ fontWeight: 700 }}>5.0 - 8.0</span>
+                <span style={{ fontWeight: 700 }}>4.0 - 10.0</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.5rem' }}>
                 <span>pH</span>
-                <span style={{ fontWeight: 700 }}>7.0 - 8.0</span>
+                <span style={{ fontWeight: 700 }}>6.5 - 8.5</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.5rem' }}>
                 <span>Amonio (mg/L)</span>
-                <span style={{ fontWeight: 700 }}>&lt; 0.05</span>
+                <span style={{ fontWeight: 700 }}>&lt; 0.10</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
                 <span>Nitrito (mg/L)</span>
-                <span style={{ fontWeight: 700 }}>&lt; 0.1</span>
+                <span style={{ fontWeight: 700 }}>&lt; 0.50</span>
               </div>
             </div>
           </div>

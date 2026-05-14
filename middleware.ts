@@ -65,7 +65,12 @@ export async function middleware(request: NextRequest) {
     request.nextUrl.pathname.startsWith('/siembra') ||
     request.nextUrl.pathname.startsWith('/registros') ||
     request.nextUrl.pathname.startsWith('/perfil') ||
-    request.nextUrl.pathname.startsWith('/configuracion')
+    request.nextUrl.pathname.startsWith('/configuracion') ||
+    request.nextUrl.pathname.startsWith('/aireacion') ||
+    request.nextUrl.pathname.startsWith('/mantenimiento') ||
+    request.nextUrl.pathname.startsWith('/tratamiento') ||
+    request.nextUrl.pathname.startsWith('/almacen') ||
+    request.nextUrl.pathname.startsWith('/ayuda')
 
   if (isProtectedRoute && !user) {
     return NextResponse.redirect(new URL('/', request.url))

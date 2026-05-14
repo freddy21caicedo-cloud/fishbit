@@ -58,15 +58,16 @@ export default function AlimentacionPage() {
   }, [estanqueId]);
 
   const fetchBasicData = async () => {
-    // 1. Fetch Ponds with Fish
+    // 1. Fetch Ponds with Fish (filtered by active unit for multi-tenant isolation)
+    const activeUnitId = localStorage.getItem('active_unit_id');
     const { data: pondsData } = await supabase
       .from('estanques')
       .select('*')
-      .eq('status', 'con_peces');
+      .eq('status', 'con_peces')
+      .eq('unit_id', activeUnitId); // Bug #5 fix: was missing this filter
     setPonds(pondsData || []);
 
     // 2. Fetch Alimento Inventory
-    const activeUnitId = localStorage.getItem('active_unit_id');
     const { data: invData } = await supabase
       .from('inventory')
       .select('*')
@@ -91,7 +92,7 @@ export default function AlimentacionPage() {
     const lastBio = bioData?.[0] || null;
     setLastBiometryData(lastBio);
 
-    // 2. Get Total Food Consumed ONLY FOR THIS BATCH
+    // 2. Get Total Food Consumed FOR THIS BATCH (direct feeding records)
     let query = supabase
       .from('alimentacion_diaria')
       .select('quantity_kg')
@@ -106,8 +107,18 @@ export default function AlimentacionPage() {
     }
 
     const { data: foodData } = await query;
-    const total = (foodData || []).reduce((sum, item) => sum + (parseFloat(item.quantity_kg) || 0), 0);
-    setTotalFoodSinceLastBio(total);
+    const directFood = (foodData || []).reduce((sum, item) => sum + (parseFloat(item.quantity_kg) || 0), 0);
+
+    // 3. Add food inherited from incoming transfers (trazabilidad de traslados)
+    //    food_total_kg = alimento acumulado por los peces antes de llegar a este estanque
+    const { data: transferFood } = await supabase
+      .from('transfers')
+      .select('food_total_kg')
+      .eq('destino_id', id)
+      .not('food_total_kg', 'is', null);
+    const inheritedFood = (transferFood || []).reduce((sum, r) => sum + (parseFloat(r.food_total_kg) || 0), 0);
+
+    setTotalFoodSinceLastBio(directFood + inheritedFood);
   };
 
   useEffect(() => {
@@ -404,7 +415,7 @@ export default function AlimentacionPage() {
                   ))}
                   {history.length === 0 && (
                     <tr>
-                      <td colSpan={5} style={{ padding: '3rem', textAlign: 'center', color: 'var(--muted-foreground)' }}>No hay registros de alimentaciÃ³n recientes.</td>
+                      <td colSpan={5} style={{ padding: '3rem', textAlign: 'center', color: 'var(--muted-foreground)' }}>No hay registros de alimentación recientes.</td>
                     </tr>
                   )}
                 </tbody>

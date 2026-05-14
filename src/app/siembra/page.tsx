@@ -34,6 +34,7 @@ interface Estanque {
   status: string;
   current_count?: number;
   current_biomass_kg?: string | number;
+  costo_alevinos_acumulado?: string | number;
 }
 
 interface SpeciesRow {
@@ -53,6 +54,11 @@ export default function SiembraPage() {
   const [hora, setHora] = useState(new Date().toTimeString().slice(0, 5));
   const [estanque, setEstanque] = useState(estanqueParam || '');
   const [estanquesList, setEstanquesList] = useState<Estanque[]>([]);
+
+  // IMPORTANT: rows must be declared BEFORE fetchAlevinosStock to avoid stale-closure reference.
+  const [rows, setRows] = useState<SpeciesRow[]>([
+    { id: typeof crypto !== 'undefined' ? crypto.randomUUID() : '1', especie: '', cantidad: '', pesoPromedio: '' }
+  ]);
 
   useEffect(() => {
     fetchAlevinosStock();
@@ -91,6 +97,7 @@ export default function SiembraPage() {
   const fetchEstanques = async () => {
     try {
       const activeUnitId = typeof window !== 'undefined' ? localStorage.getItem('active_unit_id') : null;
+      if (!activeUnitId) return; // Bug #13 fix: guard against null unitId
       const { data, error } = await supabase
         .from('estanques')
         .select('*')
@@ -127,7 +134,8 @@ export default function SiembraPage() {
 
     const finalizePromise = async () => {
       // 1. Create Seeding Header
-      const batchId = `LOTE-${new Date().toISOString().slice(2,10).replace(/-/g,'')}-${pond.name.replace(/\s+/g,'').toUpperCase()}`;
+      const speciesCode = rows.length === 1 ? rows[0].especie.slice(0, 3).toUpperCase() : 'POLI';
+      const batchId = `LOTE-${new Date().toISOString().slice(2, 10).replace(/-/g, '')}-${speciesCode}-${pond.name.replace(/\s+/g, '').toUpperCase()}`;
       const totalQty = rows.reduce((acc, r) => acc + (parseInt(r.cantidad) || 0), 0);
       
       const { data: siembraData, error: siembraError } = await supabase
@@ -150,28 +158,56 @@ export default function SiembraPage() {
       const siembraId = siembraData[0].id;
       const isPolyculture = rows.length > 1;
 
-        // 2. Prepare Details for Bulk Insert
-        const detailsToInsert = rows.map(row => {
+        // 2. Prepare Details for Bulk Insert (with cost tracking per row)
+        const detailsToInsert = await Promise.all(rows.map(async row => {
           const qty = parseInt(row.cantidad) || 0;
           const weight = parseFloat(row.pesoPromedio) || 0;
           const bio = (qty * weight) / 1000;
           const stockItem = alevinosStock.find(s => s.especie === row.especie);
-          
+
+          // Buscar costo promedio del alevino por unidad desde facturas
+          const { data: invoiceItemsData } = await supabase
+            .from('invoice_items')
+            .select('quantity, unit_price, invoices!inner(category, unit_id)')
+            .eq('invoices.category', 'alevinos')
+            .eq('invoices.unit_id', activeUnitId)
+            .ilike('product_name', `%${row.especie}%`);
+
+          let costoUnitario = 0;
+          if (invoiceItemsData && invoiceItemsData.length > 0) {
+            const totalQty = invoiceItemsData.reduce((s: number, i: any) => s + (parseFloat(i.quantity) || 0), 0);
+            const totalCost = invoiceItemsData.reduce((s: number, i: any) => s + ((parseFloat(i.quantity) || 0) * (parseFloat(i.unit_price) || 0)), 0);
+            costoUnitario = totalQty > 0 ? totalCost / totalQty : 0;
+          }
+
+          const costoTotalLote = costoUnitario * qty;
+
           return {
             siembra_id: siembraId,
             species_name: row.especie,
             quantity: qty,
             avg_weight_gr: weight,
             biomass_kg: bio,
-            inventory_item_id: stockItem?.id || null
+            inventory_item_id: stockItem?.id || null,
+            costo_unitario_alevino: costoUnitario,
+            costo_total_lote: costoTotalLote
           };
-        });
+        }));
 
         const { error: detailsError } = await supabase
           .from('siembra_details')
           .insert(detailsToInsert);
 
         if (detailsError) throw detailsError;
+
+        // Acumular costo total de alevinos en el estanque
+        const costoAlevinosTotal = detailsToInsert.reduce((s: number, d: any) => s + (d.costo_total_lote || 0), 0);
+        await supabase
+          .from('estanques')
+          .update({
+            costo_alevinos_acumulado: (parseFloat(pond.costo_alevinos_acumulado as string) || 0) + costoAlevinosTotal
+          })
+          .eq('id', pond.id);
 
       // 3. Update Pond Species and Inventory
       for (const row of rows) {
@@ -215,12 +251,27 @@ export default function SiembraPage() {
       }
 
       // 3. Update Pond Global Status
+      // Query actual pond_species count AFTER all inserts/updates above,
+      // so we correctly identify polyculture even when species were stocked
+      // on different dates (each with a single-row form).
+      const { data: allPondSpecies } = await supabase
+        .from('pond_species')
+        .select('id, species_name')
+        .eq('estanque_id', pond.id)
+        .eq('unit_id', activeUnitId);
+
+      const totalSpeciesInPond = allPondSpecies?.length || 0;
+      const finalIsPolyculture = totalSpeciesInPond > 1;
+      const finalSpeciesLabel = finalIsPolyculture
+        ? 'Policultivo'
+        : (allPondSpecies?.[0]?.species_name || rows[0].especie);
+
       const { error: pondUpdateError } = await supabase
         .from('estanques')
         .update({
           status: 'con_peces',
-          is_polyculture: isPolyculture,
-          current_species: isPolyculture ? 'Policultivo' : rows[0].especie,
+          is_polyculture: finalIsPolyculture,
+          current_species: finalSpeciesLabel,
           current_count: (pond.current_count || 0) + totalQty,
           current_biomass_kg: (parseFloat(pond.current_biomass_kg as string) || 0) + totalBiomasa,
           current_batch_id: batchId
@@ -242,9 +293,7 @@ export default function SiembraPage() {
     });
   };
   
-  const [rows, setRows] = useState<SpeciesRow[]>([
-    { id: typeof crypto !== 'undefined' ? crypto.randomUUID() : '1', especie: '', cantidad: '', pesoPromedio: '' }
-  ]);
+  // rows state is declared near the top of the component (before fetchAlevinosStock).
 
   const addRow = () => {
     const newId = typeof crypto !== 'undefined' ? crypto.randomUUID() : Math.random().toString();
@@ -285,7 +334,7 @@ export default function SiembraPage() {
         </Link>
         <div>
           <h1 style={{ fontWeight: 800 }}>Nueva Siembra</h1>
-          <p style={{ color: 'var(--muted-foreground)', fontSize: '0.9rem' }}>Vincular stock de alevinos con la producciÃ³n.</p>
+          <p style={{ color: 'var(--muted-foreground)', fontSize: '0.9rem' }}>Vincular stock de alevinos con la producción.</p>
         </div>
       </header>
 
@@ -507,7 +556,7 @@ export default function SiembraPage() {
               ⚠️ Recomendación Técnica Importante
             </h4>
             <p style={{ fontSize: '0.95rem', color: 'var(--muted-foreground)', lineHeight: 1.5 }}>
-              Para asegurar la supervivencia de los peces, es fundamental realizar la <strong>toma de parÃ¡metros fisicoquÃ­micos</strong> (OxÃ­geno, pH, Temperatura) y registrarlos en el <Link href="/registros" style={{ color: 'var(--primary)', fontWeight: 700, textDecoration: 'underline' }}>mÃ³dulo de registros</Link> antes de iniciar la siembra.
+              Para asegurar la supervivencia de los peces, es fundamental realizar la <strong>toma de parámetros fisicoquímicos</strong> (Oxígeno, pH, Temperatura) y registrarlos en el <Link href="/registros" style={{ color: 'var(--primary)', fontWeight: 700, textDecoration: 'underline' }}>módulo de registros</Link> antes de iniciar la siembra.
             </p>
           </div>
         </div>

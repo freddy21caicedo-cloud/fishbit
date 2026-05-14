@@ -27,7 +27,6 @@ export default function BiometriaPage() {
   const [estanqueId, setEstanqueId] = useState(estanqueParam || '');
   const [estanquesList, setEstanquesList] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-  const [showHistory, setShowHistory] = useState(false);
   const [history, setHistory] = useState<any[]>([]);
   const [biometrias, setBiometrias] = useState<any[]>([]);
 
@@ -64,19 +63,13 @@ export default function BiometriaPage() {
   const selectedPond = estanquesList.find(p => p.id === estanqueId);
 
   // Update rows when pond changes
+  // Always query pond_species directly — do NOT rely on is_polyculture flag.
+  // A pond can have multiple species stocked on different dates, each stocking
+  // individually (is_polyculture=false per stocking), but pond_species will
+  // have one row per species regardless.
   useEffect(() => {
     if (selectedPond) {
-      if (selectedPond.is_polyculture) {
-        fetchPondSpecies(selectedPond.id);
-      } else {
-        setBiometrias([{
-          speciesName: selectedPond.current_species || 'Desconocida',
-          pesoCaptura: '',
-          pecesCapturados: '',
-          poblacionTotal: selectedPond.current_count || 0,
-          biomasaInicial: parseFloat(selectedPond.current_biomass_kg) || 0
-        }]);
-      }
+      fetchPondSpecies(selectedPond.id);
     } else {
       setBiometrias([]);
     }
@@ -91,17 +84,22 @@ export default function BiometriaPage() {
       .eq('estanque_id', pondId)
       .eq('unit_id', activeUnitId);
 
-    // 2. Fetch Latest Siembra Details to get stocking weights
-    const { data: siembraData } = await supabase
+    // Fetch stocking weights from ALL siembras for this pond (not just the latest)
+    // so that each species gets its own stocking weight regardless of stocking date.
+    const { data: allSiembras } = await supabase
       .from('siembras')
       .select('*, siembra_details(*)')
       .eq('estanque_id', pondId)
-      .order('date', { ascending: false })
-      .limit(1);
+      .order('date', { ascending: false });
     
     const stockingWeights: Record<string, number> = {};
-    siembraData?.[0]?.siembra_details?.forEach((sd: any) => {
-      stockingWeights[sd.species_name] = Number(sd.avg_weight_gr) || 0;
+    allSiembras?.forEach((siembra: any) => {
+      siembra.siembra_details?.forEach((sd: any) => {
+        // Keep the most recent weight per species (siembras are ordered desc)
+        if (!stockingWeights[sd.species_name]) {
+          stockingWeights[sd.species_name] = Number(sd.avg_weight_gr) || 0;
+        }
+      });
     });
 
     if (data && data.length > 0) {
@@ -115,6 +113,7 @@ export default function BiometriaPage() {
         pesoSiembra: stockingWeights[s.species_name] || Number(s.avg_weight_gr) || 0
       })));
     } else {
+      // Fallback: no pond_species records — use the pond's top-level fields
       const pond = estanquesList.find(p => p.id === pondId);
       const spName = pond?.current_species && pond.current_species !== 'Policultivo' ? pond.current_species : '';
       setBiometrias([{

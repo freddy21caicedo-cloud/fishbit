@@ -85,6 +85,7 @@ export function TrendsChart({
       case 'mortalidad': return 'Mortalidad (Uds)';
       case 'biomasa': return 'Biomasa (kg)';
       case 'consumo': return 'Alimento (kg)';
+      case 'peso_promedio': return 'Peso Promedio (g)';
       default: return 'Parámetro';
     }
   };
@@ -102,6 +103,7 @@ export function TrendsChart({
       case 'mortalidad': return 'Uds';
       case 'biomasa': return 'kg';
       case 'consumo': return 'kg';
+      case 'peso_promedio': return 'g';
       default: return '';
     }
   };
@@ -115,6 +117,7 @@ export function TrendsChart({
       case 'mortalidad': return '#ef4444';
       case 'biomasa': return '#10b981';
       case 'consumo': return '#ec4899';
+      case 'peso_promedio': return '#f97316'; // warm orange — growth tracking
       default: return '#6366f1';
     }
   };
@@ -134,7 +137,9 @@ export function TrendsChart({
     return data.length > 0 ? data : [];
   }, [data]);
 
-  const showSpeciesFilter = isPolyculture && (selectedParam === 'mortalidad' || selectedParam === 'biomasa');
+  const showSpeciesFilter = isPolyculture && (
+    selectedParam === 'mortalidad' || selectedParam === 'biomasa' || selectedParam === 'peso_promedio'
+  );
 
   return (
     <PremiumCard style={{ padding: 'clamp(1rem, 3vw, 2.5rem)' }}>
@@ -206,6 +211,7 @@ export function TrendsChart({
               <option value="mortalidad">Mortalidad</option>
               <option value="biomasa">Biomasa</option>
               <option value="consumo">Alimento</option>
+              <option value="peso_promedio">Crecimiento (Peso Prom.)</option>
             </optgroup>
           </select>
         </div>

@@ -14,7 +14,13 @@ import { AnimatePresence } from 'framer-motion';
 
 // UI Components
 import { StatCard } from '../components/ui/StatCard';
-import { TrendsChart } from './components/TrendsChart';
+import dynamic from 'next/dynamic';
+
+const TrendsChart = dynamic(() => import('./components/TrendsChart').then(mod => mod.TrendsChart), { 
+  ssr: false,
+  loading: () => <div className="card-premium" style={{ height: '450px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Loader2 className="animate-spin" /></div>
+});
+
 import { FinanceSummary } from './components/FinanceSummary';
 import { FeedInventorySummary } from './components/FeedInventorySummary';
 
@@ -161,16 +167,22 @@ export default function Dashboard() {
         return;
       }
 
-      const currentPond = ponds.find(p => p.id === selectedPond);
-      if (currentPond?.is_polyculture) {
-        const { data } = await supabase
-          .from('pond_species')
-          .select('species_name')
-          .eq('estanque_id', selectedPond);
-        
-        if (data) {
-          setPondSpecies(data);
-        }
+      // Always query pond_species directly — do NOT rely on is_polyculture flag.
+      // A pond where species were stocked on different dates (each with a single
+      // row form) will have is_polyculture=false but multiple pond_species entries.
+      const { data } = await supabase
+        .from('pond_species')
+        .select('species_name')
+        .eq('estanque_id', selectedPond);
+
+      if (data && data.length > 0) {
+        // Deduplicate by species_name
+        const unique = Array.from(
+          new Map(data.map((s: any) => [s.species_name, s])).values()
+        );
+        setPondSpecies(unique);
+        // Reset species filter whenever the pond changes
+        setSelectedSpecies('Todas');
       } else {
         setPondSpecies([]);
         setSelectedSpecies('Todas');
@@ -178,7 +190,7 @@ export default function Dashboard() {
     };
 
     fetchSpecies();
-  }, [selectedPond, ponds]);
+  }, [selectedPond]);
 
   const fetchDetailedStats = async (unitId: string) => {
     try {
@@ -374,6 +386,71 @@ export default function Dashboard() {
           });
           
           data = Object.entries(grouped).map(([name, value]) => ({ name, value: parseFloat(value.toFixed(1)) }));
+
+        } else if (selectedParam === 'peso_promedio') {
+          // Growth curve starting from stocking weight (siembra) as point 0,
+          // followed by biometria records in chronological order.
+
+          // 1. Fetch all siembras for this pond with their details (stocking weights).
+          //    Multiple siembras may exist if species were stocked on different dates.
+          const { data: siembrasData } = await supabase
+            .from('siembras')
+            .select('date, siembra_details(species_name, avg_weight_gr)')
+            .eq('estanque_id', selectedPond)
+            .order('date', { ascending: true });
+
+          // Ordered map to preserve chronological insertion order
+          const orderedPoints: Map<string, { sum: number; count: number }> = new Map();
+
+          // Add stocking weight points from each siembra
+          (siembrasData || []).forEach((siembra: any) => {
+            if (!siembra.date) return;
+            const dateKey = `${siembra.date.split('-')[2]}/${siembra.date.split('-')[1]}`;
+            const details: any[] = siembra.siembra_details || [];
+
+            // Filter details by species if one is selected
+            const relevantDetails = selectedSpecies !== 'Todas'
+              ? details.filter((d: any) => d.species_name === selectedSpecies)
+              : details;
+
+            relevantDetails.forEach((d: any) => {
+              const w = parseFloat(d.avg_weight_gr) || 0;
+              if (w <= 0) return;
+              if (!orderedPoints.has(dateKey)) orderedPoints.set(dateKey, { sum: 0, count: 0 });
+              const pt = orderedPoints.get(dateKey)!;
+              pt.sum += w;
+              pt.count += 1;
+            });
+          });
+
+          // 2. Fetch biometria records
+          let bioQuery = supabase
+            .from('biometrias')
+            .select('avg_weight_gr, date, species_name')
+            .eq('estanque_id', selectedPond);
+
+          if (selectedSpecies !== 'Todas') {
+            bioQuery = bioQuery.eq('species_name', selectedSpecies);
+          }
+
+          const { data: bioRes } = await bioQuery.order('date', { ascending: true });
+
+          // Append biometria points (grouped + averaged per day)
+          (bioRes || []).forEach((r: any) => {
+            if (!r.date) return;
+            const dateKey = `${r.date.split('-')[2]}/${r.date.split('-')[1]}`;
+            if (!orderedPoints.has(dateKey)) orderedPoints.set(dateKey, { sum: 0, count: 0 });
+            const pt = orderedPoints.get(dateKey)!;
+            pt.sum += parseFloat(r.avg_weight_gr) || 0;
+            pt.count += 1;
+          });
+
+          data = Array.from(orderedPoints.entries())
+            .filter(([, { count }]) => count > 0)
+            .map(([name, { sum, count }]) => ({
+              name,
+              value: parseFloat((sum / count).toFixed(1))
+            }));
         }
 
         setChartData(data);
@@ -463,7 +540,7 @@ export default function Dashboard() {
           onPondChange={setSelectedPond}
           onParamChange={setSelectedParam}
           ponds={ponds}
-          isPolyculture={currentPond?.is_polyculture || false}
+          isPolyculture={pondSpecies.length > 1}
           pondSpecies={pondSpecies}
           selectedSpecies={selectedSpecies}
           setSelectedSpecies={setSelectedSpecies}

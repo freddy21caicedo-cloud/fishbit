@@ -4,22 +4,25 @@ import { useEffect, useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
 import { toast } from 'react-hot-toast';
-import { 
-  Plus, 
-  X, 
-  Calculator, 
-  Waves, 
-  Box, 
-  Fish, 
-  FlaskConical, 
-  Settings, 
+import {
+  Plus,
+  X,
+  Calculator,
+  Waves,
+  Box,
+  Fish,
+  FlaskConical,
+  Settings,
   Wind,
   Calendar,
   Hash,
   Dna,
   Pencil,
   Trash2,
-  BadgeDollarSign
+  BadgeDollarSign,
+  Info,
+  ArrowRightLeft,
+  History
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
@@ -73,11 +76,11 @@ const EditTooltip = ({ label, onClick }: { label: string, onClick?: () => void }
           </motion.div>
         )}
       </AnimatePresence>
-      <button 
+      <button
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
         onClick={onClick}
-        className="glass" 
+        className="glass"
         style={{ padding: '0.4rem', borderRadius: '6px', border: '1px solid var(--border)', cursor: 'pointer', color: 'var(--muted-foreground)' }}
       >
         <Pencil size={14} />
@@ -125,7 +128,7 @@ const DeleteTooltip = ({ label, onClick }: { label: string, onClick?: () => void
           </motion.div>
         )}
       </AnimatePresence>
-      <button 
+      <button
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
         onClick={(e) => {
@@ -133,10 +136,66 @@ const DeleteTooltip = ({ label, onClick }: { label: string, onClick?: () => void
           e.stopPropagation();
           onClick?.();
         }}
-        className="glass" 
+        className="glass"
         style={{ padding: '0.4rem', borderRadius: '6px', border: '1px solid rgba(239, 68, 68, 0.2)', cursor: 'pointer', color: '#ef4444' }}
       >
         <Trash2 size={14} />
+      </button>
+    </>
+  );
+};
+
+const DetailTooltip = ({ label, onClick }: { label: string, onClick?: () => void }) => {
+  const [isHovered, setIsHovered] = useState(false);
+  return (
+    <>
+      <AnimatePresence>
+        {isHovered && (
+          <motion.div
+            initial={{ opacity: 0, y: -10, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -5, scale: 0.9 }}
+            style={{
+              position: 'absolute',
+              bottom: '100%',
+              marginBottom: '8px',
+              padding: '6px 10px',
+              background: 'rgba(37, 99, 235, 0.85)',
+              color: 'white',
+              fontSize: '0.7rem',
+              fontWeight: 700,
+              borderRadius: '6px',
+              whiteSpace: 'nowrap',
+              pointerEvents: 'none',
+              zIndex: 50,
+              boxShadow: '0 10px 15px -3px rgba(37, 99, 235, 0.1)'
+            }}
+          >
+            {label}
+            <div style={{
+              position: 'absolute',
+              top: '100%',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              borderLeft: '5px solid transparent',
+              borderRight: '5px solid transparent',
+              borderTop: '5px solid rgba(37, 99, 235, 0.85)'
+            }} />
+          </motion.div>
+        )}
+      </AnimatePresence>
+      <button
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          onClick?.();
+        }}
+        className="glass"
+        style={{ padding: '0.4rem', borderRadius: '6px', border: '1px solid rgba(37, 99, 235, 0.2)', cursor: 'pointer', color: 'var(--primary)' }}
+      >
+        <Info size={14} />
       </button>
     </>
   );
@@ -182,14 +241,14 @@ const ActionButton = ({ icon: Icon, label, color }: { icon: any, label: string, 
           </motion.div>
         )}
       </AnimatePresence>
-      <button 
+      <button
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
-        className="glass" 
-        style={{ 
-          padding: '0.625rem', 
-          borderRadius: '10px', 
-          border: '1px solid var(--border)', 
+        className="glass"
+        style={{
+          padding: '0.625rem',
+          borderRadius: '10px',
+          border: '1px solid var(--border)',
           cursor: 'pointer',
           color: color || 'var(--muted-foreground)',
           transition: 'all 0.2s ease',
@@ -222,8 +281,14 @@ const AnimatedWaves = () => (
 
 const PondCard = ({ pond, handleDeleteSiembra, handleEditClick }: any) => {
   const [isFlipped, setIsFlipped] = useState(false);
-  const [kpis, setKpis] = useState<{ diasLote: string; consumo: string; fca: string; mortalidad: string } | null>(null);
+  const [kpis, setKpis] = useState<{ diasLote: string; consumo: string; fca: string; mortalidad: string; costoTotal: string } | null>(null);
   const [loadingKpis, setLoadingKpis] = useState(false);
+
+  // Reset cached KPIs whenever core pond data changes so stale values are never shown
+  useEffect(() => {
+    setKpis(null);
+    setIsFlipped(false);
+  }, [pond.current_count, pond.current_biomass_kg, pond.status]);
 
   const density = pond.status === 'con_peces' && pond.volume > 0
     ? (pond.current_count / pond.volume).toFixed(2)
@@ -234,7 +299,8 @@ const PondCard = ({ pond, handleDeleteSiembra, handleEditClick }: any) => {
   const handleFlip = async () => {
     const next = !isFlipped;
     setIsFlipped(next);
-    if (next && !kpis && pond.status === 'con_peces') {
+    // Always reload KPIs when flipping to back — never serve stale cache
+    if (next && pond.status === 'con_peces') {
       setLoadingKpis(true);
       try {
         const { data: siembra } = await supabase
@@ -252,11 +318,20 @@ const PondCard = ({ pond, handleDeleteSiembra, handleEditClick }: any) => {
         if (siembra?.date) {
           const diff = Math.floor((Date.now() - new Date(siembra.date).getTime()) / 86400000);
           diasLote = `${diff} días`;
-          const [alimentRes, mortRes] = await Promise.all([
+          const [alimentRes, mortRes, transferRes] = await Promise.all([
             supabase.from('alimentacion_diaria').select('quantity_kg').eq('estanque_id', pond.id),
-            supabase.from('mortality').select('quantity').eq('estanque_id', pond.id)
+            supabase.from('mortality').select('quantity').eq('estanque_id', pond.id),
+            // Lee ambas columnas: consumo_kg_arrastrado (traslados nuevos) y food_total_kg (traslados viejos)
+            supabase.from('transfers').select('food_total_kg, consumo_kg_arrastrado').eq('destino_id', pond.id)
           ]);
-          consumoTotal = (alimentRes.data || []).reduce((s: number, r: any) => s + parseFloat(r.quantity_kg || 0), 0);
+          const directFood = (alimentRes.data || []).reduce((s: number, r: any) => s + parseFloat(r.quantity_kg || 0), 0);
+          // Preferir consumo_kg_arrastrado; si no existe, usar food_total_kg (compatibilidad hacia atrás)
+          const inheritedFood = (transferRes.data || []).reduce((s: number, r: any) => {
+            const nuevo = parseFloat(r.consumo_kg_arrastrado || 0);
+            const viejo = parseFloat(r.food_total_kg || 0);
+            return s + (nuevo > 0 ? nuevo : viejo);
+          }, 0);
+          consumoTotal = directFood + inheritedFood;
           mortalidadTotal = (mortRes.data || []).reduce((s: number, r: any) => s + parseInt(r.quantity || 0), 0);
         }
 
@@ -265,14 +340,29 @@ const PondCard = ({ pond, handleDeleteSiembra, handleEditClick }: any) => {
         const totalPeces = pond.current_count + mortalidadTotal;
         const mortPct = totalPeces > 0 ? ((mortalidadTotal / totalPeces) * 100).toFixed(2) : '0.00';
 
+        // Costo total acumulado del estanque
+        const { data: costoData } = await supabase
+          .from('estanques')
+          .select('costo_alevinos_acumulado, consumo_alimento_acumulado_kg, costo_alimento_acumulado')
+          .eq('id', pond.id)
+          .single();
+
+        const costoAlevinos = parseFloat(costoData?.costo_alevinos_acumulado) || 0;
+        const costoAlimento = parseFloat(costoData?.costo_alimento_acumulado) || 0;
+        const costoTotal = costoAlevinos + costoAlimento;
+        const costoTotalFormateado = costoTotal > 0
+          ? '$' + costoTotal.toLocaleString('es-CO', { maximumFractionDigits: 0 })
+          : '$0';
+
         setKpis({
           diasLote,
           consumo: consumoTotal.toLocaleString('es-CO', { maximumFractionDigits: 2 }) + ' kg',
           fca,
-          mortalidad: mortPct + '%'
+          mortalidad: mortPct + '%',
+          costoTotal: costoTotalFormateado
         });
       } catch {
-        setKpis({ diasLote: 'Error', consumo: 'Error', fca: 'Error', mortalidad: 'Error' });
+        setKpis({ diasLote: 'Error', consumo: 'Error', fca: 'Error', mortalidad: 'Error', costoTotal: 'Error' });
       } finally {
         setLoadingKpis(false);
       }
@@ -284,6 +374,7 @@ const PondCard = ({ pond, handleDeleteSiembra, handleEditClick }: any) => {
     { label: 'CONSUMO TOTAL', value: kpis?.consumo ?? '—', color: '#8b5cf6' },
     { label: 'FCA', value: kpis?.fca ?? '—', color: '#f59e0b' },
     { label: 'MORTALIDAD', value: kpis?.mortalidad ?? '—', color: '#ef4444' },
+    { label: 'COSTO TOTAL', value: kpis?.costoTotal ?? '—', color: '#8b5cf6' },
   ];
 
   return (
@@ -299,13 +390,22 @@ const PondCard = ({ pond, handleDeleteSiembra, handleEditClick }: any) => {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <h3 style={{ fontSize: '1.25rem', fontWeight: 800 }}>{pond.name}</h3>
               <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <div onClick={stopProp}><DetailTooltip label="Ver Detalle" onClick={() => pond.onDetailClick?.(pond)} /></div>
                 {pond.status === 'con_peces' && <div onClick={stopProp}><DeleteTooltip label="Borrar Siembra" onClick={() => handleDeleteSiembra(pond)} /></div>}
                 <div onClick={stopProp}><EditTooltip label="Editar" onClick={() => handleEditClick(pond)} /></div>
               </div>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.7rem', fontWeight: 900, color: pond.color, background: `${pond.color}18`, padding: '4px 10px', borderRadius: '20px', alignSelf: 'flex-start' }}>
-              <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: pond.color }}></span>
-              {pond.statusLabel.toUpperCase()}
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.7rem', fontWeight: 900, color: pond.color, background: `${pond.color}18`, padding: '4px 10px', borderRadius: '20px', alignSelf: 'flex-start' }}>
+                <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: pond.color }}></span>
+                {pond.statusLabel.toUpperCase()}
+              </div>
+              {pond.status === 'con_peces' && pond.current_batch_id && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.65rem', fontWeight: 900, color: 'var(--primary)', background: 'var(--secondary)', padding: '4px 10px', borderRadius: '20px', border: '1px solid var(--border)' }}>
+                  <Hash size={10} strokeWidth={3} />
+                  <span style={{ opacity: 0.8 }}>LOTE:</span> {pond.current_batch_id.toString().slice(0, 8).toUpperCase()}
+                </div>
+              )}
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', margin: '0.5rem 0' }}>
               <div>
@@ -317,22 +417,48 @@ const PondCard = ({ pond, handleDeleteSiembra, handleEditClick }: any) => {
                 <div style={{ fontWeight: 800, fontSize: '1.1rem' }}>{pond.current_biomass_kg} <span style={{ fontSize: '0.7rem' }}>kg</span></div>
               </div>
             </div>
-            <div style={{ background: 'var(--secondary)', borderRadius: '12px', padding: '1rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                <span style={{ fontSize: '0.65rem', fontWeight: 800, color: 'var(--muted-foreground)' }}>ESPECIE / CANTIDAD</span>
-                {pond.is_polyculture && <span style={{ fontSize: '0.6rem', background: 'var(--primary)', color: 'white', padding: '2px 6px', borderRadius: '4px' }}>POLI</span>}
-              </div>
-              <div style={{ fontWeight: 700, fontSize: '0.9rem' }}>{pond.especie}</div>
-              <div style={{ fontSize: '1.25rem', fontWeight: 900, color: 'var(--primary)', marginTop: '0.25rem' }}>
-                {pond.current_count.toLocaleString()} <span style={{ fontSize: '0.8rem', color: 'var(--muted-foreground)' }}>uds</span>
-              </div>
-              {density !== null && (
+            {pond.status === 'con_peces' ? (
+              <div style={{ background: 'var(--secondary)', borderRadius: '12px', padding: '1rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                  <span style={{ fontSize: '0.65rem', fontWeight: 800, color: 'var(--muted-foreground)' }}>ESPECIE / CANTIDAD</span>
+                  {pond.speciesRows?.length > 1 && (
+                    <span style={{ fontSize: '0.6rem', background: 'var(--primary)', color: 'white', padding: '2px 6px', borderRadius: '4px' }}>POLICULTIVO</span>
+                  )}
+                </div>
+
+                {/* Per-species tags — one per row in pond_species */}
+                {pond.speciesRows?.length > 0 ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', marginBottom: '0.5rem' }}>
+                    {pond.speciesRows.map((s: any, i: number) => (
+                      <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                        <span style={{
+                          display: 'inline-block',
+                          width: '7px', height: '7px', borderRadius: '50%',
+                          background: i === 0 ? '#10b981' : i === 1 ? '#3b82f6' : '#f59e0b',
+                          flexShrink: 0
+                        }} />
+                        <span style={{ fontWeight: 700, fontSize: '0.85rem' }}>{s.species_name}</span>
+                        <span style={{ fontSize: '0.7rem', color: 'var(--muted-foreground)', marginLeft: 'auto' }}>
+                          {(s.current_count || 0).toLocaleString()} uds
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div style={{ fontWeight: 700, fontSize: '0.9rem', marginBottom: '0.5rem' }}>{pond.especie}</div>
+                )}
+
+                <div style={{ fontSize: '1.25rem', fontWeight: 900, color: 'var(--primary)', marginTop: '0.25rem' }}>
+                  {pond.current_count.toLocaleString()} <span style={{ fontSize: '0.8rem', color: 'var(--muted-foreground)' }}>uds total</span>
+                </div>
+                {density !== null && (
                 <div style={{ marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                   <span style={{ fontSize: '0.65rem', fontWeight: 800, color: 'var(--muted-foreground)' }}>DENSIDAD:</span>
                   <span style={{ fontSize: '0.85rem', fontWeight: 900, color: '#8b5cf6' }}>{density} <span style={{ fontSize: '0.65rem', color: 'var(--muted-foreground)' }}>uds/m³</span></span>
                 </div>
               )}
-            </div>
+              </div>
+            ) : null}
             <div style={{ display: 'flex', gap: '0.5rem', borderTop: '1px solid var(--border)', paddingTop: '1rem', marginTop: 'auto', flexWrap: 'wrap' }}>
               <div onClick={stopProp}><Link href={`/siembra?estanque=${pond.id}`}><ActionButton icon={Fish} label="Siembra" color="#10b981" /></Link></div>
               <div onClick={stopProp}><Link href={`/tratamiento?estanque=${pond.id}`}><ActionButton icon={FlaskConical} label="Tratamiento" color="#f59e0b" /></Link></div>
@@ -347,9 +473,16 @@ const PondCard = ({ pond, handleDeleteSiembra, handleEditClick }: any) => {
           <div className="card-premium" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', border: `2px solid ${pond.color}`, borderRadius: '16px', height: '100%', backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <h3 style={{ fontSize: '1.1rem', fontWeight: 900, color: 'var(--primary)' }}>{pond.name} · KPIs</h3>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.7rem', fontWeight: 900, color: pond.color, background: `${pond.color}18`, padding: '4px 10px', borderRadius: '20px' }}>
-                <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: pond.color }}></span>
-                {pond.statusLabel.toUpperCase()}
+              <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+                {pond.current_batch_id && (
+                  <div style={{ fontSize: '0.65rem', fontWeight: 900, color: 'var(--muted-foreground)', background: 'var(--secondary)', padding: '4px 10px', borderRadius: '20px', border: '1px solid var(--border)' }}>
+                    #{pond.current_batch_id.toString().slice(0, 6).toUpperCase()}
+                  </div>
+                )}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.7rem', fontWeight: 900, color: pond.color, background: `${pond.color}18`, padding: '4px 10px', borderRadius: '20px' }}>
+                  <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: pond.color }}></span>
+                  {pond.statusLabel.toUpperCase()}
+                </div>
               </div>
             </div>
 
@@ -362,7 +495,7 @@ const PondCard = ({ pond, handleDeleteSiembra, handleEditClick }: any) => {
                 Sin producción activa.<br />Realiza una siembra para ver KPIs.
               </div>
             ) : (
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', flex: 1 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '0.75rem', flex: 1 }}>
                 {kpiItems.map((item) => (
                   <div key={item.label} className="glass" style={{ padding: '1rem', borderRadius: '12px', border: `1px solid ${item.color}22`, background: `${item.color}08` }}>
                     <div style={{ fontSize: '0.6rem', fontWeight: 900, color: 'var(--muted-foreground)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.4rem' }}>{item.label}</div>
@@ -390,8 +523,162 @@ const PondCard = ({ pond, handleDeleteSiembra, handleEditClick }: any) => {
   );
 };
 
+const PondDetailModal = ({ pond, onClose }: { pond: any, onClose: () => void }) => {
+  const [history, setHistory] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchTraceability();
+  }, [pond.id]);
+
+  const fetchTraceability = async () => {
+    setLoading(true);
+    try {
+      const { data: transfers } = await supabase
+        .from('transfers')
+        .select('*, origen:estanques!origen_id(name), destino:estanques!destino_id(name)')
+        .or(`origen_id.eq.${pond.id},destino_id.eq.${pond.id}`)
+        .order('date', { ascending: false })
+        .limit(10);
+
+      const formattedHistory = (transfers || []).map(t => ({
+        type: t.origen_id === pond.id ? 'Salida' : 'Entrada',
+        date: t.date,
+        quantity: t.quantity,
+        species: t.species_name,
+        otherPond: t.origen_id === pond.id ? t.destino?.name : t.origen?.name,
+        revertido: t.revertido
+      }));
+
+      setHistory(formattedHistory);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', zIndex: 10000, pointerEvents: 'none' }}>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        onClick={onClose}
+        style={{ position: 'absolute', inset: 0, background: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(10px)', pointerEvents: 'auto' }}
+      />
+      <motion.div
+        initial={{ scale: 0.9, opacity: 0, x: '-50%', y: '-40%' }}
+        animate={{ scale: 1, opacity: 1, x: '-50%', y: '-50%' }}
+        exit={{ scale: 0.9, opacity: 0, x: '-50%', y: '-40%' }}
+        className="card-premium"
+        style={{
+          position: 'absolute',
+          top: '50%',
+          left: '50%',
+          width: '95%',
+          maxWidth: '600px',
+          maxHeight: '90vh',
+          overflowY: 'auto',
+          padding: '2rem',
+          pointerEvents: 'auto',
+          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+          zIndex: 10001
+        }}
+      >
+        <button onClick={onClose} style={{ position: 'absolute', top: '1rem', right: '1rem', background: 'none', border: 'none', color: 'var(--muted-foreground)', cursor: 'pointer' }}><X size={24} /></button>
+        
+        <div style={{ marginBottom: '2rem' }}>
+          <h2 style={{ fontWeight: 950, fontSize: '1.75rem', letterSpacing: '-0.04em', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <Waves size={32} style={{ color: 'var(--primary)' }} />
+            {pond.name}
+          </h2>
+          <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+             {pond.current_batch_id && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.75rem', fontWeight: 900, color: 'var(--primary)', background: 'var(--secondary)', padding: '6px 12px', borderRadius: '20px', border: '1px solid var(--border)' }}>
+                  <Hash size={12} strokeWidth={3} />
+                  <span style={{ opacity: 0.8 }}>LOTE:</span> {pond.current_batch_id}
+                </div>
+              )}
+          </div>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '2rem' }}>
+          <div className="glass" style={{ padding: '1.25rem', borderRadius: '16px', border: '1px solid var(--border)' }}>
+            <div style={{ fontSize: '0.7rem', fontWeight: 800, color: 'var(--muted-foreground)', textTransform: 'uppercase', marginBottom: '0.5rem' }}>Población Actual</div>
+            <div style={{ fontSize: '1.5rem', fontWeight: 950 }}>{pond.current_count?.toLocaleString()} <span style={{ fontSize: '0.8rem', opacity: 0.6 }}>uds</span></div>
+          </div>
+          <div className="glass" style={{ padding: '1.25rem', borderRadius: '16px', border: '1px solid var(--border)' }}>
+            <div style={{ fontSize: '0.7rem', fontWeight: 800, color: 'var(--muted-foreground)', textTransform: 'uppercase', marginBottom: '0.5rem' }}>Biomasa Estimada</div>
+            <div style={{ fontSize: '1.5rem', fontWeight: 950 }}>{parseFloat(pond.current_biomass_kg || 0).toFixed(1)} <span style={{ fontSize: '0.8rem', opacity: 0.6 }}>kg</span></div>
+          </div>
+        </div>
+
+        <div style={{ marginBottom: '2rem' }}>
+          <h3 style={{ fontSize: '0.85rem', fontWeight: 900, color: 'var(--muted-foreground)', textTransform: 'uppercase', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <Fish size={16} /> Desglose de Especies
+          </h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            {pond.speciesRows?.map((s: any, i: number) => (
+              <div key={i} className="glass" style={{ padding: '1rem', borderRadius: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                  <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: 'var(--primary)' }} />
+                  <span style={{ fontWeight: 800 }}>{s.species_name}</span>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontWeight: 900 }}>{s.current_count.toLocaleString()} uds</div>
+                  <div style={{ fontSize: '0.75rem', opacity: 0.6 }}>{s.current_biomass_kg.toFixed(1)} kg</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <h3 style={{ fontSize: '0.85rem', fontWeight: 900, color: 'var(--muted-foreground)', textTransform: 'uppercase', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <History size={16} /> Trazabilidad de Movimientos
+          </h3>
+          {loading ? (
+            <div style={{ padding: '2rem', textAlign: 'center' }}>Cargando historial...</div>
+          ) : history.length === 0 ? (
+            <div style={{ padding: '2rem', textAlign: 'center', opacity: 0.5 }}>No hay movimientos registrados para este lote.</div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              {history.map((h, i) => (
+                <div key={i} style={{ 
+                  padding: '1rem', 
+                  borderRadius: '12px', 
+                  background: h.revertido ? 'rgba(239, 68, 68, 0.05)' : 'var(--secondary)',
+                  border: `1px solid ${h.revertido ? 'rgba(239, 68, 68, 0.1)' : 'var(--border)'}`,
+                  opacity: h.revertido ? 0.6 : 1,
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center'
+                }}>
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      {h.type === 'Salida' ? <ArrowRightLeft size={14} style={{ color: '#ef4444' }} /> : <ArrowRightLeft size={14} style={{ color: '#10b981' }} />}
+                      <span style={{ fontWeight: 800, fontSize: '0.9rem' }}>{h.type} {h.type === 'Salida' ? 'a' : 'desde'} {h.otherPond}</span>
+                    </div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)' }}>{new Date(h.date).toLocaleDateString()} · {h.species}</div>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontWeight: 900, color: h.type === 'Salida' ? '#ef4444' : '#10b981' }}>{h.type === 'Salida' ? '-' : '+'}{h.quantity.toLocaleString()}</div>
+                    {h.revertido && <div style={{ fontSize: '0.65rem', color: '#ef4444', fontWeight: 900 }}>REVERTIDO</div>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </motion.div>
+    </div>
+  );
+};
+
 export default function EstanquesPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedDetailPond, setSelectedDetailPond] = useState<any | null>(null);
   const [ponds, setPonds] = useState<any[]>([]);
   const [editingPond, setEditingPond] = useState<any | null>(null);
   const [formData, setFormData] = useState({ numero: '', largo: '', ancho: '', profundidad: '' });
@@ -399,6 +686,19 @@ export default function EstanquesPage() {
 
   useEffect(() => {
     fetchEstanques();
+
+    // Realtime: auto-refresh cards when estanques or pond_species change
+    // (triggered by traslado, siembra, biometría, mortalidad, etc.)
+    const activeUnitId = localStorage.getItem('active_unit_id');
+    if (!activeUnitId) return;
+
+    const channel = supabase
+      .channel(`estanques-live-${activeUnitId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'estanques', filter: `unit_id=eq.${activeUnitId}` }, () => fetchEstanques())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pond_species' }, () => fetchEstanques())
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
   }, []);
 
   const fetchEstanques = async () => {
@@ -406,12 +706,13 @@ export default function EstanquesPage() {
     if (!activeUnitId) return;
 
     try {
+      // Fetch ponds AND their species in a single query via the relation
       const { data: pondsData, error: pErr } = await supabase
         .from('estanques')
-        .select('*')
+        .select('*, pond_species(species_name, current_count, current_biomass_kg)')
         .eq('unit_id', activeUnitId)
         .order('name');
-      
+
       if (pErr) throw pErr;
 
       const formatted = (pondsData || []).map(p => {
@@ -425,14 +726,54 @@ export default function EstanquesPage() {
           statusLabel = 'Mantenimiento';
         }
 
+        // Build species label from real pond_species rows.
+        // Deduplicate by species_name (same species stocked on different dates
+        // creates multiple pond_species rows — we sum them into one).
+        const rawSpeciesRows: any[] = (p.pond_species || []).filter((s: any) => (s.current_count || 0) > 0);
+
+        // Override status visually: if no active fish, treat as vacío even if DB says con_peces
+        const effectiveCount = p.current_count || 0;
+        const effectiveStatus = (effectiveCount === 0 && rawSpeciesRows.length === 0) ? 'vacio' : p.status;
+        if (effectiveStatus === 'vacio') {
+          color = '#64748b';
+          statusLabel = 'Vacío';
+        }
+        const speciesMap = new Map<string, { species_name: string; current_count: number; current_biomass_kg: number }>();
+        for (const s of rawSpeciesRows) {
+          if (speciesMap.has(s.species_name)) {
+            const existing = speciesMap.get(s.species_name)!;
+            existing.current_count += (s.current_count || 0);
+            existing.current_biomass_kg += (parseFloat(s.current_biomass_kg) || 0);
+          } else {
+            speciesMap.set(s.species_name, {
+              species_name: s.species_name,
+              current_count: s.current_count || 0,
+              current_biomass_kg: parseFloat(s.current_biomass_kg) || 0
+            });
+          }
+        }
+        const speciesRows = Array.from(speciesMap.values());
+        let especieLabel: string;
+        if (speciesRows.length > 1) {
+          especieLabel = speciesRows.map((s: any) => s.species_name).join(' + ');
+        } else if (speciesRows.length === 1) {
+          especieLabel = speciesRows[0].species_name;
+        } else {
+          // Fallback to legacy column if pond_species is still empty
+          especieLabel = p.current_species || 'N/A';
+        }
+
         return {
           ...p,
+          status: effectiveStatus,
           color,
           statusLabel,
           volume: p.capacity_m3 || 0,
-          especie: p.is_polyculture ? 'Policultivo' : (p.current_species || 'N/A'),
+          especie: especieLabel,
+          speciesRows,          // pass through for rich rendering in card
           current_count: p.current_count || 0,
-          current_biomass_kg: p.current_biomass_kg || 0
+          current_biomass_kg: p.current_biomass_kg || 0,
+          onDetailClick: (pnd: any) => setSelectedDetailPond(pnd)
         };
       });
       setPonds(formatted);
@@ -461,11 +802,11 @@ export default function EstanquesPage() {
 
   const handleEditClick = (pond: any) => {
     const num = pond.name.split('-')[1] || '';
-    setFormData({ 
-      numero: num, 
-      largo: '', 
-      ancho: '', 
-      profundidad: (pond.capacity_m3 || 0).toString() 
+    setFormData({
+      numero: num,
+      largo: '',
+      ancho: '',
+      profundidad: (pond.capacity_m3 || 0).toString()
     });
     setEditingPond(pond);
     setIsModalOpen(true);
@@ -526,7 +867,15 @@ export default function EstanquesPage() {
 
       if (!siembras || siembras.length === 0) {
         await supabase.from('estanques').update({
-          status: 'vacio', is_polyculture: false, current_species: null, current_count: 0, current_biomass_kg: 0
+          status: 'vacio', 
+          is_polyculture: false, 
+          current_species: null, 
+          current_count: 0, 
+          current_biomass_kg: 0,
+          costo_alevinos_acumulado: 0,
+          consumo_alimento_acumulado_kg: 0,
+          costo_alimento_acumulado: 0,
+          current_batch_id: null
         }).eq('id', pond.id);
         await supabase.from('pond_species').delete().eq('estanque_id', pond.id);
         return;
@@ -542,7 +891,17 @@ export default function EstanquesPage() {
 
       await Promise.all([
         ...inventoryOps,
-        supabase.from('estanques').update({ status: 'vacio', is_polyculture: false, current_species: null, current_count: 0, current_biomass_kg: 0 }).eq('id', pond.id),
+        supabase.from('estanques').update({ 
+          status: 'vacio', 
+          is_polyculture: false, 
+          current_species: null, 
+          current_count: 0, 
+          current_biomass_kg: 0,
+          costo_alevinos_acumulado: 0,
+          consumo_alimento_acumulado_kg: 0,
+          costo_alimento_acumulado: 0,
+          current_batch_id: null
+        }).eq('id', pond.id),
         supabase.from('pond_species').delete().eq('estanque_id', pond.id),
         supabase.from('siembras').delete().eq('id', lastSiembra.id)
       ]);
@@ -570,11 +929,11 @@ export default function EstanquesPage() {
 
       <div className="responsive-grid-3">
         {ponds.map((pond) => (
-          <PondCard 
-            key={pond.id} 
-            pond={pond} 
-            handleDeleteSiembra={handleDeleteSiembra} 
-            handleEditClick={handleEditClick} 
+          <PondCard
+            key={pond.id}
+            pond={pond}
+            handleDeleteSiembra={handleDeleteSiembra}
+            handleEditClick={handleEditClick}
           />
         ))}
       </div>
@@ -583,29 +942,29 @@ export default function EstanquesPage() {
         {isModalOpen && (
           <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', zIndex: 9999, pointerEvents: 'none' }}>
             {/* Backdrop */}
-            <motion.div 
-              initial={{ opacity: 0 }} 
-              animate={{ opacity: 1 }} 
-              exit={{ opacity: 0 }} 
-              onClick={resetForm} 
-              style={{ position: 'absolute', inset: 0, background: 'rgba(15, 23, 42, 0.5)', backdropFilter: 'blur(8px)', pointerEvents: 'auto' }} 
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={resetForm}
+              style={{ position: 'absolute', inset: 0, background: 'rgba(15, 23, 42, 0.5)', backdropFilter: 'blur(8px)', pointerEvents: 'auto' }}
             />
-            
+
             {/* Modal Centrado */}
-            <motion.div 
-              initial={{ scale: 0.9, opacity: 0, x: '-50%', y: '-40%' }} 
-              animate={{ scale: 1, opacity: 1, x: '-50%', y: '-50%' }} 
-              exit={{ scale: 0.9, opacity: 0, x: '-50%', y: '-40%' }} 
-              className="card-premium" 
-              style={{ 
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0, x: '-50%', y: '-40%' }}
+              animate={{ scale: 1, opacity: 1, x: '-50%', y: '-50%' }}
+              exit={{ scale: 0.9, opacity: 0, x: '-50%', y: '-40%' }}
+              className="card-premium"
+              style={{
                 position: 'absolute',
                 top: '50%',
                 left: '50%',
-                width: '90%', 
-                maxWidth: '450px', 
+                width: '90%',
+                maxWidth: '450px',
                 maxHeight: '85vh',
                 overflowY: 'auto',
-                padding: '2rem', 
+                padding: '2rem',
                 pointerEvents: 'auto',
                 display: 'flex',
                 flexDirection: 'column',
@@ -615,24 +974,24 @@ export default function EstanquesPage() {
             >
               <button onClick={resetForm} style={{ position: 'absolute', top: '1rem', right: '1rem', background: 'none', border: 'none', color: 'var(--muted-foreground)', cursor: 'pointer' }}><X size={20} /></button>
               <h2 style={{ fontWeight: 800 }}>{editingPond ? 'Editar Estanque' : 'Nuevo Estanque'}</h2>
-              
+
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
                 <div className="premium-input-group">
                   <label className="premium-label"><Hash size={14} /> Número de Estanque</label>
                   <div className="premium-input-wrapper">
                     <span style={{ fontWeight: 800, color: 'var(--muted-foreground)', marginRight: '0.5rem' }}>Est-</span>
-                    <input 
-                      type="number" 
-                      name="numero" 
-                      value={formData.numero} 
-                      onChange={handleInputChange} 
-                      placeholder="01" 
+                    <input
+                      type="number"
+                      name="numero"
+                      value={formData.numero}
+                      onChange={handleInputChange}
+                      placeholder="01"
                       className="premium-input"
                       style={{ paddingLeft: 0 }}
                     />
                   </div>
                 </div>
-                
+
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.75rem' }}>
                   <div className="premium-input-group">
                     <label className="premium-label">Largo (m)</label>
@@ -647,7 +1006,7 @@ export default function EstanquesPage() {
                     <input type="number" name="profundidad" value={formData.profundidad} onChange={handleInputChange} placeholder="0.0" className="premium-input" />
                   </div>
                 </div>
-                
+
                 <div style={{ padding: '1.25rem', background: 'rgba(37, 99, 235, 0.05)', borderRadius: '12px', border: '1px solid rgba(37, 99, 235, 0.1)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div>
                     <div style={{ fontSize: '0.65rem', fontWeight: 800, color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>Capacidad Estimada</div>
@@ -655,7 +1014,7 @@ export default function EstanquesPage() {
                   </div>
                   <Box size={32} style={{ color: 'var(--primary)', opacity: 0.2 }} />
                 </div>
-                
+
                 <button className="btn-primary" disabled={loading} onClick={handleCreateEstanque} style={{ padding: '1rem', fontWeight: 800, height: '56px' }}>
                   {loading ? 'Procesando...' : editingPond ? 'Guardar Cambios' : 'Crear Estanque'}
                 </button>
@@ -664,6 +1023,16 @@ export default function EstanquesPage() {
           </div>
         )}
       </AnimatePresence>
+
+      <AnimatePresence>
+        {selectedDetailPond && (
+          <PondDetailModal 
+            pond={selectedDetailPond} 
+            onClose={() => setSelectedDetailPond(null)} 
+          />
+        )}
+      </AnimatePresence>
+
       <AnimatedWaves />
     </div>
   );
