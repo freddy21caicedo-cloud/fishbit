@@ -478,11 +478,9 @@ export default function Dashboard() {
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
             <h1 style={{ fontWeight: 900, letterSpacing: '-0.04em' }}>Hola 👋</h1>
-            {planType === 'premium' && (
-              <span style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)', color: 'white', padding: '4px 10px', borderRadius: '8px', fontSize: '0.65rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.05em', boxShadow: '0 4px 12px rgba(217, 119, 6, 0.2)' }}>
-                Premium
-              </span>
-            )}
+            <span style={{ background: 'linear-gradient(135deg, #0d9488, #10b981)', color: 'white', padding: '4px 10px', borderRadius: '8px', fontSize: '0.65rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.05em', boxShadow: '0 4px 12px rgba(13, 148, 136, 0.2)' }}>
+              Plan Único
+            </span>
           </div>
           <p style={{ color: 'var(--muted-foreground)', fontWeight: 600 }}>Unidad: <strong style={{ color: 'var(--foreground)' }}>{activeUnit?.name || 'Cargando...'}</strong></p>
         </div>

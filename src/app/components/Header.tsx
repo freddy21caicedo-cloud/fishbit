@@ -12,35 +12,24 @@ import {
   AlertCircle
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useAuth } from "./providers/AuthProvider";
+import { useUnit } from "./providers/UnitProvider";
+import { useLogout } from "../hooks/useLogout";
 
 export default function Header() {
   const pathname = usePathname();
   const router = useRouter();
-  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+  const { session, isSuperAdmin, profile } = useAuth();
+  const { userRole } = useUnit();
+  const logout = useLogout();
   const [showNotifications, setShowNotifications] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
-  const [notifications, setNotifications] = useState([
-    { id: 1, text: "Nueva Unidad 'Piscícola Norte' creada", time: "Hace 5 min", type: "success" },
-    { id: 2, text: "Ticket de soporte de Freddy pendiente", time: "Hace 12 min", type: "alert" }
-  ]);
+  const [notifications, setNotifications] = useState<any[]>([]);
 
   const profileRef = useRef<HTMLDivElement>(null);
   const notifRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    async function checkRole() {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const { data } = await supabase
-          .from('profiles')
-          .select('is_superadmin')
-          .eq('id', user.id)
-          .single();
-        setIsSuperAdmin(data?.is_superadmin || false);
-      }
-    }
-    checkRole();
-
     const handleClickOutside = (event: MouseEvent) => {
       if (profileRef.current && !profileRef.current.contains(event.target as Node)) setShowProfileMenu(false);
       if (notifRef.current && !notifRef.current.contains(event.target as Node)) setShowNotifications(false);
@@ -49,12 +38,6 @@ export default function Header() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const handleSignOut = async () => {
-    await supabase.auth.signOut();
-    localStorage.removeItem('active_unit_id');
-    router.refresh();
-    router.push('/');
-  };
 
   const hiddenPages = ['/estanques', '/siembra', '/tratamiento', '/mantenimiento', '/aireacion', '/biometria', '/mortalidad', '/traslado', '/almacen', '/finanzas', '/configuracion', '/ayuda'];
   if (hiddenPages.includes(pathname) || pathname.startsWith('/registros')) return null;
@@ -62,7 +45,9 @@ export default function Header() {
   return (
     <header className="header" style={{ position: 'relative', zIndex: 60 }}>
       <div>
-        <h1 style={{ fontSize: '1.5rem', marginBottom: '0.25rem' }}>Bienvenido de nuevo, Freddy</h1>
+        <h1 style={{ fontSize: '1.5rem', marginBottom: '0.25rem' }}>
+          Bienvenido de nuevo, {profile?.full_name || session?.user?.email?.split('@')[0] || "Usuario"}
+        </h1>
         <p style={{ color: 'var(--muted-foreground)', fontSize: '0.875rem', marginBottom: isSuperAdmin ? '0' : '1rem' }}>
           {isSuperAdmin 
             ? "Aquí está el resumen global de tu plataforma FishBit."
@@ -87,7 +72,9 @@ export default function Header() {
             style={{ padding: '0.6rem', borderRadius: '12px', border: '1px solid var(--border)', cursor: 'pointer', position: 'relative', background: showNotifications ? 'var(--secondary)' : 'var(--card)' }}
           >
             <Bell size={20} />
-            <span style={{ position: 'absolute', top: '8px', right: '8px', width: '8px', height: '8px', background: 'var(--destructive)', borderRadius: '50%', border: '2px solid var(--card)' }}></span>
+            {notifications.length > 0 && (
+              <span style={{ position: 'absolute', top: '8px', right: '8px', width: '8px', height: '8px', background: 'var(--destructive)', borderRadius: '50%', border: '2px solid var(--card)' }}></span>
+            )}
           </button>
 
           <AnimatePresence>
@@ -100,20 +87,33 @@ export default function Header() {
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
                   <h4 style={{ fontWeight: 800 }}>Notificaciones</h4>
-                  <span style={{ fontSize: '0.7rem', color: 'var(--primary)', fontWeight: 700, cursor: 'pointer' }}>Limpiar</span>
+                  {notifications.length > 0 && (
+                    <span 
+                      onClick={() => setNotifications([])}
+                      style={{ fontSize: '0.7rem', color: 'var(--primary)', fontWeight: 700, cursor: 'pointer' }}
+                    >
+                      Limpiar
+                    </span>
+                  )}
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                  {notifications.map(n => (
-                    <div key={n.id} style={{ display: 'flex', gap: '0.75rem', padding: '0.75rem', borderRadius: '12px', background: 'var(--secondary)' }}>
-                      <div style={{ color: n.type === 'success' ? '#10b981' : '#3b82f6' }}>
-                        {n.type === 'success' ? <CheckCircle2 size={18} /> : <AlertCircle size={18} />}
+                  {notifications.length > 0 ? (
+                    notifications.map(n => (
+                      <div key={n.id} style={{ display: 'flex', gap: '0.75rem', padding: '0.75rem', borderRadius: '12px', background: 'var(--secondary)' }}>
+                        <div style={{ color: n.type === 'success' ? '#10b981' : '#3b82f6' }}>
+                          {n.type === 'success' ? <CheckCircle2 size={18} /> : <AlertCircle size={18} />}
+                        </div>
+                        <div>
+                          <div style={{ fontSize: '0.85rem', fontWeight: 600, lineHeight: 1.3 }}>{n.text}</div>
+                          <div style={{ fontSize: '0.7rem', color: 'var(--muted-foreground)', marginTop: '0.2rem' }}>{n.time}</div>
+                        </div>
                       </div>
-                      <div>
-                        <div style={{ fontSize: '0.85rem', fontWeight: 600, lineHeight: 1.3 }}>{n.text}</div>
-                        <div style={{ fontSize: '0.7rem', color: 'var(--muted-foreground)', marginTop: '0.2rem' }}>{n.time}</div>
-                      </div>
+                    ))
+                  ) : (
+                    <div style={{ textAlign: 'center', padding: '1.5rem', color: 'var(--muted-foreground)', fontSize: '0.85rem' }}>
+                      No tienes notificaciones pendientes.
                     </div>
-                  ))}
+                  )}
                 </div>
               </motion.div>
             )}
@@ -138,7 +138,9 @@ export default function Header() {
                 style={{ position: 'absolute', top: '120%', right: 0, width: '220px', background: 'var(--card)', border: '1px solid var(--border)', borderRadius: '16px', boxShadow: 'var(--shadow-xl)', padding: '0.5rem', zIndex: 100 }}
               >
                 <div style={{ padding: '0.75rem', borderBottom: '1px solid var(--border)', marginBottom: '0.5rem' }}>
-                  <div style={{ fontWeight: 800, fontSize: '0.9rem' }}>Freddy</div>
+                  <div style={{ fontWeight: 800, fontSize: '0.9rem' }}>
+                    {profile?.full_name || session?.user?.email?.split('@')[0] || "Usuario"}
+                  </div>
                   <div style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)' }}>{isSuperAdmin ? 'Super Administrador' : 'Administrador'}</div>
                 </div>
                 <button 
@@ -159,7 +161,7 @@ export default function Header() {
                 </button>
                 <div style={{ height: '1px', background: 'var(--border)', margin: '0.5rem 0' }}></div>
                 <button 
-                  onClick={handleSignOut}
+                  onClick={logout}
                   className="nav-item" 
                   style={{ width: '100%', border: 'none', background: 'none', justifyContent: 'flex-start', padding: '0.75rem', cursor: 'pointer', color: '#ef4444' }}
                 >

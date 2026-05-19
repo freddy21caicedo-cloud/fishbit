@@ -4,8 +4,8 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
+import { FishBitIcon } from './components/FishBitLogo';
 import { 
-  Fish, 
   Mail, 
   Lock, 
   ArrowRight, 
@@ -19,6 +19,34 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Dynamic settings from database
+  const [globalSettings, setGlobalSettings] = useState({
+    support_whatsapp: '+573000000000',
+    support_email: 'soporte@fishbit.co'
+  });
+
+  useEffect(() => {
+    async function loadGlobalSettings() {
+      try {
+        const { data, error } = await supabase
+          .from('app_config')
+          .select('value')
+          .eq('key', 'global_settings')
+          .maybeSingle();
+        if (data?.value) {
+          const parsed = typeof data.value === 'string' ? JSON.parse(data.value) : data.value;
+          setGlobalSettings({
+            support_whatsapp: parsed.support_whatsapp ?? '+573000000000',
+            support_email: parsed.support_email ?? 'soporte@fishbit.co'
+          });
+        }
+      } catch (err) {
+        console.error("Error loading system settings in LoginPage:", err);
+      }
+    }
+    loadGlobalSettings();
+  }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -67,8 +95,7 @@ export default function LoginPage() {
         router.push('/select-unit');
       } else {
         localStorage.setItem('active_unit_id', userUnits[0].unit_id);
-        // Force full page reload to ensure cookies are sent to the middleware
-        window.location.href = '/dashboard';
+        router.push('/dashboard');
       }
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : 'Error al iniciar sesión';
@@ -80,7 +107,7 @@ export default function LoginPage() {
 
   const handleForgotPassword = (e: React.MouseEvent) => {
     e.preventDefault();
-    const supportEmail = process.env.NEXT_PUBLIC_SUPPORT_EMAIL || 'especialistaacuicola@gmail.com';
+    const supportEmail = globalSettings.support_email;
     const subject = encodeURIComponent("Recuperación de Contraseña FishBit");
     const body = encodeURIComponent(`Hola, necesito recuperar mi acceso a FishBit.\n\nMi correo de usuario es: ${email || '[Escribe tu correo aquí]'}`);
     window.location.href = `mailto:${supportEmail}?subject=${subject}&body=${body}`;
@@ -88,7 +115,8 @@ export default function LoginPage() {
 
   const handleContactSupport = (e: React.MouseEvent) => {
     e.preventDefault();
-    const whatsappNumber = process.env.NEXT_PUBLIC_SUPPORT_WHATSAPP || '573000000000';
+    // Normalize whatsappNumber to only contain digits for wa.me API
+    const whatsappNumber = globalSettings.support_whatsapp.replace(/\D/g, '');
     const message = encodeURIComponent("Hola FishBit, me gustaría solicitar una cuenta o soporte para mi granja acuícola.");
     window.open(`https://wa.me/${whatsappNumber}?text=${message}`, '_blank');
   };
@@ -149,27 +177,21 @@ export default function LoginPage() {
           style={{ width: '100%', maxWidth: '420px' }}
         >
           <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
-            <div style={{ 
-              width: '64px', 
-              height: '64px', 
-              background: 'var(--primary)', 
-              borderRadius: '16px', 
-              display: 'flex', 
-              alignItems: 'center', 
-              justifyContent: 'center',
-              margin: '0 auto 1.5rem',
-              boxShadow: '0 10px 25px rgba(13, 148, 136, 0.2)',
-              position: 'relative'
-            }}>
-              <Fish color="white" size={32} />
-              <motion.div 
-                animate={{ scale: [1, 1.2, 1], opacity: [0.5, 0.2, 0.5] }}
+            {/* FishBit Corporate Logo */}
+            <div style={{ position: 'relative', width: '90px', height: '90px', margin: '0 auto 1.5rem' }}>
+              <FishBitIcon size={90} style={{ filter: 'drop-shadow(0 8px 24px rgba(30,202,212,0.5))' }} />
+              <motion.div
+                animate={{ scale: [1, 1.15, 1], opacity: [0.6, 0.15, 0.6] }}
                 transition={{ duration: 3, repeat: Infinity }}
-                style={{ position: 'absolute', inset: -8, border: '2px solid var(--primary)', borderRadius: '20px' }} 
+                style={{ position: 'absolute', inset: -12, border: '2px solid rgba(30,202,212,0.4)', borderRadius: '50%' }}
               />
             </div>
-            <h1 style={{ fontSize: '2.25rem', fontWeight: 800, color: 'white', letterSpacing: '-0.02em', marginBottom: '0.5rem' }}>FishBit</h1>
-            <p style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '0.9rem', fontWeight: 600 }}>Gestión Acuícola de Siguiente Generación</p>
+            <h1 style={{ fontSize: '2.5rem', fontWeight: 900, color: 'white', letterSpacing: '-0.03em', marginBottom: '0.35rem', fontFamily: 'var(--font-heading)' }}>
+              Fish<span style={{ color: '#1ECAD4' }}>Bit</span>
+            </h1>
+            <p style={{ color: 'rgba(255, 255, 255, 0.65)', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em' }}>
+              Inteligencia en Crecimiento Acuícola
+            </p>
           </div>
 
           <div className="card-premium" style={{ 

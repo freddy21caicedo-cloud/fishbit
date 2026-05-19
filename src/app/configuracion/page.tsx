@@ -50,7 +50,15 @@ export default function ConfiguracionPage() {
   const [activeTab, setActiveTab] = useState('parametros');
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [prices, setPrices] = useState({ basic: 18, premium: 30 });
+
+  // Global settings state
+  const [systemSettings, setSystemSettings] = useState({
+    price_cop: 100000,
+    support_whatsapp: '+573000000000',
+    free_trial_days: 30,
+    grace_days: 3,
+    support_email: 'soporte@fishbit.co'
+  });
 
   // Thresholds state (mock for UI)
   const [thresholds, setThresholds] = useState({
@@ -65,9 +73,76 @@ export default function ConfiguracionPage() {
     warmMortality: '5', coldMortality: '10'
   });
 
+  const [notificationSettings, setNotificationSettings] = useState({
+    whatsapp_enabled: false,
+    whatsapp_number: '',
+    whatsapp_alert_oxygen: true,
+    whatsapp_alert_temp: true,
+    whatsapp_alert_mortality: true,
+    whatsapp_alert_inventory: true,
+    email_enabled: false,
+    email_address: '',
+    email_daily_summary: true,
+    email_non_compliance: false,
+    push_enabled: false,
+    push_frequency: 'instant'
+  });
+
   const handleThresholdChange = (key: string, value: string) => {
     setThresholds(prev => ({ ...prev, [key]: value }));
-  };  const fetchSettings = useCallback(async () => {
+  };
+
+  const fetchGlobalSettings = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('app_config')
+        .select('value')
+        .eq('key', 'global_settings')
+        .maybeSingle();
+
+      if (data?.value) {
+        const parsed = typeof data.value === 'string' ? JSON.parse(data.value) : data.value;
+        setSystemSettings({
+          price_cop: parsed.price ?? 100000,
+          support_whatsapp: parsed.support_whatsapp ?? '+573000000000',
+          free_trial_days: parsed.trial_days ?? 30,
+          grace_days: parsed.grace_days ?? 3,
+          support_email: parsed.support_email ?? 'soporte@fishbit.co'
+        });
+      }
+    } catch (err) {
+      console.error("Error fetching global settings:", err);
+    }
+  }, []);
+
+  const saveGlobalSettings = async (updatedSettings = systemSettings) => {
+    const savePromise = async () => {
+      const payload = {
+        price: updatedSettings.price_cop,
+        support_whatsapp: updatedSettings.support_whatsapp,
+        trial_days: updatedSettings.free_trial_days,
+        grace_days: updatedSettings.grace_days,
+        support_email: updatedSettings.support_email
+      };
+
+      const { error } = await supabase
+        .from('app_config')
+        .upsert({
+          key: 'global_settings',
+          value: payload
+        });
+
+      if (error) throw error;
+    };
+
+    toast.promise(savePromise(), {
+      loading: 'Guardando configuración global...',
+      success: 'Configuración guardada correctamente.',
+      error: 'Error al guardar la configuración global.',
+    });
+  };
+
+  const fetchSettings = useCallback(async () => {
     const activeUnitId = localStorage.getItem('active_unit_id');
     if (!activeUnitId) return;
 
@@ -100,6 +175,13 @@ export default function ConfiguracionPage() {
           warmMortality: t.warm_mortality_max?.toString() || '5',
           coldMortality: t.cold_mortality_max?.toString() || '10',
         });
+
+        if (t.notification_settings) {
+          setNotificationSettings(prev => ({
+            ...prev,
+            ...t.notification_settings
+          }));
+        }
       }
     } catch (err) {
       console.error("Error loading settings:", err);
@@ -114,7 +196,16 @@ export default function ConfiguracionPage() {
     }
 
     const savePromise = async () => {
+      const { data: currentData } = await supabase
+        .from('unit_settings')
+        .select('thresholds')
+        .eq('unit_id', activeUnitId)
+        .maybeSingle();
+
+      const existingThresholds = currentData?.thresholds || {};
+
       const thresholdsPayload = {
+        ...existingThresholds,
         o2_mg_l_min: parseFloat(thresholds.o2_mg_l_min),
         o2_mg_l_max: parseFloat(thresholds.o2_mg_l_max),
         o2_perc_min: parseFloat(thresholds.o2_perc_min),
@@ -152,6 +243,44 @@ export default function ConfiguracionPage() {
     });
   };
 
+  const saveNotificationSettings = async (settingsToSave = notificationSettings) => {
+    const activeUnitId = localStorage.getItem('active_unit_id');
+    if (!activeUnitId) {
+      toast.error("No se identificó la unidad activa.");
+      return;
+    }
+
+    const savePromise = async () => {
+      const { data: currentData } = await supabase
+        .from('unit_settings')
+        .select('thresholds')
+        .eq('unit_id', activeUnitId)
+        .maybeSingle();
+
+      const existingThresholds = currentData?.thresholds || {};
+
+      const thresholdsPayload = {
+        ...existingThresholds,
+        notification_settings: settingsToSave
+      };
+
+      const { error } = await supabase
+        .from('unit_settings')
+        .upsert(
+          { unit_id: activeUnitId, thresholds: thresholdsPayload, updated_at: new Date().toISOString() },
+          { onConflict: 'unit_id' }
+        );
+
+      if (error) throw error;
+    };
+
+    toast.promise(savePromise(), {
+      loading: 'Guardando canales de notificación...',
+      success: 'Canales de notificación guardados correctamente.',
+      error: 'Error al guardar los canales.',
+    });
+  };
+
   useEffect(() => {
     async function checkRole() {
       const { data: { user } } = await supabase.auth.getUser();
@@ -182,6 +311,7 @@ export default function ConfiguracionPage() {
 
         if (superStatus) {
           setActiveTab('negocio');
+          fetchGlobalSettings();
         } else if (finalRole === 'admin') {
           setActiveTab('equipo');
         } else {
@@ -191,7 +321,7 @@ export default function ConfiguracionPage() {
       setLoading(false);
     }
     checkRole();
-  }, [fetchSettings]);
+  }, [fetchSettings, fetchGlobalSettings]);
 
   const getTabs = () => {
     if (isSuperAdmin) {
@@ -284,16 +414,73 @@ export default function ConfiguracionPage() {
               <div>
                 <div style={{ marginBottom: '2.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
                   <div>
-                    <h2 style={{ fontSize: '1.4rem', fontWeight: 900, letterSpacing: '-0.02em', marginBottom: '0.25rem' }}>Estructura de Precios</h2>
-                    <p style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>Ajusta las suscripciones globales.</p>
+                    <h2 style={{ fontSize: '1.4rem', fontWeight: 900, letterSpacing: '-0.02em', marginBottom: '0.25rem' }}>Estructura de Precios (Plan Único)</h2>
+                    <p style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>Ajusta la tarifa de suscripción global para el Plan Único FishBit.</p>
                   </div>
-                  <button className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: '#0d9488' }}>
+                  <button 
+                    onClick={() => saveGlobalSettings()} 
+                    className="btn-primary" 
+                    style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: '#0d9488' }}
+                  >
                     <Save size={18} /> Guardar Tarifas
                   </button>
                 </div>
-                <div className="responsive-grid-2">
-                  <PriceCard title="Suscripción Básica" icon={CreditCard} value={prices.basic} onChange={(v: number) => setPrices({...prices, basic: v})} />
-                  <PriceCard title="Suscripción Premium" icon={DollarSign} value={prices.premium} onChange={(v: number) => setPrices({...prices, premium: v})} color="#f59e0b" />
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '2rem' }}>
+                  <div className="glass" style={{ padding: '2.5rem', borderRadius: '24px', position: 'relative', overflow: 'hidden' }}>
+                    <div style={{
+                      position: 'absolute', top: 0, right: 0, width: '150px', height: '150px',
+                      background: 'radial-gradient(circle, rgba(13, 148, 136, 0.15) 0%, transparent 70%)',
+                      pointerEvents: 'none'
+                    }} />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '2rem', color: '#0d9488', flexWrap: 'wrap' }}>
+                      <CreditCard size={28} /> 
+                      <span style={{ fontWeight: 950, fontSize: '1.3rem', letterSpacing: '-0.02em' }}>Plan Único FishBit</span>
+                      <span style={{
+                        padding: '4px 12px', borderRadius: '20px', fontSize: '0.65rem', fontWeight: 900,
+                        background: 'rgba(13, 148, 136, 0.1)', color: '#0d9488', textTransform: 'uppercase',
+                        letterSpacing: '0.05em'
+                      }}>
+                        Acceso Completo Ilimitado
+                      </span>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '2rem' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                        <label className="premium-label" style={{ position: 'static', fontWeight: 700 }}>Moneda Plan</label>
+                        <select className="premium-input" disabled style={{ fontWeight: 800, background: 'var(--secondary)', cursor: 'not-allowed' }}>
+                          <option value="COP">COP (Pesos Colombianos) - Exclusivo</option>
+                        </select>
+                        <span style={{ fontSize: '0.7rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>De acuerdo a las reglas de negocio, solo se maneja moneda colombiana.</span>
+                      </div>
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                        <label className="premium-label" style={{ position: 'static', fontWeight: 700 }}>Valor Mensual (COP)</label>
+                        <div style={{ position: 'relative' }}>
+                          <span style={{ position: 'absolute', left: '1.25rem', top: '50%', transform: 'translateY(-50%)', fontWeight: 900, color: 'var(--muted-foreground)' }}>$</span>
+                          <input 
+                            type="number" 
+                            value={systemSettings.price_cop} 
+                            onChange={e => setSystemSettings({...systemSettings, price_cop: Number(e.target.value)})} 
+                            className="premium-input" 
+                            style={{ paddingLeft: '2.5rem', fontSize: '1.25rem', fontWeight: 950 }} 
+                          />
+                        </div>
+                        <span style={{ fontSize: '0.7rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>Valor sugerido: $100.000 COP</span>
+                      </div>
+                    </div>
+
+                    <div style={{
+                      marginTop: '2.5rem', background: 'rgba(255, 255, 255, 0.02)',
+                      border: '1px solid var(--border)', borderRadius: '16px', padding: '1.5rem'
+                    }}>
+                      <h4 style={{ fontWeight: 900, fontSize: '0.9rem', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <Info size={16} color="#0d9488" /> Detalles del Plan
+                      </h4>
+                      <p style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)', lineHeight: '1.5', fontWeight: 500 }}>
+                        Este plan otorga acceso ilimitado a todas las herramientas de gestión acuícola: Estanques, Siembras, Parámetros Técnicos, Almacén, Finanzas y Personal. La facturación es realizada manualmente por el equipo de administración y el acceso se suspende automáticamente si el plazo expira más allá de los días de gracia permitidos.
+                      </p>
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
@@ -303,16 +490,66 @@ export default function ConfiguracionPage() {
                 <div style={{ marginBottom: '2.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
                   <div>
                     <h2 style={{ fontSize: '1.4rem', fontWeight: 900, letterSpacing: '-0.02em', marginBottom: '0.25rem' }}>Sistema Maestro</h2>
-                    <p style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>Reglas de negocio y soporte.</p>
+                    <p style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>Parámetros de soporte técnico, días de cortesía y grace periods.</p>
                   </div>
-                  <button className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: '#0d9488' }}>
+                  <button 
+                    onClick={() => saveGlobalSettings()} 
+                    className="btn-primary" 
+                    style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: '#0d9488' }}
+                  >
                     <Save size={18} /> Aplicar Cambios
                   </button>
                 </div>
-                <div className="responsive-grid-3">
-                  <SystemInput label="Moneda de Transacción" type="select" options={['COP', 'USD', 'MXN']} />
-                  <SystemInput label="WhatsApp Central" type="text" placeholder="+57 300 000 0000" />
-                  <SystemInput label="Gracia (Días)" type="number" defaultValue="3" />
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '2rem' }}>
+                  <div className="glass" style={{ padding: '1.5rem', borderRadius: '20px', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                    <label className="premium-label" style={{ position: 'static', fontWeight: 700 }}>WhatsApp de Soporte Central</label>
+                    <input 
+                      type="text" 
+                      placeholder="+573000000000" 
+                      value={systemSettings.support_whatsapp} 
+                      onChange={e => setSystemSettings({...systemSettings, support_whatsapp: e.target.value})} 
+                      className="premium-input" 
+                      style={{ fontWeight: 800 }} 
+                    />
+                    <span style={{ fontSize: '0.7rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>WhatsApp del administrador al que los clientes suspendidos contactarán. Incluir código de país.</span>
+                  </div>
+
+                  <div className="glass" style={{ padding: '1.5rem', borderRadius: '20px', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                    <label className="premium-label" style={{ position: 'static', fontWeight: 700 }}>Correo de Soporte Central</label>
+                    <input 
+                      type="email" 
+                      placeholder="soporte@fishbit.co" 
+                      value={systemSettings.support_email} 
+                      onChange={e => setSystemSettings({...systemSettings, support_email: e.target.value})} 
+                      className="premium-input" 
+                      style={{ fontWeight: 800 }} 
+                    />
+                    <span style={{ fontSize: '0.7rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>Correo electrónico secundario de soporte que se mostrará en pantalla de bloqueo.</span>
+                  </div>
+
+                  <div className="glass" style={{ padding: '1.5rem', borderRadius: '20px', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                    <label className="premium-label" style={{ position: 'static', fontWeight: 700 }}>Periodo de Cortesía (Días de Prueba)</label>
+                    <input 
+                      type="number" 
+                      value={systemSettings.free_trial_days} 
+                      onChange={e => setSystemSettings({...systemSettings, free_trial_days: Number(e.target.value)})} 
+                      className="premium-input" 
+                      style={{ fontWeight: 800 }} 
+                    />
+                    <span style={{ fontSize: '0.7rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>Días de prueba gratis de bienvenida para nuevos clientes al iniciar.</span>
+                  </div>
+
+                  <div className="glass" style={{ padding: '1.5rem', borderRadius: '20px', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                    <label className="premium-label" style={{ position: 'static', fontWeight: 700 }}>Días de Gracia (Grace Period)</label>
+                    <input 
+                      type="number" 
+                      value={systemSettings.grace_days} 
+                      onChange={e => setSystemSettings({...systemSettings, grace_days: Number(e.target.value)})} 
+                      className="premium-input" 
+                      style={{ fontWeight: 800 }} 
+                    />
+                    <span style={{ fontSize: '0.7rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>Días adicionales permitidos tras el vencimiento de la fecha de pago antes del bloqueo.</span>
+                  </div>
                 </div>
               </div>
             )}
@@ -431,10 +668,334 @@ export default function ConfiguracionPage() {
             {!isSuperAdmin && activeTab === 'equipo' && <TeamManagement />}
 
             {(activeTab === 'notificaciones') && (
-              <div style={{ padding: '6rem 2rem', textAlign: 'center' }}>
-                <Bell size={48} style={{ margin: '0 auto 1.5rem', opacity: 0.1, color: 'var(--primary)' }} />
-                <h3 style={{ fontWeight: 900, color: 'var(--muted-foreground)' }}>Canales de Notificación</h3>
-                <p style={{ fontSize: '0.9rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>Próximamente: Integración con WhatsApp y Push Notifications.</p>
+              <div>
+                <div style={{ marginBottom: '2.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+                  <div>
+                    <h2 style={{ fontSize: '1.4rem', fontWeight: 950, letterSpacing: '-0.03em', marginBottom: '0.25rem' }}>Canales y Alertas de Notificación</h2>
+                    <p style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>Configura cómo y cuándo deseas recibir alertas críticas de tu producción.</p>
+                  </div>
+                  <button onClick={() => saveNotificationSettings()} className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <Save size={18} /> Guardar Canales
+                  </button>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '2rem' }}>
+                  
+                  {/* WhatsApp Business Card */}
+                  <div className="glass" style={{
+                    padding: '2.5rem',
+                    borderRadius: '24px',
+                    border: '1px solid rgba(37, 211, 102, 0.15)',
+                    position: 'relative',
+                    overflow: 'hidden',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '1.5rem'
+                  }}>
+                    <div style={{
+                      position: 'absolute', top: 0, right: 0, width: '120px', height: '120px',
+                      background: 'radial-gradient(circle, rgba(37, 211, 102, 0.1) 0%, transparent 70%)',
+                      pointerEvents: 'none'
+                    }} />
+                    
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                        <div style={{ background: 'rgba(37, 211, 102, 0.1)', color: '#25d366', padding: '0.6rem', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
+                            <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.003 5.419 5.422.002 12.079.002c3.223.001 6.253 1.257 8.531 3.539 2.279 2.28 3.532 5.312 3.53 8.534-.005 6.658-5.424 12.077-12.081 12.077-2.007-.001-3.98-.502-5.733-1.45L0 24zm6.59-4.846c1.62.963 3.223 1.442 4.93 1.443 5.348 0 9.697-4.35 9.7-9.699.003-2.593-1.002-5.031-2.83-6.86C16.618 2.21 14.183 1.2 11.59 1.2 6.241 1.2 1.893 5.55 1.89 10.899c0 1.761.462 3.327 1.34 4.883l-.991 3.613 3.808-.941zm11.238-5.597c-.301-.15-1.78-.879-2.056-.979-.275-.1-.475-.15-.675.15-.2.3-.775.979-.95 1.179-.175.2-.35.225-.65.075-1.041-.521-1.745-1.004-2.434-2.185-.59-.99-.785-1.98-.95-2.18-.16-.2.13-.245.33-.445.1-.1.2-.225.3-.325.1-.1.125-.175.187-.3.063-.125.031-.24-.015-.34-.047-.1-.475-1.144-.65-1.569-.17-.412-.34-.356-.475-.362-.122-.006-.262-.007-.402-.007-.14 0-.368.053-.56.262-.193.21-.735.719-.735 1.753s.75 2.032.855 2.172c.105.14 1.474 2.25 3.57 3.153.499.215.888.343 1.192.439.502.159.96.137 1.32.083.402-.06 1.78-.727 2.03-1.429.25-.701.25-1.3.175-1.429-.075-.13-.275-.23-.575-.38z"/>
+                          </svg>
+                        </div>
+                        <div>
+                          <h3 style={{ fontSize: '1.15rem', fontWeight: 900, letterSpacing: '-0.02em', margin: 0 }}>Notificaciones WhatsApp</h3>
+                          <span style={{ fontSize: '0.75rem', fontWeight: 700, color: notificationSettings.whatsapp_enabled ? '#25d366' : 'var(--muted-foreground)' }}>
+                            {notificationSettings.whatsapp_enabled ? 'CONECTADO' : 'INACTIVO'}
+                          </span>
+                        </div>
+                      </div>
+                      <PremiumSwitch
+                        checked={notificationSettings.whatsapp_enabled}
+                        onChange={(val) => {
+                          const updated = { ...notificationSettings, whatsapp_enabled: val };
+                          setNotificationSettings(updated);
+                          saveNotificationSettings(updated);
+                        }}
+                      />
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                      <label className="premium-label" style={{ position: 'static', fontWeight: 700 }}>Número Móvil de Alerta</label>
+                      <div style={{ position: 'relative' }}>
+                        <span style={{ position: 'absolute', left: '1.25rem', top: '50%', transform: 'translateY(-50%)', fontWeight: 800, color: 'var(--muted-foreground)' }}>🇨🇴 +57</span>
+                        <input
+                          type="tel"
+                          placeholder="300 123 4567"
+                          value={notificationSettings.whatsapp_number}
+                          onChange={(e) => setNotificationSettings(prev => ({ ...prev, whatsapp_number: e.target.value }))}
+                          disabled={!notificationSettings.whatsapp_enabled}
+                          className="premium-input"
+                          style={{
+                            paddingLeft: '4.5rem',
+                            fontWeight: 800,
+                            background: !notificationSettings.whatsapp_enabled ? 'rgba(255, 255, 255, 0.02)' : 'transparent',
+                            cursor: !notificationSettings.whatsapp_enabled ? 'not-allowed' : 'text'
+                          }}
+                        />
+                      </div>
+                      <span style={{ fontSize: '0.7rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>Solo números de Colombia. Formato de 10 dígitos.</span>
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.5rem' }}>
+                      <span style={{ fontSize: '0.75rem', fontWeight: 900, color: 'var(--muted-foreground)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Eventos a reportar</span>
+                      
+                      <PremiumCheckbox
+                        checked={notificationSettings.whatsapp_alert_oxygen}
+                        label="Oxígeno Crítico (< 4.5 mg/L)"
+                        onChange={(val) => {
+                          const u = { ...notificationSettings, whatsapp_alert_oxygen: val };
+                          setNotificationSettings(u);
+                          if (notificationSettings.whatsapp_enabled) saveNotificationSettings(u);
+                        }}
+                      />
+                      <PremiumCheckbox
+                        checked={notificationSettings.whatsapp_alert_temp}
+                        label="Límites de Temperatura superados"
+                        onChange={(val) => {
+                          const u = { ...notificationSettings, whatsapp_alert_temp: val };
+                          setNotificationSettings(u);
+                          if (notificationSettings.whatsapp_enabled) saveNotificationSettings(u);
+                        }}
+                      />
+                      <PremiumCheckbox
+                        checked={notificationSettings.whatsapp_alert_mortality}
+                        label="Picos inusuales de Mortalidad"
+                        onChange={(val) => {
+                          const u = { ...notificationSettings, whatsapp_alert_mortality: val };
+                          setNotificationSettings(u);
+                          if (notificationSettings.whatsapp_enabled) saveNotificationSettings(u);
+                        }}
+                      />
+                      <PremiumCheckbox
+                        checked={notificationSettings.whatsapp_alert_inventory}
+                        label="Desabastecimiento de Alimento"
+                        onChange={(val) => {
+                          const u = { ...notificationSettings, whatsapp_alert_inventory: val };
+                          setNotificationSettings(u);
+                          if (notificationSettings.whatsapp_enabled) saveNotificationSettings(u);
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Email Notifications Card */}
+                  <div className="glass" style={{
+                    padding: '2.5rem',
+                    borderRadius: '24px',
+                    border: '1px solid rgba(99, 102, 241, 0.15)',
+                    position: 'relative',
+                    overflow: 'hidden',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '1.5rem'
+                  }}>
+                    <div style={{
+                      position: 'absolute', top: 0, right: 0, width: '120px', height: '120px',
+                      background: 'radial-gradient(circle, rgba(99, 102, 241, 0.1) 0%, transparent 70%)',
+                      pointerEvents: 'none'
+                    }} />
+
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                        <div style={{ background: 'rgba(99, 102, 241, 0.1)', color: '#6366f1', padding: '0.6rem', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <Mail size={22} />
+                        </div>
+                        <div>
+                          <h3 style={{ fontSize: '1.15rem', fontWeight: 900, letterSpacing: '-0.02em', margin: 0 }}>Notificaciones E-mail</h3>
+                          <span style={{ fontSize: '0.75rem', fontWeight: 700, color: notificationSettings.email_enabled ? '#6366f1' : 'var(--muted-foreground)' }}>
+                            {notificationSettings.email_enabled ? 'ACTIVO' : 'INACTIVO'}
+                          </span>
+                        </div>
+                      </div>
+                      <PremiumSwitch
+                        checked={notificationSettings.email_enabled}
+                        onChange={(val) => {
+                          const updated = { ...notificationSettings, email_enabled: val };
+                          setNotificationSettings(updated);
+                          saveNotificationSettings(updated);
+                        }}
+                      />
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                      <label className="premium-label" style={{ position: 'static', fontWeight: 700 }}>Correo de Alertas</label>
+                      <div style={{ position: 'relative' }}>
+                        <input
+                          type="email"
+                          placeholder="gerencia@granja.co"
+                          value={notificationSettings.email_address}
+                          onChange={(e) => setNotificationSettings(prev => ({ ...prev, email_address: e.target.value }))}
+                          disabled={!notificationSettings.email_enabled}
+                          className="premium-input"
+                          style={{
+                            fontWeight: 800,
+                            background: !notificationSettings.email_enabled ? 'rgba(255, 255, 255, 0.02)' : 'transparent',
+                            cursor: !notificationSettings.email_enabled ? 'not-allowed' : 'text'
+                          }}
+                        />
+                      </div>
+                      <span style={{ fontSize: '0.7rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>Dirección e-mail principal para informes maestros.</span>
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.5rem' }}>
+                      <span style={{ fontSize: '0.75rem', fontWeight: 900, color: 'var(--muted-foreground)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Reportes Recurrentes</span>
+
+                      <PremiumCheckbox
+                        checked={notificationSettings.email_daily_summary}
+                        label="Resumen Financiero Diario al cierre"
+                        onChange={(val) => {
+                          const u = { ...notificationSettings, email_daily_summary: val };
+                          setNotificationSettings(u);
+                          if (notificationSettings.email_enabled) saveNotificationSettings(u);
+                        }}
+                      />
+                      <PremiumCheckbox
+                        checked={notificationSettings.email_non_compliance}
+                        label="Alerta de Omisión Técnica (Sin registros antes de las 18:00)"
+                        onChange={(val) => {
+                          const u = { ...notificationSettings, email_non_compliance: val };
+                          setNotificationSettings(u);
+                          if (notificationSettings.email_enabled) saveNotificationSettings(u);
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Browser Push & API Status Card */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+                    
+                    {/* Browser Push Card */}
+                    <div className="glass" style={{
+                      padding: '2.2rem',
+                      borderRadius: '24px',
+                      border: '1px solid rgba(255, 255, 255, 0.06)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '1.25rem'
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                          <div style={{ background: 'rgba(255, 255, 255, 0.05)', color: 'var(--foreground)', padding: '0.6rem', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <Bell size={22} />
+                          </div>
+                          <div>
+                            <h3 style={{ fontSize: '1.15rem', fontWeight: 900, letterSpacing: '-0.02em', margin: 0 }}>Push en Navegador</h3>
+                            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: notificationSettings.push_enabled ? 'var(--primary)' : 'var(--muted-foreground)' }}>
+                              {notificationSettings.push_enabled ? 'Suscrito' : 'Inactivo'}
+                            </span>
+                          </div>
+                        </div>
+                        <PremiumSwitch
+                          checked={notificationSettings.push_enabled}
+                          onChange={(val) => {
+                            const updated = { ...notificationSettings, push_enabled: val };
+                            setNotificationSettings(updated);
+                            saveNotificationSettings(updated);
+                            if (val) {
+                              toast.success("¡Permiso de notificaciones push concedido!");
+                            }
+                          }}
+                        />
+                      </div>
+                      
+                      {notificationSettings.push_enabled && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '0.25rem' }}>
+                          <span style={{ fontSize: '0.75rem', fontWeight: 900, color: 'var(--muted-foreground)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Frecuencia de Notificaciones</span>
+                          <div style={{ display: 'flex', gap: '1rem' }}>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const u = { ...notificationSettings, push_frequency: 'instant' };
+                                setNotificationSettings(u);
+                                saveNotificationSettings(u);
+                              }}
+                              style={{
+                                flex: 1,
+                                padding: '0.6rem',
+                                borderRadius: '10px',
+                                background: notificationSettings.push_frequency === 'instant' ? 'rgba(37, 99, 235, 0.1)' : 'transparent',
+                                border: notificationSettings.push_frequency === 'instant' ? '1px solid var(--primary)' : '1px solid var(--border)',
+                                color: notificationSettings.push_frequency === 'instant' ? 'var(--primary)' : 'var(--muted-foreground)',
+                                fontWeight: 800,
+                                cursor: 'pointer',
+                                fontSize: '0.75rem',
+                                transition: 'all 0.2s',
+                                paddingLeft: 0,
+                                paddingRight: 0
+                              }}
+                            >
+                              Instantáneas
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const u = { ...notificationSettings, push_frequency: 'digest' };
+                                setNotificationSettings(u);
+                                saveNotificationSettings(u);
+                              }}
+                              style={{
+                                flex: 1,
+                                padding: '0.6rem',
+                                borderRadius: '10px',
+                                background: notificationSettings.push_frequency === 'digest' ? 'rgba(37, 99, 235, 0.1)' : 'transparent',
+                                border: notificationSettings.push_frequency === 'digest' ? '1px solid var(--primary)' : '1px solid var(--border)',
+                                color: notificationSettings.push_frequency === 'digest' ? 'var(--primary)' : 'var(--muted-foreground)',
+                                fontWeight: 800,
+                                cursor: 'pointer',
+                                fontSize: '0.75rem',
+                                transition: 'all 0.2s',
+                                paddingLeft: 0,
+                                paddingRight: 0
+                              }}
+                            >
+                              Resumen Diario
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Gateway Status Card */}
+                    <div className="glass" style={{
+                      padding: '2.2rem',
+                      borderRadius: '24px',
+                      border: '1px solid rgba(255, 255, 255, 0.06)',
+                      background: 'linear-gradient(135deg, rgba(13, 148, 136, 0.05) 0%, rgba(2, 6, 23, 0.4) 100%)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '1rem'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <span style={{ fontSize: '0.75rem', fontWeight: 900, color: 'var(--muted-foreground)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Pasarela de Notificaciones</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                          <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#10b981', boxShadow: '0 0 8px #10b981' }} />
+                          <span style={{ fontSize: '0.65rem', fontWeight: 900, color: '#10b981' }}>ONLINE</span>
+                        </div>
+                      </div>
+                      
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>API Endpoint:</span>
+                        <code style={{ fontSize: '0.7rem', padding: '0.4rem 0.6rem', borderRadius: '8px', background: 'rgba(0,0,0,0.3)', color: 'var(--primary)', fontFamily: 'monospace', fontWeight: 700, wordBreak: 'break-all' }}>
+                          https://api.fishbit.co/v1/notifications
+                        </code>
+                      </div>
+
+                      <p style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)', lineHeight: '1.4', margin: 0, fontWeight: 500 }}>
+                        Conectado a la pasarela distribuida de FishBit. Garantiza una entrega de alertas de parámetros en menos de 5 segundos tras registrarse una medición fuera de rango.
+                      </p>
+                    </div>
+
+                  </div>
+
+                </div>
               </div>
             )}
           </motion.div>
@@ -443,6 +1004,71 @@ export default function ConfiguracionPage() {
     </div>
   );
 }
+
+// --- Dynamic Notification Components ---
+
+const PremiumSwitch = ({ checked, onChange }: { checked: boolean, onChange: (val: boolean) => void }) => {
+  return (
+    <button
+      type="button"
+      onClick={() => onChange(!checked)}
+      style={{
+        width: '50px',
+        height: '26px',
+        borderRadius: '999px',
+        background: checked ? 'var(--primary)' : 'rgba(255, 255, 255, 0.1)',
+        border: '1px solid rgba(255, 255, 255, 0.08)',
+        position: 'relative',
+        cursor: 'pointer',
+        transition: 'background 0.3s ease',
+        padding: 0,
+        display: 'flex',
+        alignItems: 'center'
+      }}
+    >
+      <motion.div
+        animate={{ x: checked ? 25 : 3 }}
+        transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+        style={{
+          width: '18px',
+          height: '18px',
+          borderRadius: '50%',
+          background: 'white',
+          boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+        }}
+      />
+    </button>
+  );
+};
+
+const PremiumCheckbox = ({ checked, label, onChange }: { checked: boolean, label: string, onChange: (val: boolean) => void }) => {
+  return (
+    <label style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer', userSelect: 'none', margin: '0.4rem 0' }}>
+      <button
+        type="button"
+        onClick={() => onChange(!checked)}
+        style={{
+          width: '20px',
+          height: '20px',
+          borderRadius: '6px',
+          background: checked ? 'var(--primary)' : 'rgba(255, 255, 255, 0.05)',
+          border: checked ? '1px solid var(--primary)' : '1px solid rgba(255, 255, 255, 0.1)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: 'white',
+          cursor: 'pointer',
+          padding: 0
+        }}
+      >
+        {checked && <span style={{ fontSize: '0.65rem', fontWeight: 900 }}>✓</span>}
+      </button>
+      <span style={{ fontSize: '0.85rem', fontWeight: 600, color: checked ? 'var(--foreground)' : 'var(--muted-foreground)', transition: 'color 0.2s' }}>
+        {label}
+      </span>
+    </label>
+  );
+};
 
 // --- Corrected Structural Components ---
 
@@ -492,33 +1118,7 @@ const ParamInput = ({ label, icon: Icon, color, min, max, onMinChange, onMaxChan
   </div>
 );
 
-const PriceCard = ({ title, icon: Icon, value, onChange, color }: any) => (
-  <div className="glass" style={{ padding: '2rem', borderRadius: '24px' }}>
-    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem', color: color || 'var(--primary)' }}>
-      <Icon size={24} /> <span style={{ fontWeight: 950, fontSize: '1.1rem' }}>{title}</span>
-    </div>
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-      <label className="premium-label" style={{ position: 'static', fontWeight: 700 }}>Valor Mensual (USD)</label>
-      <div style={{ position: 'relative' }}>
-        <span style={{ position: 'absolute', left: '1.25rem', top: '50%', transform: 'translateY(-50%)', fontWeight: 900, color: 'var(--muted-foreground)' }}>$</span>
-        <input type="number" value={value} onChange={e => onChange(Number(e.target.value))} className="premium-input" style={{ paddingLeft: '2.5rem', fontSize: '1.25rem', fontWeight: 950 }} />
-      </div>
-    </div>
-  </div>
-);
 
-const SystemInput = ({ label, type, options, placeholder, defaultValue }: any) => (
-  <div className="glass" style={{ padding: '1.5rem', borderRadius: '20px', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-    <label className="premium-label" style={{ position: 'static', fontWeight: 700 }}>{label}</label>
-    {type === 'select' ? (
-      <select className="premium-input" style={{ fontWeight: 800 }}>
-        {options.map((o: any) => <option key={o} value={o}>{o}</option>)}
-      </select>
-    ) : (
-      <input type={type} placeholder={placeholder} defaultValue={defaultValue} className="premium-input" style={{ fontWeight: 800 }} />
-    )}
-  </div>
-);
 
 const InputGroup = ({ label, placeholder, value, onChange, defaultValue }: any) => (
   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
@@ -633,42 +1233,38 @@ const TeamManagement = () => {
     e.preventDefault();
     setInviting(true);
     const invitePromise = async () => {
-      if (planType === 'basic') {
-        const countByRole = members.filter(m => m.role === inviteData.role).length;
-        if (countByRole >= 1) { 
-          throw new Error("Límite de Plan Básico: Solo 1 usuario por rol.");
-        }
-      }
       let activeUnitId = localStorage.getItem('active_unit_id');
       if (!activeUnitId) throw new Error("Unidad no identificada.");
 
-      const { data, error: authError } = await supabase.auth.signUp({ 
-        email: inviteData.email, 
-        password: 'FishBit2026!', 
-        options: { data: { full_name: inviteData.fullName } } 
+      const response = await fetch('/api/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: inviteData.email,
+          fullName: inviteData.fullName,
+          role: inviteData.role,
+          unitId: activeUnitId
+        })
       });
 
-      if (authError) throw authError;
-
-      if (data.user) {
-        await supabase.from('profiles').insert([{ 
-          id: data.user.id, 
-          full_name: inviteData.fullName, 
-          email: inviteData.email, 
-          role: inviteData.role, 
-          is_superadmin: false 
-        }]);
-
-        await supabase.from('user_units').insert([{ 
-          user_id: data.user.id, 
-          unit_id: activeUnitId,
-          role: inviteData.role 
-        }]);
-        
-        setShowInviteModal(false);
-        setInviteData({ email: '', fullName: '', role: 'tecnico' });
-        fetchTeam(true);
+      const res = await response.json();
+      if (!response.ok || res.error) {
+        throw new Error(res.error || 'Error al invitar miembro');
       }
+
+      const generatedPassword = res.password;
+      if (generatedPassword) {
+        try {
+          await navigator.clipboard.writeText(generatedPassword);
+          toast.success(`Contraseña temporal copiada al portapapeles: ${generatedPassword}`, { duration: 10000 });
+        } catch {
+          alert(`Miembro creado. Contraseña temporal: ${generatedPassword}\n\nPor favor, cópiala ahora.`);
+        }
+      }
+
+      setShowInviteModal(false);
+      setInviteData({ email: '', fullName: '', role: 'tecnico' });
+      fetchTeam(true);
     };
 
     toast.promise(invitePromise(), {
@@ -726,12 +1322,12 @@ const TeamManagement = () => {
               borderRadius: '20px', 
               fontSize: '0.65rem', 
               fontWeight: 900, 
-              background: planType === 'premium' ? 'rgba(245, 158, 11, 0.1)' : 'rgba(13, 148, 136, 0.1)',
-              color: planType === 'premium' ? '#d97706' : '#0d9488',
+              background: 'rgba(13, 148, 136, 0.1)',
+              color: '#0d9488',
               textTransform: 'uppercase',
               letterSpacing: '0.05em'
             }}>
-              {planType === 'premium' ? 'Premium: Ilimitado' : 'Básico: 1 por rol'}
+              Plan Único: Ilimitado
             </span>
           </div>
         </div>

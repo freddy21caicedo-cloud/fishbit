@@ -25,28 +25,76 @@ import {
   X,
   Trash2,
   ChevronRight,
-  UserPlus
+  UserPlus,
+  Calendar
 } from 'lucide-react';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { toast } from 'react-hot-toast';
+
+interface SuperAdminUnit {
+  id: string;
+  name: string;
+  location: string;
+  created_at?: string;
+  subscriptions: any[];
+  user_units: { count: number }[];
+}
+
+interface SuperAdminProfile {
+  id: string;
+  full_name: string;
+  email: string;
+  role: string;
+  is_superadmin: boolean;
+  user_units: {
+    user_id: string;
+    unit_id: string;
+    role: string;
+    units: { name: string };
+  }[];
+}
+
+interface SuperAdminSubscription {
+  id: string;
+  unit_id: string;
+  units: SuperAdminUnit;
+  plan_type: string;
+  status: string;
+  next_billing_date: string;
+  client_name: string;
+}
+
+interface SuperAdminTicket {
+  id: string;
+  subject: string;
+  priority: string;
+  description: string;
+  status: string;
+  created_at: string;
+  user_id: string;
+  profiles: { full_name: string };
+}
 
 type Tab = 'overview' | 'units' | 'clients' | 'billing' | 'support';
 
 export default function SuperAdminHub() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const initialTab = (searchParams.get('tab') as Tab) || 'overview';
   
   // State
   const [activeTab, setActiveTab] = useState<Tab>(initialTab);
   const [loading, setLoading] = useState(true);
-  const [units, setUnits] = useState<any[]>([]);
-  const [profiles, setProfiles] = useState<any[]>([]);
+  const [units, setUnits] = useState<SuperAdminUnit[]>([]);
+  const [profiles, setProfiles] = useState<SuperAdminProfile[]>([]);
   const [totalRevenue, setTotalRevenue] = useState(0);
-  const [subscriptions, setSubscriptions] = useState<any[]>([]);
-  const [tickets, setTickets] = useState<any[]>([]);
+  const [subscriptions, setSubscriptions] = useState<SuperAdminSubscription[]>([]);
+  const [tickets, setTickets] = useState<SuperAdminTicket[]>([]);
   
   // Modal States
   const [isUnitModalOpen, setIsUnitModalOpen] = useState(false);
+  const [isEditUnitModalOpen, setIsEditUnitModalOpen] = useState(false);
   const [isUserModalOpen, setIsUserModalOpen] = useState(false);
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
   
@@ -55,11 +103,25 @@ export default function SuperAdminHub() {
   const [selectedUnitId, setSelectedUnitId] = useState('');
   const [selectedRole, setSelectedRole] = useState('admin');
   const [newUnit, setNewUnit] = useState({ name: '', location: '' });
+  const [editUnit, setEditUnit] = useState({ id: '', name: '', location: '' });
   const [newUser, setNewUser] = useState({ email: '', password: '', fullName: '' });
 
   const fetchAllData = useCallback(async () => {
     setLoading(true);
     try {
+      // Security Check: Verify SuperAdmin status
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        router.push('/');
+        return;
+      }
+      const { data: profile } = await supabase.from('profiles').select('is_superadmin').eq('id', user.id).single();
+      if (!profile?.is_superadmin) {
+        toast.error('Acceso denegado. Permisos insuficientes.');
+        router.push('/dashboard');
+        return;
+      }
+
       const results = await Promise.allSettled([
         supabase.from('units').select('*'),
         supabase.from('profiles').select('*'),
@@ -68,7 +130,8 @@ export default function SuperAdminHub() {
         supabase.from('support_tickets').select('*')
       ]);
 
-      const unitsData = (results[0].status === 'fulfilled' ? results[0].value.data : []) || [];
+      const allUnitsData = (results[0].status === 'fulfilled' ? results[0].value.data : []) || [];
+      const unitsData = allUnitsData.filter(u => u.id !== '00000000-0000-0000-0000-000000000000');
       const profilesData = (results[1].status === 'fulfilled' ? results[1].value.data : []) || [];
       const uuData = (results[2].status === 'fulfilled' ? results[2].value.data : []) || [];
       const subsData = (results[3].status === 'fulfilled' ? results[3].value.data : []) || [];
@@ -141,7 +204,7 @@ export default function SuperAdminHub() {
         unit_id: data.id,
         plan_type: 'basic',
         status: 'active',
-        price: 18,
+        price: 0, // First month free promotion
         next_billing_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
       }]);
 
@@ -157,23 +220,43 @@ export default function SuperAdminHub() {
     });
   };
 
+  const handleUpdateUnit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const updatePromise = async () => {
+      const { error } = await supabase
+        .from('units')
+        .update({ name: editUnit.name, location: editUnit.location })
+        .eq('id', editUnit.id);
+      if (error) throw error;
+      
+      setIsEditUnitModalOpen(false);
+      fetchAllData();
+    };
+
+    toast.promise(updatePromise(), {
+      loading: 'Actualizando unidad...',
+      success: 'Unidad actualizada exitosamente.',
+      error: 'Error al actualizar unidad.'
+    });
+  };
+
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
     const registerPromise = async () => {
-      const { data, error } = await supabase.auth.signUp({
-        email: newUser.email,
-        password: newUser.password,
-        options: { data: { full_name: newUser.fullName } }
-      });
-      if (error) throw error;
-
-      if (data.user) {
-        await supabase.from('profiles').insert([{
-          id: data.user.id,
-          full_name: newUser.fullName,
+      const response = await fetch('/api/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           email: newUser.email,
-          is_superadmin: false
-        }]);
+          fullName: newUser.fullName,
+          password: newUser.password,
+          role: 'admin'
+        })
+      });
+
+      const res = await response.json();
+      if (!response.ok || res.error) {
+        throw new Error(res.error || 'Error al registrar cliente');
       }
 
       setIsUserModalOpen(false);
@@ -214,16 +297,23 @@ export default function SuperAdminHub() {
     if (!confirm("¿Eliminar usuario definitivamente?")) return;
     
     const deletePromise = async () => {
-      await supabase.from('user_units').delete().eq('user_id', id);
-      const { error } = await supabase.from('profiles').delete().eq('id', id);
-      if (error) throw error;
+      const response = await fetch('/api/users/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: id })
+      });
+
+      const res = await response.json();
+      if (!response.ok || res.error) {
+        throw new Error(res.error || 'Error al eliminar usuario');
+      }
       fetchAllData();
     };
 
     toast.promise(deletePromise(), {
       loading: 'Eliminando...',
-      success: 'Usuario eliminado.',
-      error: 'Error al eliminar.'
+      success: 'Usuario eliminado del sistema.',
+      error: (err) => `Error: ${err.message}`
     });
   };
 
@@ -267,7 +357,26 @@ export default function SuperAdminHub() {
             </div>
             <p style={{ color: 'var(--muted-foreground)', fontWeight: 600, fontSize: '0.9rem' }}>Centro de control maestro FishBit.</p>
           </div>
-          <div style={{ display: 'flex', gap: '1rem' }}>
+          <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+             <Link 
+                href="/configuracion" 
+                style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '0.5rem', 
+                  padding: '0.8rem 1.5rem', 
+                  background: 'var(--secondary)', 
+                  border: '1px solid var(--border)',
+                  color: 'var(--foreground)',
+                  borderRadius: '12px',
+                  textDecoration: 'none',
+                  fontWeight: 800,
+                  fontSize: '0.9rem',
+                  transition: 'all 0.2s'
+                }}
+             >
+                <Settings size={20} /> Configuración Global
+             </Link>
              <button onClick={() => setIsUnitModalOpen(true)} className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.8rem 1.5rem', background: '#0d9488', borderRadius: '12px' }}>
                 <Plus size={20} /> Nueva Unidad
              </button>
@@ -292,10 +401,15 @@ export default function SuperAdminHub() {
           transition={{ duration: 0.2 }}
         >
           {activeTab === 'overview' && <OverviewTab units={units} profiles={profiles} tickets={tickets} revenue={totalRevenue} />}
-          {activeTab === 'units' && <UnitsTab units={units} onDelete={handleDeleteUnit} />}
+          {activeTab === 'units' && <UnitsTab units={units} onDelete={handleDeleteUnit} onEdit={(u: any) => { setEditUnit({ id: u.id, name: u.name, location: u.location }); setIsEditUnitModalOpen(true); }} />}
           {activeTab === 'clients' && (
             <ClientsTab 
-              profiles={profiles} 
+              profiles={profiles.filter((p: any) => 
+                !p.is_superadmin && (
+                  (!p.user_units || p.user_units.length === 0) || 
+                  p.user_units.some((uu: any) => uu.role === 'admin')
+                )
+              )} 
               onRegister={() => setIsUserModalOpen(true)} 
               onAssign={(p: any) => { setSelectedUser(p); setIsAssignModalOpen(true); }}
               onDelete={handleDeleteUser}
@@ -313,6 +427,16 @@ export default function SuperAdminHub() {
               <InputGroup label="Nombre Comercial" placeholder="FishBit Central" value={newUnit.name} onChange={(v: string) => setNewUnit({...newUnit, name: v})} />
               <InputGroup label="Región / País" placeholder="Antioquia, Colombia" value={newUnit.location} onChange={(v: string) => setNewUnit({...newUnit, location: v})} />
               <button type="submit" className="btn-primary" style={{ padding: '1.25rem', fontWeight: 800, background: '#0d9488', borderRadius: '14px' }}>Confirmar Apertura</button>
+            </form>
+          </Modal>
+        )}
+
+        {isEditUnitModalOpen && (
+          <Modal title="Editar Unidad" onClose={() => setIsEditUnitModalOpen(false)}>
+            <form onSubmit={handleUpdateUnit} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+              <InputGroup label="Nombre Comercial" placeholder="FishBit Central" value={editUnit.name} onChange={(v: string) => setEditUnit({...editUnit, name: v})} />
+              <InputGroup label="Región / País" placeholder="Antioquia, Colombia" value={editUnit.location} onChange={(v: string) => setEditUnit({...editUnit, location: v})} />
+              <button type="submit" className="btn-primary" style={{ padding: '1.25rem', fontWeight: 800, background: '#0d9488', borderRadius: '14px' }}>Guardar Cambios</button>
             </form>
           </Modal>
         )}
@@ -374,49 +498,122 @@ const TabNav = ({ id, label, icon: Icon, active, setActive }: any) => (
   </button>
 );
 
-const OverviewTab = ({ units, profiles, tickets, revenue }: any) => (
-  <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.5rem' }}>
-      <StatCard label="Granjas" value={units.length} icon={Globe} color="#0d9488" />
-      <StatCard label="Usuarios" value={profiles.length} icon={Users} color="#0d9488" />
-      <StatCard label="Soporte" value={tickets.length} icon={MessageSquare} color="#f59e0b" />
-      <StatCard label="Revenue" value={`$${revenue.toLocaleString()}`} icon={DollarSign} color="#8b5cf6" />
-    </div>
-    <div className="responsive-grid-2">
-      <SectionCard title="Granjas Recientes">
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-          {units.slice(0, 5).map((u: any) => (
-            <div key={u.id} className="glass" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '1rem', borderRadius: '14px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                <Navigation size={20} color="#0d9488" />
-                <div>
-                  <div style={{ fontWeight: 800, fontSize: '0.95rem' }}>{u.name}</div>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)' }}>{u.location}</div>
-                </div>
-              </div>
-              <ChevronRight size={18} color="var(--muted-foreground)" />
-            </div>
-          ))}
-        </div>
-      </SectionCard>
-      <SectionCard title="Usuarios Recientes">
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          {profiles.slice(0, 5).map((p: any) => (
-            <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-              <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: '#0d9488', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.9rem', fontWeight: 900 }}>{p.full_name?.[0] || 'U'}</div>
-              <div>
-                <div style={{ fontWeight: 800, fontSize: '0.95rem' }}>{p.full_name}</div>
-                <div style={{ fontSize: '0.7rem', color: 'var(--muted-foreground)', fontWeight: 700 }}>{p.is_superadmin ? 'PLATFORM OWNER' : 'CLIENT'}</div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </SectionCard>
-    </div>
-  </div>
-);
+const OverviewTab = ({ units, profiles, tickets, revenue }: any) => {
+  // Filter for clients (Administradores only, excluding SuperAdmins and technicians/operators)
+  const clientProfiles = profiles.filter((p: any) => 
+    !p.is_superadmin && (
+      (!p.user_units || p.user_units.length === 0) || 
+      p.user_units.some((uu: any) => uu.role === 'admin')
+    )
+  );
 
-const UnitsTab = ({ units, onDelete }: any) => (
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.5rem' }}>
+        <StatCard label="Granjas" value={units.length} icon={Globe} color="#0d9488" />
+        <StatCard label="Usuarios" value={clientProfiles.length} icon={Users} color="#0d9488" />
+        <StatCard label="Soporte" value={tickets.length} icon={MessageSquare} color="#f59e0b" />
+        <StatCard label="Ingresos (COP)" value={`$${revenue.toLocaleString('es-CO')}`} icon={DollarSign} color="#8b5cf6" />
+      </div>
+      <div className="responsive-grid-2">
+        <SectionCard title="Unidades Acuícolas Recientes">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            {units.slice(0, 5).map((u: any) => {
+              const sub = u.subscriptions?.[0];
+              const isExpired = sub ? new Date(sub.next_billing_date) < new Date() : true;
+              const isSuspended = sub ? (sub.status === 'canceled' || sub.status === 'suspended') : true;
+              const statusText = isSuspended ? 'SUSPENDIDO' : (isExpired ? 'VENCIDO' : 'ACTIVO');
+              const statusColor = isSuspended || isExpired ? '#ef4444' : '#10b981';
+              const statusBg = isSuspended || isExpired ? 'rgba(239, 68, 68, 0.1)' : 'rgba(16, 185, 129, 0.1)';
+
+              const unitProfiles = profiles.filter((p: any) => p.user_units?.some((uu: any) => uu.unit_id === u.id));
+              let latestProfile: any = null;
+              let maxTime = 0;
+              
+              unitProfiles.forEach((p: any) => {
+                const time = new Date(p.updated_at || p.created_at || u.created_at).getTime();
+                if (time > maxTime) {
+                  maxTime = time;
+                  latestProfile = p;
+                }
+              });
+
+              const lastAccessDate = latestProfile ? new Date(maxTime) : new Date(u.created_at);
+              const lastAccessStr = lastAccessDate.toLocaleDateString('es-CO', { 
+                day: '2-digit', 
+                month: 'short', 
+                hour: '2-digit', 
+                minute: '2-digit' 
+              });
+
+              const uuRelation = latestProfile?.user_units?.find((uu: any) => uu.unit_id === u.id);
+              const roleLabel = uuRelation 
+                ? (uuRelation.role === 'admin' ? 'Admin' : uuRelation.role === 'tecnico' ? 'Técnico' : 'Operario')
+                : (latestProfile?.is_superadmin ? 'SuperAdmin' : 'Cliente');
+              
+              const whoAccess = latestProfile 
+                ? ` (${latestProfile.full_name?.split(' ')[0] || 'Usuario'} - ${roleLabel})` 
+                : '';
+
+              return (
+                <div key={u.id} className="glass" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '1rem', borderRadius: '14px', gap: '1rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '38px', height: '38px', borderRadius: '10px', background: 'rgba(13,148,136,0.1)', color: '#0d9488' }}>
+                      <Navigation size={18} />
+                    </div>
+                    <div>
+                      <div style={{ fontWeight: 800, fontSize: '0.95rem' }}>{u.name}</div>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)', display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '2px' }}>
+                        <Calendar size={12} />
+                        <span>Acceso: {lastAccessStr}{whoAccess}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <span style={{ 
+                      padding: '4px 10px', 
+                      borderRadius: '10px', 
+                      background: statusBg, 
+                      color: statusColor, 
+                      fontSize: '0.65rem', 
+                      fontWeight: 900,
+                      letterSpacing: '0.05em'
+                    }}>
+                      {statusText}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </SectionCard>
+        <SectionCard title="Usuarios Recientes">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            {clientProfiles.slice(0, 5).map((p: any) => {
+              const unitText = p.is_superadmin 
+                ? 'PLATFORM OWNER' 
+                : (!p.user_units || p.user_units.length === 0) 
+                  ? 'Sin unidad asignada' 
+                  : p.user_units.map((uu: any) => uu.units.name).join(', ');
+
+              return (
+                <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                  <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: '#0d9488', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.9rem', fontWeight: 900 }}>{p.full_name?.[0] || 'U'}</div>
+                  <div>
+                    <div style={{ fontWeight: 800, fontSize: '0.95rem' }}>{p.full_name}</div>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--muted-foreground)', fontWeight: 700 }}>{unitText}</div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </SectionCard>
+      </div>
+    </div>
+  );
+};
+
+const UnitsTab = ({ units, onDelete, onEdit }: any) => (
   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1.5rem' }}>
     {units.map((u: any) => (
       <div key={u.id} className="card-premium" style={{ padding: '2rem' }}>
@@ -436,8 +633,8 @@ const UnitsTab = ({ units, onDelete }: any) => (
             <div style={{ fontWeight: 900, fontSize: '1rem', color: '#0d9488' }}>OPEN</div>
           </div>
         </div>
-        <button className="btn-primary" style={{ width: '100%', padding: '1rem', borderRadius: '12px', background: 'transparent', border: '1px solid var(--border)', color: 'var(--foreground)', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
-          Configurar <TrendingUp size={16} />
+        <button onClick={() => onEdit(u)} className="btn-primary" style={{ width: '100%', padding: '1rem', borderRadius: '12px', background: 'transparent', border: '1px solid var(--border)', color: 'var(--foreground)', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
+          Configurar <Settings size={16} />
         </button>
       </div>
     ))}
@@ -504,19 +701,34 @@ const ClientsTab = ({ profiles, onRegister, onAssign, onDelete }: any) => (
   </div>
 );
 
-const BillingTab = ({ subscriptions, onRefresh }: { subscriptions: any[], onRefresh: () => void }) => {
-  const PLAN_PRICES: Record<string, number> = {
-    basic: 18,
-    premium: 30
-  };
+const BillingTab = ({ subscriptions, onRefresh }: { subscriptions: SuperAdminSubscription[], onRefresh: () => void }) => {
+  const [planPrice, setPlanPrice] = useState(100000);
+
+  useEffect(() => {
+    async function loadPrice() {
+      try {
+        const { data } = await supabase
+          .from('app_config')
+          .select('value')
+          .eq('key', 'global_settings')
+          .maybeSingle();
+        if (data?.value) {
+          const parsed = typeof data.value === 'string' ? JSON.parse(data.value) : data.value;
+          setPlanPrice(parsed.price ?? 100000);
+        }
+      } catch (err) {
+        console.error("Error loading plan price in BillingTab:", err);
+      }
+    }
+    loadPrice();
+  }, []);
 
   const handleManualRenewal = async (sub: any) => {
-    if (!confirm(`¿Confirmas renovación manual para ${sub.units.name}?`)) return;
+    if (!confirm(`¿Confirmas renovación manual de $${planPrice.toLocaleString('es-CO')} COP para ${sub.units.name}?`)) return;
     
     const renewPromise = async () => {
       const newNextDate = new Date();
       newNextDate.setDate(newNextDate.getDate() + 30);
-      const price = PLAN_PRICES[sub.plan_type] || 0;
 
       if (sub.id.startsWith('temp-')) {
         const { error } = await supabase.from('subscriptions').insert([{ 
@@ -524,14 +736,14 @@ const BillingTab = ({ subscriptions, onRefresh }: { subscriptions: any[], onRefr
           status: 'active', 
           plan_type: 'basic',
           next_billing_date: newNextDate.toISOString(),
-          price: PLAN_PRICES.basic
+          price: planPrice
         }]);
         if (error) throw error;
       } else {
         const { error } = await supabase.from('subscriptions').update({ 
           status: 'active', 
           next_billing_date: newNextDate.toISOString(),
-          price: price
+          price: planPrice
         }).eq('id', sub.id);
         if (error) throw error;
       }
@@ -539,107 +751,212 @@ const BillingTab = ({ subscriptions, onRefresh }: { subscriptions: any[], onRefr
     };
 
     toast.promise(renewPromise(), {
-      loading: 'Procesando pago...',
-      success: 'Suscripción renovada.',
-      error: 'Error en proceso.'
+      loading: 'Registrando pago manual...',
+      success: 'Suscripción renovada por 30 días.',
+      error: 'Error al renovar suscripción.'
     });
   };
 
-  const handleTogglePlan = async (sub: any) => {
-    const newPlan = sub.plan_type === 'premium' ? 'basic' : 'premium';
-    const togglePromise = async () => {
+  const handleToggleStatus = async (sub: any, currentStatus: string) => {
+    const isCurrentlyActive = currentStatus === 'active';
+    const newStatus = isCurrentlyActive ? 'canceled' : 'active';
+    const actionText = isCurrentlyActive ? 'suspender' : 'activar';
+    
+    if (!confirm(`¿Confirmas ${actionText} la suscripción para ${sub.units.name}?`)) return;
+    
+    const toggleStatusPromise = async () => {
       if (sub.id.startsWith('temp-')) {
-        const { error } = await supabase.from('subscriptions').insert([{ 
+        const nextDate = new Date();
+        nextDate.setDate(nextDate.getDate() + 30);
+        const { error } = await supabase.from('subscriptions').insert([{
           unit_id: sub.unit_id,
-          plan_type: newPlan,
-          status: 'active',
-          price: newPlan === 'premium' ? 30 : 18,
-          next_billing_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+          status: newStatus,
+          plan_type: 'basic',
+          price: 0, // First month free welcome promotion
+          next_billing_date: nextDate.toISOString()
         }]);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from('subscriptions').update({ 
-          plan_type: newPlan,
-          price: newPlan === 'premium' ? 30 : 18 
+        const { error } = await supabase.from('subscriptions').update({
+          status: newStatus
         }).eq('id', sub.id);
         if (error) throw error;
       }
       onRefresh();
     };
 
-    toast.promise(togglePromise(), {
-      loading: 'Cambiando plan...',
-      success: `Cambiado a ${newPlan.toUpperCase()}`,
-      error: 'Error al cambiar.'
+    toast.promise(toggleStatusPromise(), {
+      loading: `${isCurrentlyActive ? 'Suspendiendo' : 'Activando'} acceso...`,
+      success: `Suscripción ${isCurrentlyActive ? 'suspendida' : 'activada'} correctamente.`,
+      error: 'Error al cambiar estado de acceso.'
+    });
+  };
+
+  const handleResetAllSubscriptions = async () => {
+    if (!confirm("¿Confirmas que deseas REINICIAR todas las suscripciones a estado INACTIVO (cancelado)? Esto establecerá las suscripciones actuales en tarifa de $0 COP para que puedan comenzar su mes de bienvenida gratis al activar su acceso.")) return;
+    
+    const resetPromise = async () => {
+      // 1. Obtener todas las suscripciones existentes
+      const { data: subs, error: fetchError } = await supabase
+        .from('subscriptions')
+        .select('id');
+      
+      if (fetchError) throw fetchError;
+      
+      if (subs && subs.length > 0) {
+        // 2. Actualizar cada una a estado inactivo (canceled) y tarifa de $0 COP (mes gratis de bienvenida)
+        const promises = subs.map(s => 
+          supabase
+            .from('subscriptions')
+            .update({
+              status: 'canceled',
+              price: 0,
+              next_billing_date: new Date().toISOString()
+            })
+            .eq('id', s.id)
+        );
+        
+        const results = await Promise.all(promises);
+        const firstError = results.find(r => r.error)?.error;
+        if (firstError) throw firstError;
+      }
+      
+      onRefresh();
+    };
+
+    toast.promise(resetPromise(), {
+      loading: 'Restableciendo suscripciones a inactivas...',
+      success: 'Todas las suscripciones han sido reiniciadas. Listas para activar el mes gratis.',
+      error: 'Error al reiniciar suscripciones.'
     });
   };
 
   return (
     <div className="card-premium" style={{ padding: 0 }}>
-       <div style={{ padding: '2rem', borderBottom: '1px solid var(--border)' }}>
-          <h3 style={{ fontWeight: 900, fontSize: '1.4rem' }}>Facturación Global</h3>
-          <p style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>Recaudación y estados de suscripción.</p>
+       <div style={{ 
+         padding: '2rem', 
+         borderBottom: '1px solid var(--border)',
+         display: 'flex',
+         justifyContent: 'space-between',
+         alignItems: 'center',
+         flexWrap: 'wrap',
+         gap: '1rem'
+       }}>
+          <div>
+             <h3 style={{ fontWeight: 900, fontSize: '1.4rem' }}>Facturación Global (COP)</h3>
+             <p style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>Recaudación manual y control de accesos de clientes.</p>
+          </div>
+          <button
+            onClick={handleResetAllSubscriptions}
+            style={{
+              padding: '0.6rem 1.25rem',
+              fontSize: '0.75rem',
+              fontWeight: 800,
+              borderRadius: '8px',
+              border: '1px solid #ef4444',
+              background: 'rgba(239, 68, 68, 0.1)',
+              color: '#ef4444',
+              cursor: 'pointer',
+              transition: 'all 0.2s'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.background = 'rgba(239, 68, 68, 0.2)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)';
+            }}
+          >
+            Reiniciar Facturación (Vaciar DB)
+          </button>
        </div>
        <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
              <thead style={{ background: 'var(--secondary)', textAlign: 'left' }}>
                <tr>
-                 <th style={tableHeaderStyle}>Granja</th>
-                 <th style={tableHeaderStyle}>Producto</th>
-                 <th style={tableHeaderStyle}>Estatus</th>
-                 <th style={tableHeaderStyle}>Vencimiento</th>
-                 <th style={{ ...tableHeaderStyle, textAlign: 'right' }}>Gestión</th>
+                 <th style={tableHeaderStyle}>Granja / Cliente</th>
+                 <th style={tableHeaderStyle}>Plan / Tarifa</th>
+                 <th style={tableHeaderStyle}>Estatus de Acceso</th>
+                 <th style={tableHeaderStyle}>Próximo Cobro</th>
+                 <th style={{ ...tableHeaderStyle, textAlign: 'right' }}>Acciones Maestras</th>
                </tr>
              </thead>
              <tbody>
                {subscriptions.map((s: any) => {
                  const isExpired = new Date(s.next_billing_date) < new Date();
+                 const isSuspended = s.status === 'canceled' || s.status === 'suspended';
                  const isActive = s.status === 'active' && !isExpired;
                  
                  return (
                    <tr key={s.id} style={{ borderBottom: '1px solid var(--border)' }}>
                      <td style={tableCellStyle}>
                         <div style={{ fontWeight: 900, fontSize: '0.95rem' }}>{s.units.name}</div>
-                        <div style={{ fontSize: '0.7rem', color: 'var(--muted-foreground)', fontWeight: 700 }}>REF: {s.client_name}</div>
+                        <div style={{ fontSize: '0.7rem', color: 'var(--muted-foreground)', fontWeight: 700 }}>TITULAR: {s.client_name}</div>
                      </td>
                      <td style={tableCellStyle}>
-                        <button 
-                          onClick={() => handleTogglePlan(s)}
-                          style={{ 
-                            padding: '6px 12px', 
-                            borderRadius: '20px', 
-                            background: s.plan_type === 'premium' ? 'linear-gradient(135deg, #f59e0b, #d97706)' : 'rgba(13,148,136,0.1)', 
-                            color: s.plan_type === 'premium' ? 'white' : '#0d9488', 
-                            fontSize: '0.65rem', 
-                            fontWeight: 900,
-                            border: 'none',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '5px'
-                          }}
-                        >
-                          {s.plan_type === 'premium' && <Flag size={10} />}
-                          {s.plan_type.toUpperCase()}
-                        </button>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                           <span style={{ 
+                             padding: '4px 10px', 
+                             borderRadius: '12px', 
+                             background: s.price === 0 ? 'linear-gradient(135deg, #10b981, #059669)' : 'rgba(13,148,136,0.1)', 
+                             color: s.price === 0 ? 'white' : '#0d9488', 
+                             fontSize: '0.65rem', 
+                             fontWeight: 900,
+                             width: 'fit-content',
+                             letterSpacing: '0.05em'
+                           }}>
+                             {s.price === 0 ? 'MES GRATIS DE CORTESÍA' : 'PLAN ÚNICO'}
+                           </span>
+                           <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--muted-foreground)' }}>
+                             {s.price === 0 ? 'Próxima renovación: $100.000 COP' : `$${(s.price || 0).toLocaleString('es-CO')} COP/mes`}
+                           </span>
+                        </div>
                      </td>
                      <td style={tableCellStyle}>
-                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: isExpired || s.status === 'canceled' ? '#ef4444' : '#0d9488', fontWeight: 900, fontSize: '0.75rem' }}>
-                         {isExpired || s.status === 'canceled' ? <AlertCircle size={14} /> : <CheckCircle2 size={14} />}
-                         {s.status === 'canceled' ? 'SUSPENDED' : (isExpired ? 'EXPIRED' : 'ACTIVE')}
+                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: isExpired || isSuspended ? '#ef4444' : '#10b981', fontWeight: 900, fontSize: '0.75rem' }}>
+                         {isExpired || isSuspended ? <AlertCircle size={14} /> : <CheckCircle2 size={14} />}
+                         {isSuspended ? 'SUSPENDIDO' : (isExpired ? 'VENCIDO' : 'ACTIVO')}
                        </div>
                      </td>
                      <td style={tableCellStyle}>
-                        <span style={{ fontWeight: 700, fontSize: '0.85rem' }}>{new Date(s.next_billing_date).toLocaleDateString()}</span>
+                        <span style={{ fontWeight: 700, fontSize: '0.85rem', color: isExpired ? '#ef4444' : 'inherit' }}>
+                          {new Date(s.next_billing_date).toLocaleDateString('es-CO')}
+                        </span>
                      </td>
                      <td style={{ ...tableCellStyle, textAlign: 'right' }}>
-                       <button 
-                         onClick={() => handleManualRenewal(s)}
-                         className="btn-primary" 
-                         style={{ padding: '0.6rem 1.25rem', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.4rem', background: '#0d9488', marginLeft: 'auto', borderRadius: '8px' }}
-                       >
-                         <DollarSign size={14} /> Renovar Pago
-                       </button>
+                       <div style={{ display: 'flex', gap: '0.6rem', justifyContent: 'flex-end', alignItems: 'center' }}>
+                         <button 
+                           onClick={() => handleToggleStatus(s, s.status)}
+                           style={{ 
+                             padding: '0.6rem 1.1rem', 
+                             fontSize: '0.75rem', 
+                             fontWeight: 800,
+                             borderRadius: '8px',
+                             border: `1px solid ${s.status === 'active' ? '#ef4444' : '#10b981'}`,
+                             background: 'transparent',
+                             color: s.status === 'active' ? '#ef4444' : '#10b981',
+                             cursor: 'pointer',
+                             transition: 'all 0.2s'
+                           }}
+                         >
+                           {s.status === 'active' ? 'Suspender Acceso' : 'Activar Acceso'}
+                         </button>
+                         <button 
+                           onClick={() => handleManualRenewal(s)}
+                           className="btn-primary" 
+                           style={{ 
+                             padding: '0.6rem 1.25rem', 
+                             fontSize: '0.75rem', 
+                             display: 'flex', 
+                             alignItems: 'center', 
+                             gap: '0.4rem', 
+                             background: '#0d9488', 
+                             borderRadius: '8px',
+                             fontWeight: 800
+                           }}
+                         >
+                           <DollarSign size={14} /> Registrar Pago
+                         </button>
+                       </div>
                      </td>
                    </tr>
                  );
@@ -651,8 +968,8 @@ const BillingTab = ({ subscriptions, onRefresh }: { subscriptions: any[], onRefr
   );
 };
 
-const SupportTab = ({ tickets, onRefresh }: { tickets: any[], onRefresh: () => void }) => {
-  const [selectedTicket, setSelectedTicket] = useState<any>(null);
+const SupportTab = ({ tickets, onRefresh }: { tickets: SuperAdminTicket[], onRefresh: () => void }) => {
+  const [selectedTicket, setSelectedTicket] = useState<SuperAdminTicket | null>(null);
   const [response, setResponse] = useState('');
 
   const handleUpdateStatus = async (id: string, newStatus: string) => {
@@ -664,15 +981,17 @@ const SupportTab = ({ tickets, onRefresh }: { tickets: any[], onRefresh: () => v
   };
 
   const handleSendResponse = async () => {
-    toast.success(`Respuesta enviada a ${selectedTicket.profiles?.full_name}`);
-    await handleUpdateStatus(selectedTicket.id, 'resolved');
+    toast.success(`Respuesta enviada a ${selectedTicket?.profiles?.full_name}`);
+    if (selectedTicket) {
+      await handleUpdateStatus(selectedTicket.id, 'resolved');
+    }
     setSelectedTicket(null);
     setResponse('');
   };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-      {tickets.map((t: any) => (
+      {tickets.map((t: SuperAdminTicket) => (
         <div key={t.id} className="card-premium" style={{ padding: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '2rem', flexWrap: 'wrap' }}>
           <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center' }}>
             <div style={{ 

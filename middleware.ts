@@ -56,30 +56,47 @@ export async function middleware(request: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser()
 
-  // Protected routes logic
-  const isProtectedRoute = 
-    request.nextUrl.pathname.startsWith('/dashboard') || 
-    request.nextUrl.pathname.startsWith('/superadmin') ||
-    request.nextUrl.pathname.startsWith('/estanques') ||
-    request.nextUrl.pathname.startsWith('/finanzas') ||
-    request.nextUrl.pathname.startsWith('/siembra') ||
-    request.nextUrl.pathname.startsWith('/registros') ||
-    request.nextUrl.pathname.startsWith('/perfil') ||
-    request.nextUrl.pathname.startsWith('/configuracion') ||
-    request.nextUrl.pathname.startsWith('/aireacion') ||
-    request.nextUrl.pathname.startsWith('/mantenimiento') ||
-    request.nextUrl.pathname.startsWith('/tratamiento') ||
-    request.nextUrl.pathname.startsWith('/almacen') ||
-    request.nextUrl.pathname.startsWith('/ayuda')
+  const pathname = request.nextUrl.pathname
+  const isPublicRoute = pathname === '/' || pathname === '/signup'
 
-  if (isProtectedRoute && !user) {
-    return NextResponse.redirect(new URL('/', request.url))
+  // If user is not logged in and attempts to access any non-public page, redirect to login
+  if (!user) {
+    if (!isPublicRoute) {
+      return NextResponse.redirect(new URL('/', request.url))
+    }
+    return response
   }
 
-  // Redirect if already logged in and trying to access landing/login
-  if (request.nextUrl.pathname === '/' && user) {
-    // We might need to check profile for superadmin, but for now redirect to /dashboard
-    return NextResponse.redirect(new URL('/dashboard', request.url))
+  // If user is logged in:
+  // 1. Fetch their superadmin status from app_metadata (JWT claim) or fallback to database
+  let isSuperAdmin = !!user.app_metadata?.is_superadmin
+  if (!isSuperAdmin) {
+    try {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('is_superadmin')
+        .eq('id', user.id)
+        .maybeSingle()
+      isSuperAdmin = profile?.is_superadmin || false
+    } catch (err) {
+      console.error('Error fetching role in middleware:', err)
+    }
+  }
+
+  // 2. Protect /superadmin route
+  if (pathname.startsWith('/superadmin')) {
+    if (!isSuperAdmin) {
+      return NextResponse.redirect(new URL('/dashboard', request.url))
+    }
+  }
+
+  // 3. Redirect if logged in and trying to access landing/login
+  if (isPublicRoute) {
+    if (isSuperAdmin) {
+      return NextResponse.redirect(new URL('/superadmin', request.url))
+    } else {
+      return NextResponse.redirect(new URL('/dashboard', request.url))
+    }
   }
 
   return response

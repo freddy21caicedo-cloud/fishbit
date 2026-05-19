@@ -18,7 +18,7 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (!isAuthPage && session) {
+  if (!isAuthPage) {
     return (
       <AppLayout>
         {children}

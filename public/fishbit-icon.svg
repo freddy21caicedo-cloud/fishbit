@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" fill="none">
+  <!--
+    FishBit Geometric Fish Icon
+    Fish swims from bottom-left (tail) to upper-right (head) at ~45°
+    White gaps between segments achieved by white stroke or gaps in paths
+  -->
+
+  <!-- ═══════════════════════════════════════════
+       TAIL SECTION  (bottom-left)
+       3 dark-navy triangle pieces
+  ════════════════════════════════════════════ -->
+
+  <!-- Bottom-most tail triangle (left point) -->
+  <polygon points="18,168  46,152  38,178" fill="#1B3565"/>
+
+  <!-- Middle tail piece (vertical bar shape, dark) -->
+  <polygon points="44,148  58,128  62,168  48,172" fill="#163B6A"/>
+
+  <!-- Upper tail dark triangle (pointing up-left, dorsal of tail) -->
+  <polygon points="42,120  66,88  72,128  52,140" fill="#1B3565"/>
+
+
+  <!-- ═══════════════════════════════════════════
+       BODY  –  3 vertical bar segments (like bar chart)
+       Each separated by ~4px white gaps
+       Bars go bottom-right to upper-left as fish tilts
+  ════════════════════════════════════════════ -->
+
+  <!-- Bar 1 (bottom / shortest) -->
+  <polygon points="68,150  80,124  90,130  78,158" fill="#0D5C8A"/>
+
+  <!-- Bar 2 (middle) -->
+  <polygon points="88,132  100,100  112,108  100,140" fill="#0E6A9C"/>
+
+  <!-- Bar 3 (top / tallest) -->
+  <polygon points="108,112  122,76  134,86  120,122" fill="#0D5C8A"/>
+
+
+  <!-- ═══════════════════════════════════════════
+       HEAD SECTION  (upper-right)
+       Large cyan triangular facets
+  ════════════════════════════════════════════ -->
+
+  <!-- Dorsal fin triangle (above the main head, darker teal) -->
+  <polygon points="118,68  148,38  164,72  138,82" fill="#0A9BAA"/>
+
+  <!-- Main head body (large bright cyan) -->
+  <polygon points="126,86  162,58  186,90  162,110  138,104" fill="#1ECAD4"/>
+
+  <!-- Pectoral fin below head (smaller, slightly darker cyan) -->
+  <polygon points="136,106  162,112  158,136  128,124" fill="#16B8C4"/>
+
+  <!-- Small lower-right accent fin -->
+  <polygon points="158,118  178,110  176,138  156,138" fill="#1ECAD4"/>
+
+
+  <!-- ═══════════════════════════════════════════
+       EYE  –  white circle
+  ════════════════════════════════════════════ -->
+  <circle cx="172" cy="74" r="7" fill="white"/>
+</svg>

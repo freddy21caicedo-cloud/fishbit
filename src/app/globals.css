@@ -1,49 +1,58 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Nunito:wght@400;500;600;700;800;900&display=swap');
 
 :root {
+  /* ─── FishBit Corporate Identity ─────────────────────────────────────────
+     Navy  #1B2E5E  — primary brand / logotype deep blue
+     Cyan  #2DC9D8  — accent / water-drop / fish icon highlight
+     Teal  #0A7D9A  — intermediate depth shade
+  ───────────────────────────────────────────────────────────────────────── */
+
   /* Colors */
-  --background: #f8fafc;
-  --foreground: #0f172a;
-  
+  --background: #f0f4f8;
+  --foreground: #0d1b2e;
+
   --card: #ffffff;
-  --card-foreground: #0f172a;
-  
-  --primary: #0d9488;
+  --card-foreground: #0d1b2e;
+
+  /* Primary = FishBit Navy */
+  --primary: #1B2E5E;
   --primary-foreground: #ffffff;
-  
-  --secondary: #f1f5f9;
-  --secondary-foreground: #1e293b;
-  
-  --muted: #f1f5f9;
-  --muted-foreground: #64748b;
-  
-  --accent: #14b8a6;
+
+  /* Secondary / hover surfaces */
+  --secondary: #e8f0fb;
+  --secondary-foreground: #1B2E5E;
+
+  --muted: #e8f0fb;
+  --muted-foreground: #5a708a;
+
+  /* Accent = FishBit Cyan */
+  --accent: #2DC9D8;
   --accent-foreground: #ffffff;
-  
+
   --destructive: #ef4444;
   --destructive-foreground: #ffffff;
 
-  --border: #e2e8f0;
-  --input: #e2e8f0;
-  --ring: #0d9488;
+  --border: #d0dcea;
+  --input: #d0dcea;
+  --ring: #2DC9D8;
 
   --radius: 1rem;
 
   /* Fonts */
   --font-sans: 'Inter', system-ui, sans-serif;
-  --font-heading: 'Outfit', sans-serif;
+  --font-heading: 'Nunito', sans-serif;
 
   /* Shadows */
-  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-  --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
-  --shadow-md: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
-  --shadow-lg: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
-  
+  --shadow-sm: 0 1px 2px 0 rgb(27 46 94 / 0.06);
+  --shadow: 0 4px 6px -1px rgb(27 46 94 / 0.1), 0 2px 4px -2px rgb(27 46 94 / 0.06);
+  --shadow-md: 0 10px 15px -3px rgb(27 46 94 / 0.12), 0 4px 6px -4px rgb(27 46 94 / 0.08);
+  --shadow-lg: 0 20px 25px -5px rgb(27 46 94 / 0.15), 0 8px 10px -6px rgb(27 46 94 / 0.1);
+
   /* Glassmorphism */
-  --glass-bg: rgba(255, 255, 255, 0.7);
-  --glass-border: rgba(255, 255, 255, 0.4);
-  --glass-blur: blur(12px);
-  
+  --glass-bg: rgba(255, 255, 255, 0.72);
+  --glass-border: rgba(27, 46, 94, 0.12);
+  --glass-blur: blur(14px);
+
   /* Material Design 3 (MD3) Compatibility */
   --md-primary: var(--primary);
   --md-outline: var(--border);
@@ -53,30 +62,31 @@
 }
 
 .dark {
-  --background: #020617;
-  --foreground: #f8fafc;
-  
-  --card: #0f172a;
-  --card-foreground: #f8fafc;
-  
-  --primary: #14b8a6;
-  --primary-foreground: #ffffff;
-  
-  --secondary: #1e293b;
-  --secondary-foreground: #f8fafc;
-  
-  --muted: #1e293b;
-  --muted-foreground: #94a3b8;
-  
-  --accent: #1e293b;
-  --accent-foreground: #f8fafc;
-  
-  --border: #1e293b;
-  --input: #1e293b;
-  --ring: #14b8a6;
-  
-  --glass-bg: rgba(15, 23, 42, 0.7);
-  --glass-border: rgba(30, 41, 59, 0.4);
+  --background: #06101e;
+  --foreground: #e8f0fb;
+
+  --card: #0d1b2e;
+  --card-foreground: #e8f0fb;
+
+  /* Primary stays navy but lightened so it pops on dark */
+  --primary: #2DC9D8;
+  --primary-foreground: #06101e;
+
+  --secondary: #0f2040;
+  --secondary-foreground: #e8f0fb;
+
+  --muted: #0f2040;
+  --muted-foreground: #7a9bbf;
+
+  --accent: #2DC9D8;
+  --accent-foreground: #06101e;
+
+  --border: #132240;
+  --input: #132240;
+  --ring: #2DC9D8;
+
+  --glass-bg: rgba(13, 27, 46, 0.72);
+  --glass-border: rgba(45, 201, 216, 0.12);
 }
 
 * {
@@ -240,7 +250,7 @@ h3 { font-size: clamp(0.9rem, 2.5vw, 1.25rem); }
 }
 
 .text-gradient {
-  background: linear-gradient(135deg, var(--primary), #8b5cf6);
+  background: linear-gradient(135deg, #1B2E5E, #2DC9D8);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
@@ -271,6 +281,15 @@ h3 { font-size: clamp(0.9rem, 2.5vw, 1.25rem); }
 
 .animate-fade-in {
   animation: fadeIn 0.5s ease forwards;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
 }
 
 /* Layout Classes */
@@ -315,7 +334,7 @@ h3 { font-size: clamp(0.9rem, 2.5vw, 1.25rem); }
 }
 
 .nav-item:hover, .nav-item.active {
-  background-color: var(--secondary);
+  background-color: rgba(27, 46, 94, 0.07);
   color: var(--primary);
 }
 
@@ -370,16 +389,16 @@ h3 { font-size: clamp(0.9rem, 2.5vw, 1.25rem); }
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 6px 16px rgba(13, 148, 136, 0.35); /* Sombra color FishBit */
+  box-shadow: 0 6px 16px rgba(45, 201, 216, 0.35); /* Sombra FishBit Cyan */
   cursor: pointer;
-  transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1); /* Efecto rebote suave */
+  transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .mobile-menu-fab:hover {
   transform: scale(1.08) translateY(-2px);
   background-color: var(--primary);
   color: white;
-  box-shadow: 0 12px 24px rgba(13, 148, 136, 0.5);
+  box-shadow: 0 12px 24px rgba(45, 201, 216, 0.5);
   border-color: var(--primary);
 }
 
@@ -541,11 +560,11 @@ h3 { font-size: clamp(0.9rem, 2.5vw, 1.25rem); }
 /* Premium Date Input System */
 /* --- Material Design 3 (MD3) Input System --- */
 :root {
-  --md-primary: #0d9488;
-  --md-outline: #cbd5e1;
+  --md-primary: #1B2E5E;
+  --md-outline: #d0dcea;
   --md-surface: #ffffff;
-  --md-on-surface: #1e293b;
-  --md-on-surface-variant: #64748b;
+  --md-on-surface: #0d1b2e;
+  --md-on-surface-variant: #5a708a;
 }
 
 .premium-input-group {
