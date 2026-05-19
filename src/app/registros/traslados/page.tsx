@@ -1,4 +1,5 @@
 'use client';
+// Recompiling...
 
 import { useEffect, useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -271,7 +272,10 @@ export default function TrasladoPage() {
             : destinoData.current_species,
           is_polyculture: destinoEstabaVacio
             ? traslados.length > 1
-            : (destinoData.is_polyculture || traslados.length > 1)
+            : (destinoData.is_polyculture || traslados.length > 1),
+          current_batch_id: destinoEstabaVacio 
+            ? origenData.current_batch_id 
+            : destinoData.current_batch_id
         }).eq('id', destinoId);
 
         // 10. Actualizar pond_species del destino
@@ -402,6 +406,28 @@ export default function TrasladoPage() {
         costo_alimento_acumulado: Math.max(0, (parseFloat(destinoActual.costo_alimento_acumulado) || 0) - costoAlimentoDevuelto)
       }).eq('id', transfer.destino_id);
 
+      // Actualizar pond_species en destino para esta especie específica (Restar o Eliminar)
+      const { data: destinoSpecies } = await supabase
+        .from('pond_species')
+        .select('*')
+        .eq('estanque_id', transfer.destino_id)
+        .eq('species_name', transfer.species_name)
+        .single();
+
+      if (destinoSpecies) {
+        const nuevoCountEspecie = (destinoSpecies.current_count || 0) - transfer.quantity;
+        const nuevaBiomasaEspecie = Math.max(0, (parseFloat(destinoSpecies.current_biomass_kg) || 0) - biomasaDevuelta);
+        
+        if (nuevoCountEspecie <= 0) {
+          await supabase.from('pond_species').delete().eq('id', destinoSpecies.id);
+        } else {
+          await supabase.from('pond_species').update({
+            current_count: nuevoCountEspecie,
+            current_biomass_kg: nuevaBiomasaEspecie
+          }).eq('id', destinoSpecies.id);
+        }
+      }
+
       // 4. RECALCULAR ETIQUETAS Y ESTADO (Origen y Destino)
       const updatePondMetadata = async (pondId: string) => {
         const { data: specs } = await supabase.from('pond_species').select('species_name, current_count').eq('estanque_id', pondId);
@@ -506,15 +532,11 @@ export default function TrasladoPage() {
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '2.5rem' }}>
                     {traslados.map((t, index) => (
-                      <div key={index} style={{ 
+                      <div key={index} className="traslado-row-grid" style={{ 
                         padding: '1.25rem', 
                         background: 'var(--secondary)', 
                         borderRadius: '12px', 
                         border: '1px solid var(--border)',
-                        display: 'grid',
-                        gridTemplateColumns: '2fr 1fr 1fr',
-                        gap: '1rem',
-                        alignItems: 'center',
                         position: 'relative'
                       }}>
                         {traslados.length > 1 && (
@@ -645,9 +667,9 @@ export default function TrasladoPage() {
                         </div>
                       </td>
                       <td style={{ padding: '1rem' }}>
-                        {h.food_total_kg != null ? (
+                        {(h.consumo_kg_arrastrado != null || h.food_total_kg != null) ? (
                           <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#10b981' }}>
-                            {parseFloat(h.food_total_kg).toLocaleString('es-CO', { maximumFractionDigits: 2 })} kg
+                            {parseFloat(h.consumo_kg_arrastrado ?? h.food_total_kg).toLocaleString('es-CO', { maximumFractionDigits: 2 })} kg
                           </span>
                         ) : (
                           <span style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)' }}>—</span>

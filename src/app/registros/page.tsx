@@ -12,17 +12,20 @@ import {
   Plus,
   History,
   ChevronDown,
-  ChevronRight
+  ChevronRight,
+  Trash2,
+  Loader2
 } from 'lucide-react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
+import { toast } from 'react-hot-toast';
 
 const recordTypes = [
   { id: 'alimentacion', label: 'Alimentación', icon: Utensils, color: '#10b981', bg: 'rgba(16, 185, 129, 0.1)' },
   { id: 'biometria', label: 'Biometría', icon: Scale, color: '#8b5cf6', bg: 'rgba(139, 92, 246, 0.1)' },
   { id: 'calidad-agua', label: 'Calidad de Agua', icon: Droplets, color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.1)' },
   { id: 'mortalidad', label: 'Mortalidad', icon: AlertTriangle, color: '#ef4444', bg: 'rgba(239, 68, 68, 0.1)' },
-  { id: 'traslado', label: 'Traslado', icon: ArrowRightLeft, color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.1)' },
+  { id: 'traslados', label: 'Traslado', icon: ArrowRightLeft, color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.1)' },
 ];
 
 const ActionCard = ({ type }: any) => (
@@ -82,6 +85,7 @@ export default function RegistrosPage() {
   const [ponds, setPonds] = useState<any[]>(['Todos los Estanques']);
   const [activities, setActivities] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isDeleting, setIsDeleting] = useState<string | null>(null);
   const [fechaDesde, setFechaDesde] = useState('');
   const [fechaHasta, setFechaHasta] = useState('');
 
@@ -134,35 +138,42 @@ export default function RegistrosPage() {
         type: 'alimentacion',
         pond: a.estanques?.name,
         detail: `${(a.inventory as any)?.name || 'Alimento'} · ${a.quantity_kg} kg`,
-        rawDate: a.date || a.created_at
+        rawDate: a.date || a.created_at,
+        originalId: a.id
       })),
       ...(biometrias.data || []).map(b => ({
         id: `bio-${b.id}`,
         type: 'biometria',
         pond: b.estanques?.name,
         detail: `${b.species_name || 'Esp.'} · ${b.avg_weight_gr || b.average_weight_g || '—'} g/ud · ${b.total_biomass_kg || '—'} kg biomasa`,
-        rawDate: b.date || b.created_at
+        rawDate: b.date || b.created_at,
+        originalId: b.id
       })),
       ...(calidadAgua.data || []).map(c => ({
         id: `cal-${c.id}`,
         type: 'calidad-agua',
         pond: c.estanques?.name,
         detail: formatWQ(c),
-        rawDate: c.date || c.created_at
+        rawDate: c.date || c.created_at,
+        originalId: c.id
       })),
       ...(mortalidad.data || []).map(m => ({
         id: `mor-${m.id}`,
         type: 'mortalidad',
         pond: m.estanques?.name,
         detail: `${m.species_name || 'Especie'} · ${m.quantity} baja(s) · ${m.cause || ''}`,
-        rawDate: m.date || m.created_at
+        rawDate: m.date || m.created_at,
+        originalId: m.id
       })),
-      ...(traslados.data || []).map(t => ({
+      ...(traslados.data || [])
+        .filter(t => !t.revertido) // Punto 5.2: Ocultar traslados revertidos
+        .map(t => ({
         id: `tra-${t.id}`,
         type: 'traslado',
         pond: (t.origen as any)?.name,
         detail: `${t.quantity} ${t.species_name || 'uds'} · de ${(t.origen as any)?.name || '—'} → ${(t.destino as any)?.name || '—'}`,
-        rawDate: t.date || t.created_at
+        rawDate: t.date || t.created_at,
+        originalId: t.id
       })),
     ].sort((a, b) => new Date(b.rawDate).getTime() - new Date(a.rawDate).getTime());
 
@@ -176,6 +187,33 @@ export default function RegistrosPage() {
     const matchHasta = !fechaHasta || a.rawDate <= fechaHasta + 'T23:59:59';
     return matchPond && matchDesde && matchHasta;
   });
+
+  const handleDeleteRecord = async (e: React.MouseEvent, record: any) => {
+    e.stopPropagation();
+    if (!confirm('¿Estás seguro de que deseas eliminar este registro? Esta acción no se puede deshacer.')) return;
+    
+    setIsDeleting(record.id);
+    try {
+      let tableName = '';
+      if (record.type === 'alimentacion') tableName = 'alimentacion_diaria';
+      if (record.type === 'biometria') tableName = 'biometrias';
+      if (record.type === 'calidad-agua') tableName = 'water_quality';
+      if (record.type === 'mortalidad') tableName = 'mortality';
+      if (record.type === 'traslado') tableName = 'transfers';
+
+      if (!tableName || !record.originalId) throw new Error('Tipo de registro no soportado o ID inválido');
+
+      const { error } = await supabase.from(tableName).delete().eq('id', record.originalId);
+      if (error) throw error;
+      
+      toast.success('Registro eliminado exitosamente');
+      setActivities(prev => prev.filter(a => a.id !== record.id));
+    } catch (error: any) {
+      toast.error('Error al eliminar: ' + error.message);
+    } finally {
+      setIsDeleting(null);
+    }
+  };
 
   return (
     <div className="animate-fade-in page-container">
@@ -303,9 +341,23 @@ export default function RegistrosPage() {
                       {activity.rawDate ? new Date(activity.rawDate).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' }) : ''}
                     </div>
                   </div>
-                  <div style={{ textAlign: 'right', fontSize: '0.75rem', color: 'var(--muted-foreground)' }}>
+                  <div style={{ textAlign: 'right', fontSize: '0.75rem', color: 'var(--muted-foreground)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <button 
+                      onClick={(e) => handleDeleteRecord(e, activity)}
+                      disabled={isDeleting === activity.id}
+                      style={{ 
+                        background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', 
+                        padding: '0.4rem', borderRadius: '8px', display: 'flex', alignItems: 'center',
+                        justifyContent: 'center', transition: 'background 0.2s ease'
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)'}
+                      onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                      title="Eliminar Registro"
+                    >
+                      {isDeleting === activity.id ? <Loader2 size={18} className="animate-spin" /> : <Trash2 size={18} />}
+                    </button>
+                    <ChevronRight size={18} style={{ color: 'var(--border)' }} />
                   </div>
-                  <ChevronRight size={18} style={{ marginLeft: '1rem', color: 'var(--border)' }} />
                 </div>
               );
             })}

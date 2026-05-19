@@ -505,21 +505,181 @@ const PondCard = ({ pond, handleDeleteSiembra, handleEditClick }: any) => {
               </div>
             )}
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', borderTop: '1px solid var(--border)', paddingTop: '1rem' }}>
-              <div onClick={stopProp}>
-                {pond.status === 'con_peces' ? (
-                  <Link href={`/liquidacion?estanque=${pond.id}`}><ActionButton icon={BadgeDollarSign} label="Liquidar" color="#8b5cf6" /></Link>
-                ) : (
-                  <div onClick={() => toast.error(`"${pond.name}" no tiene peces activos.`, { duration: 3500 })}>
-                    <ActionButton icon={BadgeDollarSign} label="Liquidar" color="#94a3b8" />
+            <div style={{ display: 'flex', justifyContent: 'flex-end', borderTop: '1px solid var(--border)', paddingTop: '1rem', gap: '0.5rem' }}>
+              {pond.status === 'con_peces' ? (
+                <>
+                  <div onClick={stopProp}>
+                    <Link href={`/finanzas?tab=ventas&estanque=${pond.id}`}><ActionButton icon={BadgeDollarSign} label="Vender" color="#10b981" /></Link>
                   </div>
-                )}
-              </div>
+                  <div onClick={(e) => { stopProp(e); pond.onLiquidarClick?.(pond); }}>
+                    <ActionButton icon={Box} label="Liquidar Lote" color="#8b5cf6" />
+                  </div>
+                </>
+              ) : (
+                <div onClick={() => toast.error(`"${pond.name}" no tiene peces activos.`, { duration: 3500 })}>
+                  <ActionButton icon={BadgeDollarSign} label="Liquidar" color="#94a3b8" />
+                </div>
+              )}
             </div>
           </div>
         </div>
       </motion.div>
     </motion.div>
+  );
+};
+
+const LiquidationModal = ({ pond, onClose, fetchEstanques }: { pond: any, onClose: () => void, fetchEstanques: () => void }) => {
+  const [kpis, setKpis] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [closing, setClosing] = useState(false);
+
+  useEffect(() => {
+    fetchKPIs();
+  }, [pond.id]);
+
+  const fetchKPIs = async () => {
+    setLoading(true);
+    try {
+      const { data: alimentRes } = await supabase.from('alimentacion_diaria').select('quantity_kg, total_cost').eq('estanque_id', pond.id);
+      const feedKg = (alimentRes || []).reduce((s: number, r: any) => s + parseFloat(r.quantity_kg || 0), 0);
+      
+      const { data: mortRes } = await supabase.from('mortality').select('quantity').eq('estanque_id', pond.id);
+      const mort = (mortRes || []).reduce((s: number, r: any) => s + parseInt(r.quantity || 0), 0);
+
+      const { data: salesRes } = await supabase.from('ventas').select('cantidad_kg, cantidad_peces, precio_kg').eq('estanque_id', pond.id);
+      const salesKg = (salesRes || []).reduce((s: number, r: any) => s + parseFloat(r.cantidad_kg || 0), 0);
+      const salesIncome = (salesRes || []).reduce((s: number, r: any) => s + (parseFloat(r.cantidad_kg || 0) * parseFloat(r.precio_kg || 0)), 0);
+      const salesUnits = (salesRes || []).reduce((s: number, r: any) => s + parseInt(r.cantidad_peces || 0), 0);
+
+      const fca = salesKg > 0 ? (feedKg / salesKg).toFixed(2) : '0.00';
+      const totalCostos = parseFloat(pond.costo_alevinos_acumulado || 0) + parseFloat(pond.costo_alimento_acumulado || 0);
+      const costPerKg = salesKg > 0 ? (totalCostos / salesKg).toFixed(0) : '0';
+      
+      const startingPopulation = salesUnits + mort + (pond.current_count || 0);
+      const mortalityPct = startingPopulation > 0 ? ((mort / startingPopulation) * 100).toFixed(2) : '0.00';
+
+      const profit = salesIncome - totalCostos;
+
+      setKpis({ feedKg, salesKg, salesIncome, salesUnits, fca, costPerKg, mortalityPct, profit, totalCostos, mort });
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCloseBatch = async () => {
+    setClosing(true);
+    try {
+      const activeUnitId = localStorage.getItem('active_unit_id');
+      const cierreData = {
+        unit_id: activeUnitId,
+        estanque_id: pond.id,
+        batch_id: pond.current_batch_id,
+        fecha_cierre: new Date().toISOString().split('T')[0],
+        fca: parseFloat(kpis.fca),
+        mortalidad_pct: parseFloat(kpis.mortalityPct),
+        costo_por_kg: parseFloat(kpis.costPerKg),
+        rentabilidad: kpis.profit,
+        ingresos_totales: kpis.salesIncome,
+        costos_totales: kpis.totalCostos,
+        kilos_vendidos: kpis.salesKg
+      };
+      
+      // Ignorar error si la tabla no existe aún
+      await supabase.from('cierres_lote').insert([cierreData]);
+
+      await supabase.from('pond_species').delete().eq('estanque_id', pond.id);
+
+      const { error } = await supabase.from('estanques').update({
+        status: 'vacio',
+        is_polyculture: false,
+        current_species: null,
+        current_count: 0,
+        current_biomass_kg: 0,
+        costo_alevinos_acumulado: 0,
+        consumo_alimento_acumulado_kg: 0,
+        costo_alimento_acumulado: 0,
+        current_batch_id: null
+      }).eq('id', pond.id);
+
+      if (error) throw error;
+
+      toast.success('Lote cerrado y estanque reseteado con éxito.');
+      fetchEstanques();
+      onClose();
+    } catch (err: any) {
+      toast.error('Error al cerrar lote: ' + err.message);
+    } finally {
+      setClosing(false);
+    }
+  };
+
+  return (
+    <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', zIndex: 10000, pointerEvents: 'none' }}>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        onClick={onClose}
+        style={{ position: 'absolute', inset: 0, background: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(10px)', pointerEvents: 'auto' }}
+      />
+      <motion.div
+        initial={{ scale: 0.9, opacity: 0, x: '-50%', y: '-40%' }}
+        animate={{ scale: 1, opacity: 1, x: '-50%', y: '-50%' }}
+        exit={{ scale: 0.9, opacity: 0, x: '-50%', y: '-40%' }}
+        className="card-premium"
+        style={{ position: 'absolute', top: '50%', left: '50%', width: '95%', maxWidth: '500px', padding: '2rem', pointerEvents: 'auto', zIndex: 10001 }}
+      >
+        <button onClick={onClose} style={{ position: 'absolute', top: '1rem', right: '1rem', background: 'none', border: 'none', color: 'var(--muted-foreground)', cursor: 'pointer' }}><X size={24} /></button>
+        <h2 style={{ fontWeight: 900, marginBottom: '1.5rem', color: '#8b5cf6', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <Box size={24} /> Liquidación de Lote
+        </h2>
+        
+        {loading ? (
+          <div style={{ textAlign: 'center', padding: '2rem' }}>Calculando KPIs del lote...</div>
+        ) : kpis ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <p style={{ fontSize: '0.9rem', color: 'var(--muted-foreground)', marginBottom: '1rem' }}>
+              Revisa los KPIs finales de <strong>{pond.name}</strong> antes de cerrar el lote. Esta acción guardará el histórico y reseteará el estanque a cero.
+            </p>
+            
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+              <div style={{ padding: '1rem', background: 'var(--secondary)', borderRadius: '12px' }}>
+                <div style={{ fontSize: '0.7rem', color: 'var(--muted-foreground)', fontWeight: 700 }}>FCA FINAL</div>
+                <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#f59e0b' }}>{kpis.fca}</div>
+              </div>
+              <div style={{ padding: '1rem', background: 'var(--secondary)', borderRadius: '12px' }}>
+                <div style={{ fontSize: '0.7rem', color: 'var(--muted-foreground)', fontWeight: 700 }}>MORTALIDAD</div>
+                <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#ef4444' }}>{kpis.mortalityPct}%</div>
+              </div>
+              <div style={{ padding: '1rem', background: 'var(--secondary)', borderRadius: '12px' }}>
+                <div style={{ fontSize: '0.7rem', color: 'var(--muted-foreground)', fontWeight: 700 }}>COSTO POR KG</div>
+                <div style={{ fontSize: '1.25rem', fontWeight: 900, color: '#8b5cf6' }}>${kpis.costPerKg}</div>
+              </div>
+              <div style={{ padding: '1rem', background: 'var(--secondary)', borderRadius: '12px' }}>
+                <div style={{ fontSize: '0.7rem', color: 'var(--muted-foreground)', fontWeight: 700 }}>KILOS VENDIDOS</div>
+                <div style={{ fontSize: '1.25rem', fontWeight: 900 }}>{kpis.salesKg.toLocaleString()} kg</div>
+              </div>
+            </div>
+
+            <div style={{ padding: '1rem', background: 'rgba(16,185,129,0.1)', borderRadius: '12px', border: '1px solid rgba(16,185,129,0.2)', marginTop: '1rem' }}>
+              <div style={{ fontSize: '0.8rem', color: '#10b981', fontWeight: 800 }}>RENTABILIDAD (UTILIDAD BRUTA)</div>
+              <div style={{ fontSize: '2rem', fontWeight: 900, color: '#10b981' }}>
+                ${kpis.profit.toLocaleString('es-CO', { maximumFractionDigits: 0 })}
+              </div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)', marginTop: '0.25rem' }}>
+                Ingresos: ${kpis.salesIncome.toLocaleString()} - Costos: ${kpis.totalCostos.toLocaleString()}
+              </div>
+            </div>
+
+            <button onClick={handleCloseBatch} disabled={closing} className="btn-primary" style={{ width: '100%', marginTop: '1rem', background: '#8b5cf6', borderColor: '#8b5cf6' }}>
+              {closing ? 'Cerrando Lote...' : 'Finalizar y Cerrar Lote'}
+            </button>
+          </div>
+        ) : null}
+      </motion.div>
+    </div>
   );
 };
 
@@ -679,6 +839,7 @@ const PondDetailModal = ({ pond, onClose }: { pond: any, onClose: () => void }) 
 export default function EstanquesPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedDetailPond, setSelectedDetailPond] = useState<any | null>(null);
+  const [selectedLiquidationPond, setSelectedLiquidationPond] = useState<any>(null);
   const [ponds, setPonds] = useState<any[]>([]);
   const [editingPond, setEditingPond] = useState<any | null>(null);
   const [formData, setFormData] = useState({ numero: '', largo: '', ancho: '', profundidad: '' });
@@ -882,27 +1043,69 @@ export default function EstanquesPage() {
       }
 
       const lastSiembra = siembras[0];
+      
+      let totalQtyDeleted = 0;
+      let totalBiomassDeleted = 0;
+      let totalCostoAlevinosDeleted = 0;
+
       const inventoryOps = (lastSiembra.siembra_details || []).map(async (detail: any) => {
-        const { data: inv } = await supabase.from('inventory').select('*').eq('id', detail.inventory_item_id).single();
-        if (inv) {
-          await supabase.from('inventory').update({ current_stock: (parseFloat(inv.current_stock) || 0) + detail.quantity }).eq('id', inv.id);
+        totalQtyDeleted += detail.quantity || 0;
+        totalBiomassDeleted += parseFloat(detail.biomass_kg) || 0;
+        totalCostoAlevinosDeleted += parseFloat(detail.costo_total_lote) || 0;
+
+        // 1. Devolver al inventario
+        if (detail.inventory_item_id) {
+          const { data: inv } = await supabase.from('inventory').select('*').eq('id', detail.inventory_item_id).single();
+          if (inv) {
+            await supabase.from('inventory').update({ current_stock: (parseFloat(inv.current_stock) || 0) + detail.quantity }).eq('id', inv.id);
+          }
+        }
+
+        // 2. Descontar de pond_species (o eliminar si llega a 0)
+        if (detail.species_name) {
+          const { data: pSpec } = await supabase.from('pond_species').select('*')
+            .eq('estanque_id', pond.id)
+            .eq('species_name', detail.species_name)
+            .single();
+          
+          if (pSpec) {
+            const newCount = (pSpec.current_count || 0) - (detail.quantity || 0);
+            const newBio = Math.max(0, (parseFloat(pSpec.current_biomass_kg) || 0) - (parseFloat(detail.biomass_kg) || 0));
+            if (newCount <= 0) {
+              await supabase.from('pond_species').delete().eq('id', pSpec.id);
+            } else {
+              await supabase.from('pond_species').update({ current_count: newCount, current_biomass_kg: newBio }).eq('id', pSpec.id);
+            }
+          }
         }
       });
 
+      await Promise.all(inventoryOps);
+
+      // 3. Actualizar estado global del estanque
+      const { data: remainingSpecs } = await supabase.from('pond_species').select('species_name, current_count').eq('estanque_id', pond.id);
+      const activeSpecs = (remainingSpecs || []).filter(s => s.current_count > 0);
+      
+      const newPondCount = Math.max(0, (pond.current_count || 0) - totalQtyDeleted);
+      const newPondBiomass = Math.max(0, (parseFloat(pond.current_biomass_kg) || 0) - totalBiomassDeleted);
+      const newCostoAlevinos = Math.max(0, (parseFloat(pond.costo_alevinos_acumulado) || 0) - totalCostoAlevinosDeleted);
+      
+      const isPoly = activeSpecs.length > 1;
+      let label = null;
+      if (activeSpecs.length === 1) label = activeSpecs[0].species_name;
+      else if (activeSpecs.length > 1) label = 'Policultivo';
+
       await Promise.all([
-        ...inventoryOps,
         supabase.from('estanques').update({ 
-          status: 'vacio', 
-          is_polyculture: false, 
-          current_species: null, 
-          current_count: 0, 
-          current_biomass_kg: 0,
-          costo_alevinos_acumulado: 0,
-          consumo_alimento_acumulado_kg: 0,
-          costo_alimento_acumulado: 0,
-          current_batch_id: null
+          status: newPondCount > 0 ? 'con_peces' : 'vacio', 
+          is_polyculture: isPoly, 
+          current_species: label, 
+          current_count: newPondCount, 
+          current_biomass_kg: newPondBiomass,
+          costo_alevinos_acumulado: newCostoAlevinos,
+          // Mantenemos consumo_alimento_acumulado_kg y costo_alimento_acumulado intactos según la regla de negocio
+          current_batch_id: newPondCount > 0 ? pond.current_batch_id : null
         }).eq('id', pond.id),
-        supabase.from('pond_species').delete().eq('estanque_id', pond.id),
         supabase.from('siembras').delete().eq('id', lastSiembra.id)
       ]);
     };
@@ -931,7 +1134,7 @@ export default function EstanquesPage() {
         {ponds.map((pond) => (
           <PondCard
             key={pond.id}
-            pond={pond}
+            pond={{...pond, onDetailClick: setSelectedDetailPond, onLiquidarClick: setSelectedLiquidationPond}}
             handleDeleteSiembra={handleDeleteSiembra}
             handleEditClick={handleEditClick}
           />
@@ -1029,6 +1232,13 @@ export default function EstanquesPage() {
           <PondDetailModal 
             pond={selectedDetailPond} 
             onClose={() => setSelectedDetailPond(null)} 
+          />
+        )}
+        {selectedLiquidationPond && (
+          <LiquidationModal 
+            pond={selectedLiquidationPond} 
+            onClose={() => setSelectedLiquidationPond(null)} 
+            fetchEstanques={fetchEstanques}
           />
         )}
       </AnimatePresence>

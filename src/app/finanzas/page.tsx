@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useSearchParams } from 'next/navigation';
 import { DollarSign, LayoutDashboard, Users, BarChart3, ShoppingCart, FileSpreadsheet } from 'lucide-react';
 import { useUnit } from '../components/providers/UnitProvider';
 import { PanelGeneral } from './components/PanelGeneral';
@@ -20,7 +21,15 @@ const TABS = [
 
 export default function FinanzasPage() {
   const { activeUnitId } = useUnit();
-  const [activeTab, setActiveTab] = useState('panel');
+  const searchParams = useSearchParams();
+  const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'panel');
+
+  useEffect(() => {
+    const tab = searchParams.get('tab');
+    if (tab && TABS.some(t => t.id === tab)) {
+      setActiveTab(tab);
+    }
+  }, [searchParams]);
 
   return (
     <div className="animate-fade-in page-container">

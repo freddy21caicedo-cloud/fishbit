@@ -200,6 +200,22 @@ h1, h2, h3, h4, h5, h6 {
   }
 }
 
+.traslado-row-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr;
+  gap: 1rem;
+  align-items: center;
+}
+
+@media (max-width: 768px) {
+  .traslado-row-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+  .traslado-row-grid > div:first-child {
+    grid-column: span 2;
+  }
+}
+
 /* Utils */
 .mobile-only { display: none; }
 .desktop-only { display: block; }

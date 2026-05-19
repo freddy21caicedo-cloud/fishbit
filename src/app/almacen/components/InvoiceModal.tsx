@@ -150,9 +150,17 @@ export function InvoiceModal({ isOpen, onClose, unitId, activeCat, onSuccess, pr
         const price = parseFloat(item.unitPrice) || 0;
         const ivaP = activeCat === 'alimento' ? 5 : (item.hasIva ? parseFloat(item.ivaPercent) || 0 : 0);
         
+        let finalBatch = item.batch;
+        if (activeCat === 'alevinos') {
+          const provName = providers.find(p => p.id === proveedorId)?.name?.split(' ')[0] || 'PROV';
+          const espName = item.product.split(' ')[0] || 'ESP';
+          const dateStr = fechaFactura.replace(/-/g, '').slice(2);
+          finalBatch = `LOTE-${dateStr}-${espName}-${provName}`.toUpperCase();
+        }
+
         await supabase.from('invoice_items').insert([{
           invoice_id: invoiceId, unit_id: unitId, product_name: item.product,
-          batch: item.batch, quantity: qty, kilos: parseFloat(item.kilos) || 0,
+          batch: finalBatch, quantity: qty, kilos: parseFloat(item.kilos) || 0,
           unit_price: price, flete_per_unit: fletePorBulto, total_price: qty * price,
           has_iva: activeCat === 'alimento' ? true : item.hasIva, iva_percent: ivaP
         }]);
@@ -240,7 +248,8 @@ export function InvoiceModal({ isOpen, onClose, unitId, activeCat, onSuccess, pr
           )}
 
           {/* Items Section */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <div style={{ width: '100%', overflowX: 'auto', paddingBottom: '1rem' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', minWidth: '800px' }}>
             {items.map((item) => (
               <div key={item.id} className="glass" style={{ padding: '1.25rem', borderRadius: '18px', display: 'grid', gridTemplateColumns: activeCat === 'alimento' ? '2fr 1fr 1fr 1fr 1.5fr 50px' : '2.5fr 1.5fr 1fr 1.5fr 50px', gap: '1rem', alignItems: 'end', background: 'var(--card)', position: 'relative', zIndex: focusedRowId === item.id ? 50 : 1 }}>
                 <div style={{ position: 'relative' }}>
@@ -272,7 +281,13 @@ export function InvoiceModal({ isOpen, onClose, unitId, activeCat, onSuccess, pr
                     )}
                   </AnimatePresence>
                 </div>
-                <PremiumInput label="LOTE" placeholder="Lot..." value={item.batch} onChange={(e) => updateItem(item.id, 'batch', e.target.value)} />
+                <PremiumInput 
+                  label="LOTE" 
+                  placeholder={activeCat === 'alevinos' ? "Auto-generado" : "Lot..."} 
+                  value={activeCat === 'alevinos' ? "AUTO" : item.batch} 
+                  onChange={(e) => updateItem(item.id, 'batch', e.target.value)} 
+                  disabled={activeCat === 'alevinos'} 
+                />
                 <PremiumInput type="number" label={activeCat === 'alimento' ? 'BULTOS' : 'CANT'} placeholder="0" value={item.quantity} onChange={(e) => updateItem(item.id, 'quantity', e.target.value)} style={{ fontWeight: 900 }} />
                 {activeCat === 'alimento' && <PremiumInput type="number" label="KILOS" placeholder="Kg" value={item.kilos} onChange={(e) => updateItem(item.id, 'kilos', e.target.value)} style={{ fontWeight: 900 }} />}
                 <PremiumInput type="number" label="VLR UNIT" placeholder="0" value={item.unitPrice} onChange={(e) => updateItem(item.id, 'unitPrice', e.target.value)} style={{ fontWeight: 900, color: 'var(--primary)' }} icon={DollarSign} />
@@ -280,6 +295,7 @@ export function InvoiceModal({ isOpen, onClose, unitId, activeCat, onSuccess, pr
               </div>
             ))}
             <button onClick={() => setItems([...items, { id: Date.now(), product: '', batch: '', quantity: '', kilos: '', unitPrice: '', hasIva: false, ivaPercent: '19' }])} style={{ padding: '1rem', borderRadius: '16px', border: '2px dashed var(--primary)', background: 'transparent', color: 'var(--primary)', fontWeight: 800, fontSize: '0.9rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.75rem' }}><Plus size={20} /> Agregar Ítem a la Factura</button>
+          </div>
           </div>
         </div>
 

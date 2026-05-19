@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'react-hot-toast';
 import { Plus, CheckCircle, Clock, X } from 'lucide-react';
@@ -14,29 +15,19 @@ export function ModuloVentas({ unitId }: { unitId: string }) {
   const [newClienteName, setNewClienteName] = useState('');
   const [newClientePhone, setNewClientePhone] = useState('');
 
-  const [form, setForm] = useState({ cliente_id: '', estanque_id: '', species_name: '', tipo_venta: 'vivo', cantidad_kg: '', precio_kg: '', fecha: new Date().toISOString().split('T')[0], notas: '' });
+  const [form, setForm] = useState({ cliente_id: '', estanque_id: '', species_name: '', tipo_venta: 'vivo', cantidad_kg: '', peso_promedio_gr: '', precio_kg: '', fecha: new Date().toISOString().split('T')[0], notas: '' });
   const [pondSpecies, setPondSpecies] = useState<string[]>([]);
   const [pondBiomasa, setPondBiomasa] = useState(0);
+  const searchParams = useSearchParams();
 
   useEffect(() => {
     if (!unitId) return;
     fetchAll();
   }, [unitId]);
 
-  const fetchAll = async () => {
-    const [p, c, v] = await Promise.all([
-      supabase.from('estanques').select('id, name, current_biomass_kg, current_species, is_polyculture, current_count').eq('unit_id', unitId).eq('status', 'con_peces'),
-      supabase.from('clientes').select('*').eq('unit_id', unitId).order('name'),
-      supabase.from('ventas').select('*, clientes(name), estanques(name)').eq('unit_id', unitId).order('fecha', { ascending: false }).limit(50),
-    ]);
-    setPonds(p.data || []);
-    setClientes(c.data || []);
-    setVentas(v.data || []);
-  };
-
-  const handlePondChange = async (pondId: string) => {
+  const handlePondChange = async (pondId: string, currentPonds = ponds) => {
     setForm(f => ({ ...f, estanque_id: pondId, species_name: '' }));
-    const pond = ponds.find(p => p.id === pondId);
+    const pond = currentPonds.find(p => p.id === pondId);
     if (!pond) return;
     setPondBiomasa(parseFloat(pond.current_biomass_kg || 0));
     if (pond.is_polyculture) {
@@ -47,22 +38,60 @@ export function ModuloVentas({ unitId }: { unitId: string }) {
     }
   };
 
+  const fetchAll = async () => {
+    const [p, c, v] = await Promise.all([
+      supabase.from('estanques').select('id, name, current_biomass_kg, current_species, is_polyculture, current_count').eq('unit_id', unitId).eq('status', 'con_peces'),
+      supabase.from('clientes').select('*').eq('unit_id', unitId).order('name'),
+      supabase.from('ventas').select('*, clientes(name), estanques(name)').eq('unit_id', unitId).order('fecha', { ascending: false }).limit(50),
+    ]);
+    setPonds(p.data || []);
+    setClientes(c.data || []);
+    setVentas(v.data || []);
+
+    const estanqueParam = searchParams.get('estanque');
+    if (estanqueParam && (p.data || []).find(pd => pd.id === estanqueParam)) {
+      handlePondChange(estanqueParam, p.data || []);
+    }
+  };
+
   const saveVenta = async () => {
-    const { cliente_id, estanque_id, species_name, tipo_venta, cantidad_kg, precio_kg, fecha } = form;
-    if (!estanque_id || !species_name || !cantidad_kg || !precio_kg) return toast.error('Completa todos los campos requeridos');
+    const { cliente_id, estanque_id, species_name, tipo_venta, cantidad_kg, peso_promedio_gr, precio_kg, fecha } = form;
+    if (!estanque_id || !species_name || !cantidad_kg || !precio_kg || !peso_promedio_gr) return toast.error('Completa todos los campos requeridos');
     const kgNum = parseFloat(cantidad_kg);
+    const pesoPromedioNum = parseFloat(peso_promedio_gr);
+    const cantidadPeces = Math.round((kgNum * 1000) / pesoPromedioNum);
 
     if (kgNum > pondBiomasa) {
       toast('⚠️ Cantidad supera la biomasa registrada. Se ajustará el inventario.', { icon: '⚠️', duration: 4000 });
     }
 
-    const { error } = await supabase.from('ventas').insert([{ unit_id: unitId, cliente_id: cliente_id || null, estanque_id, species_name, tipo_venta, cantidad_kg: kgNum, precio_kg: parseFloat(precio_kg), fecha, notas: form.notas }]);
+    // Append calculation to notes to avoid DB schema crash if columns don't exist
+    const notasAmpliadas = form.notas ? `${form.notas} | Proyección: ~${cantidadPeces} peces (${pesoPromedioNum}g)` : `Proyección: ~${cantidadPeces} peces (${pesoPromedioNum}g)`;
+
+    const { error } = await supabase.from('ventas').insert([{ unit_id: unitId, cliente_id: cliente_id || null, estanque_id, species_name, tipo_venta, cantidad_kg: kgNum, precio_kg: parseFloat(precio_kg), fecha, notas: notasAmpliadas }]);
     if (error) return toast.error('Error: ' + error.message);
 
-    // Update pond biomass
-    await supabase.from('estanques').update({ current_biomass_kg: Math.max(0, pondBiomasa - kgNum) }).eq('id', estanque_id);
-    toast.success('Venta registrada correctamente');
-    setForm({ cliente_id: '', estanque_id: '', species_name: '', tipo_venta: 'vivo', cantidad_kg: '', precio_kg: '', fecha: new Date().toISOString().split('T')[0], notas: '' });
+    // Update pond biomass & count
+    const pond = ponds.find(p => p.id === estanque_id);
+    const newBiomasa = Math.max(0, pondBiomasa - kgNum);
+    const newCount = Math.max(0, (pond?.current_count || 0) - cantidadPeces);
+
+    await supabase.from('estanques').update({ current_biomass_kg: newBiomasa, current_count: newCount }).eq('id', estanque_id);
+
+    // Update pond_species
+    const { data: speciesData } = await supabase.from('pond_species').select('id, current_count, current_biomass_kg').eq('estanque_id', estanque_id).eq('species_name', species_name).single();
+    if (speciesData) {
+      const newSpeciesCount = Math.max(0, (speciesData.current_count || 0) - cantidadPeces);
+      const newSpeciesBiomasa = Math.max(0, parseFloat(speciesData.current_biomass_kg || '0') - kgNum);
+      if (newSpeciesCount <= 0) {
+        await supabase.from('pond_species').delete().eq('id', speciesData.id);
+      } else {
+        await supabase.from('pond_species').update({ current_count: newSpeciesCount, current_biomass_kg: newSpeciesBiomasa }).eq('id', speciesData.id);
+      }
+    }
+
+    toast.success(`Venta registrada. Se descontaron ~${cantidadPeces} peces.`);
+    setForm({ cliente_id: '', estanque_id: '', species_name: '', tipo_venta: 'vivo', cantidad_kg: '', peso_promedio_gr: '', precio_kg: '', fecha: new Date().toISOString().split('T')[0], notas: '' });
     setPondSpecies([]); setPondBiomasa(0);
     fetchAll();
   };
@@ -133,6 +162,16 @@ export function ModuloVentas({ unitId }: { unitId: string }) {
             <input type="number" value={form.cantidad_kg} onChange={e => setForm(f => ({ ...f, cantidad_kg: e.target.value }))} className="premium-input"
               style={parseFloat(form.cantidad_kg) > pondBiomasa && pondBiomasa > 0 ? { borderColor: '#f59e0b' } : {}} placeholder="0" />
             {parseFloat(form.cantidad_kg) > pondBiomasa && pondBiomasa > 0 && <div style={{ fontSize: '0.7rem', color: '#f59e0b', fontWeight: 700, marginTop: '4px' }}>⚠️ Supera biomasa registrada ({pondBiomasa.toFixed(1)} kg)</div>}
+          </div>
+
+          <div className="premium-input-group">
+            <label className="premium-label">Peso Promedio (g) por animal</label>
+            <input type="number" value={form.peso_promedio_gr} onChange={e => setForm(f => ({ ...f, peso_promedio_gr: e.target.value }))} className="premium-input" placeholder="Ej: 500" />
+            {form.cantidad_kg && form.peso_promedio_gr && (
+              <div style={{ fontSize: '0.7rem', color: 'var(--primary)', fontWeight: 700, marginTop: '4px' }}>
+                Proyección: ~{Math.round((parseFloat(form.cantidad_kg) * 1000) / parseFloat(form.peso_promedio_gr))} peces a descontar
+              </div>
+            )}
           </div>
 
           <div className="premium-input-group">

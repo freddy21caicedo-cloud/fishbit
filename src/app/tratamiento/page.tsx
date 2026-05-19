@@ -45,10 +45,6 @@ export default function TratamientoPage() {
     { id: '1', producto_id: '', producto_nombre: '', dosis: '', unidad: 'gr' }
   ]);
 
-  useEffect(() => {
-    fetchData();
-  }, []);
-
   const fetchData = async () => {
     try {
       const activeUnitId = localStorage.getItem('active_unit_id');
@@ -65,6 +61,10 @@ export default function TratamientoPage() {
       toast.error("Error al cargar datos: " + error.message);
     }
   };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
 
   const selectedPond = useMemo(() => ponds.find(p => p.id === estanqueId), [estanqueId, ponds]);
 
