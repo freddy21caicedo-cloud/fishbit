@@ -133,9 +133,14 @@ export function TrendsChart({
     return null;
   }, [selectedParam, thresholds]);
 
+  const [timeRange, setTimeRange] = useState<'7d' | '30d' | 'all'>('all');
+
   const displayData = useMemo(() => {
-    return data.length > 0 ? data : [];
-  }, [data]);
+    if (data.length === 0) return [];
+    if (timeRange === '7d') return data.slice(-7);
+    if (timeRange === '30d') return data.slice(-30);
+    return data;
+  }, [data, timeRange]);
 
   const showSpeciesFilter = isPolyculture && (
     selectedParam === 'mortalidad' || selectedParam === 'biomasa' || selectedParam === 'peso_promedio'
@@ -152,7 +157,37 @@ export function TrendsChart({
             Visualización avanzada de registros históricos
           </p>
         </div>
-        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', width: '100%', justifyContent: 'flex-start', maxWidth: '600px' }}>
+        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', width: '100%', justifyContent: 'flex-start', maxWidth: '650px', alignItems: 'center' }}>
+          <div style={{ display: 'flex', background: 'var(--secondary)', padding: '4px', borderRadius: '12px', border: '1px solid var(--border)', alignItems: 'center', height: '42px' }}>
+            {[
+              { id: '7d', label: '7D' },
+              { id: '30d', label: '30D' },
+              { id: 'all', label: 'Ciclo' }
+            ].map(r => (
+              <button
+                key={r.id}
+                onClick={() => setTimeRange(r.id as any)}
+                style={{
+                  padding: '6px 12px',
+                  borderRadius: '8px',
+                  fontSize: '0.75rem',
+                  fontWeight: 900,
+                  border: 'none',
+                  background: timeRange === r.id ? 'var(--primary)' : 'transparent',
+                  color: timeRange === r.id ? 'var(--primary-foreground)' : 'var(--muted-foreground)',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  boxShadow: timeRange === r.id ? 'var(--shadow-sm)' : 'none',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  height: '100%'
+                }}
+              >
+                {r.label}
+              </button>
+            ))}
+          </div>
           {showSpeciesFilter && setSelectedSpecies && (
             <select 
               value={selectedSpecies}
