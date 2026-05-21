@@ -198,7 +198,7 @@ export default function Dashboard() {
         setPonds(data as Pond[]);
         
         // Validar si el estanque seleccionado actualmente existe en la nueva unidad
-        const pondExists = data.some(p => p.id === selectedPond);
+        const pondExists = data.some((p: any) => p.id === selectedPond);
         
         if (data.length > 0 && !pondExists) {
           setSelectedPond(data[0].id);
