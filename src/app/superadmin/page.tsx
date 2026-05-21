@@ -32,6 +32,7 @@ import {
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { toast } from 'react-hot-toast';
+import { useAuth } from '../components/providers/AuthProvider';
 
 interface SuperAdminUnit {
   id: string;
@@ -83,6 +84,7 @@ export default function SuperAdminHub() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const initialTab = (searchParams.get('tab') as Tab) || 'overview';
+  const { session, loading: authLoading, profileLoading, isSuperAdmin } = useAuth();
   
   // State
   const [activeTab, setActiveTab] = useState<Tab>(initialTab);
@@ -107,22 +109,9 @@ export default function SuperAdminHub() {
   const [editUnit, setEditUnit] = useState({ id: '', name: '', location: '' });
   const [newUser, setNewUser] = useState({ email: '', password: '', fullName: '' });
 
-  const fetchAllData = useCallback(async () => {
-    setLoading(true);
+  const fetchAllData = useCallback(async (showLoader = false) => {
+    if (showLoader) setLoading(true);
     try {
-      // Security Check: Verify SuperAdmin status
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        router.push('/');
-        return;
-      }
-      const { data: profile } = await supabase.from('profiles').select('is_superadmin').eq('id', user.id).single();
-      if (!profile?.is_superadmin) {
-        toast.error('Acceso denegado. Permisos insuficientes.');
-        router.push('/dashboard');
-        return;
-      }
-
       const results = await Promise.allSettled([
         supabase.from('units').select('*'),
         supabase.from('profiles').select('*'),
@@ -191,10 +180,23 @@ export default function SuperAdminHub() {
   }, []);
 
   useEffect(() => {
+    if (authLoading || profileLoading) return;
+
+    if (!session) {
+      router.push('/');
+      return;
+    }
+
+    if (!isSuperAdmin) {
+      toast.error('Acceso denegado. Permisos insuficientes.');
+      router.push('/dashboard');
+      return;
+    }
+
     const tab = searchParams.get('tab') as Tab;
     if (tab) setActiveTab(tab);
-    fetchAllData();
-  }, [searchParams, fetchAllData]);
+    fetchAllData(true);
+  }, [authLoading, profileLoading, session, isSuperAdmin, searchParams, fetchAllData, router]);
 
   // Handlers
   const handleCreateUnit = async (e: React.FormEvent) => {
@@ -343,7 +345,7 @@ export default function SuperAdminHub() {
     });
   };
 
-  if (loading) {
+  if (authLoading || profileLoading || loading) {
     return (
       <div style={{ minHeight: '80vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <div style={{ textAlign: 'center' }}>

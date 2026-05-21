@@ -19,6 +19,7 @@ import {
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'react-hot-toast';
+import { useUnit } from '../components/providers/UnitProvider';
 
 const recordTypes = [
   { id: 'alimentacion', label: 'Alimentación', icon: Utensils, color: '#10b981', bg: 'rgba(16, 185, 129, 0.1)' },
@@ -81,6 +82,7 @@ const ActionCard = ({ type }: any) => (
 );
 
 export default function RegistrosPage() {
+  const { userRole } = useUnit();
   const [selectedPond, setSelectedPond] = useState('Todos los Estanques');
   const [ponds, setPonds] = useState<any[]>(['Todos los Estanques']);
   const [activities, setActivities] = useState<any[]>([]);
@@ -342,20 +344,22 @@ export default function RegistrosPage() {
                     </div>
                   </div>
                   <div style={{ textAlign: 'right', fontSize: '0.75rem', color: 'var(--muted-foreground)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <button 
-                      onClick={(e) => handleDeleteRecord(e, activity)}
-                      disabled={isDeleting === activity.id}
-                      style={{ 
-                        background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', 
-                        padding: '0.4rem', borderRadius: '8px', display: 'flex', alignItems: 'center',
-                        justifyContent: 'center', transition: 'background 0.2s ease'
-                      }}
-                      onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)'}
-                      onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
-                      title="Eliminar Registro"
-                    >
-                      {isDeleting === activity.id ? <Loader2 size={18} className="animate-spin" /> : <Trash2 size={18} />}
-                    </button>
+                    {userRole !== 'operario' && (
+                      <button 
+                        onClick={(e) => handleDeleteRecord(e, activity)}
+                        disabled={isDeleting === activity.id}
+                        style={{ 
+                          background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', 
+                          padding: '0.4rem', borderRadius: '8px', display: 'flex', alignItems: 'center',
+                          justifyContent: 'center', transition: 'background 0.2s ease'
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)'}
+                        onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                        title="Eliminar Registro"
+                      >
+                        {isDeleting === activity.id ? <Loader2 size={18} className="animate-spin" /> : <Trash2 size={18} />}
+                      </button>
+                    )}
                     <ChevronRight size={18} style={{ color: 'var(--border)' }} />
                   </div>
                 </div>

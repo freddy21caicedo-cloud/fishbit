@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '../providers/AuthProvider';
 import { useUnit } from '../providers/UnitProvider';
@@ -32,6 +32,7 @@ interface AppLayoutProps {
 
 export default function AppLayout({ children }: AppLayoutProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const { session, profileLoading, isSuperAdmin } = useAuth();
   const { activeUnit, loading: unitLoading, refreshUnitData, userRole, roleLoading } = useUnit();
   const logout = useLogout();
@@ -121,6 +122,21 @@ export default function AppLayout({ children }: AppLayoutProps) {
       clearTimeout(timeoutId);
     };
   }, []);
+
+  // Strict frontend route protection for operarios
+  useEffect(() => {
+    if (!profileLoading && !roleLoading && userRole === 'operario') {
+      const allowedPaths = ['/registros', '/ayuda'];
+      const currentPath = pathname || '';
+      
+      const isAllowed = allowedPaths.some(allowed => currentPath === allowed || currentPath.startsWith(allowed + '/'));
+      
+      if (!isAllowed) {
+        toast.error('Acceso denegado: Tu rol de Operario solo permite registrar datos.');
+        router.replace('/registros');
+      }
+    }
+  }, [profileLoading, roleLoading, userRole, pathname, router]);
 
   const isMobile = width < 768;
   const isTablet = width >= 768 && width <= 1024;
