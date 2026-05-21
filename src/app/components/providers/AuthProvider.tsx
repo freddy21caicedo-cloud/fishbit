@@ -96,8 +96,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setProfileLoading(false);
         initializedRef.current = false;
 
-        // Redirect to login if not already there
-        if (typeof window !== 'undefined') {
+        // Redirect to login if not already there and they actually signed out
+        if (typeof window !== 'undefined' && event === 'SIGNED_OUT') {
           const isAuthPage = window.location.pathname === '/' || window.location.pathname === '/signup';
           if (!isAuthPage && !(window as any).__redirectingToHome) {
             (window as any).__redirectingToHome = true;
