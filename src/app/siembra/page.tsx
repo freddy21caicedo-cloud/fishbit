@@ -78,7 +78,7 @@ export default function SiembraPage() {
       
       if (error) throw error;
       
-      const formatted: InventoryItem[] = (data || []).map(i => ({
+      const formatted: InventoryItem[] = (data || []).map((i: any) => ({
         ...i,
         especie: i.name,
         stock: Number(i.current_stock) || 0,

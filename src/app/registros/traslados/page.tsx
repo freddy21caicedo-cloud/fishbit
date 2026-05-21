@@ -73,7 +73,7 @@ export default function TrasladoPage() {
       .select('id, species_name, current_count, current_biomass_kg, avg_weight_gr')
       .eq('estanque_id', pondId);
     if (data && data.length > 0) {
-      setTraslados(data.map(s => ({
+      setTraslados(data.map((s: any) => ({
         speciesId: s.id,
         speciesName: s.species_name,
         quantity: '',
@@ -431,7 +431,7 @@ export default function TrasladoPage() {
       // 4. RECALCULAR ETIQUETAS Y ESTADO (Origen y Destino)
       const updatePondMetadata = async (pondId: string) => {
         const { data: specs } = await supabase.from('pond_species').select('species_name, current_count').eq('estanque_id', pondId);
-        const activeSpecs = (specs || []).filter(s => s.current_count > 0);
+        const activeSpecs = (specs || []).filter((s: any) => s.current_count > 0);
         
         const isPoly = activeSpecs.length > 1;
         let label = 'Vacío';

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useUnit } from '../components/providers/UnitProvider';
+import { useAuth } from '../components/providers/AuthProvider';
 import { 
   Utensils, 
   Skull, 
@@ -59,10 +60,42 @@ const evaluateHealthState = (oxygen?: number, temp?: number, ph?: number, thresh
 };
 
 export default function Dashboard() {
-  const { activeUnitId, activeUnit } = useUnit();
+  const { session, isSuperAdmin } = useAuth();
+  const { activeUnitId, activeUnit, userRole, roleLoading: isLoadingRole } = useUnit();
   
-  const [userRole, setUserRole] = useState<Profile['role'] | null>(null);
-  const [isLoadingRole, setIsLoadingRole] = useState(true);
+  const [userUnits, setUserUnits] = useState<any[]>([]);
+
+  // Fetch units for standard admin/client users to see if they have multiple
+  useEffect(() => {
+    if (!session?.user?.id || isSuperAdmin) return;
+
+    const fetchUserUnits = async () => {
+      try {
+        const { data: userUnitRows } = await supabase
+          .from('user_units')
+          .select('unit_id')
+          .eq('user_id', session.user.id);
+
+        if (!userUnitRows || userUnitRows.length === 0) return;
+
+        const unitIds = userUnitRows.map((r: any) => r.unit_id).filter(Boolean);
+
+        const { data: unitRows } = await supabase
+          .from('units')
+          .select('id, name, location')
+          .in('id', unitIds);
+
+        if (unitRows) {
+          setUserUnits(unitRows);
+        }
+      } catch (err) {
+        console.error('Dashboard: error fetching user units:', err);
+      }
+    };
+
+    fetchUserUnits();
+  }, [session?.user?.id, isSuperAdmin]);
+  
   const [stats, setStats] = useState<DashboardStats>({
     biomass: { total: 0, details: [] },
     consumption: { total: 0, details: [] },
@@ -94,29 +127,6 @@ export default function Dashboard() {
   
   const [financeData, setFinanceData] = useState<FinanceData>({ total: 0, food: 0, seeds: 0, pending: 0 });
   const [isFinanceLoading, setIsFinanceLoading] = useState(false);
-
-  // 1. Initial Load: User Role
-  useEffect(() => {
-    const fetchUserRole = async () => {
-      setIsLoadingRole(true);
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('role')
-            .eq('id', user.id)
-            .single();
-          if (profile) setUserRole(profile.role as Profile['role']);
-        }
-      } catch (error) {
-        console.error("Error fetching user role:", error);
-      } finally {
-        setIsLoadingRole(false);
-      }
-    };
-    fetchUserRole();
-  }, []);
 
   // 2. Fetch Unit Data + Realtime subscription
   useEffect(() => {
@@ -206,7 +216,7 @@ export default function Dashboard() {
         const unique = Array.from(
           new Map(data.map((s: any) => [s.species_name, s])).values()
         );
-        setPondSpecies(unique);
+        setPondSpecies(unique as { species_name: string }[]);
         setSelectedSpecies('Todas');
       } else {
         setPondSpecies([]);
@@ -227,7 +237,7 @@ export default function Dashboard() {
         .eq('unit_id', unitId)
         .eq('status', 'con_peces');
 
-      const activePonds = pondsData || [];
+      const activePonds: any[] = pondsData || [];
 
       if (activePonds.length === 0) {
         setStats({
@@ -246,13 +256,13 @@ export default function Dashboard() {
       const { data: wqData } = await supabase
         .from('water_quality')
         .select('estanque_id, o2_mg_l, temperature_c, ph')
-        .in('estanque_id', activePonds.map(p => p.id))
+        .in('estanque_id', activePonds.map((p: any) => p.id))
         .order('date', { ascending: false })
         .order('hour', { ascending: false });
 
       const wqMap: Record<string, any> = {};
       if (wqData) {
-        wqData.forEach(r => {
+        wqData.forEach((r: any) => {
           if (!wqMap[r.estanque_id]) wqMap[r.estanque_id] = r;
         });
       }
@@ -261,11 +271,11 @@ export default function Dashboard() {
       const { data: speciesData } = await supabase
         .from('pond_species')
         .select('estanque_id, species_name')
-        .in('estanque_id', activePonds.map(p => p.id));
+        .in('estanque_id', activePonds.map((p: any) => p.id));
 
       const speciesMap: Record<string, string[]> = {};
       if (speciesData) {
-        speciesData.forEach(s => {
+        speciesData.forEach((s: any) => {
           if (!speciesMap[s.estanque_id]) speciesMap[s.estanque_id] = [];
           speciesMap[s.estanque_id].push(s.species_name);
         });
@@ -338,8 +348,8 @@ export default function Dashboard() {
         .eq('unit_id', unitId)
         .eq('category', 'alimento');
 
-      const inventoryTotal = (invData || []).reduce((s, i) => s + (parseFloat(i.current_stock) || 0), 0);
-      const inventoryDetails = (invData || []).map(i => ({
+      const inventoryTotal = (invData || []).reduce((s: any, i: any) => s + (parseFloat(i.current_stock) || 0), 0);
+      const inventoryDetails = (invData || []).map((i: any) => ({
         label: i.name,
         value: parseFloat((parseFloat(i.current_stock) || 0).toFixed(1)),
         unit: 'kg'
@@ -490,7 +500,7 @@ export default function Dashboard() {
           const { data: res } = await query.order('date', { ascending: true });
           
           const grouped: Record<string, number> = {};
-          (res || []).forEach(r => {
+          (res || []).forEach((r: any) => {
             if (!r.date) return;
             const dateKey = `${r.date.split('-')[2]}/${r.date.split('-')[1]}`;
             grouped[dateKey] = (grouped[dateKey] || 0) + (parseInt(r.quantity) || 0);
@@ -510,7 +520,7 @@ export default function Dashboard() {
           const { data: res } = await query.order('date', { ascending: true });
           
           const grouped: Record<string, number> = {};
-          (res || []).forEach(r => {
+          (res || []).forEach((r: any) => {
             if (!r.date) return;
             const dateKey = `${r.date.split('-')[2]}/${r.date.split('-')[1]}`;
             grouped[dateKey] = (grouped[dateKey] || 0) + (parseFloat(r.total_biomass_kg) || 0);
@@ -525,7 +535,7 @@ export default function Dashboard() {
             .order('date', { ascending: true });
             
           const grouped: Record<string, number> = {};
-          (res || []).forEach(r => {
+          (res || []).forEach((r: any) => {
             if (!r.date) return;
             const dateKey = `${r.date.split('-')[2]}/${r.date.split('-')[1]}`;
             grouped[dateKey] = (grouped[dateKey] || 0) + (parseFloat(r.quantity_kg) || 0);
@@ -614,7 +624,51 @@ export default function Dashboard() {
               Plan Único
             </span>
           </div>
-          <p style={{ color: 'var(--muted-foreground)', fontWeight: 600 }}>Unidad: <strong style={{ color: 'var(--foreground)' }}>{activeUnit?.name || 'Cargando...'}</strong></p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.25rem' }}>
+            <span style={{ color: 'var(--muted-foreground)', fontWeight: 600, fontSize: '0.95rem' }}>Unidad:</span>
+            {!isSuperAdmin && userUnits.length > 1 ? (
+              <div style={{ position: 'relative', display: 'inline-block' }}>
+                <select
+                  value={activeUnitId || ''}
+                  onChange={(e) => {
+                    const newUnitId = e.target.value;
+                    if (newUnitId && newUnitId !== activeUnitId) {
+                      localStorage.setItem('active_unit_id', newUnitId);
+                      window.location.reload();
+                    }
+                  }}
+                  style={{
+                    background: 'var(--card)',
+                    color: 'var(--foreground)',
+                    border: '1px solid var(--border)',
+                    borderRadius: '12px',
+                    padding: '0.5rem 2.25rem 0.5rem 1rem',
+                    fontSize: '0.9rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    outline: 'none',
+                    appearance: 'none',
+                    backgroundImage: 'url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'%230d9488\' stroke-width=\'3\' stroke-linecap=\'round\' stroke-linejoin=\'round\'%3e%3cpolyline points=\'6 9 12 15 18 9\'%3e%3c/polyline%3e%3c/svg%3e")',
+                    backgroundRepeat: 'no-repeat',
+                    backgroundPosition: 'right 0.75rem center',
+                    backgroundSize: '0.9rem',
+                    transition: 'all 0.2s ease',
+                    boxShadow: 'var(--shadow-sm)',
+                  }}
+                >
+                  {userUnits.map((u: any) => (
+                    <option key={u.id} value={u.id} style={{ background: 'var(--card)', color: 'var(--foreground)' }}>
+                      {u.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : (
+              <strong style={{ color: 'var(--foreground)', fontWeight: 850, fontSize: '0.95rem' }}>
+                {activeUnit?.name || 'Cargando...'}
+              </strong>
+            )}
+          </div>
         </div>
         <div style={{ padding: '0.6rem 1.25rem', background: 'var(--secondary)', borderRadius: '14px', border: '1px solid var(--border)', fontSize: '0.85rem', fontWeight: 800 }}>
           {new Date().toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })}

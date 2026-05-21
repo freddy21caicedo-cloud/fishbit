@@ -58,6 +58,8 @@ export async function middleware(request: NextRequest) {
 
   const pathname = request.nextUrl.pathname
   const isPublicRoute = pathname === '/' || pathname === '/signup'
+  // Routes that are accessible while authenticated but should NOT redirect to dashboard
+  const isSelectUnitRoute = pathname === '/select-unit' || pathname.startsWith('/select-unit/')
 
   // If user is not logged in and attempts to access any non-public page, redirect to login
   if (!user) {
@@ -67,10 +69,17 @@ export async function middleware(request: NextRequest) {
     return response
   }
 
-  // If user is logged in:
-  // 1. Fetch their superadmin status from app_metadata (JWT claim) or fallback to database
+  // select-unit is accessible while logged in — don't redirect to dashboard
+  if (isSelectUnitRoute) {
+    return response
+  }
+
+  // Only query the DB for superadmin status when strictly needed:
+  // accessing /superadmin, or on the login page redirect logic
+  const needsSuperAdminCheck = pathname.startsWith('/superadmin') || isPublicRoute
+
   let isSuperAdmin = !!user.app_metadata?.is_superadmin
-  if (!isSuperAdmin) {
+  if (!isSuperAdmin && needsSuperAdminCheck) {
     try {
       const { data: profile } = await supabase
         .from('profiles')
@@ -83,14 +92,14 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // 2. Protect /superadmin route
+  // Protect /superadmin route
   if (pathname.startsWith('/superadmin')) {
     if (!isSuperAdmin) {
       return NextResponse.redirect(new URL('/dashboard', request.url))
     }
   }
 
-  // 3. Redirect if logged in and trying to access landing/login
+  // Redirect if logged in and trying to access landing/login
   if (isPublicRoute) {
     if (isSuperAdmin) {
       return NextResponse.redirect(new URL('/superadmin', request.url))
@@ -109,8 +118,9 @@ export const config = {
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
-     * Feel free to modify this pattern to include more paths.
+     * - api/ routes (handled server-side, no auth redirect needed)
+     * - manifest.json, service workers, static assets
      */
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|api/|manifest\\.json|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)',
   ],
 }

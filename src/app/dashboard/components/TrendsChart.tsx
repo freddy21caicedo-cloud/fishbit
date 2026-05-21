@@ -315,13 +315,15 @@ export function TrendsChart({
               tickFormatter={(val: any) => typeof val === 'number' ? val.toLocaleString('es-CO', { maximumFractionDigits: 2 }) : val}
               domain={[
                 (dataMin: number) => {
-                  const min = currentThresholds ? currentThresholds.min : dataMin;
-                  if (isNaN(dataMin) || dataMin === Infinity) return min - 1;
+                  if (!isFinite(dataMin)) return 0;
+                  const min = currentThresholds && isFinite(currentThresholds.min) ? currentThresholds.min : dataMin;
+                  if (!isFinite(min)) return 0;
                   return Math.min(dataMin, min - 0.5);
                 },
                 (dataMax: number) => {
-                  const max = currentThresholds ? currentThresholds.max : dataMax;
-                  if (isNaN(dataMax) || dataMax === -Infinity) return max + 1;
+                  if (!isFinite(dataMax)) return 10;
+                  const max = currentThresholds && isFinite(currentThresholds.max) ? currentThresholds.max : dataMax;
+                  if (!isFinite(max)) return dataMax + 10;
                   return Math.max(dataMax, max + 0.5);
                 }
               ]}

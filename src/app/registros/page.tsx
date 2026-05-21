@@ -106,7 +106,7 @@ export default function RegistrosPage() {
       .order('name');
     
     if (pondsData) {
-      setPonds(['Todos los Estanques', ...pondsData.map(p => p.name)]);
+      setPonds(['Todos los Estanques', ...pondsData.map((p: any) => p.name)]);
     }
 
     // 2. Fetch Activity from all tables
@@ -133,7 +133,7 @@ export default function RegistrosPage() {
     };
 
     const combined: any[] = [
-      ...(alimentacion.data || []).map(a => ({
+      ...(alimentacion.data || []).map((a: any) => ({
         id: `ali-${a.id}`,
         type: 'alimentacion',
         pond: a.estanques?.name,
@@ -141,7 +141,7 @@ export default function RegistrosPage() {
         rawDate: a.date || a.created_at,
         originalId: a.id
       })),
-      ...(biometrias.data || []).map(b => ({
+      ...(biometrias.data || []).map((b: any) => ({
         id: `bio-${b.id}`,
         type: 'biometria',
         pond: b.estanques?.name,
@@ -149,7 +149,7 @@ export default function RegistrosPage() {
         rawDate: b.date || b.created_at,
         originalId: b.id
       })),
-      ...(calidadAgua.data || []).map(c => ({
+      ...(calidadAgua.data || []).map((c: any) => ({
         id: `cal-${c.id}`,
         type: 'calidad-agua',
         pond: c.estanques?.name,
@@ -157,7 +157,7 @@ export default function RegistrosPage() {
         rawDate: c.date || c.created_at,
         originalId: c.id
       })),
-      ...(mortalidad.data || []).map(m => ({
+      ...(mortalidad.data || []).map((m: any) => ({
         id: `mor-${m.id}`,
         type: 'mortalidad',
         pond: m.estanques?.name,
@@ -166,8 +166,8 @@ export default function RegistrosPage() {
         originalId: m.id
       })),
       ...(traslados.data || [])
-        .filter(t => !t.revertido) // Punto 5.2: Ocultar traslados revertidos
-        .map(t => ({
+        .filter((t: any) => !t.revertido) // Punto 5.2: Ocultar traslados revertidos
+        .map((t: any) => ({
         id: `tra-${t.id}`,
         type: 'traslado',
         pond: (t.origen as any)?.name,
@@ -175,7 +175,7 @@ export default function RegistrosPage() {
         rawDate: t.date || t.created_at,
         originalId: t.id
       })),
-    ].sort((a, b) => new Date(b.rawDate).getTime() - new Date(a.rawDate).getTime());
+    ].sort((a: any, b: any) => new Date(b.rawDate).getTime() - new Date(a.rawDate).getTime());
 
     setActivities(combined);
     setLoading(false);

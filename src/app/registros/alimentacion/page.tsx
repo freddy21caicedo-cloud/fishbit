@@ -107,7 +107,7 @@ export default function AlimentacionPage() {
     }
 
     const { data: foodData } = await query;
-    const directFood = (foodData || []).reduce((sum, item) => sum + (parseFloat(item.quantity_kg) || 0), 0);
+    const directFood = (foodData || []).reduce((sum: number, item: any) => sum + (parseFloat(item.quantity_kg) || 0), 0);
 
     // 3. Add food inherited from incoming transfers (trazabilidad de traslados)
     //    food_total_kg = alimento acumulado por los peces antes de llegar a este estanque
@@ -116,7 +116,7 @@ export default function AlimentacionPage() {
       .select('food_total_kg')
       .eq('destino_id', id)
       .not('food_total_kg', 'is', null);
-    const inheritedFood = (transferFood || []).reduce((sum, r) => sum + (parseFloat(r.food_total_kg) || 0), 0);
+    const inheritedFood = (transferFood || []).reduce((sum: number, r: any) => sum + (parseFloat(r.food_total_kg) || 0), 0);
 
     setTotalFoodSinceLastBio(directFood + inheritedFood);
   };

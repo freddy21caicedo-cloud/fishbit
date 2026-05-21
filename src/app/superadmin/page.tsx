@@ -131,30 +131,30 @@ export default function SuperAdminHub() {
       ]);
 
       const allUnitsData = (results[0].status === 'fulfilled' ? results[0].value.data : []) || [];
-      const unitsData = allUnitsData.filter(u => u.id !== '00000000-0000-0000-0000-000000000000');
+      const unitsData = allUnitsData.filter((u: any) => u.id !== '00000000-0000-0000-0000-000000000000');
       const profilesData = (results[1].status === 'fulfilled' ? results[1].value.data : []) || [];
       const uuData = (results[2].status === 'fulfilled' ? results[2].value.data : []) || [];
       const subsData = (results[3].status === 'fulfilled' ? results[3].value.data : []) || [];
       const ticketsData = (results[4].status === 'fulfilled' ? results[4].value.data : []) || [];
 
-      const processedProfiles = profilesData.map(p => ({
+      const processedProfiles = profilesData.map((p: any) => ({
         ...p,
-        user_units: uuData.filter(uu => uu.user_id === p.id).map(uu => ({
+        user_units: uuData.filter((uu: any) => uu.user_id === p.id).map((uu: any) => ({
           ...uu,
-          units: unitsData.find(u => u.id === uu.unit_id) || { name: 'Unidad Desconocida' }
+          units: unitsData.find((u: any) => u.id === uu.unit_id) || { name: 'Unidad Desconocida' }
         }))
       }));
 
-      const processedUnits = unitsData.map(u => ({
+      const processedUnits = unitsData.map((u: any) => ({
         ...u,
-        subscriptions: subsData.filter(s => s.unit_id === u.id),
-        user_units: [{ count: uuData.filter(uu => uu.unit_id === u.id).length }]
+        subscriptions: subsData.filter((s: any) => s.unit_id === u.id),
+        user_units: [{ count: uuData.filter((uu: any) => uu.unit_id === u.id).length }]
       }));
 
-      const processedSubs = unitsData.map(u => {
-        const sub = subsData.find(s => s.unit_id === u.id);
-        const unitAdminRelation = uuData.find(uu => uu.unit_id === u.id && uu.role === 'admin');
-        const adminProfile = profilesData.find(p => p.id === unitAdminRelation?.user_id);
+      const processedSubs = unitsData.map((u: any) => {
+        const sub = subsData.find((s: any) => s.unit_id === u.id);
+        const unitAdminRelation = uuData.find((uu: any) => uu.unit_id === u.id && uu.role === 'admin');
+        const adminProfile = profilesData.find((p: any) => p.id === unitAdminRelation?.user_id);
         
         return {
           id: sub?.id || `temp-${u.id}`,
@@ -167,9 +167,9 @@ export default function SuperAdminHub() {
         };
       });
 
-      const processedTickets = ticketsData.map(t => ({
+      const processedTickets = ticketsData.map((t: any) => ({
         ...t,
-        profiles: profilesData.find(p => p.id === t.user_id) || { full_name: 'Usuario' }
+        profiles: profilesData.find((p: any) => p.id === t.user_id) || { full_name: 'Usuario' }
       }));
 
       setUnits(processedUnits);
@@ -210,7 +210,8 @@ export default function SuperAdminHub() {
 
       setIsUnitModalOpen(false);
       setNewUnit({ name: '', location: '' });
-      fetchAllData();
+      await fetchAllData();
+      return true;
     };
 
     toast.promise(createPromise(), {
@@ -223,14 +224,16 @@ export default function SuperAdminHub() {
   const handleUpdateUnit = async (e: React.FormEvent) => {
     e.preventDefault();
     const updatePromise = async () => {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('units')
         .update({ name: editUnit.name, location: editUnit.location })
-        .eq('id', editUnit.id);
+        .eq('id', editUnit.id)
+        .select();
       if (error) throw error;
       
       setIsEditUnitModalOpen(false);
-      fetchAllData();
+      await fetchAllData();
+      return data;
     };
 
     toast.promise(updatePromise(), {
@@ -261,7 +264,8 @@ export default function SuperAdminHub() {
 
       setIsUserModalOpen(false);
       setNewUser({ email: '', password: '', fullName: '' });
-      fetchAllData();
+      await fetchAllData();
+      return true;
     };
 
     toast.promise(registerPromise(), {
@@ -283,7 +287,8 @@ export default function SuperAdminHub() {
       }]);
       if (error) throw error;
       setIsAssignModalOpen(false);
-      fetchAllData();
+      await fetchAllData();
+      return true;
     };
 
     toast.promise(assignPromise(), {
@@ -307,7 +312,8 @@ export default function SuperAdminHub() {
       if (!response.ok || res.error) {
         throw new Error(res.error || 'Error al eliminar usuario');
       }
-      fetchAllData();
+      await fetchAllData();
+      return true;
     };
 
     toast.promise(deletePromise(), {
@@ -323,7 +329,8 @@ export default function SuperAdminHub() {
     const deletePromise = async () => {
       const { error } = await supabase.from('units').delete().eq('id', id);
       if (error) throw error;
-      fetchAllData();
+      await fetchAllData();
+      return true;
     };
 
     toast.promise(deletePromise(), {
@@ -805,7 +812,7 @@ const BillingTab = ({ subscriptions, onRefresh }: { subscriptions: SuperAdminSub
       
       if (subs && subs.length > 0) {
         // 2. Actualizar cada una a estado inactivo (canceled) y tarifa de $0 COP (mes gratis de bienvenida)
-        const promises = subs.map(s => 
+        const promises = subs.map((s: any) => 
           supabase
             .from('subscriptions')
             .update({
@@ -817,7 +824,7 @@ const BillingTab = ({ subscriptions, onRefresh }: { subscriptions: SuperAdminSub
         );
         
         const results = await Promise.all(promises);
-        const firstError = results.find(r => r.error)?.error;
+        const firstError = results.find((r: any) => r.error)?.error;
         if (firstError) throw firstError;
       }
       

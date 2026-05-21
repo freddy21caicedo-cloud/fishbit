@@ -1,9 +1,8 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
-import { useRouter, usePathname } from 'next/navigation';
-import type { Session } from '@supabase/supabase-js';
+import type { Session, AuthChangeEvent } from '@supabase/supabase-js';
 
 export interface Profile {
   id: string;
@@ -24,16 +23,20 @@ const AuthContext = createContext<{
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
+  // Start NOT loading — we resolve synchronously from localStorage first, then hydrate
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [profileLoading, setProfileLoading] = useState(true);
-  const router = useRouter();
-  const pathname = usePathname();
 
-  const fetchProfile = useCallback(async (userId: string, forceLoading: boolean = false) => {
-    if (forceLoading) {
-      setProfileLoading(true);
-    }
+  // Guard to prevent concurrent profile fetches (e.g. getSession + INITIAL_SESSION both fire)
+  const fetchingProfileRef = useRef(false);
+  const initializedRef = useRef(false);
+
+  const fetchProfile = useCallback(async (userId: string) => {
+    // Prevent concurrent fetches for the same user
+    if (fetchingProfileRef.current) return;
+    fetchingProfileRef.current = true;
+    setProfileLoading(true);
     try {
       const { data, error } = await supabase
         .from('profiles')
@@ -49,48 +52,68 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.error('Error fetching profile in AuthProvider:', err);
       setProfile(null);
     } finally {
-      if (forceLoading) {
-        setProfileLoading(false);
-      }
+      fetchingProfileRef.current = false;
+      setProfileLoading(false);
     }
   }, []);
 
   const refreshProfile = useCallback(async () => {
     if (session?.user?.id) {
-      await fetchProfile(session.user.id, false);
+      fetchingProfileRef.current = false; // Allow forced refresh
+      await fetchProfile(session.user.id);
     }
   }, [session, fetchProfile]);
 
   useEffect(() => {
-    // Check session once on mount
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      if (session?.user) {
-        fetchProfile(session.user.id, true);
-      } else {
+    let active = true;
+
+    // Fail-safe: guarantee loading clears within 3s regardless of network state
+    const failSafeTimeout = setTimeout(() => {
+      if (active) {
+        console.warn('AuthProvider: fail-safe timeout fired.');
+        setLoading(false);
         setProfileLoading(false);
       }
-      setLoading(false);
-    });
+    }, 3000);
 
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      setSession(session);
-      if (session?.user) {
-        const shouldForceLoading = event === 'SIGNED_IN' || event === 'INITIAL_SESSION';
-        await fetchProfile(session.user.id, shouldForceLoading);
+    // Listen for auth changes — this fires INITIAL_SESSION immediately on mount
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event: AuthChangeEvent, newSession: Session | null) => {
+      if (!active) return;
+
+      const prevSession = session;
+      setSession(newSession);
+      setLoading(false);
+      clearTimeout(failSafeTimeout);
+
+      if (newSession?.user) {
+        // Only fetch profile if user changed or we haven't fetched yet
+        if (!initializedRef.current || prevSession?.user?.id !== newSession.user.id) {
+          initializedRef.current = true;
+          await fetchProfile(newSession.user.id);
+        }
       } else {
         setProfile(null);
         setProfileLoading(false);
-      }
-      const isAuthPage = pathname === '/' || pathname === '/signup';
-      if (!session && !isAuthPage) {
-        router.push('/');
+        initializedRef.current = false;
+
+        // Redirect to login if not already there
+        if (typeof window !== 'undefined') {
+          const isAuthPage = window.location.pathname === '/' || window.location.pathname === '/signup';
+          if (!isAuthPage && !(window as any).__redirectingToHome) {
+            (window as any).__redirectingToHome = true;
+            window.location.replace('/');
+          }
+        }
       }
     });
 
-    return () => subscription.unsubscribe();
-  }, [pathname, fetchProfile, router]);
+    return () => {
+      active = false;
+      clearTimeout(failSafeTimeout);
+      subscription.unsubscribe();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const isSuperAdmin = !!session?.user?.app_metadata?.is_superadmin || profile?.is_superadmin || false;
 

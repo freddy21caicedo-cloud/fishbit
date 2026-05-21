@@ -6,9 +6,11 @@ import { User, Mail, Shield, ArrowLeft, Camera, LogOut, Pencil, X, Save, Lock, E
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'react-hot-toast';
+import { useLogout } from '../hooks/useLogout';
 
 export default function ProfilePage() {
   const router = useRouter();
+  const logout = useLogout();
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
@@ -95,10 +97,6 @@ export default function ProfilePage() {
     setIsSavingPassword(false);
   };
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    router.push('/');
-  };
 
   if (loading) return null;
 
@@ -173,7 +171,7 @@ export default function ProfilePage() {
                 <Pencil size={18} /> Editar Información
               </button>
               <button
-                onClick={handleLogout}
+                onClick={logout}
                 className="glass"
                 style={{ flex: 1, padding: '1.25rem', borderRadius: '18px', fontWeight: 900, color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
               >

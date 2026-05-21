@@ -91,10 +91,10 @@ export default function AlmacenPage() {
         .select('product_name, batch, unit_price, created_at')
         .eq('unit_id', unitId)
         .order('created_at', { ascending: false });
-      const processedInventory = (invData || []).map(item => {
-        const itemHistory = (historyData || []).filter(h => h.product_name === item.name);
+      const processedInventory = (invData || []).map((item: any) => {
+        const itemHistory = (historyData || []).filter((h: any) => h.product_name === item.name);
         const latestBatch = itemHistory[0]?.batch || 'N/A';
-        const totalCost = itemHistory.reduce((sum, h) => sum + (Number(h.unit_price) || 0), 0);
+        const totalCost = itemHistory.reduce((sum: number, h: any) => sum + (Number(h.unit_price) || 0), 0);
         const avgCost = itemHistory.length > 0 ? totalCost / itemHistory.length : 0;
         return { ...item, lote: latestBatch, costo_promedio: avgCost };
       });

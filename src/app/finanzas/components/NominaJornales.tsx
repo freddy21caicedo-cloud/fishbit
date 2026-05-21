@@ -26,7 +26,7 @@ export function NominaJornales({ unitId }: { unitId: string }) {
 
   useEffect(() => {
     if (!unitId) return;
-    supabase.from('estanques').select('id, name').eq('unit_id', unitId).eq('status', 'con_peces').then(({ data }) => setPonds(data || []));
+    supabase.from('estanques').select('id, name').eq('unit_id', unitId).eq('status', 'con_peces').then(({ data }: any) => setPonds(data || []));
     fetchNominas();
     fetchJornales();
   }, [unitId]);

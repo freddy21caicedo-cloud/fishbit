@@ -1,9 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '@/lib/supabase';
-import { useRouter } from 'next/navigation';
 import { FishBitIcon } from './components/FishBitLogo';
 import { 
   Mail, 
@@ -14,38 +13,36 @@ import {
 } from 'lucide-react';
 
 export default function LoginPage() {
-  const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Dynamic settings from database
-  const [globalSettings, setGlobalSettings] = useState({
-    support_whatsapp: '+573000000000',
-    support_email: 'soporte@fishbit.co'
-  });
+  // Lazy-loaded settings from database (BUG 7 fix: only fetch when needed)
+  const settingsCache = useRef<{ support_whatsapp: string; support_email: string } | null>(null);
 
-  useEffect(() => {
-    async function loadGlobalSettings() {
-      try {
-        const { data, error } = await supabase
-          .from('app_config')
-          .select('value')
-          .eq('key', 'global_settings')
-          .maybeSingle();
-        if (data?.value) {
-          const parsed = typeof data.value === 'string' ? JSON.parse(data.value) : data.value;
-          setGlobalSettings({
-            support_whatsapp: parsed.support_whatsapp ?? '+573000000000',
-            support_email: parsed.support_email ?? 'soporte@fishbit.co'
-          });
-        }
-      } catch (err) {
-        console.error("Error loading system settings in LoginPage:", err);
+  const getGlobalSettings = useCallback(async () => {
+    if (settingsCache.current) return settingsCache.current;
+    const defaults = { support_whatsapp: '+573000000000', support_email: 'soporte@fishbit.co' };
+    try {
+      const { data } = await supabase
+        .from('app_config')
+        .select('value')
+        .eq('key', 'global_settings')
+        .maybeSingle();
+      if (data?.value) {
+        const parsed = typeof data.value === 'string' ? JSON.parse(data.value) : data.value;
+        settingsCache.current = {
+          support_whatsapp: parsed.support_whatsapp ?? defaults.support_whatsapp,
+          support_email: parsed.support_email ?? defaults.support_email
+        };
+        return settingsCache.current;
       }
+    } catch (err) {
+      console.error('Error loading system settings in LoginPage:', err);
     }
-    loadGlobalSettings();
+    settingsCache.current = defaults;
+    return defaults;
   }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -61,41 +58,45 @@ export default function LoginPage() {
 
       if (authError) throw authError;
 
-      // 1. Fetch Profile to check if SuperAdmin
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('is_superadmin')
-        .eq('id', data.user.id)
-        .single();
+      // Fetch profile AND units in parallel to reduce post-login latency
+      const [profileResult, unitsResult] = await Promise.all([
+        supabase.from('profiles').select('is_superadmin').eq('id', data.user.id).maybeSingle(),
+        supabase.from('user_units').select('unit_id').eq('user_id', data.user.id)
+      ]);
 
-      if (profile?.is_superadmin) {
-        router.push('/superadmin');
+      // SuperAdmin → send to admin panel
+      if (profileResult.data?.is_superadmin) {
+        window.location.replace('/superadmin');
         return;
       }
 
-      // 2. Fetch Units for regular users
-      const { data: userUnits, error: unitsError } = await supabase
-        .from('user_units')
-        .select('unit_id')
-        .eq('user_id', data.user.id);
-
-      if (unitsError) {
-        setError(`Error de acceso: No se pudo leer tu vinculación.`);
+      // Check units
+      if (unitsResult.error) {
+        setError('Error de acceso: No se pudo leer tu vinculación de granjas.');
         await supabase.auth.signOut();
         return;
       }
 
+      const userUnits = unitsResult.data;
       if (!userUnits || userUnits.length === 0) {
         setError('Acceso denegado: Tu cuenta no está vinculada a ninguna granja activa.');
         await supabase.auth.signOut();
         return;
       }
 
-      if (userUnits.length > 1) {
-        router.push('/select-unit');
+      const validUnitIds = userUnits.map((u: any) => u.unit_id);
+      const lastUnitId = localStorage.getItem('active_unit_id');
+
+      if (lastUnitId && validUnitIds.includes(lastUnitId)) {
+        // Resume last session unit
+        window.location.replace('/dashboard');
+      } else if (userUnits.length > 1) {
+        // Multiple units → let user choose
+        window.location.replace('/select-unit');
       } else {
+        // Single unit → auto-select and go
         localStorage.setItem('active_unit_id', userUnits[0].unit_id);
-        router.push('/dashboard');
+        window.location.replace('/dashboard');
       }
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : 'Error al iniciar sesión';
@@ -105,18 +106,20 @@ export default function LoginPage() {
     }
   };
 
-  const handleForgotPassword = (e: React.MouseEvent) => {
+  const handleForgotPassword = async (e: React.MouseEvent) => {
     e.preventDefault();
-    const supportEmail = globalSettings.support_email;
+    const settings = await getGlobalSettings();
+    const supportEmail = settings.support_email;
     const subject = encodeURIComponent("Recuperación de Contraseña FishBit");
     const body = encodeURIComponent(`Hola, necesito recuperar mi acceso a FishBit.\n\nMi correo de usuario es: ${email || '[Escribe tu correo aquí]'}`);
     window.location.href = `mailto:${supportEmail}?subject=${subject}&body=${body}`;
   };
 
-  const handleContactSupport = (e: React.MouseEvent) => {
+  const handleContactSupport = async (e: React.MouseEvent) => {
     e.preventDefault();
+    const settings = await getGlobalSettings();
     // Normalize whatsappNumber to only contain digits for wa.me API
-    const whatsappNumber = globalSettings.support_whatsapp.replace(/\D/g, '');
+    const whatsappNumber = settings.support_whatsapp.replace(/\D/g, '');
     const message = encodeURIComponent("Hola FishBit, me gustaría solicitar una cuenta o soporte para mi granja acuícola.");
     window.open(`https://wa.me/${whatsappNumber}?text=${message}`, '_blank');
   };

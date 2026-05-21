@@ -116,7 +116,7 @@ export function ModuloVentas({ unitId }: { unitId: string }) {
     setVentas(v.data || []);
 
     const estanqueParam = searchParams.get('estanque');
-    if (estanqueParam && (p.data || []).find(pd => pd.id === estanqueParam)) {
+    if (estanqueParam && (p.data || []).find((pd: any) => pd.id === estanqueParam)) {
       handlePondChange(estanqueParam, p.data || []);
     }
   };

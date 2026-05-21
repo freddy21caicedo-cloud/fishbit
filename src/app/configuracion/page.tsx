@@ -1185,14 +1185,14 @@ const TeamManagement = () => {
         return;
       }
 
-      const userIds = userUnits.map(uu => uu.user_id);
+      const userIds = userUnits.map((uu: any) => uu.user_id);
       const { data: profiles, error: pError } = await supabase
         .from('profiles')
         .select('*')
         .in('id', userIds);
 
       const processedMembers = userUnits.map((uu: any) => {
-        const profile = profiles?.find(p => p.id === uu.user_id) || {};
+        const profile = profiles?.find((p: any) => p.id === uu.user_id) || {};
         return {
           ...profile,
           id: uu.user_id,

@@ -701,7 +701,7 @@ const PondDetailModal = ({ pond, onClose }: { pond: any, onClose: () => void }) 
         .order('date', { ascending: false })
         .limit(10);
 
-      const formattedHistory = (transfers || []).map(t => ({
+      const formattedHistory = (transfers || []).map((t: any) => ({
         type: t.origen_id === pond.id ? 'Salida' : 'Entrada',
         date: t.date,
         quantity: t.quantity,
@@ -876,7 +876,7 @@ export default function EstanquesPage() {
 
       if (pErr) throw pErr;
 
-      const formatted = (pondsData || []).map(p => {
+      const formatted = (pondsData || []).map((p: any) => {
         let color = '#64748b';
         let statusLabel = 'Vacío';
         if (p.status === 'con_peces') {
@@ -1084,7 +1084,7 @@ export default function EstanquesPage() {
 
       // 3. Actualizar estado global del estanque
       const { data: remainingSpecs } = await supabase.from('pond_species').select('species_name, current_count').eq('estanque_id', pond.id);
-      const activeSpecs = (remainingSpecs || []).filter(s => s.current_count > 0);
+      const activeSpecs = (remainingSpecs || []).filter((s: any) => s.current_count > 0);
       
       const newPondCount = Math.max(0, (pond.current_count || 0) - totalQtyDeleted);
       const newPondBiomass = Math.max(0, (parseFloat(pond.current_biomass_kg) || 0) - totalBiomassDeleted);

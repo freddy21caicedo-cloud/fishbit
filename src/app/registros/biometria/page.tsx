@@ -103,7 +103,7 @@ export default function BiometriaPage() {
     });
 
     if (data && data.length > 0) {
-      setBiometrias(data.map(s => ({
+      setBiometrias(data.map((s: any) => ({
         speciesName: s.species_name,
         speciesId: s.id,
         pesoCaptura: '',

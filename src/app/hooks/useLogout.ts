@@ -1,20 +1,22 @@
 'use client';
 
 import { supabase } from '@/lib/supabase';
-import { useRouter } from 'next/navigation';
 
 export function useLogout() {
-  const router = useRouter();
-
   const logout = async () => {
     try {
+      // Clear localStorage FIRST so that any synchronous re-renders see it immediately cleared
+      localStorage.removeItem('active_unit_id');
+      localStorage.removeItem('fishbit_last_active');
       await supabase.auth.signOut();
     } catch (err) {
       console.error('Error during signOut:', err);
     } finally {
-      localStorage.removeItem('active_unit_id');
-      localStorage.removeItem('fishbit_last_active');
-      router.push('/');
+      // Avoid double redirection if we are already on '/' or redirecting to '/'
+      if (typeof window !== 'undefined' && window.location.pathname !== '/' && !(window as any).__redirectingToHome) {
+        (window as any).__redirectingToHome = true;
+        window.location.replace('/');
+      }
     }
   };
 

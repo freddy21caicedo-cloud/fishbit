@@ -38,7 +38,6 @@ export default function AppLayout({ children }: AppLayoutProps) {
   const [width, setWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1200);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [activatingFreeTrial, setActivatingFreeTrial] = useState(false);
-  const [isInitialized, setIsInitialized] = useState(false);
 
   // Global settings from database
   const [globalSettings, setGlobalSettings] = useState({
@@ -108,11 +107,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
     }
   };
 
-  useEffect(() => {
-    if (!profileLoading && !unitLoading && !roleLoading) {
-      setIsInitialized(true);
-    }
-  }, [profileLoading, unitLoading, roleLoading]);
+  // isInitialized pattern removed — providers manage their own fail-safe timeouts
 
   useEffect(() => {
     let timeoutId: NodeJS.Timeout;
@@ -153,16 +148,16 @@ export default function AppLayout({ children }: AppLayoutProps) {
   const canStartFreeTrial = isBlocked && !sub?.trial_activated_at;
 
   const menuItems = [
-    { label: 'Panel', icon: LayoutDashboard, href: '/dashboard', roles: ['admin', 'tecnico'] },
-    { label: 'Estanques', icon: Waves, href: '/estanques', roles: ['admin', 'tecnico'] },
-    { label: 'Registros', icon: ClipboardList, href: '/registros', roles: ['admin', 'tecnico', 'operario'] },
-    { label: 'Almacén', icon: Package, href: '/almacen', roles: ['admin', 'tecnico'] },
-    { label: 'Finanzas', icon: Coins, href: '/finanzas', roles: ['admin'] },
+    { label: 'Panel', icon: LayoutDashboard, href: '/dashboard', roles: ['admin', 'propietario', 'tecnico'] },
+    { label: 'Estanques', icon: Waves, href: '/estanques', roles: ['admin', 'propietario', 'tecnico'] },
+    { label: 'Registros', icon: ClipboardList, href: '/registros', roles: ['admin', 'propietario', 'tecnico', 'operario'] },
+    { label: 'Almacén', icon: Package, href: '/almacen', roles: ['admin', 'propietario', 'tecnico'] },
+    { label: 'Finanzas', icon: Coins, href: '/finanzas', roles: ['admin', 'propietario'] },
   ];
 
   const secondaryItems = [
-    { label: 'Configuración', icon: Settings, href: '/configuracion', roles: ['admin', 'tecnico'] },
-    { label: 'Centro de Ayuda', icon: HelpCircle, href: '/ayuda', roles: ['admin', 'tecnico', 'operario'] },
+    { label: 'Configuración', icon: Settings, href: '/configuracion', roles: ['admin', 'propietario', 'tecnico'] },
+    { label: 'Centro de Ayuda', icon: HelpCircle, href: '/ayuda', roles: ['admin', 'propietario', 'tecnico', 'operario'] },
   ];
 
   const filteredMenu = isSuperAdmin 
@@ -173,7 +168,9 @@ export default function AppLayout({ children }: AppLayoutProps) {
     ? [{ label: 'Configuración', icon: Settings, href: '/configuracion' }]
     : secondaryItems.filter(item => item.roles.includes(userRole || ''));
 
-  if (!isInitialized && (unitLoading || profileLoading || roleLoading)) {
+  // Show a slim loading overlay only on first render when unit data hasn't arrived yet.
+  // The providers have internal fail-safe timeouts so this can't show for more than 2.5s.
+  if (unitLoading && !activeUnit) {
     return (
       <div style={{
         minHeight: '100vh',

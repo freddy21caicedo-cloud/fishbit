@@ -77,7 +77,7 @@ export default function MortalidadPage() {
       .eq('unit_id', activeUnitId);
 
     if (data && data.length > 0) {
-      setMortalidades(data.map(s => ({
+      setMortalidades(data.map((s: any) => ({
         speciesId: s.id,
         speciesName: s.species_name,
         quantity: '',
