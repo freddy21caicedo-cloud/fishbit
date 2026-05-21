@@ -72,12 +72,15 @@ export function UnitProvider({ children }: { children: React.ReactNode }) {
       
       if (!error && data) {
         setActiveUnit(data);
+        return data;
       } else {
         setActiveUnit(null);
+        return null;
       }
     } catch (err) {
       console.error('Error fetching unit data:', err);
       setActiveUnit(null);
+      return null;
     } finally {
       setLoading(false);
     }
@@ -127,17 +130,25 @@ export function UnitProvider({ children }: { children: React.ReactNode }) {
 
     const initUnit = async () => {
       try {
-        const storedId = localStorage.getItem('active_unit_id');
+        let storedId = localStorage.getItem('active_unit_id');
+        if (storedId === 'null' || storedId === 'undefined') {
+          storedId = null;
+          localStorage.removeItem('active_unit_id');
+        }
         
+        let loadedUnit = null;
         if (storedId) {
-          // We have a unit in localStorage — load unit + role in parallel
           setInternalActiveUnitId(storedId);
-          await Promise.all([
+          // Wait for unit data and user role loading
+          const [unitRes] = await Promise.all([
             fetchUnitData(storedId),
             fetchUserRole(session.user.id, storedId)
           ]);
-        } else {
-          // No stored unit — pick the first one from the DB
+          loadedUnit = unitRes;
+        }
+
+        // Fallback: No stored unit ID, or the stored unit failed to load/doesn't exist
+        if (!loadedUnit) {
           const { data: userUnit } = await supabase
             .from('user_units')
             .select('unit_id')

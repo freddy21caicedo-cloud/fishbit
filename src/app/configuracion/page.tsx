@@ -24,7 +24,8 @@ import {
   AlertTriangle,
   Package,
   ShoppingBag,
-  Loader2
+  Loader2,
+  Lock
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'react-hot-toast';
@@ -338,6 +339,7 @@ export default function ConfiguracionPage() {
 
     if (userRole === 'admin') {
       baseTabs.push({ id: 'equipo', label: 'Equipo', icon: Users });
+      baseTabs.push({ id: 'seguridad', label: 'Seguridad', icon: Lock });
     }
 
     if (userRole === 'operario') {
@@ -666,6 +668,8 @@ export default function ConfiguracionPage() {
             )}
 
             {!isSuperAdmin && activeTab === 'equipo' && <TeamManagement />}
+
+            {!isSuperAdmin && activeTab === 'seguridad' && <ChangePasswordSection />}
 
             {(activeTab === 'notificaciones') && (
               <div>
@@ -1404,3 +1408,136 @@ const TeamManagement = () => {
     </div>
   );
 };
+
+const ChangePasswordSection = () => {
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newPassword !== confirmPassword) {
+      toast.error("Las nuevas contraseñas no coinciden.");
+      return;
+    }
+    if (newPassword.length < 6) {
+      toast.error("La nueva contraseña debe tener al menos 6 caracteres.");
+      return;
+    }
+
+    setLoading(true);
+    const passwordPromise = async () => {
+      // 1. Get current user session
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user || !user.email) {
+        throw new Error("No se pudo obtener la información del usuario.");
+      }
+
+      // 2. Verify current password by signing in again
+      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+        email: user.email,
+        password: currentPassword
+      });
+
+      if (signInError) {
+        throw new Error("La contraseña actual es incorrecta.");
+      }
+
+      // 3. Update to the new password
+      const { error: updateError } = await supabase.auth.updateUser({
+        password: newPassword
+      });
+
+      if (updateError) {
+        throw new Error("Error al actualizar la contraseña: " + updateError.message);
+      }
+
+      // Clear fields
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+    };
+
+    toast.promise(passwordPromise(), {
+      loading: 'Actualizando contraseña...',
+      success: 'Contraseña actualizada con éxito.',
+      error: (err) => err.message
+    }).finally(() => setLoading(false));
+  };
+
+  return (
+    <div style={{ maxWidth: '480px', margin: '0 auto', padding: '1.5rem 0' }}>
+      <div style={{ marginBottom: '2.5rem', textAlign: 'center' }}>
+        <h2 style={{ fontSize: '1.4rem', fontWeight: 900, letterSpacing: '-0.02em', marginBottom: '0.5rem' }}>
+          Cambiar Contraseña
+        </h2>
+        <p style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>
+          Mantén tu cuenta segura actualizando tu contraseña periódicamente.
+        </p>
+      </div>
+
+      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+          <label className="premium-label" style={{ position: 'static', fontWeight: 700 }}>Contraseña Actual</label>
+          <input 
+            type="password" 
+            required 
+            placeholder="Introduce tu contraseña actual" 
+            value={currentPassword} 
+            onChange={e => setCurrentPassword(e.target.value)} 
+            className="premium-input" 
+            style={{ fontWeight: 800, width: '100%' }} 
+          />
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+          <label className="premium-label" style={{ position: 'static', fontWeight: 700 }}>Nueva Contraseña</label>
+          <input 
+            type="password" 
+            required 
+            placeholder="Min. 6 caracteres" 
+            value={newPassword} 
+            onChange={e => setNewPassword(e.target.value)} 
+            className="premium-input" 
+            style={{ fontWeight: 800, width: '100%' }} 
+          />
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+          <label className="premium-label" style={{ position: 'static', fontWeight: 700 }}>Confirmar Nueva Contraseña</label>
+          <input 
+            type="password" 
+            required 
+            placeholder="Repite la nueva contraseña" 
+            value={confirmPassword} 
+            onChange={e => setConfirmPassword(e.target.value)} 
+            className="premium-input" 
+            style={{ fontWeight: 800, width: '100%' }} 
+          />
+        </div>
+
+        <button 
+          type="submit" 
+          disabled={loading} 
+          className="btn-primary" 
+          style={{ 
+            background: '#0d9488', 
+            borderRadius: '14px', 
+            padding: '1.1rem', 
+            fontWeight: 800,
+            marginTop: '1rem',
+            width: '100%',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            gap: '0.5rem'
+          }}
+        >
+          {loading ? 'Guardando...' : 'Actualizar Contraseña'}
+        </button>
+      </form>
+    </div>
+  );
+};
+

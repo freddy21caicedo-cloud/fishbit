@@ -26,7 +26,8 @@ import {
   Trash2,
   ChevronRight,
   UserPlus,
-  Calendar
+  Calendar,
+  Sparkles
 } from 'lucide-react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -163,7 +164,9 @@ export default function SuperAdminHub() {
           plan_type: sub?.plan_type || 'Sin Plan',
           status: sub?.status || 'inactive',
           next_billing_date: sub?.next_billing_date || new Date().toISOString(),
-          client_name: adminProfile?.full_name || 'Sin asignar'
+          client_name: adminProfile?.full_name || 'Sin asignar',
+          price: sub?.price ?? 0,
+          trial_activated_at: sub?.trial_activated_at || null
         };
       });
 
@@ -730,6 +733,39 @@ const BillingTab = ({ subscriptions, onRefresh }: { subscriptions: SuperAdminSub
     loadPrice();
   }, []);
 
+  const handleStartFreeTrial = async (sub: any) => {
+    if (!confirm(`¿Confirmas iniciar periodo de prueba gratis de 30 días para ${sub.units.name}?`)) return;
+    
+    const trialPromise = async () => {
+      const nextBillingDate = new Date();
+      nextBillingDate.setDate(nextBillingDate.getDate() + 30);
+
+      const subscriptionData = {
+        unit_id: sub.unit_id,
+        plan_type: 'basic',
+        status: 'active',
+        price: 0,
+        next_billing_date: nextBillingDate.toISOString(),
+        trial_activated_at: new Date().toISOString()
+      };
+
+      if (sub.id.startsWith('temp-')) {
+        const { error } = await supabase.from('subscriptions').insert([subscriptionData]);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from('subscriptions').update(subscriptionData).eq('id', sub.id);
+        if (error) throw error;
+      }
+      onRefresh();
+    };
+
+    toast.promise(trialPromise(), {
+      loading: 'Iniciando periodo gratis...',
+      success: 'Periodo de prueba gratis de 30 días iniciado con éxito.',
+      error: 'Error al iniciar periodo de prueba gratis.'
+    });
+  };
+
   const handleManualRenewal = async (sub: any) => {
     if (!confirm(`¿Confirmas renovación manual de $${planPrice.toLocaleString('es-CO')} COP para ${sub.units.name}?`)) return;
     
@@ -931,6 +967,33 @@ const BillingTab = ({ subscriptions, onRefresh }: { subscriptions: SuperAdminSub
                      </td>
                      <td style={{ ...tableCellStyle, textAlign: 'right' }}>
                        <div style={{ display: 'flex', gap: '0.6rem', justifyContent: 'flex-end', alignItems: 'center' }}>
+                         {(!s.trial_activated_at || s.status !== 'active') && (
+                           <button 
+                             onClick={() => handleStartFreeTrial(s)}
+                             style={{ 
+                               padding: '0.6rem 1.1rem', 
+                               fontSize: '0.75rem', 
+                               fontWeight: 800,
+                               borderRadius: '8px',
+                               border: '1px solid #8b5cf6',
+                               background: 'rgba(139, 92, 246, 0.1)',
+                               color: '#a78bfa',
+                               cursor: 'pointer',
+                               transition: 'all 0.2s',
+                               display: 'flex',
+                               alignItems: 'center',
+                               gap: '0.4rem'
+                             }}
+                             onMouseOver={(e) => {
+                               e.currentTarget.style.background = 'rgba(139, 92, 246, 0.2)';
+                             }}
+                             onMouseOut={(e) => {
+                               e.currentTarget.style.background = 'rgba(139, 92, 246, 0.1)';
+                             }}
+                           >
+                             <Sparkles size={14} /> Iniciar periodo gratis
+                           </button>
+                         )}
                          <button 
                            onClick={() => handleToggleStatus(s, s.status)}
                            style={{ 

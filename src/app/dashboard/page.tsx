@@ -185,17 +185,23 @@ export default function Dashboard() {
   };
 
   const fetchPonds = async (unitId: string) => {
-    const { data } = await supabase
-      .from('estanques')
-      .select('id, name, is_polyculture, status')
-      .eq('unit_id', unitId)
-      .eq('status', 'con_peces');
-    
-    if (data) {
-      setPonds(data as Pond[]);
-      if (data.length > 0 && !selectedPond) {
-        setSelectedPond(data[0].id);
+    try {
+      const { data, error } = await supabase
+        .from('estanques')
+        .select('id, name, is_polyculture, status')
+        .eq('unit_id', unitId)
+        .eq('status', 'con_peces');
+      
+      if (error) throw error;
+      
+      if (data) {
+        setPonds(data as Pond[]);
+        if (data.length > 0 && !selectedPond) {
+          setSelectedPond(data[0].id);
+        }
       }
+    } catch (err) {
+      console.error('fetchPonds error:', err);
     }
   };
 
