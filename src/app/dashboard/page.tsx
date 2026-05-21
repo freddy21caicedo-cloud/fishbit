@@ -146,10 +146,10 @@ export default function Dashboard() {
     // Realtime: re-fetch stats when inventory or alimentacion_diaria changes
     const channel = supabase
       .channel(`dashboard-inventory-${activeUnitId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory' }, () => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory', filter: 'unit_id=eq.' + activeUnitId }, () => {
         fetchDetailedStats(activeUnitId);
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'alimentacion_diaria' }, () => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'alimentacion_diaria', filter: 'unit_id=eq.' + activeUnitId }, () => {
         fetchDetailedStats(activeUnitId);
       })
       .subscribe();
@@ -676,7 +676,7 @@ export default function Dashboard() {
             )}
           </div>
         </div>
-        <div style={{ padding: '0.6rem 1.25rem', background: 'var(--secondary)', borderRadius: '14px', border: '1px solid var(--border)', fontSize: '0.85rem', fontWeight: 800 }}>
+        <div suppressHydrationWarning={true} style={{ padding: '0.6rem 1.25rem', background: 'var(--secondary)', borderRadius: '14px', border: '1px solid var(--border)', fontSize: '0.85rem', fontWeight: 800 }}>
           {new Date().toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })}
         </div>
       </header>

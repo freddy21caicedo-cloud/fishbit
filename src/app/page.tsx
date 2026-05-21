@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '@/lib/supabase';
 import { FishBitIcon } from './components/FishBitLogo';
@@ -13,6 +14,7 @@ import {
 } from 'lucide-react';
 
 export default function LoginPage() {
+  const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -66,7 +68,8 @@ export default function LoginPage() {
 
       // SuperAdmin → send to admin panel
       if (profileResult.data?.is_superadmin) {
-        window.location.replace('/superadmin');
+        router.push('/superadmin');
+        router.refresh();
         return;
       }
 
@@ -89,14 +92,17 @@ export default function LoginPage() {
 
       if (lastUnitId && validUnitIds.includes(lastUnitId)) {
         // Resume last session unit
-        window.location.replace('/dashboard');
+        router.push('/dashboard');
+        router.refresh();
       } else if (userUnits.length > 1) {
         // Multiple units → let user choose
-        window.location.replace('/select-unit');
+        router.push('/select-unit');
+        router.refresh();
       } else {
         // Single unit → auto-select and go
         localStorage.setItem('active_unit_id', userUnits[0].unit_id);
-        window.location.replace('/dashboard');
+        router.push('/dashboard');
+        router.refresh();
       }
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : 'Error al iniciar sesión';
