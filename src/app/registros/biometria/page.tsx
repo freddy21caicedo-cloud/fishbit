@@ -106,6 +106,7 @@ export default function BiometriaPage() {
       setBiometrias(data.map((s: any) => ({
         speciesName: s.species_name,
         speciesId: s.id,
+        batchId: s.batch_id,
         pesoCaptura: '',
         pecesCapturados: '',
         poblacionTotal: s.current_count || 0,
@@ -119,6 +120,7 @@ export default function BiometriaPage() {
       setBiometrias([{
         speciesName: spName,
         speciesId: null,
+        batchId: pond?.current_batch_id || null,
         pesoCaptura: '',
         pecesCapturados: '',
         poblacionTotal: pond?.current_count || 0,
@@ -172,15 +174,14 @@ export default function BiometriaPage() {
         const totalBio = parseFloat(bio.biomasaActual);
         totalPondBiomass += totalBio;
 
-        // A. Insert Record
-        // 0. Get Pond Current Batch
+        // Get Pond Current Batch as fallback
         const { data: pondData } = await supabase.from('estanques').select('current_batch_id').eq('id', estanqueId).single();
 
-        // A. Insert Record
+        // A. Insert Record with batchId of the specific species row
         const { error: bioError } = await supabase.from('biometrias').insert([{
           estanque_id: estanqueId,
           unit_id: activeUnitId,
-          batch_id: pondData?.current_batch_id,
+          batch_id: raw.batchId || pondData?.current_batch_id,
           species_name: raw.speciesName,
           date: fecha,
           avg_weight_gr: avgWeight,
@@ -202,7 +203,8 @@ export default function BiometriaPage() {
             species_name: raw.speciesName,
             current_count: raw.poblacionTotal,
             current_biomass_kg: totalBio,
-            avg_weight_gr: avgWeight
+            avg_weight_gr: avgWeight,
+            batch_id: raw.batchId
           }]);
         }
       });
@@ -283,9 +285,16 @@ export default function BiometriaPage() {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.5rem' }}>
                     {biometrias.map((b, idx) => (
                       <div key={idx} style={{ padding: '1.5rem 1rem 1rem 1rem', background: 'var(--secondary)', borderRadius: '12px', border: '1px solid var(--border)', position: 'relative' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
-                          <span style={{ fontWeight: 800, fontSize: '0.9rem', color: 'var(--primary)' }}>{b.speciesName}</span>
-                          <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Pob: {b.poblacionTotal}</span>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                          <div>
+                            <span style={{ fontWeight: 800, fontSize: '0.9rem', color: 'var(--primary)' }}>{b.speciesName}</span>
+                            {b.batchId && (
+                              <span style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)', marginLeft: '0.5rem', fontWeight: 500 }}>
+                                ({b.batchId})
+                              </span>
+                            )}
+                          </div>
+                          <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Pob: {b.poblacionTotal} uds</span>
                         </div>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                           <div className="premium-input-group">
@@ -363,7 +372,14 @@ export default function BiometriaPage() {
               <tbody>
                 {history.map((h) => (
                   <tr key={h.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                    <td style={{ padding: '0.75rem', fontWeight: 700 }}>{h.species_name}</td>
+                    <td style={{ padding: '0.75rem', fontWeight: 700 }}>
+                      {h.species_name}
+                      {h.batch_id && (
+                        <div style={{ fontSize: '0.7rem', color: 'var(--muted-foreground)', fontWeight: 500 }}>
+                          {h.batch_id}
+                        </div>
+                      )}
+                    </td>
                     <td style={{ padding: '0.75rem', fontWeight: 800, color: '#8b5cf6' }}>{h.avg_weight_gr} g</td>
                     <td style={{ padding: '0.75rem' }}><span style={{ padding: '0.2rem 0.5rem', background: 'var(--secondary)', borderRadius: '6px', fontSize: '0.8rem' }}>{h.estanques?.name}</span></td>
                     <td style={{ padding: '0.75rem', fontSize: '0.8rem', color: 'var(--muted-foreground)' }}>{new Date(h.date).toLocaleDateString()}</td>
@@ -377,7 +393,7 @@ export default function BiometriaPage() {
             {history.map((h) => (
               <div key={h.id} style={{ padding: '1rem', borderRadius: '12px', border: '1px solid var(--border)', background: 'var(--secondary)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                  <span style={{ fontWeight: 800 }}>{h.species_name}</span>
+                  <span style={{ fontWeight: 800 }}>{h.species_name} {h.batch_id ? `(${h.batch_id})` : ''}</span>
                   <span style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)' }}>{new Date(h.date).toLocaleDateString()}</span>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>

@@ -49,12 +49,45 @@ export default function MortalidadPage() {
     const activeUnitId = localStorage.getItem('active_unit_id');
     if (!activeUnitId) return;
     const { data } = await supabase
-      .from('mortality')
+      .from('mortalidad')
       .select('*, estanques(name)')
       .eq('unit_id', activeUnitId)
       .order('date', { ascending: false })
       .limit(10);
-    if (data) setHistory(data);
+    
+    if (data) {
+      // Resolve species name for each record based on its batch_id
+      const { data: siembrasData } = await supabase
+        .from('siembras')
+        .select('batch_id, siembra_details(species_name)')
+        .eq('unit_id', activeUnitId);
+
+      const batchMap: Record<string, string> = {};
+      siembrasData?.forEach((s: any) => {
+        if (s.batch_id && s.siembra_details && s.siembra_details.length > 0) {
+          batchMap[s.batch_id] = s.siembra_details[0].species_name;
+        }
+      });
+
+      // Also get from active pond_species
+      const { data: activeSpecies } = await supabase
+        .from('pond_species')
+        .select('batch_id, species_name')
+        .eq('unit_id', activeUnitId);
+      
+      activeSpecies?.forEach((s: any) => {
+        if (s.batch_id) {
+          batchMap[s.batch_id] = s.species_name;
+        }
+      });
+
+      const resolvedHistory = data.map((h: any) => ({
+        ...h,
+        species_name: h.batch_id ? (batchMap[h.batch_id] || 'Especie') : 'Global'
+      }));
+
+      setHistory(resolvedHistory);
+    }
   };
 
   const fetchPonds = async () => {
@@ -80,6 +113,7 @@ export default function MortalidadPage() {
       setMortalidades(data.map((s: any) => ({
         speciesId: s.id,
         speciesName: s.species_name,
+        batchId: s.batch_id,
         quantity: '',
         currentCount: s.current_count || 0
       })));
@@ -88,6 +122,7 @@ export default function MortalidadPage() {
       setMortalidades([{
         speciesId: null,
         speciesName: p?.current_species && p.current_species !== 'Policultivo' ? p.current_species : '',
+        batchId: p?.current_batch_id || null,
         quantity: '',
         currentCount: p?.current_count || 0
       }]);
@@ -119,13 +154,13 @@ export default function MortalidadPage() {
         const operations = mortalidades.map(async (mort) => {
           const qty = parseInt(mort.quantity) || 0;
           if (qty <= 0) return;
-          if (qty > mort.currentCount) throw new Error(`Bajas exceden población de ${mort.speciesName}`);
+          if (qty > mort.currentCount) throw new Error(`Bajas exceden población de ${mort.speciesName || 'especie'}`);
 
           totalPondMortality += qty;
-          const { error: mortError } = await supabase.from('mortality').insert([{
+          const { error: mortError } = await supabase.from('mortalidad').insert([{
             estanque_id: estanqueId,
             unit_id: activeUnitId,
-            species_name: mort.speciesName,
+            batch_id: mort.batchId || null,
             date: fecha,
             quantity: qty,
             cause: causa
@@ -230,7 +265,24 @@ export default function MortalidadPage() {
                         border: '1px solid var(--border)'
                       }}>
                         <div>
-                          <div style={{ fontSize: '1rem', fontWeight: 800 }}>{mort.speciesName}</div>
+                          <div style={{ fontSize: '1rem', fontWeight: 800 }}>
+                            {mort.speciesName}
+                            {mort.batchId && (
+                              <span style={{ 
+                                fontSize: '0.75rem', 
+                                opacity: 0.9, 
+                                color: 'var(--primary)', 
+                                background: 'rgba(59, 130, 246, 0.1)', 
+                                border: '1px solid rgba(59, 130, 246, 0.2)', 
+                                padding: '2px 8px', 
+                                borderRadius: '6px', 
+                                marginLeft: '0.5rem',
+                                display: 'inline-block'
+                              }}>
+                                {mort.batchId}
+                              </span>
+                            )}
+                          </div>
                           <div style={{ fontSize: '0.8rem', color: 'var(--muted-foreground)' }}>Población actual: <strong>{mort.currentCount.toLocaleString()}</strong></div>
                         </div>
                         <div className="premium-input-group">
@@ -276,7 +328,7 @@ export default function MortalidadPage() {
               <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: '0 0.5rem' }}>
                 <thead>
                   <tr style={{ color: 'var(--muted-foreground)', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                    <th style={{ textAlign: 'left', padding: '0.5rem 1rem' }}>Especie</th>
+                    <th style={{ textAlign: 'left', padding: '0.5rem 1rem' }}>Especie / Lote</th>
                     <th style={{ textAlign: 'center', padding: '0.5rem 1rem' }}>Bajas</th>
                     <th style={{ textAlign: 'left', padding: '0.5rem 1rem' }}>Causa</th>
                     <th style={{ textAlign: 'right', padding: '0.5rem 1rem' }}>Fecha</th>
@@ -285,7 +337,14 @@ export default function MortalidadPage() {
                 <tbody>
                   {history.map(h => (
                     <tr key={h.id} style={{ background: 'var(--secondary)', borderRadius: '12px' }}>
-                      <td style={{ padding: '1rem', fontWeight: 800, borderRadius: '12px 0 0 12px' }}>{h.species_name}</td>
+                      <td style={{ padding: '1rem', fontWeight: 800, borderRadius: '12px 0 0 12px' }}>
+                        <div>{h.species_name}</div>
+                        {h.batch_id && (
+                          <div style={{ fontSize: '0.75rem', color: 'var(--primary)', fontWeight: 500, marginTop: '2px' }}>
+                            {h.batch_id}
+                          </div>
+                        )}
+                      </td>
                       <td style={{ padding: '1rem', textAlign: 'center', color: '#ef4444', fontWeight: 900 }}>{h.quantity}</td>
                       <td style={{ padding: '1rem', fontSize: '0.85rem' }}>{h.cause}</td>
                       <td style={{ padding: '1rem', textAlign: 'right', fontSize: '0.8rem', color: 'var(--muted-foreground)', borderRadius: '0 12px 12px 0' }}>

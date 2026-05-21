@@ -125,7 +125,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
 
   // Strict frontend route protection for operarios
   useEffect(() => {
-    if (!profileLoading && !roleLoading && userRole === 'operario') {
+    if (!profileLoading && !roleLoading && !isSuperAdmin && userRole === 'operario') {
       const allowedPaths = ['/registros', '/ayuda'];
       const currentPath = pathname || '';
       
@@ -136,7 +136,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
         router.replace('/registros');
       }
     }
-  }, [profileLoading, roleLoading, userRole, pathname, router]);
+  }, [profileLoading, roleLoading, isSuperAdmin, userRole, pathname, router]);
 
   const isMobile = width < 768;
   const isTablet = width >= 768 && width <= 1024;

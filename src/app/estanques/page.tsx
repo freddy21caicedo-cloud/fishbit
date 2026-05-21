@@ -437,7 +437,9 @@ const PondCard = ({ pond, handleDeleteSiembra, handleEditClick }: any) => {
                           background: i === 0 ? '#10b981' : i === 1 ? '#3b82f6' : '#f59e0b',
                           flexShrink: 0
                         }} />
-                        <span style={{ fontWeight: 700, fontSize: '0.85rem' }}>{s.species_name}</span>
+                        <span style={{ fontWeight: 700, fontSize: '0.85rem' }}>
+                          {s.species_name} <span style={{ opacity: 0.6, fontSize: '0.75rem', fontWeight: 500 }}>({s.batch_id || 'S/L'})</span>
+                        </span>
                         <span style={{ fontSize: '0.7rem', color: 'var(--muted-foreground)', marginLeft: 'auto' }}>
                           {(s.current_count || 0).toLocaleString()} uds
                         </span>
@@ -870,7 +872,7 @@ export default function EstanquesPage() {
       // Fetch ponds AND their species in a single query via the relation
       const { data: pondsData, error: pErr } = await supabase
         .from('estanques')
-        .select('*, pond_species(species_name, current_count, current_biomass_kg)')
+        .select('*, pond_species(id, species_name, current_count, current_biomass_kg, batch_id)')
         .eq('unit_id', activeUnitId)
         .order('name');
 
@@ -888,8 +890,6 @@ export default function EstanquesPage() {
         }
 
         // Build species label from real pond_species rows.
-        // Deduplicate by species_name (same species stocked on different dates
-        // creates multiple pond_species rows — we sum them into one).
         const rawSpeciesRows: any[] = (p.pond_species || []).filter((s: any) => (s.current_count || 0) > 0);
 
         // Override status visually: if no active fish, treat as vacío even if DB says con_peces
@@ -899,26 +899,13 @@ export default function EstanquesPage() {
           color = '#64748b';
           statusLabel = 'Vacío';
         }
-        const speciesMap = new Map<string, { species_name: string; current_count: number; current_biomass_kg: number }>();
-        for (const s of rawSpeciesRows) {
-          if (speciesMap.has(s.species_name)) {
-            const existing = speciesMap.get(s.species_name)!;
-            existing.current_count += (s.current_count || 0);
-            existing.current_biomass_kg += (parseFloat(s.current_biomass_kg) || 0);
-          } else {
-            speciesMap.set(s.species_name, {
-              species_name: s.species_name,
-              current_count: s.current_count || 0,
-              current_biomass_kg: parseFloat(s.current_biomass_kg) || 0
-            });
-          }
-        }
-        const speciesRows = Array.from(speciesMap.values());
+
+        const speciesRows = rawSpeciesRows;
         let especieLabel: string;
         if (speciesRows.length > 1) {
-          especieLabel = speciesRows.map((s: any) => s.species_name).join(' + ');
+          especieLabel = speciesRows.map((s: any) => `${s.species_name} (${s.batch_id || 'S/L'})`).join(' + ');
         } else if (speciesRows.length === 1) {
-          especieLabel = speciesRows[0].species_name;
+          especieLabel = `${speciesRows[0].species_name} (${speciesRows[0].batch_id || 'S/L'})`;
         } else {
           // Fallback to legacy column if pond_species is still empty
           especieLabel = p.current_species || 'N/A';
@@ -1066,7 +1053,8 @@ export default function EstanquesPage() {
           const { data: pSpec } = await supabase.from('pond_species').select('*')
             .eq('estanque_id', pond.id)
             .eq('species_name', detail.species_name)
-            .single();
+            .eq('batch_id', lastSiembra.batch_id)
+            .maybeSingle();
           
           if (pSpec) {
             const newCount = (pSpec.current_count || 0) - (detail.quantity || 0);

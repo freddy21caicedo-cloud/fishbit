@@ -67,15 +67,20 @@ export default function TrasladoPage() {
 
   const fetchOrigenSpecies = async (pondId: string) => {
     setLoading(true);
+    const activeUnitId = localStorage.getItem('active_unit_id');
+    if (!activeUnitId) { setLoading(false); return; }
+    
     // Include current_biomass_kg so we can compute proportional biomass transfer
     const { data } = await supabase
       .from('pond_species')
-      .select('id, species_name, current_count, current_biomass_kg, avg_weight_gr')
-      .eq('estanque_id', pondId);
+      .select('id, species_name, current_count, current_biomass_kg, avg_weight_gr, batch_id')
+      .eq('estanque_id', pondId)
+      .eq('unit_id', activeUnitId);
     if (data && data.length > 0) {
       setTraslados(data.map((s: any) => ({
         speciesId: s.id,
         speciesName: s.species_name,
+        batchId: s.batch_id,
         quantity: '',
         currentCount: s.current_count || 0,
         currentBiomassKg: parseFloat(s.current_biomass_kg) || 0,
@@ -88,6 +93,7 @@ export default function TrasladoPage() {
       setTraslados([{
         speciesId: null,
         speciesName: p?.current_species || 'Especie Principal',
+        batchId: p?.current_batch_id || null,
         quantity: '',
         currentCount: totalCount,
         currentBiomassKg: totalBiomass,
@@ -200,7 +206,8 @@ export default function TrasladoPage() {
             species_name: t.speciesName,
             quantity: qty,
             date: fecha,
-            batch_id_origen: origenData.current_batch_id,
+            batch_id: t.batchId || null,
+            batch_id_origen: t.batchId || origenData.current_batch_id || null,
             es_traslado_total: esTotal,
             consumo_kg_arrastrado: consumoEspecie,
             costo_alimento_arrastrado: costoAlimentoEspecie,
@@ -274,7 +281,7 @@ export default function TrasladoPage() {
             ? traslados.length > 1
             : (destinoData.is_polyculture || traslados.length > 1),
           current_batch_id: destinoEstabaVacio 
-            ? origenData.current_batch_id 
+            ? (traslados[0].batchId || origenData.current_batch_id) 
             : destinoData.current_batch_id
         }).eq('id', destinoId);
 
@@ -283,22 +290,33 @@ export default function TrasladoPage() {
           const qty = parseInt(t.quantity) || 0;
           if (qty <= 0) continue;
 
+          // Proportional biomass for this species in the transfer
+          const fraccionEspecie = qty / (t.currentCount || 1);
+          const biomasaEspecieArrastrada = t.currentBiomassKg * fraccionEspecie;
+
           const { data: destSpecies } = await supabase
             .from('pond_species')
             .select('*')
             .eq('estanque_id', destinoId)
-            .eq('species_name', t.speciesName)
+            .eq('batch_id', t.batchId)
             .single();
 
           if (destSpecies) {
             await supabase.from('pond_species')
-              .update({ current_count: (destSpecies.current_count || 0) + qty })
+              .update({ 
+                current_count: (destSpecies.current_count || 0) + qty,
+                current_biomass_kg: (parseFloat(destSpecies.current_biomass_kg) || 0) + biomasaEspecieArrastrada,
+                updated_at: new Date().toISOString()
+              })
               .eq('id', destSpecies.id);
           } else {
             await supabase.from('pond_species').insert([{
               estanque_id: destinoId,
               species_name: t.speciesName,
+              batch_id: t.batchId || null,
               current_count: qty,
+              current_biomass_kg: biomasaEspecieArrastrada,
+              avg_weight_gr: t.avgWeightGr || 0,
               unit_id: activeUnitId
             }]);
           }
@@ -326,7 +344,7 @@ export default function TrasladoPage() {
   };
 
   const handleRevertirTraslado = async (transfer: any) => {
-    if (!confirm(`¿Revertir este traslado? Los peces (${transfer.quantity?.toLocaleString()}) volverán al estanque origen.`)) return;
+    if (!confirm(`¿Revertir este traslado? Los peces (${transfer.quantity?.toLocaleString()}) volverán al estanque origen. El estanque destino quedará vacío y se borrarán sus registros.`)) return;
 
     const revertPromise = async () => {
       const activeUnitId = localStorage.getItem('active_unit_id');
@@ -339,18 +357,14 @@ export default function TrasladoPage() {
         .single();
 
       if (!destinoActual) throw new Error("No se encontró el estanque destino");
-      if ((destinoActual.current_count || 0) < transfer.quantity) {
-        throw new Error("El destino ya no tiene suficientes peces para revertir");
-      }
 
       const snap = transfer.snapshot_origen;
 
-      // 1. Calcular biomasa y costos a devolver
-      // Si el registro tiene los datos arrastrados (traslados nuevos), los usamos. 
-      // Si no, hacemos cálculo proporcional (traslados viejos).
+      // Obtener estado actual del origen
       const { data: origenActual } = await supabase.from('estanques').select('*').eq('id', transfer.origen_id).single();
       if (!origenActual) throw new Error("No se encontró el estanque origen");
 
+      // 1. Calcular biomasa y costos a devolver
       const biomasaDevuelta = snap 
         ? (transfer.quantity * (snap.current_biomass_kg / (snap.current_count || 1)))
         : (transfer.quantity * ((parseFloat(destinoActual.current_biomass_kg) || 0) / (destinoActual.current_count || 1)));
@@ -370,12 +384,12 @@ export default function TrasladoPage() {
         current_batch_id: origenActual.current_batch_id || transfer.batch_id_origen
       }).eq('id', transfer.origen_id);
 
-      // Actualizar/crear pond_species en origen para esta especie específica
+      // Actualizar/crear pond_species en origen para esta especie y lote específica
       const { data: origenSpecies } = await supabase
         .from('pond_species')
         .select('*')
         .eq('estanque_id', transfer.origen_id)
-        .eq('species_name', transfer.species_name)
+        .eq('batch_id', transfer.batch_id_origen)
         .single();
 
       if (origenSpecies) {
@@ -389,46 +403,30 @@ export default function TrasladoPage() {
         await supabase.from('pond_species').insert([{
           estanque_id: transfer.origen_id,
           species_name: transfer.species_name,
+          batch_id: transfer.batch_id_origen || null,
           current_count: transfer.quantity,
           current_biomass_kg: biomasaDevuelta,
           unit_id: activeUnitId || transfer.unit_id
         }]);
       }
 
-      // 3. ACTUALIZAR DESTINO (Restar)
-      const nuevoCountDestino = (destinoActual.current_count || 0) - transfer.quantity;
+      // 3. ACTUALIZAR DESTINO (Destruir/Vaciar completamente a exactamente 0)
       await supabase.from('estanques').update({
-        status: nuevoCountDestino <= 0 ? 'vacio' : 'con_peces',
-        current_count: nuevoCountDestino,
-        current_biomass_kg: Math.max(0, (parseFloat(destinoActual.current_biomass_kg) || 0) - biomasaDevuelta),
-        costo_alevinos_acumulado: Math.max(0, (parseFloat(destinoActual.costo_alevinos_acumulado) || 0) - costoAlevinosDevuelto),
-        consumo_alimento_acumulado_kg: Math.max(0, (parseFloat(destinoActual.consumo_alimento_acumulado_kg) || 0) - consumoDevuelto),
-        costo_alimento_acumulado: Math.max(0, (parseFloat(destinoActual.costo_alimento_acumulado) || 0) - costoAlimentoDevuelto)
+        status: 'vacio',
+        current_count: 0,
+        current_biomass_kg: 0,
+        costo_alevinos_acumulado: 0,
+        consumo_alimento_acumulado_kg: 0,
+        costo_alimento_acumulado: 0,
+        current_species: null,
+        is_polyculture: false,
+        current_batch_id: null
       }).eq('id', transfer.destino_id);
 
-      // Actualizar pond_species en destino para esta especie específica (Restar o Eliminar)
-      const { data: destinoSpecies } = await supabase
-        .from('pond_species')
-        .select('*')
-        .eq('estanque_id', transfer.destino_id)
-        .eq('species_name', transfer.species_name)
-        .single();
+      // Borrar todas las filas de pond_species en destino
+      await supabase.from('pond_species').delete().eq('estanque_id', transfer.destino_id);
 
-      if (destinoSpecies) {
-        const nuevoCountEspecie = (destinoSpecies.current_count || 0) - transfer.quantity;
-        const nuevaBiomasaEspecie = Math.max(0, (parseFloat(destinoSpecies.current_biomass_kg) || 0) - biomasaDevuelta);
-        
-        if (nuevoCountEspecie <= 0) {
-          await supabase.from('pond_species').delete().eq('id', destinoSpecies.id);
-        } else {
-          await supabase.from('pond_species').update({
-            current_count: nuevoCountEspecie,
-            current_biomass_kg: nuevaBiomasaEspecie
-          }).eq('id', destinoSpecies.id);
-        }
-      }
-
-      // 4. RECALCULAR ETIQUETAS Y ESTADO (Origen y Destino)
+      // 4. RECALCULAR ETIQUETAS Y ESTADO (Origen)
       const updatePondMetadata = async (pondId: string) => {
         const { data: specs } = await supabase.from('pond_species').select('species_name, current_count').eq('estanque_id', pondId);
         const activeSpecs = (specs || []).filter((s: any) => s.current_count > 0);
@@ -446,7 +444,6 @@ export default function TrasladoPage() {
       };
 
       await updatePondMetadata(transfer.origen_id);
-      await updatePondMetadata(transfer.destino_id);
 
       // 5. Marcar como revertido
       await supabase.from('transfers').update({
@@ -549,7 +546,23 @@ export default function TrasladoPage() {
                         )}
                         <div>
                           {t.speciesId ? (
-                            <div style={{ fontWeight: 800, fontSize: '0.95rem' }}>{t.speciesName}</div>
+                            <div style={{ fontWeight: 800, fontSize: '0.95rem' }}>
+                              {t.speciesName}
+                              {t.batchId && (
+                                <span style={{
+                                  fontSize: '0.7rem',
+                                  color: 'var(--primary)',
+                                  background: 'rgba(59, 130, 246, 0.1)',
+                                  border: '1px solid rgba(59, 130, 246, 0.2)',
+                                  padding: '1px 6px',
+                                  borderRadius: '4px',
+                                  marginLeft: '0.5rem',
+                                  display: 'inline-block'
+                                }}>
+                                  {t.batchId}
+                                </span>
+                              )}
+                            </div>
                           ) : (
                             <input 
                               type="text"

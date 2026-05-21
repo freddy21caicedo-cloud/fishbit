@@ -11,6 +11,12 @@ export interface EnhancedPond {
   current_biomass_kg?: number;
   current_count?: number;
   species?: string;
+  speciesDetails?: Array<{
+    species_name: string;
+    current_count: number;
+    current_biomass_kg: number;
+    batch_id: string;
+  }>;
   oxygen?: number;
   temperature?: number;
   ph?: number;
@@ -177,6 +183,70 @@ export function PondsGrid({ ponds, selectedPond, onSelectPond }: PondsGridProps)
                       </div>
                     </div>
                   </div>
+
+                  {/* Premium Glassmorphic Species & Batch breakdown */}
+                  {pond.speciesDetails && pond.speciesDetails.length > 0 && (
+                    <div style={{
+                      background: 'rgba(13, 148, 136, 0.04)',
+                      backdropFilter: 'blur(8px)',
+                      border: '1px solid rgba(13, 148, 136, 0.15)',
+                      borderRadius: '14px',
+                      padding: '0.6rem 0.8rem',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '0.5rem',
+                    }}>
+                      <div style={{ 
+                        fontWeight: 800, 
+                        color: '#0d9488', 
+                        fontSize: '0.55rem', 
+                        textTransform: 'uppercase', 
+                        letterSpacing: '0.05em',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.25rem'
+                      }}>
+                        <Fish size={10} /> Desglose por Especie y Lote
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                        {pond.speciesDetails.map((spec, index) => (
+                          <div 
+                            key={index} 
+                            style={{ 
+                              display: 'flex', 
+                              justifyContent: 'space-between', 
+                              alignItems: 'center',
+                              paddingBottom: index < pond.speciesDetails!.length - 1 ? '0.35rem' : '0',
+                              borderBottom: index < pond.speciesDetails!.length - 1 ? '1px dashed rgba(13, 148, 136, 0.1)' : 'none',
+                              fontSize: '0.7rem'
+                            }}
+                          >
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.05rem' }}>
+                              <span style={{ fontWeight: 800, color: 'var(--foreground)' }}>
+                                {spec.species_name}
+                              </span>
+                              <span style={{ 
+                                fontSize: '0.58rem', 
+                                color: 'var(--muted-foreground)', 
+                                fontFamily: 'monospace',
+                                letterSpacing: '-0.02em'
+                              }}>
+                                {spec.batch_id}
+                              </span>
+                            </div>
+                            <div style={{ textAlign: 'right', fontWeight: 700 }}>
+                              <div style={{ color: 'var(--foreground)' }}>
+                                {spec.current_count.toLocaleString('es-CO')} <span style={{ fontSize: '0.55rem', opacity: 0.7 }}>uds</span>
+                              </div>
+                              <div style={{ fontSize: '0.65rem', color: '#0d9488' }}>
+                                {spec.current_biomass_kg.toLocaleString('es-CO', { maximumFractionDigits: 1 })} <span style={{ fontSize: '0.55rem', opacity: 0.7 }}>kg</span>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Real-time Parameters */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem' }}>

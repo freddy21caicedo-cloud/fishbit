@@ -81,7 +81,7 @@ export function InvoicesTable({ invoices, onRefresh }: InvoicesTableProps) {
       if (items) {
         for (const item of items) {
           const { data: invItem } = await supabase.from('inventory')
-            .select('*').eq('name', item.product_name).eq('unit_id', invoice.unit_id).single();
+            .select('*').eq('name', item.product_name).eq('unit_id', invoice.unit_id).maybeSingle();
           
           if (invItem) {
             const qtyToRemove = invoice.category === 'alimento' ? item.kilos : item.quantity;

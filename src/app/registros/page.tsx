@@ -116,9 +116,33 @@ export default function RegistrosPage() {
       supabase.from('alimentacion_diaria').select('*, estanques(name), inventory(name)').eq('unit_id', activeUnitId).order('date', { ascending: false }).limit(30),
       supabase.from('biometrias').select('*, estanques(name)').eq('unit_id', activeUnitId).order('date', { ascending: false }).limit(30),
       supabase.from('water_quality').select('*, estanques(name)').eq('unit_id', activeUnitId).order('date', { ascending: false }).limit(30),
-      supabase.from('mortality').select('*, estanques(name)').eq('unit_id', activeUnitId).order('date', { ascending: false }).limit(30),
+      supabase.from('mortalidad').select('*, estanques(name)').eq('unit_id', activeUnitId).order('date', { ascending: false }).limit(30),
       supabase.from('transfers').select('*, origen:estanques!origen_id(name), destino:estanques!destino_id(name)').eq('unit_id', activeUnitId).order('created_at', { ascending: false }).limit(30),
     ]);
+
+    // Build batch to species name map
+    const { data: siembrasData } = await supabase
+      .from('siembras')
+      .select('batch_id, siembra_details(species_name)')
+      .eq('unit_id', activeUnitId);
+
+    const batchMap: Record<string, string> = {};
+    siembrasData?.forEach((s: any) => {
+      if (s.batch_id && s.siembra_details && s.siembra_details.length > 0) {
+        batchMap[s.batch_id] = s.siembra_details[0].species_name;
+      }
+    });
+
+    const { data: activeSpecies } = await supabase
+      .from('pond_species')
+      .select('batch_id, species_name')
+      .eq('unit_id', activeUnitId);
+    
+    activeSpecies?.forEach((s: any) => {
+      if (s.batch_id) {
+        batchMap[s.batch_id] = s.species_name;
+      }
+    });
 
     // Helper: format water quality params
     const formatWQ = (c: any) => {
@@ -163,7 +187,7 @@ export default function RegistrosPage() {
         id: `mor-${m.id}`,
         type: 'mortalidad',
         pond: m.estanques?.name,
-        detail: `${m.species_name || 'Especie'} · ${m.quantity} baja(s) · ${m.cause || ''}`,
+        detail: `${m.batch_id ? (batchMap[m.batch_id] || 'Especie') : 'Especie'} ${m.batch_id ? `(${m.batch_id})` : ''} · ${m.quantity} baja(s) · ${m.cause || ''}`,
         rawDate: m.date || m.created_at,
         originalId: m.id
       })),
@@ -200,7 +224,7 @@ export default function RegistrosPage() {
       if (record.type === 'alimentacion') tableName = 'alimentacion_diaria';
       if (record.type === 'biometria') tableName = 'biometrias';
       if (record.type === 'calidad-agua') tableName = 'water_quality';
-      if (record.type === 'mortalidad') tableName = 'mortality';
+      if (record.type === 'mortalidad') tableName = 'mortalidad';
       if (record.type === 'traslado') tableName = 'transfers';
 
       if (!tableName || !record.originalId) throw new Error('Tipo de registro no soportado o ID inválido');

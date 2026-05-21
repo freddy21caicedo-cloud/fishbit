@@ -31,6 +31,8 @@ export default function AlimentacionPage() {
   const [lastBiometryData, setLastBiometryData] = useState<any>(null);
   const [totalFoodSinceLastBio, setTotalFoodSinceLastBio] = useState(0);
   const [history, setHistory] = useState<any[]>([]);
+  const [activeBatches, setActiveBatches] = useState<any[]>([]);
+  const [selectedBatchId, setSelectedBatchId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchBasicData();
@@ -54,6 +56,11 @@ export default function AlimentacionPage() {
   useEffect(() => {
     if (estanqueId) {
       fetchPondDetails(estanqueId);
+    } else {
+      setActiveBatches([]);
+      setSelectedBatchId(null);
+      setLastBiometryData(null);
+      setTotalFoodSinceLastBio(0);
     }
   }, [estanqueId]);
 
@@ -64,7 +71,7 @@ export default function AlimentacionPage() {
       .from('estanques')
       .select('*')
       .eq('status', 'con_peces')
-      .eq('unit_id', activeUnitId); // Bug #5 fix: was missing this filter
+      .eq('unit_id', activeUnitId);
     setPonds(pondsData || []);
 
     // 2. Fetch Alimento Inventory
@@ -77,9 +84,27 @@ export default function AlimentacionPage() {
   };
 
   const fetchPondDetails = async (id: string) => {
-    // 0. Get Pond Current Batch
-    const { data: pondData } = await supabase.from('estanques').select('current_batch_id').eq('id', id).single();
-    const activeBatchId = pondData?.current_batch_id;
+    const activeUnitId = localStorage.getItem('active_unit_id');
+    if (!activeUnitId) return;
+
+    // 0. Get active batches for this pond
+    const { data: batches } = await supabase
+      .from('pond_species')
+      .select('*')
+      .eq('estanque_id', id)
+      .eq('unit_id', activeUnitId)
+      .gt('current_count', 0);
+    
+    const activeList = batches || [];
+    setActiveBatches(activeList);
+
+    let activeBatchId: string | null = null;
+    if (activeList.length === 1) {
+      activeBatchId = activeList[0].batch_id;
+      setSelectedBatchId(activeBatchId);
+    } else {
+      setSelectedBatchId(null);
+    }
 
     // 1. Get Last Biometry
     const { data: bioData } = await supabase
@@ -121,12 +146,6 @@ export default function AlimentacionPage() {
     setTotalFoodSinceLastBio(directFood + inheritedFood);
   };
 
-  useEffect(() => {
-    if (estanqueId) {
-      fetchPondDetails(estanqueId);
-    }
-  }, [estanqueId, ponds]);
-
   const handleRegisterAlimentacion = async () => {
     if (!estanqueId || !alimentoId || !cantidad || parseFloat(cantidad) <= 0) {
       toast.error("Por favor complete todos los campos obligatorios.");
@@ -146,15 +165,13 @@ export default function AlimentacionPage() {
       if (!activeUnitId) throw new Error("No hay unidad activa");
 
       const registerPromise = async () => {
-        const { data: pondData } = await supabase.from('estanques').select('current_batch_id').eq('id', estanqueId).single();
-        
         const { error: regError } = await supabase.from('alimentacion_diaria').insert([{
           estanque_id: estanqueId,
           inventory_id: alimentoId,
           quantity_kg: totalQty,
           date: fecha,
           unit_id: activeUnitId,
-          batch_id: pondData?.current_batch_id
+          batch_id: selectedBatchId
         }]);
 
         if (regError) throw regError;
@@ -242,6 +259,32 @@ export default function AlimentacionPage() {
                 {ponds.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
             </div>
+            {estanqueId && activeBatches.length > 0 && (
+              <div style={{
+                marginTop: '0.5rem',
+                padding: '0.75rem 1rem',
+                borderRadius: '8px',
+                background: 'rgba(37, 99, 235, 0.08)',
+                border: '1px solid rgba(37, 99, 235, 0.15)',
+                fontSize: '0.8rem'
+              }}>
+                {activeBatches.length === 1 ? (
+                  <div>
+                    <span style={{ fontWeight: 800, color: 'var(--primary)' }}>Monocultivo detectado:</span>
+                    <p style={{ color: 'var(--muted-foreground)', margin: '0.25rem 0 0 0' }}>
+                      Alimento asociado al Lote: <strong style={{ color: 'white' }}>{activeBatches[0].batch_id}</strong> ({activeBatches[0].species_name})
+                    </p>
+                  </div>
+                ) : (
+                  <div>
+                    <span style={{ fontWeight: 800, color: '#f59e0b' }}>Policultivo detectado ({activeBatches.length} lotes):</span>
+                    <p style={{ color: 'var(--muted-foreground)', margin: '0.25rem 0 0 0' }}>
+                      El consumo se registrará de forma <strong style={{ color: 'white' }}>Global (Todos los lotes)</strong> por no ser cuantificable por especie.
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
           <div className="premium-input-group" style={{ marginBottom: '1.5rem' }}>
             <label className="premium-label"><Package size={14} /> Tipo de Alimento</label>
@@ -407,6 +450,15 @@ export default function AlimentacionPage() {
                         <span style={{ padding: '0.25rem 0.6rem', background: 'var(--secondary)', borderRadius: '6px', fontSize: '0.85rem', fontWeight: 600 }}>
                           {h.estanques?.name}
                         </span>
+                        {h.batch_id ? (
+                          <span style={{ marginLeft: '0.5rem', fontSize: '0.75rem', color: 'var(--muted-foreground)' }}>
+                            ({h.batch_id})
+                          </span>
+                        ) : (
+                          <span style={{ marginLeft: '0.5rem', fontSize: '0.75rem', color: '#f59e0b', fontWeight: 600 }}>
+                            (GLOBAL)
+                          </span>
+                        )}
                       </td>
                       <td style={{ padding: '1rem', fontSize: '0.85rem', color: 'var(--muted-foreground)' }}>
                         {new Date(h.date).toLocaleDateString()}

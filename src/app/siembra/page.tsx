@@ -216,31 +216,16 @@ export default function SiembraPage() {
         const bio = (qty * weight) / 1000;
         const stockItem = alevinosStock.find(s => s.especie === row.especie);
 
-        // Update Pond Species
-        const { data: existingSpec } = await supabase
-          .from('pond_species')
-          .select('*')
-          .eq('estanque_id', pond.id)
-          .eq('species_name', row.especie)
-          .single();
-
-        if (existingSpec) {
-          await supabase.from('pond_species').update({
-            current_count: (existingSpec.current_count || 0) + qty,
-            current_biomass_kg: (parseFloat(existingSpec.current_biomass_kg) || 0) + bio,
-            avg_weight_gr: weight,
-            updated_at: new Date().toISOString()
-          }).eq('id', existingSpec.id);
-        } else {
-          await supabase.from('pond_species').insert([{
-            estanque_id: pond.id,
-            unit_id: activeUnitId,
-            species_name: row.especie,
-            current_count: qty,
-            current_biomass_kg: bio,
-            avg_weight_gr: weight
-          }]);
-        }
+        // Always insert new Pond Species row with its unique batch_id (never aggregate!)
+        await supabase.from('pond_species').insert([{
+          estanque_id: pond.id,
+          unit_id: activeUnitId,
+          species_name: row.especie,
+          current_count: qty,
+          current_biomass_kg: bio,
+          avg_weight_gr: weight,
+          batch_id: batchId
+        }]);
 
         // Subtract from inventory
         if (stockItem) {

@@ -142,7 +142,10 @@ export function InvoiceModal({ isOpen, onClose, unitId, activeCat, onSuccess, pr
         status: isCredit ? 'pendiente' : 'pagada', unit_id: unitId
       }]).select();
 
-      if (invError || !invData) throw invError;
+      if (invError) throw invError;
+      if (!invData || invData.length === 0) {
+        throw new Error("No se pudo registrar la factura (respuesta vacía de la base de datos).");
+      }
       const invoiceId = invData[0].id;
       
       for (const item of items) {
@@ -158,30 +161,54 @@ export function InvoiceModal({ isOpen, onClose, unitId, activeCat, onSuccess, pr
           finalBatch = `LOTE-${dateStr}-${espName}-${provName}`.toUpperCase();
         }
 
-        await supabase.from('invoice_items').insert([{
+        const { error: itemError } = await supabase.from('invoice_items').insert([{
           invoice_id: invoiceId, unit_id: unitId, product_name: item.product,
           batch: finalBatch, quantity: qty, kilos: parseFloat(item.kilos) || 0,
           unit_price: price, flete_per_unit: fletePorBulto, total_price: qty * price,
           has_iva: activeCat === 'alimento' ? true : item.hasIva, iva_percent: ivaP
         }]);
 
-        const { data: existing } = await supabase.from('inventory').select('*').eq('category', activeCat).eq('name', item.product).eq('unit_id', unitId).single();
+        if (itemError) throw itemError;
+
+        const { data: existing, error: selectError } = await supabase
+          .from('inventory')
+          .select('*')
+          .eq('category', activeCat)
+          .eq('name', item.product)
+          .eq('unit_id', unitId)
+          .maybeSingle();
+
+        if (selectError) throw selectError;
+
         const qtyToAdd = activeCat === 'alimento' ? (parseFloat(item.kilos) || 0) : qty;
         
         if (existing) {
-          await supabase.from('inventory').update({ current_stock: (Number(existing.current_stock) || 0) + qtyToAdd, last_entry: new Date().toISOString() }).eq('id', existing.id);
+          const { error: updateError } = await supabase
+            .from('inventory')
+            .update({ 
+              current_stock: (Number(existing.current_stock) || 0) + qtyToAdd, 
+              last_entry: new Date().toISOString() 
+            })
+            .eq('id', existing.id);
+          
+          if (updateError) throw updateError;
         } else {
-          await supabase.from('inventory').insert([{
-            category: activeCat, name: item.product, current_stock: qtyToAdd,
-            unit: activeCat === 'alimento' ? 'kg' : activeCat === 'alevinos' ? 'unidades' : 'uds',
-            unit_id: unitId, last_entry: new Date().toISOString()
-          }]);
+          const { error: insertError } = await supabase
+            .from('inventory')
+            .insert([{
+              category: activeCat, name: item.product, current_stock: qtyToAdd,
+              unit: activeCat === 'alimento' ? 'kg' : activeCat === 'alevinos' ? 'unidades' : 'uds',
+              unit_id: unitId, last_entry: new Date().toISOString()
+            }]);
+          
+          if (insertError) throw insertError;
         }
       }
       toast.success("Factura e Inventario actualizados");
       onSuccess(); onClose();
     } catch (error: any) {
-      toast.error("Error: " + error.message);
+      console.error("Error al registrar la factura:", error);
+      toast.error("Error: " + (error?.message || error?.error_description || JSON.stringify(error) || "Error desconocido"));
     } finally {
       setLoading(false);
     }
@@ -248,7 +275,7 @@ export function InvoiceModal({ isOpen, onClose, unitId, activeCat, onSuccess, pr
           )}
 
           {/* Items Section */}
-          <div style={{ width: '100%', overflowX: 'auto', paddingBottom: '1rem' }}>
+          <div style={{ width: '100%', overflowX: 'auto', paddingBottom: '190px', marginBottom: '-180px' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', minWidth: '800px' }}>
             {items.map((item) => (
               <div key={item.id} className="glass" style={{ padding: '1.25rem', borderRadius: '18px', display: 'grid', gridTemplateColumns: activeCat === 'alimento' ? '2fr 1fr 1fr 1fr 1.5fr 50px' : '2.5fr 1.5fr 1fr 1.5fr 50px', gap: '1rem', alignItems: 'end', background: 'var(--card)', position: 'relative', zIndex: focusedRowId === item.id ? 50 : 1 }}>
@@ -269,12 +296,48 @@ export function InvoiceModal({ isOpen, onClose, unitId, activeCat, onSuccess, pr
                     {focusedRowId === item.id && (
                       <motion.div 
                         initial={{ opacity: 0, y: -10, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -10, scale: 0.95 }}
-                        style={{ position: 'absolute', top: 'calc(100% + 5px)', left: 0, width: '100%', background: 'white', borderRadius: '14px', boxShadow: '0 20px 60px rgba(0,0,0,0.3)', zIndex: 9999, maxHeight: '200px', overflowY: 'auto', border: '1px solid var(--border)', padding: '6px' }}
+                        style={{ 
+                          position: 'absolute', 
+                          top: 'calc(100% + 5px)', 
+                          left: 0, 
+                          width: '100%', 
+                          background: 'rgba(15, 23, 42, 0.95)', 
+                          backdropFilter: 'blur(8px)',
+                          borderRadius: '14px', 
+                          boxShadow: '0 20px 60px rgba(0,0,0,0.5)', 
+                          zIndex: 9999, 
+                          maxHeight: '200px', 
+                          overflowY: 'auto', 
+                          border: '1px solid rgba(255,255,255,0.1)', 
+                          padding: '6px' 
+                        }}
                       >
                         {(CAT_PRODUCTS[activeCat] || [])
                           .filter(p => p.toLowerCase().includes(item.product.toLowerCase()))
                           .map(p => (
-                            <div key={p} onClick={() => updateItem(item.id, 'product', p)} style={{ padding: '0.75rem 1rem', fontSize: '0.85rem', cursor: 'pointer', borderRadius: '10px', fontWeight: 700, color: 'var(--foreground)', transition: 'all 0.2s ease' }} onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--primary)', e.currentTarget.style.color = 'white')} onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent', e.currentTarget.style.color = 'var(--foreground)')}>{p}</div>
+                            <div 
+                              key={p} 
+                              onClick={() => updateItem(item.id, 'product', p)} 
+                              style={{ 
+                                padding: '0.75rem 1rem', 
+                                fontSize: '0.85rem', 
+                                cursor: 'pointer', 
+                                borderRadius: '10px', 
+                                fontWeight: 700, 
+                                color: '#cbd5e1', 
+                                transition: 'all 0.2s ease' 
+                              }} 
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.background = 'var(--primary)';
+                                e.currentTarget.style.color = 'white';
+                              }} 
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.background = 'transparent';
+                                e.currentTarget.style.color = '#cbd5e1';
+                              }}
+                            >
+                              {p}
+                            </div>
                           ))
                         }
                       </motion.div>

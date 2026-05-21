@@ -279,17 +279,26 @@ export default function Dashboard() {
         });
       }
 
-      // 3. Fetch active species per pond
+      // 3. Fetch active species per pond (including batch details)
       const { data: speciesData } = await supabase
         .from('pond_species')
-        .select('estanque_id, species_name')
+        .select('estanque_id, species_name, current_count, current_biomass_kg, batch_id')
         .in('estanque_id', activePonds.map((p: any) => p.id));
 
       const speciesMap: Record<string, string[]> = {};
+      const speciesDetailsMap: Record<string, any[]> = {};
       if (speciesData) {
         speciesData.forEach((s: any) => {
           if (!speciesMap[s.estanque_id]) speciesMap[s.estanque_id] = [];
           speciesMap[s.estanque_id].push(s.species_name);
+
+          if (!speciesDetailsMap[s.estanque_id]) speciesDetailsMap[s.estanque_id] = [];
+          speciesDetailsMap[s.estanque_id].push({
+            species_name: s.species_name,
+            current_count: parseInt(s.current_count as any) || 0,
+            current_biomass_kg: parseFloat(s.current_biomass_kg as any) || 0,
+            batch_id: s.batch_id || ''
+          });
         });
       }
 
@@ -440,6 +449,7 @@ export default function Dashboard() {
           current_biomass_kg: parseFloat(p.current_biomass_kg as any) || 0,
           current_count: parseInt(p.current_count as any) || 0,
           species: speciesText,
+          speciesDetails: speciesDetailsMap[p.id] || [],
           oxygen,
           temperature,
           ph,
