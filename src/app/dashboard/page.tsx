@@ -61,7 +61,7 @@ const evaluateHealthState = (oxygen?: number, temp?: number, ph?: number, thresh
 
 export default function Dashboard() {
   const { session, isSuperAdmin } = useAuth();
-  const { activeUnitId, activeUnit, userRole, roleLoading: isLoadingRole } = useUnit();
+  const { activeUnitId, activeUnit, userRole, roleLoading: isLoadingRole, setActiveUnitId } = useUnit();
   
   const [userUnits, setUserUnits] = useState<any[]>([]);
 
@@ -196,8 +196,14 @@ export default function Dashboard() {
       
       if (data) {
         setPonds(data as Pond[]);
-        if (data.length > 0 && !selectedPond) {
+        
+        // Validar si el estanque seleccionado actualmente existe en la nueva unidad
+        const pondExists = data.some(p => p.id === selectedPond);
+        
+        if (data.length > 0 && !pondExists) {
           setSelectedPond(data[0].id);
+        } else if (data.length === 0) {
+          setSelectedPond('');
         }
       }
     } catch (err) {
@@ -639,8 +645,7 @@ export default function Dashboard() {
                   onChange={(e) => {
                     const newUnitId = e.target.value;
                     if (newUnitId && newUnitId !== activeUnitId) {
-                      localStorage.setItem('active_unit_id', newUnitId);
-                      window.location.reload();
+                      setActiveUnitId(newUnitId); // Actualiza la unidad reactivamente sin recargar
                     }
                   }}
                   style={{
