@@ -332,8 +332,81 @@ export default function SuperAdminHub() {
     if (!confirm("¿Eliminar unidad y todos sus datos?")) return;
     
     const deletePromise = async () => {
-      const { error } = await supabase.from('units').delete().eq('id', id);
-      if (error) throw error;
+      // 1. Get siembras for this unit to delete siembra_details
+      const { data: siembras, error: fetchSiembrasErr } = await supabase
+        .from('siembras')
+        .select('id')
+        .eq('unit_id', id);
+      
+      if (fetchSiembrasErr && fetchSiembrasErr.code !== 'PGRST205') {
+        throw fetchSiembrasErr;
+      }
+
+      const siembraIds = (siembras || []).map((s: any) => s.id);
+      if (siembraIds.length > 0) {
+        const { error: delSiembraDetailsErr } = await supabase
+          .from('siembra_details')
+          .delete()
+          .in('siembra_id', siembraIds);
+        
+        if (delSiembraDetailsErr && delSiembraDetailsErr.code !== 'PGRST205') {
+          throw delSiembraDetailsErr;
+        }
+      }
+
+      // 2. Delete detail/leaf tables that have unit_id
+      const leafTables = [
+        'aireacion_logs',
+        'alimentacion_diaria',
+        'biometrias',
+        'mortalidad',
+        'mortality',
+        'invoice_items',
+        'historial_gastos',
+        'pond_species',
+        'transfers',
+        'ventas',
+        'water_quality',
+        'mantenimiento_logs',
+        'tratamiento_details',
+        'jornales',
+        'nomina'
+      ];
+
+      for (const table of leafTables) {
+        const { error: err } = await supabase.from(table).delete().eq('unit_id', id);
+        if (err && err.code !== 'PGRST205') {
+          console.warn(`Warning deleting from ${table}:`, err);
+        }
+      }
+
+      // 3. Delete parent tables that have unit_id
+      const parentTables = [
+        'aireacion_config',
+        'siembras',
+        'tratamientos',
+        'invoices',
+        'inventory',
+        'providers',
+        'clientes',
+        'estanques',
+        'unit_settings',
+        'cierres_lote',
+        'subscriptions',
+        'user_units'
+      ];
+
+      for (const table of parentTables) {
+        const { error: err } = await supabase.from(table).delete().eq('unit_id', id);
+        if (err && err.code !== 'PGRST205') {
+          console.warn(`Warning deleting from parent table ${table}:`, err);
+        }
+      }
+
+      // 4. Finally delete the unit itself!
+      const { error: unitDelErr } = await supabase.from('units').delete().eq('id', id);
+      if (unitDelErr) throw unitDelErr;
+
       await fetchAllData();
       return true;
     };
@@ -341,7 +414,7 @@ export default function SuperAdminHub() {
     toast.promise(deletePromise(), {
       loading: 'Borrando unidad...',
       success: 'Unidad eliminada.',
-      error: 'Error al borrar.'
+      error: (err) => `Error al borrar: ${err.message || 'Error desconocido'}`
     });
   };
 
