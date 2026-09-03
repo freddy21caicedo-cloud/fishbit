@@ -1,0 +1,101 @@
+{
+  "version": 1,
+  "skills": {
+    "connector-googlemail": {
+      "source": "caffeinelabs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/connector-googlemail/SKILL.md",
+      "computedHash": "4f6e98b075793b7d6238383ae6f1a35945d73f3e7256f9ce9a0fff831c318fbf"
+    },
+    "create-profile": {
+      "source": "rolemodel/rolemodel-skills",
+      "sourceType": "github",
+      "skillPath": "skills/create-profile/SKILL.md",
+      "computedHash": "917d071c7edcbfaaf5888990bf6e347e4848d4e7d1c0d1d6a48cd43451cfd33e"
+    },
+    "dart-fix-runtime-errors": {
+      "source": "dart-lang/skills",
+      "sourceType": "github",
+      "skillPath": "skills/dart-fix-runtime-errors/SKILL.md",
+      "computedHash": "5d297ccaf9a34c5939c80600ff8398437c0c6bd5d343093852b65559689fae1d"
+    },
+    "excel-report-generator": {
+      "source": "wwwzhouhui/skills_collection",
+      "sourceType": "github",
+      "skillPath": "excel-report-generator/SKILL.md",
+      "computedHash": "c722a8772273c55bbdaec002c7c9e3b19721e9d8f24ebaf177f7305677bacaaa"
+    },
+    "farming-expert": {
+      "source": "personamanagmentlayer/pcl",
+      "sourceType": "github",
+      "skillPath": "stdlib/domains/farming/SKILL.md",
+      "computedHash": "74dbe83fe889f7a11433c1605f15ceefc9551cbd743325584f195d84e63f8cf1"
+    },
+    "flutter-add-integration-test": {
+      "source": "flutter/agent-plugins",
+      "sourceType": "github",
+      "skillPath": "skills/flutter-add-integration-test/SKILL.md",
+      "computedHash": "4246d3ef5f21bdb7945899056b99cf3863e2bff645a132b41634caaded68da6d"
+    },
+    "flutter-apply-architecture-best-practices": {
+      "source": "flutter/agent-plugins",
+      "sourceType": "github",
+      "skillPath": "skills/flutter-apply-architecture-best-practices/SKILL.md",
+      "computedHash": "baeb208b1cab90c559677626dbd101b96ba93f803cbed85122abdadeb3283a8b"
+    },
+    "flutter-ui-ux": {
+      "source": "ajianaz/skills-collection",
+      "sourceType": "github",
+      "skillPath": "skills/flutter-ui-ux/SKILL.md",
+      "computedHash": "9e74fa709465fa235164ce83b4407708f1fc5205feb0e889495d1e387f544d15"
+    },
+    "glassmorphism": {
+      "source": "bergside/awesome-design-skills",
+      "sourceType": "github",
+      "skillPath": "skills/glassmorphism/SKILL.md",
+      "computedHash": "a7814af3878a34f67442cdadc09bd79eebf57835b8ebe409f8c2f6b74ab26dc5"
+    },
+    "login-flow": {
+      "source": "nexu-io/open-design",
+      "sourceType": "github",
+      "skillPath": "skills/login-flow/SKILL.md",
+      "computedHash": "cec5399259ac5c2fb770da15cbce231080da1b9ca7dae38197dd0770d1a98d88"
+    },
+    "modular-monolith-architecture": {
+      "source": "azzam-almatrafi/skills",
+      "sourceType": "github",
+      "skillPath": "modular-monolith-architecture/SKILL.md",
+      "computedHash": "cb36cec934f6069741fc72819a306b92d2eef9f2078b7ce8e21a455f6d180b54"
+    },
+    "oauth": {
+      "source": "vercel-labs/portless",
+      "sourceType": "github",
+      "skillPath": "skills/oauth/SKILL.md",
+      "computedHash": "141fa84182bbe56650fc7c8f86e1d109bb1582e8bb8b844d1866daccc1ff8caf"
+    },
+    "pdf-extraction": {
+      "source": "claude-office-skills/skills",
+      "sourceType": "github",
+      "skillPath": "pdf-extraction/SKILL.md",
+      "computedHash": "44ec33ec9d178e3c04c3dd210a98cb6ad0c3a45f9383019071bc9556cfc323e6"
+    },
+    "saas-metrics": {
+      "source": "claude-office-skills/skills",
+      "sourceType": "github",
+      "skillPath": "saas-metrics/SKILL.md",
+      "computedHash": "fc259c9ef951df76f5b2f3177b3815c5ac0ff7f7d92ee6feb8bbc1c0ae839843"
+    },
+    "setting-up-ec2-instance-profiles": {
+      "source": "aws/agent-toolkit-for-aws",
+      "sourceType": "github",
+      "skillPath": "skills/specialized-skills/ec2-skills/setting-up-ec2-instance-profiles/SKILL.md",
+      "computedHash": "7c216c45864f84809b26d241bfa349f45cbb6b7e74d39596a77f986cd71bf71f"
+    },
+    "supabase-postgres-best-practices": {
+      "source": "supabase/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/supabase-postgres-best-practices/SKILL.md",
+      "computedHash": "128fac78002d916c8ca908245d398e634f540d8bcf20915b2b2359aeb18eba59"
+    }
+  }
+}

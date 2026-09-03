@@ -1,0 +1,295 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:fishbit_finance/core/design_system/app_colors.dart';
+import 'package:fishbit_finance/core/design_system/app_typography.dart';
+import 'package:fishbit_finance/core/design_system/glass_container.dart';
+import 'package:fishbit_finance/core/design_system/glass_form_field.dart';
+import 'package:fishbit_finance/core/design_system/glass_button.dart';
+import 'package:fishbit_finance/modules/auth_tenant/presentation/providers/auth_provider.dart';
+
+class OnboardingEmpresaScreen extends ConsumerStatefulWidget {
+  const OnboardingEmpresaScreen({super.key});
+
+  @override
+  ConsumerState<OnboardingEmpresaScreen> createState() => _OnboardingEmpresaScreenState();
+}
+
+class _OnboardingEmpresaScreenState extends ConsumerState<OnboardingEmpresaScreen> {
+  final _formKey = GlobalKey<FormState>();
+  final _companyNameCtrl = TextEditingController();
+  final _nitCtrl = TextEditingController();
+  final _ubicacionCtrl = TextEditingController(text: 'Colombia');
+  final _unitNameCtrl = TextEditingController(text: 'Sede Principal');
+  final _unitSiglaCtrl = TextEditingController(text: 'PRI');
+
+  final List<String> _allAvailableSpecies = [
+    'Tilapia Roja',
+    'Cachama Negra',
+    'Bocachico',
+    'Trucha Arcoíris',
+    'Pangasius',
+    'Camarón / Langostino',
+  ];
+
+  late final List<String> _selectedSpecies = [
+    'Tilapia Roja',
+    'Cachama Negra',
+    'Bocachico',
+    'Pangasius',
+  ];
+
+  @override
+  void dispose() {
+    _companyNameCtrl.dispose();
+    _nitCtrl.dispose();
+    _ubicacionCtrl.dispose();
+    _unitNameCtrl.dispose();
+    _unitSiglaCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _handleSetup() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    final success = await ref.read(authProvider.notifier).setupCompanyForUser(
+          companyNombre: _companyNameCtrl.text.trim(),
+          companyNit: _nitCtrl.text.trim(),
+          companyUbicacion: _ubicacionCtrl.text.trim(),
+          unitNombre: _unitNameCtrl.text.trim(),
+          unitSigla: _unitSiglaCtrl.text.trim(),
+          especiesHabilitadas: _selectedSpecies,
+        );
+
+    if (success && mounted) {
+      context.go('/');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('¡Bienvenido Administrador! ${_companyNameCtrl.text} ha sido creada con éxito.'),
+          backgroundColor: AppColors.greenBiomass,
+        ),
+      );
+    }
+  }
+
+
+  @override
+  Widget build(BuildContext context) {
+    final authState = ref.watch(authProvider);
+    final user = authState.currentUser;
+
+    return Scaffold(
+      backgroundColor: AppColors.backgroundDark,
+      body: Stack(
+        children: [
+          // Orbes de luz ambiental
+          Positioned(
+            top: -60,
+            left: -60,
+            child: Container(
+              width: 320,
+              height: 320,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: AppColors.cyanWater.withValues(alpha: 0.15),
+              ),
+            ),
+          ),
+          Positioned(
+            bottom: -60,
+            right: -60,
+            child: Container(
+              width: 320,
+              height: 320,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: AppColors.greenBiomass.withValues(alpha: 0.15),
+              ),
+            ),
+          ),
+
+          SafeArea(
+            child: Center(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 520),
+                  child: GlassContainer(
+                    borderRadius: 28,
+                    padding: const EdgeInsets.all(28),
+                    blur: 24,
+                    opacity: 0.14,
+                    borderColor: Colors.white.withValues(alpha: 0.16),
+                    child: Form(
+                      key: _formKey,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                width: 44,
+                                height: 44,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: AppColors.cyanWater.withValues(alpha: 0.18),
+                                  border: Border.all(color: AppColors.cyanWater.withValues(alpha: 0.4)),
+                                ),
+                                child: const Icon(Icons.domain_add_rounded, color: AppColors.cyanWater, size: 24),
+                              ),
+                              const SizedBox(width: 14),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Configura tu Empresa Piscícola',
+                                      style: AppTypography.titleLarge.copyWith(color: Colors.white, fontWeight: FontWeight.w900),
+                                    ),
+                                    Text(
+                                      'Hola ${user?.nombre ?? 'Administrador'}, crea tu tenant acuícola.',
+                                      style: AppTypography.bodySmall.copyWith(color: AppColors.textSecondaryDark),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 20),
+
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: AppColors.cyanWater.withValues(alpha: 0.08),
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(color: AppColors.cyanWater.withValues(alpha: 0.2)),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.admin_panel_settings_rounded, color: AppColors.cyanWater, size: 20),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Text(
+                                    'Tu cuenta (${user?.email ?? 'Gmail'}) quedará asignada automáticamente como Administrador General de la Empresa.',
+                                    style: AppTypography.bodySmall.copyWith(color: Colors.white70, fontSize: 12),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+
+                          Text('DATOS DE LA EMPRESA', style: AppTypography.labelMicro.copyWith(color: AppColors.cyanWater, letterSpacing: 1.2)),
+                          const SizedBox(height: 10),
+
+                          GlassFormField(
+                            label: 'NOMBRE O RAZÓN SOCIAL',
+                            hint: 'ej. Piscícola San Jerónimo S.A.S.',
+                            controller: _companyNameCtrl,
+                            prefixIcon: Icons.business_rounded,
+                            validator: (val) => val == null || val.trim().isEmpty ? 'Ingresa el nombre de la empresa' : null,
+                          ),
+                          const SizedBox(height: 12),
+
+                          Row(
+                            children: [
+                              Expanded(
+                                child: GlassFormField(
+                                  label: 'NIT / RUT',
+                                  hint: 'ej. 901.888.777-2',
+                                  controller: _nitCtrl,
+                                  prefixIcon: Icons.badge_outlined,
+                                  validator: (val) => val == null || val.trim().isEmpty ? 'Ingresa el NIT' : null,
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: GlassFormField(
+                                  label: 'UBICACIÓN / MUNICIPIO',
+                                  hint: 'ej. Antioquia',
+                                  controller: _ubicacionCtrl,
+                                  prefixIcon: Icons.location_on_outlined,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 20),
+
+                          Text('ESPECIES ACUÍCOLAS A CULTIVAR', style: AppTypography.labelMicro.copyWith(color: AppColors.cyanWater, letterSpacing: 1.2)),
+                          const SizedBox(height: 6),
+                          Text('Selecciona las especies que manejará esta empresa:', style: AppTypography.bodySmall.copyWith(color: AppColors.textSecondaryDark, fontSize: 11.5)),
+                          const SizedBox(height: 8),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: _allAvailableSpecies.map((sp) {
+                              final isSelected = _selectedSpecies.contains(sp);
+                              return FilterChip(
+                                label: Text(sp, style: TextStyle(color: isSelected ? Colors.white : AppColors.textSecondaryDark, fontWeight: isSelected ? FontWeight.w800 : FontWeight.w500, fontSize: 12)),
+                                selected: isSelected,
+                                selectedColor: AppColors.cyanWater.withValues(alpha: 0.25),
+                                checkmarkColor: AppColors.cyanWater,
+                                backgroundColor: Colors.white.withValues(alpha: 0.05),
+                                side: BorderSide(color: isSelected ? AppColors.cyanWater : Colors.white12),
+                                onSelected: (val) {
+                                  setState(() {
+                                    if (val) {
+                                      _selectedSpecies.add(sp);
+                                    } else {
+                                      if (_selectedSpecies.length > 1) {
+                                        _selectedSpecies.remove(sp);
+                                      }
+                                    }
+                                  });
+                                },
+                              );
+                            }).toList(),
+                          ),
+                          const SizedBox(height: 20),
+
+                          // Banner de Plan Anual
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: AppColors.purpleAnalytics.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(color: AppColors.purpleAnalytics.withValues(alpha: 0.3)),
+                            ),
+                            child: const Row(
+                              children: [
+                                Icon(Icons.workspace_premium_rounded, color: AppColors.purpleAnalytics, size: 22),
+                                SizedBox(width: 10),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text('Plan Anual Pro: \$400.000 COP / año', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 12.5)),
+                                      Text('Acceso completo a todos los módulos (Finanzas, CAPEX, Nómina, Calidad de Agua, Bodega y Ventas).', style: TextStyle(color: AppColors.textSecondaryDark, fontSize: 11)),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 24),
+
+                          GlassButton(
+                            label: 'Crear Piscícola y Activar Administrador',
+                            backgroundColor: AppColors.cyanWater,
+                            isLoading: authState.isLoading,
+                            onPressed: _handleSetup,
+                          ),
+
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
