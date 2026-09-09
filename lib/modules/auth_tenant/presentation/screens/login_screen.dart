@@ -9,7 +9,6 @@ import 'package:fishbit_finance/core/design_system/glass_container.dart';
 import 'package:fishbit_finance/core/design_system/glass_form_field.dart';
 import 'package:fishbit_finance/core/design_system/glass_button.dart';
 import 'package:fishbit_finance/core/design_system/fishbit_icons.dart';
-import 'package:fishbit_finance/core/design_system/video_background_widget.dart';
 import 'package:fishbit_finance/modules/auth_tenant/presentation/providers/auth_provider.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -141,19 +140,73 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.backgroundDark,
-      body: VideoBackgroundWidget(
-        assetPath: 'assets/videos/login_bg.mp4',
-        overlayOpacity: 0.50,
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 32),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 420),
-              child: GlassContainer(
-                borderRadius: 28,
-                padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 36),
-                blur: 24,
-                opacity: 0.18,
+      body: Stack(
+        children: [
+          // 1. Textura de Fondo con Grabado Científico Vintage de Peces (Seamless Repeat)
+          Positioned.fill(
+            child: Image.asset(
+              'assets/images/fish_pattern_bg.jpg',
+              repeat: ImageRepeat.repeat,
+              fit: BoxFit.none,
+              scale: 2.2, // Escala refinada para grabado taxonómico nítido
+              alignment: Alignment.topLeft,
+            ),
+          ),
+
+          // 2. Capa de Tinte y Oscurecimiento Profundo OLED (Sutileza + Alto Contraste)
+          Positioned.fill(
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    AppColors.backgroundDark.withValues(alpha: 0.88),
+                    const Color(0xFF0A0F18).withValues(alpha: 0.84),
+                    AppColors.backgroundDark.withValues(alpha: 0.94),
+                  ],
+                ),
+              ),
+            ),
+          ),
+
+          // 3. Orbes de Resplandor Ambiental Atmosférico (Apple / Luxury Glow)
+          Positioned(
+            top: -60,
+            left: -60,
+            child: Container(
+              width: 320,
+              height: 320,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: AppColors.cyanWater.withValues(alpha: 0.16),
+              ),
+            ),
+          ),
+          Positioned(
+            bottom: -80,
+            right: -80,
+            child: Container(
+              width: 340,
+              height: 340,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: AppColors.coralAction.withValues(alpha: 0.14),
+              ),
+            ),
+          ),
+
+          // 4. Tarjeta Glassmorphic de Autenticación
+          Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 32),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 420),
+                child: GlassContainer(
+                  borderRadius: 28,
+                  padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 36),
+                  blur: 24,
+                  opacity: 0.20,
                   borderColor: Colors.white.withValues(alpha: 0.16),
                   child: Form(
                     key: _formKey,
@@ -483,7 +536,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               ),
             ),
           ),
-        ),
+        ],
+      ),
     );
   }
 }

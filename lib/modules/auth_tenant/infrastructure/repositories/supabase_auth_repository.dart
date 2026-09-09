@@ -288,6 +288,9 @@ class SupabaseAuthRepository implements AuthRepository {
     required String unitNombre,
     required String unitSigla,
     List<String>? especiesHabilitadas,
+    String? primerEstanqueNombre,
+    double? primerEstanqueCapacidadM3,
+    String? primerEstanqueTipo,
   }) async {
     final companyId = const Uuid().v4();
     final unitId = const Uuid().v4();
@@ -307,25 +310,33 @@ class SupabaseAuthRepository implements AuthRepository {
       creadoEn: DateTime.now(),
     );
 
-    // Persistir en Supabase (empresas, unidades_acuicolas, miembros_equipo, profiles)
+    // Persistir en Supabase (empresas, unidades_acuicolas, miembros_equipo, profiles, estanques)
     try {
       await _supabase.from('empresas').insert({
         'id': companyId,
-        'razon_social': companyNombre.trim(),
-        'nombre_comercial': companyNombre.trim(),
+        'nombre': companyNombre.trim(),
         'nit': companyNit.trim(),
-        'direccion': companyUbicacion.trim(),
-        'email_contacto': userEmail.trim().toLowerCase(),
+        'moneda': 'COP',
         'especies_habilitadas': especies,
       });
 
       await _supabase.from('unidades_acuicolas').insert({
         'id': unitId,
-        'empresa_id': companyId,
         'nombre': unitNombre.trim(),
         'sigla': unitSigla.trim().toUpperCase(),
         'ubicacion': companyUbicacion.trim(),
       });
+
+      // También en tabla units si existe
+      try {
+        await _supabase.from('units').insert({
+          'id': unitId,
+          'empresa_id': companyId,
+          'name': unitNombre.trim(),
+          'sigla': unitSigla.trim().toUpperCase(),
+          'location': companyUbicacion.trim(),
+        });
+      } catch (_) {}
 
       await _supabase.from('miembros_equipo').insert({
         'id': memberId,
@@ -349,6 +360,30 @@ class SupabaseAuthRepository implements AuthRepository {
           'role': UserRole.admin.name,
           if (adminTelefono != null && adminTelefono.trim().isNotEmpty) 'phone': adminTelefono.trim(),
           'updated_at': DateTime.now().toIso8601String(),
+        });
+      } catch (_) {}
+
+      // Crear el primer estanque si se especificó
+      final estanqueNombre = (primerEstanqueNombre != null && primerEstanqueNombre.trim().isNotEmpty)
+          ? primerEstanqueNombre.trim()
+          : 'Estanque 01';
+      final capacidadM3 = primerEstanqueCapacidadM3 ?? 250.0;
+      final estanqueId = const Uuid().v4();
+
+      try {
+        await _supabase.from('estanques').insert({
+          'id': estanqueId,
+          'empresa_id': companyId,
+          'unit_id': unitId,
+          'unidad_acuicola_id': unitId,
+          'nombre': estanqueNombre,
+          'sigla': 'E-01',
+          'capacidad_m3': capacidadM3,
+          'especie': especies.isNotEmpty ? especies.first : 'Tilapia Roja',
+          'biomasa_kg': 0.0,
+          'costo_acumulado_biologico': 0.0,
+          'estado': 'Disponible',
+          'aireacion_activa': false,
         });
       } catch (_) {}
     } catch (_) {}
@@ -473,26 +508,28 @@ class SupabaseAuthRepository implements AuthRepository {
         }
       }
 
-      // 2. Consultar tabla configuraciones (soporta IDs alfanuméricos como "PISC")
-      final configRes = await _supabase
-          .from('configuraciones')
-          .select('*')
-          .limit(1)
-          .maybeSingle();
+      // 2. Consultar tabla configuraciones solo si coincide con el empresaId
+      if (empresaId.isNotEmpty && !empresaId.startsWith('c1000000-')) {
+        final configRes = await _supabase
+            .from('configuraciones')
+            .select('*')
+            .eq('empresa_id', empresaId)
+            .maybeSingle();
 
-      if (configRes != null) {
-        return Company(
-          id: empresaId,
-          razonSocial: configRes['razon_social'] as String? ?? 'Piscícola',
-          nombreComercial: configRes['razon_social'] as String? ?? 'Piscícola',
-          nit: configRes['nit'] as String? ?? '',
-          direccion: configRes['direccion'] as String? ?? '',
-          telefono: configRes['telefono'] as String? ?? '',
-          precioMercadoActualKg: (configRes['precio_mercado_actual_kg'] as num?)?.toDouble() ?? 8500.0,
-          limiteMortalidadCritica: (configRes['limite_mortalidad_critica'] as num?)?.toDouble() ?? 10.0,
-          stockAlertaMinimoAlimento: (configRes['stock_alerta_minimo_alimento'] as num?)?.toDouble() ?? 200.0,
-          moneda: configRes['moneda'] as String? ?? 'COP',
-        );
+        if (configRes != null) {
+          return Company(
+            id: empresaId,
+            razonSocial: configRes['razon_social'] as String? ?? 'Piscícola',
+            nombreComercial: configRes['razon_social'] as String? ?? 'Piscícola',
+            nit: configRes['nit'] as String? ?? '',
+            direccion: configRes['direccion'] as String? ?? '',
+            telefono: configRes['telefono'] as String? ?? '',
+            precioMercadoActualKg: (configRes['precio_mercado_actual_kg'] as num?)?.toDouble() ?? 8500.0,
+            limiteMortalidadCritica: (configRes['limite_mortalidad_critica'] as num?)?.toDouble() ?? 10.0,
+            stockAlertaMinimoAlimento: (configRes['stock_alerta_minimo_alimento'] as num?)?.toDouble() ?? 200.0,
+            moneda: configRes['moneda'] as String? ?? 'COP',
+          );
+        }
       }
     } catch (_) {}
     return null;

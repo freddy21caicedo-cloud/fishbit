@@ -190,6 +190,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
     required String unitNombre,
     required String unitSigla,
     List<String>? especiesHabilitadas,
+    String? primerEstanqueNombre,
+    double? primerEstanqueCapacidadM3,
+    String? primerEstanqueTipo,
   }) async {
     final user = state.currentUser;
     if (user == null) return false;
@@ -208,6 +211,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
         unitNombre: unitNombre,
         unitSigla: unitSigla,
         especiesHabilitadas: especiesHabilitadas,
+        primerEstanqueNombre: primerEstanqueNombre,
+        primerEstanqueCapacidadM3: primerEstanqueCapacidadM3,
+        primerEstanqueTipo: primerEstanqueTipo,
       );
       await _hydrateUserData(admin);
       return true;

@@ -75,19 +75,9 @@ class SupabaseWarehouseRepository implements WarehouseRepository {
           .order('creado_en', ascending: true)
           .limit(100);
       final listFallback = (resFallback as List).map((row) => InventoryItem.fromJson(row as Map<String, dynamic>)).toList();
-      return listFallback.isNotEmpty ? listFallback : _demoItems;
+      return listFallback;
     } catch (_) {
-      try {
-        final resFallback = await _supabase
-            .from('inventario_insumos')
-            .select('*')
-            .order('creado_en', ascending: true)
-            .limit(100);
-        final listFallback = (resFallback as List).map((row) => InventoryItem.fromJson(row as Map<String, dynamic>)).toList();
-        return listFallback.isNotEmpty ? listFallback : _demoItems;
-      } catch (_) {
-        return _demoItems;
-      }
+      return [];
     }
   }
 

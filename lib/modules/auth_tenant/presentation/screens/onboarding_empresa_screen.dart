@@ -30,6 +30,11 @@ class _OnboardingEmpresaScreenState extends ConsumerState<OnboardingEmpresaScree
   final _unitNameCtrl = TextEditingController(text: 'Sede Principal');
   final _unitSiglaCtrl = TextEditingController(text: 'PRI');
 
+  // Datos Primer Estanque
+  final _pondNameCtrl = TextEditingController(text: 'Estanque 01');
+  final _pondCapacidadCtrl = TextEditingController(text: '300');
+  String _pondTipo = 'Geomembrana';
+
   @override
   void initState() {
     super.initState();
@@ -63,11 +68,15 @@ class _OnboardingEmpresaScreenState extends ConsumerState<OnboardingEmpresaScree
     _ubicacionCtrl.dispose();
     _unitNameCtrl.dispose();
     _unitSiglaCtrl.dispose();
+    _pondNameCtrl.dispose();
+    _pondCapacidadCtrl.dispose();
     super.dispose();
   }
 
   Future<void> _handleSetup() async {
     if (!_formKey.currentState!.validate()) return;
+
+    final capacidadParsed = double.tryParse(_pondCapacidadCtrl.text.trim()) ?? 250.0;
 
     final success = await ref.read(authProvider.notifier).setupCompanyForUser(
           adminNombre: _adminNameCtrl.text.trim(),
@@ -79,13 +88,16 @@ class _OnboardingEmpresaScreenState extends ConsumerState<OnboardingEmpresaScree
           unitNombre: _unitNameCtrl.text.trim(),
           unitSigla: _unitSiglaCtrl.text.trim(),
           especiesHabilitadas: _selectedSpecies,
+          primerEstanqueNombre: _pondNameCtrl.text.trim(),
+          primerEstanqueCapacidadM3: capacidadParsed,
+          primerEstanqueTipo: _pondTipo,
         );
 
     if (success && mounted) {
       context.go('/');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('¡Bienvenido Administrador! ${_companyNameCtrl.text} ha sido creada con éxito.'),
+          content: Text('¡Bienvenido Administrador! ${_companyNameCtrl.text} y su primer estanque han sido creados con éxito.'),
           backgroundColor: AppColors.greenBiomass,
         ),
       );
@@ -351,7 +363,92 @@ class _OnboardingEmpresaScreenState extends ConsumerState<OnboardingEmpresaScree
                               );
                             }).toList(),
                           ),
-                          const SizedBox(height: 20),
+                          const SizedBox(height: 24),
+
+                          // 3. CONFIGURACIÓN DEL PRIMER ESTANQUE
+                          Text('3. TU PRIMER ESTANQUE', style: AppTypography.labelMicro.copyWith(color: AppColors.cyanWater, letterSpacing: 1.2)),
+                          const SizedBox(height: 6),
+                          Text('Inicia tu inventario acuícola configurando tu primer estanque:', style: AppTypography.bodySmall.copyWith(color: AppColors.textSecondaryDark, fontSize: 11.5)),
+                          const SizedBox(height: 12),
+
+                          // Nombre / Código del Estanque
+                          GlassFormField(
+                            label: 'NOMBRE O IDENTIFICADOR DEL ESTANQUE',
+                            hint: 'ej. Estanque 01 (Geomembrana)',
+                            controller: _pondNameCtrl,
+                            prefixIcon: Icons.water_rounded,
+                            validator: (val) => val == null || val.trim().isEmpty ? 'Ingresa el nombre del estanque' : null,
+                          ),
+                          const SizedBox(height: 12),
+
+                          // Capacidad y Tipo de Estanque
+                          Row(
+                            children: [
+                              Expanded(
+                                flex: 3,
+                                child: GlassFormField(
+                                  label: 'VOLUMEN / CAPACIDAD (m³)',
+                                  hint: 'ej. 300',
+                                  controller: _pondCapacidadCtrl,
+                                  prefixIcon: Icons.straighten_rounded,
+                                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                  validator: (val) {
+                                    if (val == null || val.trim().isEmpty) return 'Requerido';
+                                    if (double.tryParse(val.trim()) == null) return 'Inválido';
+                                    return null;
+                                  },
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                flex: 3,
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'TIPO DE ESTANQUE',
+                                      style: AppTypography.labelMicro.copyWith(
+                                        color: AppColors.cyanWater,
+                                        fontWeight: FontWeight.w700,
+                                        letterSpacing: 0.8,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Container(
+                                      height: 52,
+                                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white.withValues(alpha: 0.08),
+                                        borderRadius: BorderRadius.circular(16),
+                                        border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+                                      ),
+                                      child: DropdownButtonHideUnderline(
+                                        child: DropdownButton<String>(
+                                          value: _pondTipo,
+                                          dropdownColor: const Color(0xFF131F2E),
+                                          icon: const Icon(Icons.arrow_drop_down_rounded, color: AppColors.cyanWater),
+                                          style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
+                                          isExpanded: true,
+                                          items: const [
+                                            DropdownMenuItem(value: 'Geomembrana', child: Text('Geomembrana')),
+                                            DropdownMenuItem(value: 'Tierra', child: Text('Tierra')),
+                                            DropdownMenuItem(value: 'Concreto', child: Text('Concreto')),
+                                            DropdownMenuItem(value: 'Raceway', child: Text('Raceway')),
+                                          ],
+                                          onChanged: (val) {
+                                            if (val != null) {
+                                              setState(() => _pondTipo = val);
+                                            }
+                                          },
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 24),
 
                           // Banner de Plan Anual
                           Container(

@@ -198,9 +198,9 @@ class SupabasePondsRepository implements PondsRepository {
       if (rawList.isNotEmpty) {
         return rawList.map((row) => Pond.fromJson(row as Map<String, dynamic>)).toList();
       }
-      return _demoPonds;
+      return [];
     } catch (_) {
-      return _demoPonds;
+      return [];
     }
   }
 
@@ -280,9 +280,9 @@ class SupabasePondsRepository implements PondsRepository {
         }
       } catch (_) {}
 
-      return _demoBatches;
+      return [];
     } catch (_) {
-      return _demoBatches;
+      return [];
     }
   }
 

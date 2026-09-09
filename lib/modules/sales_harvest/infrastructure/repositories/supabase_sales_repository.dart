@@ -64,9 +64,9 @@ class SupabaseSalesRepository implements SalesRepository {
           .limit(100);
 
       final list = (res as List).map((row) => BatchSale.fromJson(row as Map<String, dynamic>)).toList();
-      return list.isNotEmpty ? list : _demoSales;
+      return list;
     } catch (_) {
-      return _demoSales;
+      return [];
     }
   }
 

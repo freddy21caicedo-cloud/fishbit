@@ -18,6 +18,9 @@ abstract class AuthRepository {
     required String unitNombre,
     required String unitSigla,
     List<String>? especiesHabilitadas,
+    String? primerEstanqueNombre,
+    double? primerEstanqueCapacidadM3,
+    String? primerEstanqueTipo,
   });
   Future<UserMember> registerCompanyWithAdmin({
     required String adminNombres,
