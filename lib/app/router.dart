@@ -61,6 +61,14 @@ final routerProvider = Provider<GoRouter>((ref) {
         return '/';
       }
 
+      // 3. Si el usuario no tiene empresa configurada (nuevo ingreso Google o registro incompleto),
+      // forzar onboarding de empresa
+      final hasCompany = user?.empresaId != null && user!.empresaId!.isNotEmpty;
+      if (!hasCompany) {
+        return isOnboardingRoute ? null : '/onboarding-empresa';
+      }
+
+      // 4. Si ya tiene empresa y está en login, register u onboarding, llevar al inicio
       if (isAuthRoute || isOnboardingRoute) {
         return '/';
       }

@@ -12,6 +12,7 @@ import 'package:fishbit_finance/modules/auth_tenant/presentation/providers/auth_
 import 'package:fishbit_finance/modules/ponds_batches/domain/models/fish_batch.dart';
 import 'package:fishbit_finance/modules/ponds_batches/presentation/providers/ponds_provider.dart';
 import 'package:fishbit_finance/modules/sales_harvest/domain/models/batch_sale.dart';
+import 'package:fishbit_finance/modules/sales_harvest/presentation/dialogs/crear_cliente_modal.dart';
 import 'package:fishbit_finance/modules/sales_harvest/presentation/providers/sales_provider.dart';
 
 class VentaRapidaModal extends ConsumerStatefulWidget {
@@ -34,6 +35,7 @@ class VentaRapidaModal extends ConsumerStatefulWidget {
 class _VentaRapidaModalState extends ConsumerState<VentaRapidaModal> {
   final _formKey = GlobalKey<FormState>();
   final _clienteNombreCtrl = TextEditingController(text: 'Distribuidora del Mar S.A.S.');
+  String? _selectedClientId = 'cl100000-0000-0000-0000-000000000001';
   final _kgCtrl = TextEditingController(text: '500.0');
   final _precioKgCtrl = TextEditingController(text: '9200');
   CivilDate _fechaVenta = CivilDate.today();
@@ -135,10 +137,109 @@ class _VentaRapidaModalState extends ConsumerState<VentaRapidaModal> {
                   ),
                   const SizedBox(height: 14),
 
+                  // Selector inteligente de Cliente con botón de creación rápida
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'CLIENTE COMPRADOR',
+                        style: AppTypography.bodySmall.copyWith(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 11,
+                          letterSpacing: 0.6,
+                          color: AppColors.greenBiomass,
+                        ),
+                      ),
+                      InkWell(
+                        onTap: () async {
+                          final newClient = await CrearClienteModal.show(
+                            context,
+                            initialNombre: _clienteNombreCtrl.text.trim(),
+                          );
+                          if (newClient != null) {
+                            setState(() {
+                              _selectedClientId = newClient.id;
+                              _clienteNombreCtrl.text = newClient.nombre;
+                            });
+                          }
+                        },
+                        borderRadius: BorderRadius.circular(8),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.add_circle_outline_rounded, size: 14, color: AppColors.greenBiomass),
+                              const SizedBox(width: 4),
+                              Text(
+                                '+ Nuevo Cliente',
+                                style: AppTypography.labelMicro.copyWith(
+                                  color: AppColors.greenBiomass,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+
+                  // Dropdown / Autocomplete Glassmorphic de clientes
+                  if (salesState.clients.isNotEmpty)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.06),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: AppColors.greenBiomass.withValues(alpha: 0.3)),
+                      ),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<String>(
+                          value: salesState.clients.any((c) => c.id == _selectedClientId)
+                              ? _selectedClientId
+                              : null,
+                          hint: Text(
+                            'Seleccionar cliente registrado...',
+                            style: AppTypography.bodySmall.copyWith(color: AppColors.textSecondaryDark),
+                          ),
+                          dropdownColor: AppColors.surfaceDark,
+                          isExpanded: true,
+                          icon: const Icon(Icons.keyboard_arrow_down_rounded, color: AppColors.greenBiomass),
+                          items: [
+                            ...salesState.clients.map((c) {
+                              return DropdownMenuItem<String>(
+                                value: c.id,
+                                child: Text(
+                                  '${c.nombre} ${c.telefono != null ? '(${c.telefono})' : ''}',
+                                  style: const TextStyle(color: Colors.white, fontSize: 13),
+                                ),
+                              );
+                            }),
+                          ],
+                          onChanged: (val) {
+                            if (val != null) {
+                              final matched = salesState.clients.firstWhere((c) => c.id == val);
+                              setState(() {
+                                _selectedClientId = matched.id;
+                                _clienteNombreCtrl.text = matched.nombre;
+                              });
+                            }
+                          },
+                        ),
+                      ),
+                    ),
+                  const SizedBox(height: 8),
+
                   GlassFormField(
-                    label: 'CLIENTE COMPRADOR',
+                    label: 'NOMBRE EN FACTURA / REMISIÓN',
                     controller: _clienteNombreCtrl,
                     prefixIcon: Icons.person_outline_rounded,
+                    isRequired: true,
+                    showClearButton: true,
+                    accentColor: AppColors.greenBiomass,
+                    validator: (v) => v == null || v.trim().isEmpty ? 'Nombre del cliente requerido' : null,
                   ),
                   const SizedBox(height: 14),
 
@@ -150,6 +251,9 @@ class _VentaRapidaModalState extends ConsumerState<VentaRapidaModal> {
                           controller: _kgCtrl,
                           keyboardType: const TextInputType.numberWithOptions(decimal: true),
                           prefixIcon: Icons.scale_rounded,
+                          isRequired: true,
+                          showClearButton: true,
+                          accentColor: AppColors.greenBiomass,
                           onChanged: (_) => setState(() {}),
                         ),
                       ),
@@ -160,6 +264,9 @@ class _VentaRapidaModalState extends ConsumerState<VentaRapidaModal> {
                           controller: _precioKgCtrl,
                           keyboardType: TextInputType.number,
                           prefixIcon: Icons.monetization_on_outlined,
+                          isRequired: true,
+                          showClearButton: true,
+                          accentColor: AppColors.greenBiomass,
                           onChanged: (_) => setState(() {}),
                         ),
                       ),
@@ -234,7 +341,7 @@ class _VentaRapidaModalState extends ConsumerState<VentaRapidaModal> {
                         loteId: selectedBatch.id,
                         codigoLote: selectedBatch.codigoLote,
                         estanqueNombre: pond?.nombre ?? 'Estanque',
-                        clienteId: null,
+                        clienteId: _selectedClientId,
                         clienteNombre: _clienteNombreCtrl.text.trim(),
                         especie: selectedBatch.especie,
                         biomasaVendidaKg: kg,

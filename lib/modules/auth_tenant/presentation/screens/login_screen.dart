@@ -161,41 +161,47 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        // Logo de Marca FishBit.
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              'Fish',
-                              style: TextStyle(
-                                fontSize: 38,
-                                fontWeight: FontWeight.w900,
-                                letterSpacing: -1.2,
-                                color: AppColors.cyanWater,
-                                shadows: [
-                                  Shadow(
-                                    color: AppColors.cyanWater.withValues(alpha: 0.7),
-                                    blurRadius: 20,
+                        // Logo de Marca FishBit (Escalable y responsivo).
+                        Center(
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  'Fish',
+                                  style: TextStyle(
+                                    fontSize: 38,
+                                    fontWeight: FontWeight.w900,
+                                    letterSpacing: -1.2,
+                                    color: AppColors.cyanWater,
+                                    shadows: [
+                                      Shadow(
+                                        color: AppColors.cyanWater.withValues(alpha: 0.7),
+                                        blurRadius: 20,
+                                      ),
+                                    ],
                                   ),
-                                ],
-                              ),
-                            ),
-                            Text(
-                              'Bit.',
-                              style: TextStyle(
-                                fontSize: 38,
-                                fontWeight: FontWeight.w900,
-                                letterSpacing: -1.2,
-                                color: AppColors.coralAction,
-                                shadows: [
-                                  Shadow(
-                                    color: AppColors.coralAction.withValues(alpha: 0.7),
-                                    blurRadius: 20,
+                                ),
+                                Text(
+                                  'Bit.',
+                                  style: TextStyle(
+                                    fontSize: 38,
+                                    fontWeight: FontWeight.w900,
+                                    letterSpacing: -1.2,
+                                    color: AppColors.coralAction,
+                                    shadows: [
+                                      Shadow(
+                                        color: AppColors.coralAction.withValues(alpha: 0.7),
+                                        blurRadius: 20,
+                                      ),
+                                    ],
                                   ),
-                                ],
-                              ),
+                                ),
+                              ],
                             ),
-                          ],
+                          ),
                         ),
                         const SizedBox(height: 4),
                         Text(
@@ -250,6 +256,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         Wrap(
                           alignment: WrapAlignment.spaceBetween,
                           crossAxisAlignment: WrapCrossAlignment.center,
+                          spacing: 8,
                           runSpacing: 4,
                           children: [
                             InkWell(
@@ -315,29 +322,33 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                               borderRadius: BorderRadius.circular(16),
                               border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
                             ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                SvgPicture.network(
-                                  'https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg',
-                                  width: 20,
-                                  height: 20,
-                                  placeholderBuilder: (_) => const Icon(
-                                    Icons.g_mobiledata_rounded,
-                                    color: Colors.white,
-                                    size: 24,
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  SvgPicture.network(
+                                    'https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg',
+                                    width: 20,
+                                    height: 20,
+                                    placeholderBuilder: (_) => const Icon(
+                                      Icons.g_mobiledata_rounded,
+                                      color: Colors.white,
+                                      size: 24,
+                                    ),
                                   ),
-                                ),
-                                const SizedBox(width: 10),
-                                Text(
-                                  'Continuar con Google',
-                                  style: AppTypography.titleMedium.copyWith(
-                                    color: Colors.white,
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w700,
+                                  const SizedBox(width: 10),
+                                  Text(
+                                    'Continuar con Google',
+                                    style: AppTypography.titleMedium.copyWith(
+                                      color: Colors.white,
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w700,
+                                    ),
                                   ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
                           ),
                         ),
@@ -368,9 +379,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
                         const SizedBox(height: 20),
 
-                        // Accesos Directos de Contacto (WhatsApp & Instagram)
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
+                        // Accesos Directos de Contacto (WhatsApp & Instagram) Responsivos
+                        Wrap(
+                          alignment: WrapAlignment.center,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          spacing: 10,
+                          runSpacing: 8,
                           children: [
                             // Botón WhatsApp Soporte
                             InkWell(
@@ -412,7 +426,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                 ),
                               ),
                             ),
-                            const SizedBox(width: 10),
 
                             // Botón Instagram (@groupgalapagos)
                             InkWell(

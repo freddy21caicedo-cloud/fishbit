@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 import 'package:fishbit_finance/core/errors/app_failure.dart';
@@ -64,6 +65,22 @@ class SupabaseAuthRepository implements AuthRepository {
 
       if (memberRow != null) {
         return UserMember.fromJson(memberRow);
+      }
+
+      // Si existe sesión en Supabase Auth pero aún no tiene perfil ni empresa asignada
+      // (caso típico: usuario que acaba de autenticarse con Google OAuth)
+      if (supabaseUser != null) {
+        final email = supabaseUser.email ?? '';
+        return UserMember(
+          id: supabaseUser.id,
+          empresaId: '', // Señal de Onboarding requerido
+          nombre: (supabaseUser.userMetadata?['full_name'] as String?) ?? (email.isNotEmpty ? email.split('@')[0] : 'Administrador'),
+          email: email,
+          role: UserRole.admin,
+          permisoGlobalEmpresa: true,
+          estado: MemberStatus.active,
+          creadoEn: DateTime.now(),
+        );
       }
 
       return null;
@@ -183,10 +200,19 @@ class SupabaseAuthRepository implements AuthRepository {
   @override
   Future<UserMember?> signInWithGoogle() async {
     try {
-      // 1. Iniciar flujo OAuth de Google con Supabase
+      // 1. Resolver URL de redirección según la plataforma y entorno
+      String? redirectUrl;
+      if (kIsWeb) {
+        final origin = Uri.base.origin;
+        // Si no es un host vacío ni inválido, usar el origin actual (ej: https://fishbit.vercel.app o http://localhost:PORT)
+        redirectUrl = origin.isNotEmpty && origin != 'null' ? origin : 'https://fishbit.vercel.app';
+      }
+
+      // Iniciar flujo OAuth de Google con Supabase
       await _supabase.auth.signInWithOAuth(
         OAuthProvider.google,
-        redirectTo: Uri.base.origin,
+        redirectTo: redirectUrl,
+        authScreenLaunchMode: LaunchMode.platformDefault,
       );
 
       final sessionUser = _supabase.auth.currentUser;
@@ -244,20 +270,8 @@ class SupabaseAuthRepository implements AuthRepository {
 
       return tempMember;
     } catch (e) {
-      // En modo desarrollo/offline, simular login exitoso con Google Admin
-      final devGoogleUser = UserMember(
-        id: 'm1000000-0000-0000-0000-000000000001',
-        empresaId: 'c1000000-0000-0000-0000-000000000001',
-        unidadAcuicolaId: 'u1000000-0000-0000-0000-000000000001',
-        nombre: 'Usuario Google Admin',
-        email: 'admin.google@fishbit.com',
-        role: UserRole.admin,
-        permisoGlobalEmpresa: true,
-        estado: MemberStatus.active,
-        creadoEn: DateTime.now(),
-      );
-      await _storage.setSessionUserId(devGoogleUser.id);
-      return devGoogleUser;
+      if (e is AppFailure) rethrow;
+      throw ServerFailure('Error al autenticar con Google: ${e.toString()}');
     }
   }
 
@@ -266,6 +280,8 @@ class SupabaseAuthRepository implements AuthRepository {
     required String userId,
     required String userEmail,
     required String userName,
+    String? adminCedula,
+    String? adminTelefono,
     required String companyNombre,
     required String companyNit,
     required String companyUbicacion,
@@ -282,44 +298,59 @@ class SupabaseAuthRepository implements AuthRepository {
       id: memberId,
       empresaId: companyId,
       unidadAcuicolaId: unitId,
-      nombre: userName,
-      email: userEmail.toLowerCase(),
+      nombre: userName.trim(),
+      email: userEmail.trim().toLowerCase(),
+      cedula: adminCedula?.trim(),
       role: UserRole.admin,
       permisoGlobalEmpresa: true,
       estado: MemberStatus.active,
       creadoEn: DateTime.now(),
     );
 
-    // Persistir en Supabase
+    // Persistir en Supabase (empresas, unidades_acuicolas, miembros_equipo, profiles)
     try {
       await _supabase.from('empresas').insert({
         'id': companyId,
-        'razon_social': companyNombre,
-        'nombre_comercial': companyNombre,
-        'nit': companyNit,
-        'direccion': companyUbicacion,
-        'email_contacto': userEmail,
+        'razon_social': companyNombre.trim(),
+        'nombre_comercial': companyNombre.trim(),
+        'nit': companyNit.trim(),
+        'direccion': companyUbicacion.trim(),
+        'email_contacto': userEmail.trim().toLowerCase(),
         'especies_habilitadas': especies,
       });
 
       await _supabase.from('unidades_acuicolas').insert({
         'id': unitId,
         'empresa_id': companyId,
-        'nombre': unitNombre,
-        'sigla': unitSigla.toUpperCase(),
-        'ubicacion': companyUbicacion,
+        'nombre': unitNombre.trim(),
+        'sigla': unitSigla.trim().toUpperCase(),
+        'ubicacion': companyUbicacion.trim(),
       });
 
       await _supabase.from('miembros_equipo').insert({
         'id': memberId,
         'empresa_id': companyId,
         'unidad_acuicola_id': unitId,
-        'nombre': userName,
-        'email': userEmail.toLowerCase(),
+        'nombre': userName.trim(),
+        'email': userEmail.trim().toLowerCase(),
+        'cedula': adminCedula?.trim(),
         'role': UserRole.admin.name,
         'permiso_global_empresa': true,
         'estado': MemberStatus.active.name,
       });
+
+      // Sincronizar o crear registro en profiles para el usuario autenticado
+      try {
+        await _supabase.from('profiles').upsert({
+          'id': memberId,
+          'email': userEmail.trim().toLowerCase(),
+          'full_name': userName.trim(),
+          'empresa_id': companyId,
+          'role': UserRole.admin.name,
+          if (adminTelefono != null && adminTelefono.trim().isNotEmpty) 'phone': adminTelefono.trim(),
+          'updated_at': DateTime.now().toIso8601String(),
+        });
+      } catch (_) {}
     } catch (_) {}
 
     await _storage.setSessionUserId(memberId);

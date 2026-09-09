@@ -308,12 +308,15 @@ class _RegisterCompanyScreenState extends ConsumerState<RegisterCompanyScreen> {
           ),
         ),
         const SizedBox(width: 8),
-        Text(
-          title,
-          style: TextStyle(
-            color: isActive || isCompleted ? Colors.white : AppColors.textSecondaryDark,
-            fontSize: 12,
-            fontWeight: isActive ? FontWeight.w800 : FontWeight.w500,
+        Flexible(
+          child: Text(
+            title,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: isActive || isCompleted ? Colors.white : AppColors.textSecondaryDark,
+              fontSize: 12,
+              fontWeight: isActive ? FontWeight.w800 : FontWeight.w500,
+            ),
           ),
         ),
       ],
@@ -338,6 +341,11 @@ class _RegisterCompanyScreenState extends ConsumerState<RegisterCompanyScreen> {
                     hint: 'Freddy',
                     controller: _nombresCtrl,
                     prefixIcon: Icons.person_outline_rounded,
+                    textCapitalization: TextCapitalization.words,
+                    textInputAction: TextInputAction.next,
+                    isRequired: true,
+                    showClearButton: true,
+                    accentColor: AppColors.cyanWater,
                     validator: (v) => v == null || v.trim().isEmpty ? 'Requerido' : null,
                   ),
                 ),
@@ -347,6 +355,12 @@ class _RegisterCompanyScreenState extends ConsumerState<RegisterCompanyScreen> {
                     label: 'APELLIDO(S)',
                     hint: 'Rojas',
                     controller: _apellidosCtrl,
+                    prefixIcon: Icons.badge_outlined,
+                    textCapitalization: TextCapitalization.words,
+                    textInputAction: TextInputAction.next,
+                    isRequired: true,
+                    showClearButton: true,
+                    accentColor: AppColors.cyanWater,
                     validator: (v) => v == null || v.trim().isEmpty ? 'Requerido' : null,
                   ),
                 ),
@@ -358,11 +372,15 @@ class _RegisterCompanyScreenState extends ConsumerState<RegisterCompanyScreen> {
               children: [
                 Expanded(
                   child: GlassFormField(
-                    label: 'CÉDULA / NIT',
-                    hint: '1.098.765.432',
+                    label: 'CÉDULA / ID',
+                    hint: '1098765432',
                     controller: _cedulaCtrl,
                     keyboardType: TextInputType.number,
-                    prefixIcon: Icons.badge_outlined,
+                    textInputAction: TextInputAction.next,
+                    prefixIcon: Icons.credit_card_rounded,
+                    isRequired: true,
+                    showClearButton: true,
+                    accentColor: AppColors.cyanWater,
                     validator: (v) => v == null || v.trim().isEmpty ? 'Requerido' : null,
                   ),
                 ),
@@ -370,10 +388,14 @@ class _RegisterCompanyScreenState extends ConsumerState<RegisterCompanyScreen> {
                 Expanded(
                   child: GlassFormField(
                     label: 'CONTACTO / CELULAR',
-                    hint: '+57 300 123 4567',
+                    hint: '300 123 4567',
                     controller: _contactoCtrl,
                     keyboardType: TextInputType.phone,
+                    textInputAction: TextInputAction.next,
                     prefixIcon: Icons.phone_outlined,
+                    isRequired: true,
+                    showClearButton: true,
+                    accentColor: AppColors.cyanWater,
                     validator: (v) => v == null || v.trim().isEmpty ? 'Requerido' : null,
                   ),
                 ),
@@ -382,14 +404,18 @@ class _RegisterCompanyScreenState extends ConsumerState<RegisterCompanyScreen> {
             const SizedBox(height: 12),
 
             GlassFormField(
-              label: 'CORREO ELECTRÓNICO',
+              label: 'CORREO ELECTRÓNICO (USUARIO MASTER)',
               hint: 'admin@piscicola.com',
               controller: _emailCtrl,
               keyboardType: TextInputType.emailAddress,
+              textInputAction: TextInputAction.next,
               prefixIcon: Icons.alternate_email_rounded,
+              isRequired: true,
+              showClearButton: true,
+              accentColor: AppColors.cyanWater,
               validator: (v) {
                 if (v == null || v.trim().isEmpty) return 'El correo es requerido';
-                if (!v.contains('@')) return 'Ingresa un correo válido';
+                if (!v.contains('@') || !v.contains('.')) return 'Ingresa un correo electrónico válido';
                 return null;
               },
             ),
@@ -403,7 +429,10 @@ class _RegisterCompanyScreenState extends ConsumerState<RegisterCompanyScreen> {
                     hint: 'Mínimo 6 caracteres',
                     controller: _passwordCtrl,
                     obscureText: _obscurePass,
+                    textInputAction: TextInputAction.next,
                     prefixIcon: Icons.lock_outline_rounded,
+                    isRequired: true,
+                    accentColor: AppColors.cyanWater,
                     suffixWidget: IconButton(
                       icon: Icon(
                         _obscurePass ? Icons.visibility_outlined : Icons.visibility_off_outlined,
@@ -414,7 +443,7 @@ class _RegisterCompanyScreenState extends ConsumerState<RegisterCompanyScreen> {
                     ),
                     validator: (v) {
                       if (v == null || v.isEmpty) return 'Requerida';
-                      if (v.length < 6) return 'Mínimo 6';
+                      if (v.length < 6) return 'Mínimo 6 caracteres';
                       return null;
                     },
                   ),
@@ -422,11 +451,14 @@ class _RegisterCompanyScreenState extends ConsumerState<RegisterCompanyScreen> {
                 const SizedBox(width: 10),
                 Expanded(
                   child: GlassFormField(
-                    label: 'CONFIRMAR',
+                    label: 'CONFIRMAR CLAVE',
                     hint: 'Repetir clave',
                     controller: _confirmPasswordCtrl,
                     obscureText: _obscureConfirmPass,
+                    textInputAction: TextInputAction.done,
                     prefixIcon: Icons.lock_reset_rounded,
+                    isRequired: true,
+                    accentColor: AppColors.cyanWater,
                     suffixWidget: IconButton(
                       icon: Icon(
                         _obscureConfirmPass ? Icons.visibility_outlined : Icons.visibility_off_outlined,
@@ -436,7 +468,7 @@ class _RegisterCompanyScreenState extends ConsumerState<RegisterCompanyScreen> {
                       onPressed: () => setState(() => _obscureConfirmPass = !_obscureConfirmPass),
                     ),
                     validator: (v) {
-                      if (v != _passwordCtrl.text) return 'No coinciden';
+                      if (v != _passwordCtrl.text) return 'Las contraseñas no coinciden';
                       return null;
                     },
                   ),
@@ -471,6 +503,11 @@ class _RegisterCompanyScreenState extends ConsumerState<RegisterCompanyScreen> {
               hint: 'Ej: Piscícola Del Caribe S.A.S.',
               controller: _companyNombreCtrl,
               prefixIcon: Icons.water_drop_outlined,
+              textCapitalization: TextCapitalization.words,
+              textInputAction: TextInputAction.next,
+              isRequired: true,
+              showClearButton: true,
+              accentColor: AppColors.greenBiomass,
               validator: (v) => v == null || v.trim().isEmpty ? 'Nombre de empresa requerido' : null,
             ),
             const SizedBox(height: 12),
@@ -480,7 +517,12 @@ class _RegisterCompanyScreenState extends ConsumerState<RegisterCompanyScreen> {
               hint: 'Ej: Córdoba, Montería, Vereda Las Palomas',
               controller: _companyUbicacionCtrl,
               prefixIcon: Icons.location_on_outlined,
-              validator: (v) => v == null || v.trim().isEmpty ? 'Ubicación requerida' : null,
+              textCapitalization: TextCapitalization.words,
+              textInputAction: TextInputAction.next,
+              isRequired: true,
+              showClearButton: true,
+              accentColor: AppColors.greenBiomass,
+              validator: (v) => v == null || v.trim().isEmpty ? 'Ubicación de la finca requerida' : null,
             ),
             const SizedBox(height: 12),
 
@@ -488,10 +530,14 @@ class _RegisterCompanyScreenState extends ConsumerState<RegisterCompanyScreen> {
               children: [
                 Expanded(
                   child: GlassFormField(
-                    label: 'NIT / IDENTIFICACIÓN TRIBUTARIA',
+                    label: 'NIT / RUT',
                     hint: '900.123.456-7',
                     controller: _companyNitCtrl,
                     prefixIcon: Icons.receipt_long_outlined,
+                    textInputAction: TextInputAction.next,
+                    isRequired: true,
+                    showClearButton: true,
+                    accentColor: AppColors.greenBiomass,
                     validator: (v) => v == null || v.trim().isEmpty ? 'NIT requerido' : null,
                   ),
                 ),
@@ -502,7 +548,10 @@ class _RegisterCompanyScreenState extends ConsumerState<RegisterCompanyScreen> {
                     hint: 'contacto@piscicola.com',
                     controller: _companyEmailCtrl,
                     keyboardType: TextInputType.emailAddress,
+                    textInputAction: TextInputAction.next,
                     prefixIcon: Icons.mail_outline_rounded,
+                    showClearButton: true,
+                    accentColor: AppColors.greenBiomass,
                   ),
                 ),
               ],
@@ -514,18 +563,26 @@ class _RegisterCompanyScreenState extends ConsumerState<RegisterCompanyScreen> {
                 Expanded(
                   child: GlassFormField(
                     label: 'REGISTRO ICA (OPCIONAL)',
-                    hint: 'ICA-2026-XXXX',
+                    hint: 'Ej: ICA-2026-0045',
                     controller: _companyIcaCtrl,
+                    textCapitalization: TextCapitalization.characters,
+                    textInputAction: TextInputAction.next,
                     prefixIcon: Icons.verified_outlined,
+                    showClearButton: true,
+                    accentColor: AppColors.greenBiomass,
                   ),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: GlassFormField(
                     label: 'REGISTRO AUNAP (OPCIONAL)',
-                    hint: 'AUNAP-RES-XXXX',
+                    hint: 'Ej: AUNAP-RES-0129',
                     controller: _companyAunapCtrl,
+                    textCapitalization: TextCapitalization.characters,
+                    textInputAction: TextInputAction.done,
                     prefixIcon: Icons.shield_outlined,
+                    showClearButton: true,
+                    accentColor: AppColors.greenBiomass,
                   ),
                 ),
               ],

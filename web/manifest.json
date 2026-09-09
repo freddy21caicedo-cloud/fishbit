@@ -1,12 +1,20 @@
 {
     "name": "FishBit - ERP Piscícola & Trazabilidad Biológica",
     "short_name": "FishBit",
-    "start_url": ".",
+    "start_url": "./",
+    "scope": "./",
     "display": "standalone",
     "background_color": "#0A101D",
     "theme_color": "#00E5FF",
-    "description": "FishBit Finance - Precision Aquaculture ERP & Biological Traceability Platform",
+    "description": "Plataforma Integral de Trazabilidad Biológica, Parámetros Fisicoquímicos y Control Financiero para Piscicultura Comercial",
     "orientation": "portrait-primary",
+    "lang": "es",
+    "dir": "ltr",
+    "categories": [
+        "business",
+        "productivity",
+        "utilities"
+    ],
     "prefer_related_applications": false,
     "icons": [
         {
@@ -31,5 +39,36 @@
             "type": "image/png",
             "purpose": "maskable"
         }
+    ],
+    "shortcuts": [
+        {
+            "name": "Monitoreo de Estanques",
+            "short_name": "Estanques",
+            "description": "Ver estado y biomasa de los estanques activos",
+            "url": "./#/ponds",
+            "icons": [{ "src": "icons/Icon-192.png", "sizes": "192x192" }]
+        },
+        {
+            "name": "Registrar Parámetros de Agua",
+            "short_name": "Calidad Agua",
+            "description": "Captura rápida de oxígeno, pH y temperatura",
+            "url": "./#/water-quality",
+            "icons": [{ "src": "icons/Icon-192.png", "sizes": "192x192" }]
+        },
+        {
+            "name": "Control de Alimentación",
+            "short_name": "Alimentación",
+            "description": "Registrar raciones y consumo de alimento balanceado",
+            "url": "./#/feeding",
+            "icons": [{ "src": "icons/Icon-192.png", "sizes": "192x192" }]
+        },
+        {
+            "name": "Dashboard Ejecutivo",
+            "short_name": "Dashboard",
+            "description": "Resumen financiero y métricas clave de la granja",
+            "url": "./#/dashboard",
+            "icons": [{ "src": "icons/Icon-192.png", "sizes": "192x192" }]
+        }
     ]
 }
+

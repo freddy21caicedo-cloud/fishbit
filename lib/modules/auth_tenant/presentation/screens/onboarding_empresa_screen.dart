@@ -17,11 +17,25 @@ class OnboardingEmpresaScreen extends ConsumerStatefulWidget {
 
 class _OnboardingEmpresaScreenState extends ConsumerState<OnboardingEmpresaScreen> {
   final _formKey = GlobalKey<FormState>();
+
+  // Datos Administrador
+  late final TextEditingController _adminNameCtrl;
+  final _cedulaCtrl = TextEditingController();
+  final _telefonoCtrl = TextEditingController();
+
+  // Datos Empresa / Sede
   final _companyNameCtrl = TextEditingController();
   final _nitCtrl = TextEditingController();
   final _ubicacionCtrl = TextEditingController(text: 'Colombia');
   final _unitNameCtrl = TextEditingController(text: 'Sede Principal');
   final _unitSiglaCtrl = TextEditingController(text: 'PRI');
+
+  @override
+  void initState() {
+    super.initState();
+    final user = ref.read(authProvider).currentUser;
+    _adminNameCtrl = TextEditingController(text: user?.nombre ?? '');
+  }
 
   final List<String> _allAvailableSpecies = [
     'Tilapia Roja',
@@ -41,6 +55,9 @@ class _OnboardingEmpresaScreenState extends ConsumerState<OnboardingEmpresaScree
 
   @override
   void dispose() {
+    _adminNameCtrl.dispose();
+    _cedulaCtrl.dispose();
+    _telefonoCtrl.dispose();
     _companyNameCtrl.dispose();
     _nitCtrl.dispose();
     _ubicacionCtrl.dispose();
@@ -53,6 +70,9 @@ class _OnboardingEmpresaScreenState extends ConsumerState<OnboardingEmpresaScree
     if (!_formKey.currentState!.validate()) return;
 
     final success = await ref.read(authProvider.notifier).setupCompanyForUser(
+          adminNombre: _adminNameCtrl.text.trim(),
+          adminCedula: _cedulaCtrl.text.trim(),
+          adminTelefono: _telefonoCtrl.text.trim(),
           companyNombre: _companyNameCtrl.text.trim(),
           companyNit: _nitCtrl.text.trim(),
           companyUbicacion: _ubicacionCtrl.text.trim(),
@@ -170,20 +190,77 @@ class _OnboardingEmpresaScreenState extends ConsumerState<OnboardingEmpresaScree
                                 const SizedBox(width: 10),
                                 Expanded(
                                   child: Text(
-                                    'Tu cuenta (${user?.email ?? 'Gmail'}) quedará asignada automáticamente como Administrador General de la Empresa.',
+                                    'Cuenta Google verificada: ${user?.email ?? 'Gmail'}. Asignada automáticamente como Administrador General de la Empresa.',
                                     style: AppTypography.bodySmall.copyWith(color: Colors.white70, fontSize: 12),
                                   ),
                                 ),
                               ],
                             ),
                           ),
-                          const SizedBox(height: 20),
+                          const SizedBox(height: 24),
 
-                          Text('DATOS DE LA EMPRESA', style: AppTypography.labelMicro.copyWith(color: AppColors.cyanWater, letterSpacing: 1.2)),
+                          // 1. DATOS DEL ADMINISTRADOR (TOMA EL CORREO DE GOOGLE)
+                          Text('1. DATOS DEL ADMINISTRADOR GENERAL', style: AppTypography.labelMicro.copyWith(color: AppColors.cyanWater, letterSpacing: 1.2)),
+                          const SizedBox(height: 10),
+
+                          // Correo de Google (Bloqueado / Solo Lectura)
+                          GlassFormField(
+                            label: 'CORREO ELECTRÓNICO (GOOGLE)',
+                            hint: user?.email ?? 'admin@gmail.com',
+                            controller: TextEditingController(text: user?.email ?? ''),
+                            prefixIcon: Icons.mark_email_read_rounded,
+                            suffixWidget: const Padding(
+                              padding: EdgeInsets.only(right: 12),
+                              child: Icon(Icons.lock_outline_rounded, color: AppColors.cyanWater, size: 18),
+                            ),
+                            isReadOnly: true,
+                          ),
+                          const SizedBox(height: 12),
+
+                          // Nombre Completo del Admin
+                          GlassFormField(
+                            label: 'NOMBRE COMPLETO DEL ADMINISTRADOR',
+                            hint: 'ej. Carlos Alberto Gómez',
+                            controller: _adminNameCtrl,
+                            prefixIcon: Icons.person_outline_rounded,
+                            validator: (val) => val == null || val.trim().isEmpty ? 'Ingresa el nombre del administrador' : null,
+                          ),
+                          const SizedBox(height: 12),
+
+                          // Cédula y Teléfono
+                          Row(
+                            children: [
+                              Expanded(
+                                child: GlassFormField(
+                                  label: 'CÉDULA / DNI',
+                                  hint: 'ej. 1020304050',
+                                  controller: _cedulaCtrl,
+                                  prefixIcon: Icons.badge_outlined,
+                                  keyboardType: TextInputType.number,
+                                  validator: (val) => val == null || val.trim().isEmpty ? 'Ingresa la cédula' : null,
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: GlassFormField(
+                                  label: 'TELÉFONO / WHATSAPP',
+                                  hint: 'ej. 3001234567',
+                                  controller: _telefonoCtrl,
+                                  prefixIcon: Icons.phone_android_rounded,
+                                  keyboardType: TextInputType.phone,
+                                  validator: (val) => val == null || val.trim().isEmpty ? 'Ingresa el teléfono' : null,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 24),
+
+                          // 2. DATOS DE LA EMPRESA & PISCÍCOLA
+                          Text('2. DATOS DE LA EMPRESA PISCÍCOLA', style: AppTypography.labelMicro.copyWith(color: AppColors.cyanWater, letterSpacing: 1.2)),
                           const SizedBox(height: 10),
 
                           GlassFormField(
-                            label: 'NOMBRE O RAZÓN SOCIAL',
+                            label: 'NOMBRE O RAZÓN SOCIAL DE LA EMPRESA',
                             hint: 'ej. Piscícola San Jerónimo S.A.S.',
                             controller: _companyNameCtrl,
                             prefixIcon: Icons.business_rounded,
@@ -198,7 +275,7 @@ class _OnboardingEmpresaScreenState extends ConsumerState<OnboardingEmpresaScree
                                   label: 'NIT / RUT',
                                   hint: 'ej. 901.888.777-2',
                                   controller: _nitCtrl,
-                                  prefixIcon: Icons.badge_outlined,
+                                  prefixIcon: Icons.domain_verification_rounded,
                                   validator: (val) => val == null || val.trim().isEmpty ? 'Ingresa el NIT' : null,
                                 ),
                               ),
@@ -206,14 +283,43 @@ class _OnboardingEmpresaScreenState extends ConsumerState<OnboardingEmpresaScree
                               Expanded(
                                 child: GlassFormField(
                                   label: 'UBICACIÓN / MUNICIPIO',
-                                  hint: 'ej. Antioquia',
+                                  hint: 'ej. San Jerónimo, Antioquia',
                                   controller: _ubicacionCtrl,
                                   prefixIcon: Icons.location_on_outlined,
+                                  validator: (val) => val == null || val.trim().isEmpty ? 'Ingresa la ubicación' : null,
                                 ),
                               ),
                             ],
                           ),
-                          const SizedBox(height: 20),
+                          const SizedBox(height: 12),
+
+                          // Sede Inicial
+                          Row(
+                            children: [
+                              Expanded(
+                                flex: 3,
+                                child: GlassFormField(
+                                  label: 'NOMBRE SEDE PRINCIPAL',
+                                  hint: 'ej. Sede Principal',
+                                  controller: _unitNameCtrl,
+                                  prefixIcon: Icons.waves_rounded,
+                                  validator: (val) => val == null || val.trim().isEmpty ? 'Nombre de sede' : null,
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                flex: 2,
+                                child: GlassFormField(
+                                  label: 'SIGLA SEDE',
+                                  hint: 'ej. PRI',
+                                  controller: _unitSiglaCtrl,
+                                  prefixIcon: Icons.short_text_rounded,
+                                  validator: (val) => val == null || val.trim().isEmpty ? 'Sigla' : null,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 24),
 
                           Text('ESPECIES ACUÍCOLAS A CULTIVAR', style: AppTypography.labelMicro.copyWith(color: AppColors.cyanWater, letterSpacing: 1.2)),
                           const SizedBox(height: 6),

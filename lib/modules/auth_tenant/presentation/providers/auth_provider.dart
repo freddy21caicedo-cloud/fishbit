@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' hide AuthState;
 import 'package:fishbit_finance/core/network/supabase_client_provider.dart';
 import 'package:fishbit_finance/core/storage/local_storage_service.dart';
 import 'package:fishbit_finance/modules/auth_tenant/domain/models/user_member.dart';
@@ -66,9 +68,32 @@ class AuthState {
 class AuthNotifier extends StateNotifier<AuthState> {
   final AuthRepository _repository;
   final LocalStorageService _storage;
+  final SupabaseClient? _supabase;
+  StreamSubscription<dynamic>? _authSubscription;
 
-  AuthNotifier(this._repository, this._storage) : super(const AuthState(isLoading: true)) {
+  AuthNotifier(this._repository, this._storage, [this._supabase]) : super(const AuthState(isLoading: true)) {
     _initSession();
+    if (_supabase != null) {
+      _listenToAuthChanges();
+    }
+  }
+
+  void _listenToAuthChanges() {
+    _authSubscription = _supabase?.auth.onAuthStateChange.listen((data) async {
+      final event = data.event;
+      final session = data.session;
+
+      if (event == AuthChangeEvent.signedIn && session?.user != null) {
+        // Al regresar del flujo de OAuth de Google en Web o móvil
+        if (state.currentUser?.id != session!.user.id) {
+          await _initSession();
+        }
+      } else if (event == AuthChangeEvent.signedOut) {
+        if (state.isAuthenticated) {
+          state = const AuthState();
+        }
+      }
+    });
   }
 
   Future<void> _initSession() async {
@@ -156,6 +181,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   Future<bool> setupCompanyForUser({
+    String? adminNombre,
+    String? adminCedula,
+    String? adminTelefono,
     required String companyNombre,
     required String companyNit,
     required String companyUbicacion,
@@ -171,7 +199,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
       final admin = await _repository.setupCompanyForUser(
         userId: user.id,
         userEmail: user.email,
-        userName: user.nombre,
+        userName: adminNombre?.trim().isNotEmpty == true ? adminNombre!.trim() : user.nombre,
+        adminCedula: adminCedula,
+        adminTelefono: adminTelefono,
         companyNombre: companyNombre,
         companyNit: companyNit,
         companyUbicacion: companyUbicacion,
@@ -340,10 +370,17 @@ class AuthNotifier extends StateNotifier<AuthState> {
     await _repository.signOut();
     state = const AuthState();
   }
+
+  @override
+  void dispose() {
+    _authSubscription?.cancel();
+    super.dispose();
+  }
 }
 
 final authProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
   final repo = ref.watch(authRepositoryProvider);
   final storage = ref.watch(localStorageServiceProvider);
-  return AuthNotifier(repo, storage);
+  final supabase = ref.watch(supabaseClientProvider);
+  return AuthNotifier(repo, storage, supabase);
 });

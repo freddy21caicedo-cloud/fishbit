@@ -19,6 +19,12 @@
       "skillPath": "skills/dart-fix-runtime-errors/SKILL.md",
       "computedHash": "5d297ccaf9a34c5939c80600ff8398437c0c6bd5d343093852b65559689fae1d"
     },
+    "deploy-to-vercel": {
+      "source": "vercel-labs/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/deploy-to-vercel/SKILL.md",
+      "computedHash": "3a0481591523c55ecfe2569b6b28b2dcbfa3742367667697219d29170981ad53"
+    },
     "excel-report-generator": {
       "source": "wwwzhouhui/skills_collection",
       "sourceType": "github",
@@ -78,6 +84,12 @@
       "sourceType": "github",
       "skillPath": "pdf-extraction/SKILL.md",
       "computedHash": "44ec33ec9d178e3c04c3dd210a98cb6ad0c3a45f9383019071bc9556cfc323e6"
+    },
+    "pwa-development": {
+      "source": "alinaqi/maggy",
+      "sourceType": "github",
+      "skillPath": "skills/pwa-development/SKILL.md",
+      "computedHash": "2219041ce92f6361ba77eb06c9a927dc7a1ba48f40ff5132321a29c4154ebc7a"
     },
     "saas-metrics": {
       "source": "claude-office-skills/skills",

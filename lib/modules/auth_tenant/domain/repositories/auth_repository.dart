@@ -10,6 +10,8 @@ abstract class AuthRepository {
     required String userId,
     required String userEmail,
     required String userName,
+    String? adminCedula,
+    String? adminTelefono,
     required String companyNombre,
     required String companyNit,
     required String companyUbicacion,

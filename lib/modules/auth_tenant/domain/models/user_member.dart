@@ -195,7 +195,7 @@ class UserMember {
     final isSuper = json['is_superadmin'] as bool? ?? json['permiso_global_empresa'] as bool? ?? false;
     final rawEmail = (json['email'] as String? ?? '').trim().toLowerCase();
     final rawUnitId = json['unit_id'] as String? ?? json['unidad_acuicola_id'] as String?;
-    final rawEmpresaId = json['empresa_id'] as String? ?? (rawUnitId != null && rawUnitId != 'TODAS' ? rawUnitId : null);
+    final rawEmpresaId = json['empresa_id'] as String?;
 
     return UserMember(
       id: json['id'] as String,
@@ -204,7 +204,7 @@ class UserMember {
       nombre: rawName,
       email: rawEmail,
       role: parseRole(rawRole),
-      unidadAcuicolaId: rawUnitId ?? rawEmpresaId,
+      unidadAcuicolaId: rawUnitId,
       permisoGlobalEmpresa: isSuper,
       estado: parseStatus(json['estado'] as String? ?? 'Activo'),
       tokenInvitacion: json['token_invitacion'] as String?,

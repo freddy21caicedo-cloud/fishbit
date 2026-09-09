@@ -341,40 +341,75 @@ class _IcaCertificationScreenState extends ConsumerState<IcaCertificationScreen>
                     ),
                   ),
                   const SizedBox(height: 14),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: DropdownButtonFormField<int>(
-                          initialValue: _semestreSeleccionado,
-                          decoration: InputDecoration(
-                            labelText: 'Periodo Semestral',
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                          ),
-                          items: const [
-                            DropdownMenuItem(value: 1, child: Text('Semestre I (Ene - Jun)')),
-                            DropdownMenuItem(value: 2, child: Text('Semestre II (Jul - Dic)')),
-                          ],
-                          onChanged: (v) => setState(() => _semestreSeleccionado = v ?? 2),
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final isNarrow = constraints.maxWidth < 450;
+                      final semestreField = DropdownButtonFormField<int>(
+                        isExpanded: true,
+                        initialValue: _semestreSeleccionado,
+                        decoration: InputDecoration(
+                          labelText: 'Periodo Semestral',
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                         ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: DropdownButtonFormField<int>(
-                          initialValue: _anioSeleccionado,
-                          decoration: InputDecoration(
-                            labelText: 'Año Fiscal',
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        items: const [
+                          DropdownMenuItem(
+                            value: 1,
+                            child: Text(
+                              'Semestre I (Ene - Jun)',
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
-                          items: [
-                            DropdownMenuItem(value: DateTime.now().year, child: Text('${DateTime.now().year}')),
-                            DropdownMenuItem(value: DateTime.now().year - 1, child: Text('${DateTime.now().year - 1}')),
-                          ],
-                          onChanged: (v) => setState(() => _anioSeleccionado = v ?? DateTime.now().year),
+                          DropdownMenuItem(
+                            value: 2,
+                            child: Text(
+                              'Semestre II (Jul - Dic)',
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                        onChanged: (v) => setState(() => _semestreSeleccionado = v ?? 2),
+                      );
+
+                      final anioField = DropdownButtonFormField<int>(
+                        isExpanded: true,
+                        initialValue: _anioSeleccionado,
+                        decoration: InputDecoration(
+                          labelText: 'Año Fiscal',
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                         ),
-                      ),
-                    ],
+                        items: [
+                          DropdownMenuItem(
+                            value: DateTime.now().year,
+                            child: Text('${DateTime.now().year}'),
+                          ),
+                          DropdownMenuItem(
+                            value: DateTime.now().year - 1,
+                            child: Text('${DateTime.now().year - 1}'),
+                          ),
+                        ],
+                        onChanged: (v) => setState(() => _anioSeleccionado = v ?? DateTime.now().year),
+                      );
+
+                      if (isNarrow) {
+                        return Column(
+                          children: [
+                            semestreField,
+                            const SizedBox(height: 10),
+                            anioField,
+                          ],
+                        );
+                      }
+
+                      return Row(
+                        children: [
+                          Expanded(child: semestreField),
+                          const SizedBox(width: 10),
+                          Expanded(child: anioField),
+                        ],
+                      );
+                    },
                   ),
                   const SizedBox(height: 14),
                   SizedBox(
@@ -387,9 +422,12 @@ class _IcaCertificationScreenState extends ConsumerState<IcaCertificationScreen>
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                       ),
                       icon: const Icon(Icons.table_view_rounded, size: 18),
-                      label: Text(
-                        'Descargar Balance Semestre $_semestreSeleccionado - $_anioSeleccionado en Excel',
-                        style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13),
+                      label: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          'Descargar Balance Semestre $_semestreSeleccionado - $_anioSeleccionado en Excel',
+                          style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13),
+                        ),
                       ),
                       onPressed: () {
                         engine.exportF08InventarioSemestral(semestre: _semestreSeleccionado, anio: _anioSeleccionado);
@@ -436,7 +474,10 @@ class _IcaCertificationScreenState extends ConsumerState<IcaCertificationScreen>
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                       ),
                       icon: const Icon(Icons.file_download_rounded, size: 20),
-                      label: const Text('Exportar Cuaderno de Campo Completo', style: TextStyle(fontWeight: FontWeight.w900)),
+                      label: const FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text('Exportar Cuaderno de Campo Completo', style: TextStyle(fontWeight: FontWeight.w900)),
+                      ),
                       onPressed: () {
                         engine.exportCuadernoCampoCompleto();
                         ScaffoldMessenger.of(context).showSnackBar(
@@ -455,8 +496,11 @@ class _IcaCertificationScreenState extends ConsumerState<IcaCertificationScreen>
             const SizedBox(height: 18),
 
             // Filtros de Formatos
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 10,
+              runSpacing: 8,
               children: [
                 Text(
                   '12 FORMATOS OFICIALES ICA (${filtered.length})',
@@ -468,6 +512,7 @@ class _IcaCertificationScreenState extends ConsumerState<IcaCertificationScreen>
                 ),
                 Wrap(
                   spacing: 6,
+                  runSpacing: 4,
                   children: ['TODOS', 'BIOSEGURIDAD', 'PRODUCCION', 'LAB'].map((cat) {
                     final isSel = _filtroFormato == cat;
                     return ChoiceChip(
@@ -563,18 +608,25 @@ class _IcaCertificationScreenState extends ConsumerState<IcaCertificationScreen>
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-              if (f.badgeInfo != null)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: isDark ? 0.08 : 0.05),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(
-                    f.badgeInfo!,
-                    style: TextStyle(color: isDark ? Colors.white70 : AppColors.textSecondaryLight, fontSize: 9.5, fontWeight: FontWeight.w600),
+              if (f.badgeInfo != null) ...[
+                const SizedBox(width: 6),
+                Flexible(
+                  flex: 0,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: isDark ? 0.08 : 0.05),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      f.badgeInfo!,
+                      style: TextStyle(color: isDark ? Colors.white70 : AppColors.textSecondaryLight, fontSize: 9.5, fontWeight: FontWeight.w600),
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
+                    ),
                   ),
                 ),
+              ],
             ],
           ),
           const SizedBox(height: 6),
@@ -591,52 +643,76 @@ class _IcaCertificationScreenState extends ConsumerState<IcaCertificationScreen>
             ),
           ),
           const SizedBox(height: 8),
-          Row(
-            children: [
-              if (f.esDiligenciableEnIca && f.onDiligenciar != null) ...[
-                Expanded(
-                  child: OutlinedButton.icon(
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: f.color,
-                      side: BorderSide(color: f.color.withValues(alpha: 0.5)),
-                      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    ),
-                    icon: const Icon(Icons.add_rounded, size: 14),
-                    label: const FittedBox(child: Text('Nuevo Registro', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800))),
-                    onPressed: f.onDiligenciar,
+          LayoutBuilder(
+            builder: (context, btnConstraints) {
+              final isCardCompact = btnConstraints.maxWidth < 280;
+              final nuevoBtn = OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: f.color,
+                  side: BorderSide(color: f.color.withValues(alpha: 0.5)),
+                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                icon: const Icon(Icons.add_rounded, size: 14),
+                label: const FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text('Nuevo Registro', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800)),
+                ),
+                onPressed: f.onDiligenciar,
+              );
+
+              final exportBtn = ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: f.esDiligenciableEnIca ? (isDark ? Colors.white10 : Colors.black12) : f.color,
+                  foregroundColor: f.esDiligenciableEnIca ? (isDark ? Colors.white : Colors.black) : Colors.black,
+                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                icon: const Icon(Icons.file_download_outlined, size: 14),
+                label: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    f.esDiligenciableEnIca ? 'Excel' : 'Exportar Excel Oficial',
+                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w900),
                   ),
                 ),
-                const SizedBox(width: 8),
-              ],
-              Expanded(
-                child: ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: f.esDiligenciableEnIca ? (isDark ? Colors.white10 : Colors.black12) : f.color,
-                    foregroundColor: f.esDiligenciableEnIca ? (isDark ? Colors.white : Colors.black) : Colors.black,
-                    padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
-                  icon: const Icon(Icons.file_download_outlined, size: 14),
-                  label: FittedBox(
-                    child: Text(
-                      f.esDiligenciableEnIca ? 'Excel' : 'Exportar Excel Oficial',
-                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w900),
+                onPressed: () {
+                  f.onExport();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('📄 Formato ${f.codigo} exportado correctamente'),
+                      backgroundColor: f.color,
+                      behavior: SnackBarBehavior.floating,
                     ),
-                  ),
-                  onPressed: () {
-                    f.onExport();
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('📄 Formato ${f.codigo} exportado correctamente'),
-                        backgroundColor: f.color,
-                        behavior: SnackBarBehavior.floating,
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ],
+                  );
+                },
+              );
+
+              if (f.esDiligenciableEnIca && f.onDiligenciar != null) {
+                if (isCardCompact) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      nuevoBtn,
+                      const SizedBox(height: 6),
+                      exportBtn,
+                    ],
+                  );
+                }
+                return Row(
+                  children: [
+                    Expanded(child: nuevoBtn),
+                    const SizedBox(width: 8),
+                    Expanded(child: exportBtn),
+                  ],
+                );
+              }
+
+              return SizedBox(
+                width: double.infinity,
+                child: exportBtn,
+              );
+            },
           ),
         ],
       ),

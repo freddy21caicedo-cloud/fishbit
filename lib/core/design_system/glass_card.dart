@@ -69,7 +69,13 @@ class GlassCard extends StatelessWidget {
                       ],
                     ),
               ),
-              if (trailingWidget != null) trailingWidget!,
+              if (trailingWidget != null) ...[
+                const SizedBox(width: 8),
+                Flexible(
+                  flex: 0,
+                  child: trailingWidget!,
+                ),
+              ],
             ],
           ),
           const SizedBox(height: 12),
