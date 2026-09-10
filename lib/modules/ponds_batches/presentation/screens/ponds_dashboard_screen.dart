@@ -294,7 +294,7 @@ class _PondsDashboardScreenState extends ConsumerState<PondsDashboardScreen> {
                     sliver: SliverGrid(
                       gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
                         maxCrossAxisExtent: 440,
-                        mainAxisExtent: 330,
+                        mainAxisExtent: 380,
                         crossAxisSpacing: 16,
                         mainAxisSpacing: 16,
                       ),

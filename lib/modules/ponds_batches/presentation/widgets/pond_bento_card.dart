@@ -520,9 +520,11 @@ class _PondBentoCardState extends State<PondBentoCard> with SingleTickerProvider
           ),
         ),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+      child: SingleChildScrollView(
+        physics: const BouncingScrollPhysics(),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
           // Selector de Especies para Policultivos
           if (isPolyculture) ...[
             SingleChildScrollView(
@@ -648,7 +650,8 @@ class _PondBentoCardState extends State<PondBentoCard> with SingleTickerProvider
           ),
         ],
       ),
-    );
+    ),
+  );
   }
 
   // Radiografía de un Lote Individual

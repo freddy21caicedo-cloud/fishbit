@@ -13,13 +13,15 @@ import 'package:fishbit_finance/modules/water_quality/domain/models/water_parame
 import 'package:fishbit_finance/modules/water_quality/presentation/providers/water_quality_provider.dart';
 
 class ParametroModal extends ConsumerStatefulWidget {
-  const ParametroModal({super.key});
+  final String? preselectedPondId;
 
-  static Future<void> show(BuildContext context) {
+  const ParametroModal({super.key, this.preselectedPondId});
+
+  static Future<void> show(BuildContext context, {String? preselectedPondId}) {
     return showDialog(
       context: context,
       barrierDismissible: true,
-      builder: (context) => const ParametroModal(),
+      builder: (context) => ParametroModal(preselectedPondId: preselectedPondId),
     );
   }
 
@@ -47,6 +49,12 @@ class _ParametroModalState extends ConsumerState<ParametroModal> {
   String? _selectedPondId;
   CivilDate _fechaMedicion = CivilDate.today();
   TimeOfDay _horaMedicion = TimeOfDay.now();
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedPondId = widget.preselectedPondId;
+  }
 
   @override
   void dispose() {

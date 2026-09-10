@@ -85,7 +85,7 @@ class _BitacoraScreenState extends ConsumerState<BitacoraScreen> with SingleTick
                           title: 'O₂ y pH',
                           onTap: () {
                             Navigator.of(ctx).pop();
-                            ParametroModal.show(context);
+                            ParametroModal.show(context, preselectedPondId: _selectedPondId);
                           },
                         ),
                       ),
@@ -97,7 +97,8 @@ class _BitacoraScreenState extends ConsumerState<BitacoraScreen> with SingleTick
                           title: 'Alimentar',
                           onTap: () {
                             Navigator.of(ctx).pop();
-                            AlimentarModal.show(context);
+                            final targetPond = _selectedPondId != null ? ref.read(pondsProvider).ponds.where((p) => p.id == _selectedPondId).firstOrNull : null;
+                            AlimentarModal.show(context, pond: targetPond);
                           },
                         ),
                       ),
@@ -113,7 +114,8 @@ class _BitacoraScreenState extends ConsumerState<BitacoraScreen> with SingleTick
                           title: 'Biometría',
                           onTap: () {
                             Navigator.of(ctx).pop();
-                            BiometriaModal.show(context);
+                            final targetPond = _selectedPondId != null ? ref.read(pondsProvider).ponds.where((p) => p.id == _selectedPondId).firstOrNull : null;
+                            BiometriaModal.show(context, pond: targetPond);
                           },
                         ),
                       ),
@@ -125,7 +127,8 @@ class _BitacoraScreenState extends ConsumerState<BitacoraScreen> with SingleTick
                           title: 'Bajas / Mort.',
                           onTap: () {
                             Navigator.of(ctx).pop();
-                            MortalidadModal.show(context);
+                            final targetPond = _selectedPondId != null ? ref.read(pondsProvider).ponds.where((p) => p.id == _selectedPondId).firstOrNull : null;
+                            MortalidadModal.show(context, pond: targetPond);
                           },
                         ),
                       ),
@@ -137,7 +140,8 @@ class _BitacoraScreenState extends ConsumerState<BitacoraScreen> with SingleTick
                           title: 'Traslado',
                           onTap: () {
                             Navigator.of(ctx).pop();
-                            TrasladoModal.show(context);
+                            final targetPond = _selectedPondId != null ? ref.read(pondsProvider).ponds.where((p) => p.id == _selectedPondId).firstOrNull : null;
+                            TrasladoModal.show(context, pond: targetPond);
                           },
                         ),
                       ),
@@ -587,9 +591,24 @@ class _BitacoraScreenState extends ConsumerState<BitacoraScreen> with SingleTick
     final textSecondary = isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
 
     final filteredParams = waterState.recentParameters.where((p) {
-      if (_selectedPondId != null && p.estanqueId != _selectedPondId) return false;
+      if (_selectedPondId != null && p.estanqueId.trim() != _selectedPondId!.trim()) return false;
       return true;
     }).toList();
+
+    // Cálculo dinámico de métricas para el estanque filtrado (o global)
+    final latestParam = filteredParams.firstOrNull;
+    final oxigenoDisplay = latestParam?.oxigenoMgL != null
+        ? '${latestParam!.oxigenoMgL!.toStringAsFixed(1)} mg/L'
+        : (filteredParams.isEmpty ? '—' : '5.5 - 7.0 mg/L');
+    final oxigenoSub = latestParam != null && latestParam.oxigenoMgL != null
+        ? 'Último registro (${latestParam.fecha.hour.toString().padLeft(2, '0')}:${latestParam.fecha.minute.toString().padLeft(2, '0')})'
+        : (filteredParams.isEmpty ? 'Sin mediciones' : 'Rango recomendado');
+    final phDisplay = latestParam?.ph != null
+        ? latestParam!.ph!.toStringAsFixed(1)
+        : (filteredParams.isEmpty ? '—' : '6.8 - 7.8');
+    final phSub = latestParam != null && latestParam.ph != null
+        ? (latestParam.ph! >= 6.5 && latestParam.ph! <= 8.5 ? 'pH en equilibrio' : 'pH fuera de rango')
+        : (filteredParams.isEmpty ? 'Sin mediciones' : 'Rango recomendado');
 
     return Center(
       child: ConstrainedBox(
@@ -606,24 +625,38 @@ class _BitacoraScreenState extends ConsumerState<BitacoraScreen> with SingleTick
                     children: [
                       Expanded(
                         child: GlassCard(
-                          title: 'Oxígeno Óptimo',
+                          title: 'Oxígeno Disuelto',
                           glowColor: AppColors.cyanWater,
-                          child: FittedBox(
-                            fit: BoxFit.scaleDown,
-                            alignment: Alignment.centerLeft,
-                            child: Text('5.5 - 7.0 mg/L', style: AppTypography.titleMedium.copyWith(color: AppColors.cyanWater)),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              FittedBox(
+                                fit: BoxFit.scaleDown,
+                                alignment: Alignment.centerLeft,
+                                child: Text(oxigenoDisplay, style: AppTypography.titleLarge.copyWith(color: AppColors.cyanWater, fontWeight: FontWeight.w900)),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(oxigenoSub, style: AppTypography.labelMicro.copyWith(color: textSecondary), overflow: TextOverflow.ellipsis),
+                            ],
                           ),
                         ),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
                         child: GlassCard(
-                          title: 'pH Rango',
+                          title: 'pH de Agua',
                           glowColor: AppColors.greenBiomass,
-                          child: FittedBox(
-                            fit: BoxFit.scaleDown,
-                            alignment: Alignment.centerLeft,
-                            child: Text('6.8 - 7.8', style: AppTypography.titleMedium.copyWith(color: AppColors.greenBiomass)),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              FittedBox(
+                                fit: BoxFit.scaleDown,
+                                alignment: Alignment.centerLeft,
+                                child: Text(phDisplay, style: AppTypography.titleLarge.copyWith(color: AppColors.greenBiomass, fontWeight: FontWeight.w900)),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(phSub, style: AppTypography.labelMicro.copyWith(color: textSecondary), overflow: TextOverflow.ellipsis),
+                            ],
                           ),
                         ),
                       ),
@@ -636,14 +669,47 @@ class _BitacoraScreenState extends ConsumerState<BitacoraScreen> with SingleTick
               );
             }
             if (filteredParams.isEmpty) {
+              final selectedPond = _selectedPondId != null ? pondMap[_selectedPondId] : null;
+              final nombreEstanque = selectedPond != null ? selectedPond.nombreLimpio : 'este estanque';
+
               return Padding(
-                padding: const EdgeInsets.all(32),
+                padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 16),
                 child: Center(
                   child: Column(
                     children: [
-                      Icon(Icons.water_drop_rounded, color: textSecondary.withValues(alpha: 0.5), size: 48),
-                      const SizedBox(height: 12),
-                      Text('No hay mediciones registradas para este estanque.', textAlign: TextAlign.center, style: TextStyle(color: textSecondary)),
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: AppColors.cyanWater.withValues(alpha: 0.12),
+                          shape: BoxShape.circle,
+                          border: Border.all(color: AppColors.cyanWater.withValues(alpha: 0.3)),
+                        ),
+                        child: const Icon(Icons.water_drop_rounded, color: AppColors.cyanWater, size: 40),
+                      ),
+                      const SizedBox(height: 14),
+                      Text(
+                        'Sin mediciones en $nombreEstanque',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 15),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Aún no se han registrado parámetros de oxígeno, pH o temperatura para $nombreEstanque.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: textSecondary, fontSize: 12),
+                      ),
+                      const SizedBox(height: 16),
+                      ElevatedButton.icon(
+                        onPressed: () => ParametroModal.show(context, preselectedPondId: _selectedPondId),
+                        icon: const Icon(Icons.add_rounded, size: 18),
+                        label: const Text('Registrar Primer Parámetro', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.cyanWater,
+                          foregroundColor: Colors.black,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -782,7 +848,7 @@ class _BitacoraScreenState extends ConsumerState<BitacoraScreen> with SingleTick
     final textPrimary = isDark ? Colors.white : AppColors.textPrimaryLight;
 
     final records = nutritionState.records.where((r) {
-      if (_selectedPondId != null && r.estanqueId != _selectedPondId) return false;
+      if (_selectedPondId != null && r.estanqueId.trim() != _selectedPondId!.trim()) return false;
       return true;
     }).toList();
     final totalKg = records.fold(0.0, (sum, r) => sum + r.cantidadConsumidaKg);
@@ -843,14 +909,50 @@ class _BitacoraScreenState extends ConsumerState<BitacoraScreen> with SingleTick
               );
             }
             if (records.isEmpty) {
+              final selectedPond = _selectedPondId != null ? pondMap[_selectedPondId] : null;
+              final nombreEstanque = selectedPond != null ? selectedPond.nombreLimpio : 'este estanque';
+
               return Padding(
-                padding: const EdgeInsets.all(32),
+                padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 16),
                 child: Center(
                   child: Column(
                     children: [
-                      Icon(Icons.restaurant_rounded, color: textSecondary.withValues(alpha: 0.5), size: 48),
-                      const SizedBox(height: 12),
-                      Text('No hay registros de alimentación para este estanque.', textAlign: TextAlign.center, style: TextStyle(color: textSecondary)),
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: AppColors.greenBiomass.withValues(alpha: 0.12),
+                          shape: BoxShape.circle,
+                          border: Border.all(color: AppColors.greenBiomass.withValues(alpha: 0.3)),
+                        ),
+                        child: const Icon(Icons.restaurant_rounded, color: AppColors.greenBiomass, size: 40),
+                      ),
+                      const SizedBox(height: 14),
+                      Text(
+                        'Sin raciones registradas en $nombreEstanque',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 15),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'No se han reportado raciones diarias de alimento concentrado para $nombreEstanque.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: textSecondary, fontSize: 12),
+                      ),
+                      const SizedBox(height: 16),
+                      ElevatedButton.icon(
+                        onPressed: () {
+                          final targetPond = _selectedPondId != null ? ref.read(pondsProvider).ponds.where((p) => p.id == _selectedPondId).firstOrNull : null;
+                          AlimentarModal.show(context, pond: targetPond);
+                        },
+                        icon: const Icon(Icons.restaurant_rounded, size: 18),
+                        label: const Text('Registrar Alimentación', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.greenBiomass,
+                          foregroundColor: Colors.black,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -1025,17 +1127,49 @@ class _BitacoraScreenState extends ConsumerState<BitacoraScreen> with SingleTick
               );
             }
             if (sortedBiometries.isEmpty) {
+              final selectedPond = _selectedPondId != null ? pondMap[_selectedPondId] : null;
+              final nombreEstanque = selectedPond != null ? selectedPond.nombreLimpio : 'este estanque';
+
               return Padding(
-                padding: const EdgeInsets.all(32),
+                padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 16),
                 child: Center(
                   child: Column(
                     children: [
-                      Icon(Icons.scale_rounded, color: textSecondary.withValues(alpha: 0.5), size: 48),
-                      const SizedBox(height: 12),
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.purpleAccent.withValues(alpha: 0.12),
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.purpleAccent.withValues(alpha: 0.3)),
+                        ),
+                        child: const Icon(Icons.scale_rounded, color: Colors.purpleAccent, size: 40),
+                      ),
+                      const SizedBox(height: 14),
                       Text(
-                        'No hay muestreos biométricos registrados para este estanque.',
+                        'Sin muestreos biométricos en $nombreEstanque',
                         textAlign: TextAlign.center,
-                        style: TextStyle(color: textSecondary),
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 15),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Registra un muestreo de peso y talla para calcular la ganancia diaria de peso (GDP).',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: textSecondary, fontSize: 12),
+                      ),
+                      const SizedBox(height: 16),
+                      ElevatedButton.icon(
+                        onPressed: () {
+                          final targetPond = _selectedPondId != null ? ref.read(pondsProvider).ponds.where((p) => p.id == _selectedPondId).firstOrNull : null;
+                          BiometriaModal.show(context, pond: targetPond);
+                        },
+                        icon: const Icon(Icons.scale_rounded, size: 18),
+                        label: const Text('Registrar Biometría', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.purpleAccent,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                        ),
                       ),
                     ],
                   ),
@@ -1188,9 +1322,10 @@ class _BitacoraScreenState extends ConsumerState<BitacoraScreen> with SingleTick
     final textPrimary = isDark ? Colors.white : AppColors.textPrimaryLight;
 
     // Filter mortality records by selected pond
+    // Filter mortality records by selected pond
     final allMortalities = pondsState.mortalityRecords;
     final records = _selectedPondId != null
-        ? allMortalities.where((m) => m.estanqueId == _selectedPondId).toList()
+        ? allMortalities.where((m) => m.estanqueId.trim() == _selectedPondId!.trim()).toList()
         : allMortalities;
 
     // Sort records in reverse chronological order
@@ -1210,7 +1345,7 @@ class _BitacoraScreenState extends ConsumerState<BitacoraScreen> with SingleTick
     }
 
     final relevantBatches = _selectedPondId != null
-        ? pondsState.batches.where((b) => b.estanqueId == _selectedPondId).toList()
+        ? pondsState.batches.where((b) => b.estanqueId.trim() == _selectedPondId!.trim()).toList()
         : pondsState.batches;
     final totalPecesActual = relevantBatches.fold<int>(0, (sum, b) => sum + b.cantidadActualPeces);
     final totalPecesInicial = relevantBatches.fold<int>(0, (sum, b) => sum + b.cantidadInicialPeces);
@@ -1228,7 +1363,7 @@ class _BitacoraScreenState extends ConsumerState<BitacoraScreen> with SingleTick
     }
 
     final filteredTransfers = _selectedPondId != null
-        ? pondsState.transferRecords.where((t) => t.estanqueOrigenId == _selectedPondId || t.estanqueDestinoId == _selectedPondId).toList()
+        ? pondsState.transferRecords.where((t) => t.estanqueOrigenId.trim() == _selectedPondId!.trim() || t.estanqueDestinoId.trim() == _selectedPondId!.trim()).toList()
         : pondsState.transferRecords;
 
     final mortCount = sortedRecords.isEmpty ? 1 : sortedRecords.length;
@@ -1311,17 +1446,48 @@ class _BitacoraScreenState extends ConsumerState<BitacoraScreen> with SingleTick
             // 1..mortCount: Registros de mortalidad o estado vacío
             if (index >= 1 && index < 1 + mortCount) {
               if (sortedRecords.isEmpty) {
+                final selectedPond = _selectedPondId != null ? pondMap[_selectedPondId] : null;
+                final nombreEstanque = selectedPond != null ? selectedPond.nombreLimpio : 'este estanque';
+
                 return Padding(
-                  padding: const EdgeInsets.all(32),
+                  padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
                   child: Center(
                     child: Column(
                       children: [
-                        Icon(Icons.health_and_safety_rounded, color: AppColors.greenBiomass.withValues(alpha: 0.5), size: 48),
+                        Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: AppColors.greenBiomass.withValues(alpha: 0.12),
+                            shape: BoxShape.circle,
+                            border: Border.all(color: AppColors.greenBiomass.withValues(alpha: 0.3)),
+                          ),
+                          child: const Icon(Icons.health_and_safety_rounded, color: AppColors.greenBiomass, size: 36),
+                        ),
                         const SizedBox(height: 12),
                         Text(
-                          'No hay registros de mortalidad en este estanque.\nPoblación en estado sanitario óptimo.',
+                          'Sin bajas reportadas en $nombreEstanque',
                           textAlign: TextAlign.center,
-                          style: TextStyle(color: textSecondary),
+                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 14),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Población en estado sanitario óptimo. (0 bajas registradas)',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: textSecondary, fontSize: 11.5),
+                        ),
+                        const SizedBox(height: 14),
+                        OutlinedButton.icon(
+                          onPressed: () {
+                            final targetPond = _selectedPondId != null ? ref.read(pondsProvider).ponds.where((p) => p.id == _selectedPondId).firstOrNull : null;
+                            MortalidadModal.show(context, pond: targetPond);
+                          },
+                          icon: const Icon(Icons.warning_amber_rounded, size: 16, color: AppColors.coralAction),
+                          label: const Text('Registrar Novedad / Baja', style: TextStyle(color: AppColors.coralAction, fontWeight: FontWeight.w800, fontSize: 11.5)),
+                          style: OutlinedButton.styleFrom(
+                            side: BorderSide(color: AppColors.coralAction.withValues(alpha: 0.5)),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          ),
                         ),
                       ],
                     ),
@@ -1605,7 +1771,7 @@ class _BiometryAnalysis {
     required String? selectedPondId,
   }) {
     final biometries = selectedPondId != null
-        ? allBiometries.where((b) => b.estanqueId == selectedPondId).toList()
+        ? allBiometries.where((b) => b.estanqueId.trim() == selectedPondId.trim()).toList()
         : allBiometries;
 
     final batchByIdOrCode = <String, FishBatch>{};
