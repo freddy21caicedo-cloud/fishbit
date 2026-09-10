@@ -2,6 +2,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fishbit_finance/core/design_system/app_colors.dart';
+import 'package:fishbit_finance/core/design_system/fishbit_logo.dart';
 import 'package:fishbit_finance/modules/auth_tenant/presentation/providers/auth_provider.dart';
 import 'package:fishbit_finance/modules/auth_tenant/presentation/dialogs/sede_selector_modal.dart';
 import 'package:fishbit_finance/modules/auth_tenant/presentation/dialogs/user_profile_sheet.dart';
@@ -63,58 +64,14 @@ class FishBitHeader extends ConsumerWidget {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  // Branding FishBit. Limpio y Prominente
-                  FittedBox(
+                  // Branding FishBit con Isotipo Oficial
+                  const FittedBox(
                     fit: BoxFit.scaleDown,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              'Fish',
-                              style: TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: -0.8,
-                                color: AppColors.cyanWater,
-                                shadows: [
-                                  Shadow(
-                                    color: AppColors.cyanWater.withValues(alpha: 0.6),
-                                    blurRadius: 14,
-                                  ),
-                                ],
-                              ),
-                            ),
-                            Text(
-                              'Bit.',
-                              style: TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: -0.8,
-                                color: AppColors.coralAction,
-                                shadows: [
-                                  Shadow(
-                                    color: AppColors.coralAction.withValues(alpha: 0.6),
-                                    blurRadius: 14,
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                        Text(
-                          'Gestión Acuícola',
-                          style: TextStyle(
-                            fontSize: 8.5,
-                            fontWeight: FontWeight.w500,
-                            color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                            letterSpacing: 0.2,
-                          ),
-                        ),
-                      ],
+                    child: FishBitLogo(
+                      size: 34,
+                      showWordmark: true,
+                      withSquircle: true,
+                      subtitle: 'Gestión Acuícola',
                     ),
                   ),
 

@@ -41,12 +41,9 @@ class SupabaseNutritionRepository implements NutritionRepository {
           .limit(100);
 
       final rawList = res as List;
-      if (rawList.isNotEmpty) {
-        return rawList.map((row) => FeedingRecord.fromJson(row as Map<String, dynamic>)).toList();
-      }
-      return _demoRecords;
+      return rawList.map((row) => FeedingRecord.fromJson(row as Map<String, dynamic>)).toList();
     } catch (_) {
-      return _demoRecords;
+      return [];
     }
   }
 

@@ -51,6 +51,7 @@ flutter:
     - assets/fonts/
     - assets/videos/
     - assets/images/
+    - assets/icons/
 
   fonts:
     - family: FishBitIcons

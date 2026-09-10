@@ -546,21 +546,9 @@ class SupabasePondsRepository implements PondsRepository {
 
       final res = await query.order('date', ascending: false).limit(100);
       final rawList = res as List;
-      if (rawList.isNotEmpty) {
-        return rawList.map((row) => BiometriaRecord.fromJson(row as Map<String, dynamic>)).toList();
-      }
-
-      var list = _demoBiometries;
-      if (pondId != null && pondId.isNotEmpty) {
-        list = list.where((b) => b.estanqueId == pondId).toList();
-      }
-      return list;
+      return rawList.map((row) => BiometriaRecord.fromJson(row as Map<String, dynamic>)).toList();
     } catch (_) {
-      var list = _demoBiometries;
-      if (pondId != null && pondId.isNotEmpty) {
-        list = list.where((b) => b.estanqueId == pondId).toList();
-      }
-      return list;
+      return [];
     }
   }
 
@@ -593,21 +581,9 @@ class SupabasePondsRepository implements PondsRepository {
 
       final res = await query.order('date', ascending: false).limit(100);
       final rawList = res as List;
-      if (rawList.isNotEmpty) {
-        return rawList.map((row) => MortalityRecord.fromJson(row as Map<String, dynamic>)).toList();
-      }
-
-      var list = _demoMortalities;
-      if (pondId != null && pondId.isNotEmpty) {
-        list = list.where((m) => m.estanqueId == pondId).toList();
-      }
-      return list;
+      return rawList.map((row) => MortalityRecord.fromJson(row as Map<String, dynamic>)).toList();
     } catch (_) {
-      var list = _demoMortalities;
-      if (pondId != null && pondId.isNotEmpty) {
-        list = list.where((m) => m.estanqueId == pondId).toList();
-      }
-      return list;
+      return [];
     }
   }
 

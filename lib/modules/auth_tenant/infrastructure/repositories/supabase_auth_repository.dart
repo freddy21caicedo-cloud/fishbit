@@ -310,7 +310,7 @@ class SupabaseAuthRepository implements AuthRepository {
       creadoEn: DateTime.now(),
     );
 
-    // Persistir en Supabase (empresas, unidades_acuicolas, miembros_equipo, profiles, estanques)
+    // Persistir en Supabase (empresas, unidades_acuicolas, miembros_equipo, profiles, user_units, estanques)
     try {
       await _supabase.from('empresas').insert({
         'id': companyId,
@@ -336,8 +336,13 @@ class SupabaseAuthRepository implements AuthRepository {
           'sigla': unitSigla.trim().toUpperCase(),
           'location': companyUbicacion.trim(),
         });
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('[setupCompanyForUser] Info: insert en units omitido o fallido: $e');
+      }
 
+      // Check constraints en Postgres:
+      // role: 'Admin', 'Tecnico', 'Operario', 'Creador'
+      // estado: 'Activo', 'Invitado', 'PendienteAprobacion', 'Suspendido'
       await _supabase.from('miembros_equipo').insert({
         'id': memberId,
         'empresa_id': companyId,
@@ -345,23 +350,35 @@ class SupabaseAuthRepository implements AuthRepository {
         'nombre': userName.trim(),
         'email': userEmail.trim().toLowerCase(),
         'cedula': adminCedula?.trim(),
-        'role': UserRole.admin.name,
+        'role': UserMember.roleToString(UserRole.admin),
         'permiso_global_empresa': true,
-        'estado': MemberStatus.active.name,
+        'estado': UserMember.statusToString(MemberStatus.active),
       });
 
-      // Sincronizar o crear registro en profiles para el usuario autenticado
+      // Sincronizar o actualizar registro en profiles para el usuario autenticado
       try {
         await _supabase.from('profiles').upsert({
           'id': memberId,
           'email': userEmail.trim().toLowerCase(),
           'full_name': userName.trim(),
           'empresa_id': companyId,
-          'role': UserRole.admin.name,
+          'role': UserMember.roleToString(UserRole.admin),
           if (adminTelefono != null && adminTelefono.trim().isNotEmpty) 'phone': adminTelefono.trim(),
           'updated_at': DateTime.now().toIso8601String(),
         });
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('[setupCompanyForUser] Error al actualizar profiles: $e');
+      }
+
+      // Asociar en user_units para RLS y pertenencia de sede
+      try {
+        await _supabase.from('user_units').upsert({
+          'user_id': memberId,
+          'unit_id': unitId,
+        });
+      } catch (e) {
+        debugPrint('[setupCompanyForUser] Error al vincular user_units: $e');
+      }
 
       // Crear el primer estanque si se especificó
       final estanqueNombre = (primerEstanqueNombre != null && primerEstanqueNombre.trim().isNotEmpty)
@@ -385,8 +402,12 @@ class SupabaseAuthRepository implements AuthRepository {
           'estado': 'Disponible',
           'aireacion_activa': false,
         });
-      } catch (_) {}
-    } catch (_) {}
+      } catch (e) {
+        debugPrint('[setupCompanyForUser] Error al crear estanque inicial: $e');
+      }
+    } catch (e) {
+      debugPrint('[setupCompanyForUser] Error crítico al persistir empresa/admin: $e');
+    }
 
     await _storage.setSessionUserId(memberId);
     await _storage.setActiveSedeId(unitId);

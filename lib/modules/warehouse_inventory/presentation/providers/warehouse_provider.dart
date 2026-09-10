@@ -549,21 +549,23 @@ class WarehouseNotifier extends StateNotifier<WarehouseState> {
       final invoices = await _repository.fetchInvoices(empresaId, unitId ?? empresaId);
       final bioPurchases = await _repository.fetchBiologicalPurchases(empresaId, unitId ?? empresaId);
 
-      // Si no hay datos en la nube todavía, inicializamos con los catálogos colombianos demo
-      final finalItems = remoteItems.isNotEmpty ? remoteItems : kDefaultInventoryItems;
+      final isMockCompany = empresaId.startsWith('c1000000-');
+      // Solo inicializar con catálogo demo si es una empresa de demostración/mock explícita
+      final finalItems = (remoteItems.isNotEmpty || !isMockCompany) ? remoteItems : kDefaultInventoryItems;
 
       state = state.copyWith(
         isLoading: false,
         items: finalItems,
-        suppliers: kDefaultSuppliers,
+        suppliers: isMockCompany ? kDefaultSuppliers : [],
         invoices: invoices,
         bioPurchases: bioPurchases,
       );
     } catch (e) {
+      final isMock = empresaId.startsWith('c1000000-');
       state = state.copyWith(
         isLoading: false,
-        items: kDefaultInventoryItems,
-        suppliers: kDefaultSuppliers,
+        items: isMock ? kDefaultInventoryItems : [],
+        suppliers: isMock ? kDefaultSuppliers : [],
         errorMessage: e.toString(),
       );
     }

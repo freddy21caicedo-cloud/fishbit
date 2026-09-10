@@ -129,10 +129,11 @@ class SupabaseWarehouseRepository implements WarehouseRepository {
       }
       final res = await query.order('creado_en', ascending: false).limit(100);
 
+      final isMockCompany = empresaId.startsWith('c1000000-');
       final list = (res as List).map((row) => PurchaseInvoice.fromJson(row as Map<String, dynamic>)).toList();
-      return list.isNotEmpty ? list : _demoInvoices;
+      return (list.isNotEmpty || !isMockCompany) ? list : _demoInvoices;
     } catch (_) {
-      return _demoInvoices;
+      return empresaId.startsWith('c1000000-') ? _demoInvoices : [];
     }
   }
 
@@ -161,10 +162,11 @@ class SupabaseWarehouseRepository implements WarehouseRepository {
       }
       final res = await query.order('creado_en', ascending: false).limit(100);
 
+      final isMockCompany = empresaId.startsWith('c1000000-');
       final list = (res as List).map((row) => BiologicalPurchase.fromJson(row as Map<String, dynamic>)).toList();
-      return list.isNotEmpty ? list : _demoBioPurchases;
+      return (list.isNotEmpty || !isMockCompany) ? list : _demoBioPurchases;
     } catch (_) {
-      return _demoBioPurchases;
+      return empresaId.startsWith('c1000000-') ? _demoBioPurchases : [];
     }
   }
 

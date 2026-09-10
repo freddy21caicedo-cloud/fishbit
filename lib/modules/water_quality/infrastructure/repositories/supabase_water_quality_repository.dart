@@ -82,13 +82,9 @@ class SupabaseWaterQualityRepository implements WaterQualityRepository {
       final res = await query.order('fecha', ascending: false).limit(50);
 
       final rawList = res as List;
-      if (rawList.isNotEmpty) {
-        return rawList.map((row) => WaterParameter.fromJson(row as Map<String, dynamic>)).toList();
-      }
-
-      return _demoParameters;
+      return rawList.map((row) => WaterParameter.fromJson(row as Map<String, dynamic>)).toList();
     } catch (_) {
-      return _demoParameters;
+      return [];
     }
   }
 

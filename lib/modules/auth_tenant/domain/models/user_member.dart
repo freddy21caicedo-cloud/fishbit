@@ -126,6 +126,19 @@ class UserMember {
     }
   }
 
+  static String statusToString(MemberStatus s) {
+    switch (s) {
+      case MemberStatus.active:
+        return 'Activo';
+      case MemberStatus.invited:
+        return 'Invitado';
+      case MemberStatus.pendingApproval:
+        return 'PendienteAprobacion';
+      case MemberStatus.suspended:
+        return 'Suspendido';
+    }
+  }
+
   static String roleToString(UserRole r) {
     switch (r) {
       case UserRole.creator:
@@ -183,7 +196,7 @@ class UserMember {
         'role': roleToString(role),
         'unidad_acuicola_id': unidadAcuicolaId,
         'permiso_global_empresa': permisoGlobalEmpresa,
-        'estado': estado.name,
+        'estado': statusToString(estado),
         'cedula': cedula,
         'salario_base': salarioBase,
         'periodo_pago': periodoPago,
