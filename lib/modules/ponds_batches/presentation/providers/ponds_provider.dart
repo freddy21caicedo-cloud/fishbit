@@ -125,6 +125,7 @@ class PondsNotifier extends StateNotifier<PondsState> {
       state = state.copyWith(ponds: [...state.ponds, created]);
     } catch (e) {
       state = state.copyWith(errorMessage: e.toString());
+      rethrow;
     }
   }
 

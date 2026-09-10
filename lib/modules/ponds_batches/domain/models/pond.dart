@@ -11,6 +11,8 @@ class Pond {
   final double? largoM;
   final double? anchoM;
   final double? profundidadM;
+  final String? tipoEstructura;
+  final String? unidadAcuicolaSigla;
   final String especieActual;
   final double biomasaKg;
   final double costoAcumuladoBiologico;
@@ -29,6 +31,8 @@ class Pond {
     this.largoM,
     this.anchoM,
     this.profundidadM,
+    this.tipoEstructura,
+    this.unidadAcuicolaSigla,
     this.especieActual = '',
     this.biomasaKg = 0.0,
     this.costoAcumuladoBiologico = 0.0,
@@ -48,6 +52,8 @@ class Pond {
     double? largoM,
     double? anchoM,
     double? profundidadM,
+    String? tipoEstructura,
+    String? unidadAcuicolaSigla,
     String? especieActual,
     double? biomasaKg,
     double? costoAcumuladoBiologico,
@@ -66,6 +72,8 @@ class Pond {
       largoM: largoM ?? this.largoM,
       anchoM: anchoM ?? this.anchoM,
       profundidadM: profundidadM ?? this.profundidadM,
+      tipoEstructura: tipoEstructura ?? this.tipoEstructura,
+      unidadAcuicolaSigla: unidadAcuicolaSigla ?? this.unidadAcuicolaSigla,
       especieActual: especieActual ?? this.especieActual,
       biomasaKg: biomasaKg ?? this.biomasaKg,
       costoAcumuladoBiologico: costoAcumuladoBiologico ?? this.costoAcumuladoBiologico,
@@ -146,13 +154,15 @@ class Pond {
     return Pond(
       id: (json['id'] ?? '').toString(),
       empresaId: (json['empresa_id'] ?? json['unidad_acuicola_id'] ?? '').toString(),
-      unidadAcuicolaId: (json['unidad_acuicola_id'] ?? json['empresa_id'] ?? '').toString(),
+      unidadAcuicolaId: (json['unidad_acuicola_id'] ?? json['unit_id'] ?? json['empresa_id'] ?? '').toString(),
       nombre: (json['nombre'] ?? json['name'] ?? '').toString(),
       sigla: (json['sigla'] ?? '').toString(),
       capacidadM3: (json['capacidad_m3'] as num?)?.toDouble() ?? 50.0,
       largoM: (json['largo_m'] as num?)?.toDouble(),
       anchoM: (json['ancho_m'] as num?)?.toDouble(),
       profundidadM: (json['profundidad_m'] as num?)?.toDouble(),
+      tipoEstructura: json['tipo_estructura'] as String?,
+      unidadAcuicolaSigla: json['unidad_acuicola_sigla'] as String?,
       especieActual: (json['especie_actual'] ?? '').toString(),
       biomasaKg: (json['biomasa_kg'] as num?)?.toDouble() ?? 0.0,
       costoAcumuladoBiologico: (json['costo_acumulado_biologico'] as num?)?.toDouble() ?? 0.0,
@@ -166,13 +176,16 @@ class Pond {
   Map<String, dynamic> toJson() => {
         'id': id,
         'empresa_id': empresaId,
+        'unit_id': unidadAcuicolaId,
         'unidad_acuicola_id': unidadAcuicolaId,
+        'unidad_acuicola_sigla': unidadAcuicolaSigla ?? (sigla.contains('-') ? sigla.split('-').first : 'PRIN'),
         'nombre': nombre,
         'sigla': sigla,
         'capacidad_m3': capacidadM3,
         'largo_m': largoM,
         'ancho_m': anchoM,
         'profundidad_m': profundidadM,
+        'tipo_estructura': tipoEstructura,
         'especie_actual': especieActual,
         'biomasa_kg': biomasaKg,
         'costo_acumulado_biologico': costoAcumuladoBiologico,

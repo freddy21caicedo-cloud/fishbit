@@ -218,9 +218,9 @@ class SupabasePondsRepository implements PondsRepository {
           .single();
 
       return Pond.fromJson(res);
-    } catch (_) {
-      _demoPonds.add(pond);
-      return pond;
+    } catch (e) {
+      // Si falla la inserción en base de datos real, propagamos el error para no engañar al usuario
+      rethrow;
     }
   }
 

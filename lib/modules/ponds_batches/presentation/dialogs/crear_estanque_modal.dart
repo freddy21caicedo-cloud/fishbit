@@ -128,6 +128,16 @@ class _CrearEstanqueModalState extends ConsumerState<CrearEstanqueModal> {
     final empresaId = auth.currentCompany?.id ?? user?.empresaId ?? 'c1000000-0000-0000-0000-000000000001';
     final unidadId = auth.activeUnitId ?? user?.unidadAcuicolaId ?? 'u1000000-0000-0000-0000-000000000001';
 
+    // Determinar la sigla de la unidad acuícola activa
+    String? unidadSigla;
+    try {
+      final activeUnit = auth.units.firstWhere((u) => u.id == unidadId);
+      unidadSigla = activeUnit.sigla;
+    } catch (_) {
+      unidadSigla = _siglaCtrl.text.trim().split('-').first.trim().toUpperCase();
+      if (unidadSigla.isEmpty) unidadSigla = 'PRIN';
+    }
+
     double? largo = _esCircular ? null : double.tryParse(_largoCtrl.text.replaceAll(',', '.'));
     double? ancho = _esCircular ? null : double.tryParse(_anchoCtrl.text.replaceAll(',', '.'));
     double? prof = double.tryParse(_profundidadCtrl.text.replaceAll(',', '.'));
@@ -136,6 +146,8 @@ class _CrearEstanqueModalState extends ConsumerState<CrearEstanqueModal> {
       id: const Uuid().v4(),
       empresaId: empresaId,
       unidadAcuicolaId: unidadId,
+      unidadAcuicolaSigla: unidadSigla,
+      tipoEstructura: _tipoEstructura,
       nombre: _nombreCtrl.text.trim(),
       sigla: _siglaCtrl.text.trim().toUpperCase(),
       capacidadM3: capacidadM3,
