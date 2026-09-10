@@ -201,7 +201,22 @@ class MockAuthRepository implements AuthRepository {
   @override
   Future<UserMember?> signInWithGoogle() async => null;
   @override
-  Future<UserMember> setupCompanyForUser({required String userId, required String userEmail, required String userName, String? adminCedula, String? adminTelefono, required String companyNombre, required String companyNit, required String companyUbicacion, required String unitNombre, required String unitSigla, List<String>? especiesHabilitadas}) async => throw UnimplementedError();
+  Future<UserMember> setupCompanyForUser({
+    required String userId,
+    required String userEmail,
+    required String userName,
+    String? adminCedula,
+    String? adminTelefono,
+    required String companyNombre,
+    required String companyNit,
+    required String companyUbicacion,
+    required String unitNombre,
+    required String unitSigla,
+    List<String>? especiesHabilitadas,
+    String? primerEstanqueNombre,
+    String? primerEstanqueTipo,
+    double? primerEstanqueCapacidadM3,
+  }) async => throw UnimplementedError();
   @override
   Future<UserMember> registerCompanyWithAdmin({required String adminNombres, required String adminApellidos, required String adminCedulaNit, required String adminContacto, required String adminEmail, required String adminPassword, required String companyNombre, required String companyUbicacion, required String companyNit, required String companyEmail, String? companyRegistroIca, String? companyRegistroAunap}) async => throw UnimplementedError();
   @override
