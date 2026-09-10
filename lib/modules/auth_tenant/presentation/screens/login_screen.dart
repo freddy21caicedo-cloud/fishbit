@@ -153,7 +153,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             ),
           ),
 
-          // 2. Capa de Tinte y Oscurecimiento Profundo OLED (Sutileza + Alto Contraste)
+          // 2. Capa de Tinte y Contraste Translúcido (Permite apreciar claramente las ilustraciones de peces)
           Positioned.fill(
             child: Container(
               decoration: BoxDecoration(
@@ -161,9 +161,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                   colors: [
-                    AppColors.backgroundDark.withValues(alpha: 0.88),
-                    const Color(0xFF0A0F18).withValues(alpha: 0.84),
-                    AppColors.backgroundDark.withValues(alpha: 0.94),
+                    AppColors.backgroundDark.withValues(alpha: 0.45),
+                    const Color(0xFF0A0F18).withValues(alpha: 0.40),
+                    AppColors.backgroundDark.withValues(alpha: 0.55),
                   ],
                 ),
               ),
@@ -179,7 +179,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               height: 320,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: AppColors.cyanWater.withValues(alpha: 0.16),
+                color: AppColors.cyanWater.withValues(alpha: 0.20),
               ),
             ),
           ),
@@ -191,12 +191,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               height: 340,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: AppColors.coralAction.withValues(alpha: 0.14),
+                color: AppColors.coralAction.withValues(alpha: 0.18),
               ),
             ),
           ),
 
-          // 4. Tarjeta Glassmorphic de Autenticación
+          // 4. Tarjeta Glassmorphic de Autenticación (Mayor desenfoque y presencia para perfecta legibilidad)
           Center(
             child: SingleChildScrollView(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 32),
@@ -205,9 +205,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 child: GlassContainer(
                   borderRadius: 28,
                   padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 36),
-                  blur: 24,
-                  opacity: 0.20,
-                  borderColor: Colors.white.withValues(alpha: 0.16),
+                  blur: 32,
+                  opacity: 0.65,
+                  tintColor: const Color(0xFF0D1522),
+                  borderColor: Colors.white.withValues(alpha: 0.22),
                   child: Form(
                     key: _formKey,
                     child: Column(
