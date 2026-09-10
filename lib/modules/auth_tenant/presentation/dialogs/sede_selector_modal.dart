@@ -7,6 +7,7 @@ import 'package:fishbit_finance/core/design_system/glass_form_field.dart';
 import 'package:fishbit_finance/core/design_system/glass_button.dart';
 import 'package:fishbit_finance/modules/auth_tenant/domain/models/user_member.dart';
 import 'package:fishbit_finance/modules/auth_tenant/presentation/providers/auth_provider.dart';
+import 'package:fishbit_finance/core/utils/sigla_generator.dart';
 
 class SedeSelectorModal extends ConsumerStatefulWidget {
   const SedeSelectorModal({super.key});
@@ -23,20 +24,10 @@ class SedeSelectorModal extends ConsumerStatefulWidget {
         child: SedeSelectorModal(),
       ),
       transitionBuilder: (dialogCtx, anim, secondaryAnim, child) {
-        final curvedAnim = CurvedAnimation(
-          parent: anim,
-          curve: Curves.easeOutBack,
-          reverseCurve: Curves.easeInCubic,
-        );
-
-        return FadeTransition(
-          opacity: anim,
-          child: ScaleTransition(
-            // Emerge directamente desde la píldora de Empresa/Sede en el header
-            alignment: const Alignment(-0.15, -0.85),
-            scale: Tween<double>(begin: 0.35, end: 1.0).animate(curvedAnim),
-            child: child,
-          ),
+        final curved = CurvedAnimation(parent: anim, curve: Curves.easeOutCubic);
+        return ScaleTransition(
+          scale: Tween<double>(begin: 0.95, end: 1.0).animate(curved),
+          child: FadeTransition(opacity: curved, child: child),
         );
       },
     );
@@ -54,7 +45,19 @@ class _SedeSelectorModalState extends ConsumerState<SedeSelectorModal> {
   bool _isLoading = false;
 
   @override
+  void initState() {
+    super.initState();
+    _unitNameCtrl.addListener(_onUnitNameChanged);
+  }
+
+  void _onUnitNameChanged() {
+    final text = _unitNameCtrl.text;
+    _unitSiglaCtrl.text = SiglaGenerator.generate(text, fallback: 'SED');
+  }
+
+  @override
   void dispose() {
+    _unitNameCtrl.removeListener(_onUnitNameChanged);
     _unitNameCtrl.dispose();
     _unitSiglaCtrl.dispose();
     _unitUbicacionCtrl.dispose();
@@ -318,9 +321,15 @@ class _SedeSelectorModalState extends ConsumerState<SedeSelectorModal> {
                                       Expanded(
                                         flex: 2,
                                         child: GlassFormField(
-                                          label: 'SIGLA',
-                                          hint: 'NOR',
+                                          label: 'SIGLA (AUTO)',
+                                          hint: 'SED',
                                           controller: _unitSiglaCtrl,
+                                          prefixIcon: Icons.short_text_rounded,
+                                          suffixWidget: const Padding(
+                                            padding: EdgeInsets.only(right: 10),
+                                            child: Icon(Icons.lock_outline_rounded, color: AppColors.cyanWater, size: 16),
+                                          ),
+                                          isReadOnly: true,
                                         ),
                                       ),
                                     ],

@@ -9,6 +9,7 @@ import 'package:fishbit_finance/modules/ponds_batches/domain/models/pond.dart';
 import 'package:fishbit_finance/modules/ponds_batches/domain/models/fish_batch.dart';
 import 'package:fishbit_finance/modules/ponds_batches/presentation/dialogs/alimentar_modal.dart';
 import 'package:fishbit_finance/modules/ponds_batches/presentation/dialogs/biometria_modal.dart';
+import 'package:fishbit_finance/modules/ponds_batches/presentation/dialogs/crear_estanque_modal.dart';
 import 'package:fishbit_finance/modules/ponds_batches/presentation/dialogs/mortalidad_modal.dart';
 import 'package:fishbit_finance/modules/ponds_batches/presentation/dialogs/siembra_modal.dart';
 import 'package:fishbit_finance/modules/ponds_batches/presentation/dialogs/traslado_modal.dart';
@@ -24,6 +25,7 @@ class PondsDashboardScreen extends ConsumerStatefulWidget {
 
 class _PondsDashboardScreenState extends ConsumerState<PondsDashboardScreen> {
   int _selectedFilterIndex = 0; // 0: Todos, 1: Activos, 2: Disponibles
+  bool _isSpeedDialOpen = false;
 
   @override
   Widget build(BuildContext context) {
@@ -43,11 +45,105 @@ class _PondsDashboardScreenState extends ConsumerState<PondsDashboardScreen> {
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       floatingActionButton: Padding(
         padding: const EdgeInsets.only(bottom: 78),
-        child: FloatingActionButton.extended(
-          backgroundColor: AppColors.cyanWater,
-          icon: const Icon(Icons.add_rounded, color: Colors.black),
-          label: const Text('Sembrar Lote', style: TextStyle(color: Colors.black, fontWeight: FontWeight.w800)),
-          onPressed: () => SiembraModal.show(context),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            if (_isSpeedDialOpen) ...[
+              // Acción 1: Nuevo Estanque
+              InkWell(
+                onTap: () {
+                  setState(() => _isSpeedDialOpen = false);
+                  CrearEstanqueModal.show(context);
+                },
+                borderRadius: BorderRadius.circular(16),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceDark,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: AppColors.cyanWater.withValues(alpha: 0.4)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.35),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.waves_rounded, color: AppColors.cyanWater, size: 18),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Nuevo Estanque',
+                        style: AppTypography.titleSmall.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+
+              // Acción 2: Sembrar Lote
+              InkWell(
+                onTap: () {
+                  setState(() => _isSpeedDialOpen = false);
+                  SiembraModal.show(context);
+                },
+                borderRadius: BorderRadius.circular(16),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceDark,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: AppColors.greenBiomass.withValues(alpha: 0.4)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.35),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.add_circle_outline_rounded, color: AppColors.greenBiomass, size: 18),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Sembrar Lote',
+                        style: AppTypography.titleSmall.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
+
+            // Botón Flotante Principal Toggle Speed Dial
+            FloatingActionButton.extended(
+              backgroundColor: _isSpeedDialOpen ? AppColors.coralAction : AppColors.cyanWater,
+              icon: AnimatedRotation(
+                turns: _isSpeedDialOpen ? 0.125 : 0.0,
+                duration: const Duration(milliseconds: 200),
+                child: Icon(_isSpeedDialOpen ? Icons.close_rounded : Icons.add_rounded, color: Colors.black),
+              ),
+              label: Text(
+                _isSpeedDialOpen ? 'Cerrar' : 'Acción Rápida',
+                style: const TextStyle(color: Colors.black, fontWeight: FontWeight.w800),
+              ),
+              onPressed: () => setState(() => _isSpeedDialOpen = !_isSpeedDialOpen),
+            ),
+          ],
         ),
       ),
       body: LayoutBuilder(
@@ -116,12 +212,50 @@ class _PondsDashboardScreenState extends ConsumerState<PondsDashboardScreen> {
                           spacing: 8,
                           runSpacing: 8,
                           children: [
-                            Text(
-                              'ESTANQUES (${filteredPonds.length})',
-                              style: AppTypography.labelMicro.copyWith(
-                                color: AppColors.textSecondaryDark,
-                                letterSpacing: 1.2,
-                              ),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  'ESTANQUES (${filteredPonds.length})',
+                                  style: AppTypography.labelMicro.copyWith(
+                                    color: AppColors.textSecondaryDark,
+                                    letterSpacing: 1.2,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                InkWell(
+                                  onTap: () {
+                                    showDialog<void>(
+                                      context: context,
+                                      barrierColor: Colors.black.withAlpha(160),
+                                      builder: (_) => const CrearEstanqueModal(),
+                                    );
+                                  },
+                                  borderRadius: BorderRadius.circular(16),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.cyanWater.withAlpha(25),
+                                      borderRadius: BorderRadius.circular(16),
+                                      border: Border.all(color: AppColors.cyanWater.withAlpha(80), width: 0.8),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        const Icon(Icons.add_rounded, size: 13, color: AppColors.cyanWater),
+                                        const SizedBox(width: 3),
+                                        Text(
+                                          'Nuevo',
+                                          style: AppTypography.labelMicro.copyWith(
+                                            color: AppColors.cyanWater,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                             Wrap(
                               spacing: 6,

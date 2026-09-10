@@ -7,6 +7,7 @@ import 'package:fishbit_finance/core/design_system/glass_container.dart';
 import 'package:fishbit_finance/core/design_system/glass_form_field.dart';
 import 'package:fishbit_finance/core/design_system/glass_button.dart';
 import 'package:fishbit_finance/modules/auth_tenant/presentation/providers/auth_provider.dart';
+import 'package:fishbit_finance/core/utils/sigla_generator.dart';
 
 class OnboardingEmpresaScreen extends ConsumerStatefulWidget {
   const OnboardingEmpresaScreen({super.key});
@@ -27,8 +28,11 @@ class _OnboardingEmpresaScreenState extends ConsumerState<OnboardingEmpresaScree
   final _companyNameCtrl = TextEditingController();
   final _nitCtrl = TextEditingController();
   final _ubicacionCtrl = TextEditingController(text: 'Colombia');
-  final _unitNameCtrl = TextEditingController(text: 'Sede Principal');
+  final _unitNameCtrl = TextEditingController();
   final _unitSiglaCtrl = TextEditingController(text: 'PRI');
+
+  // Control para saber si el usuario editó manualmente la sede
+  bool _isUnitNameManuallyEdited = false;
 
   // Datos Primer Estanque
   final _pondNameCtrl = TextEditingController(text: 'Estanque 01');
@@ -40,6 +44,28 @@ class _OnboardingEmpresaScreenState extends ConsumerState<OnboardingEmpresaScree
     super.initState();
     final user = ref.read(authProvider).currentUser;
     _adminNameCtrl = TextEditingController(text: user?.nombre ?? '');
+
+    // Sincronizar automáticamente Nombre de Sede y Sigla a partir de la Empresa
+    _companyNameCtrl.addListener(_onCompanyNameChanged);
+    _unitNameCtrl.addListener(_onUnitNameChanged);
+  }
+
+  void _onCompanyNameChanged() {
+    final compText = _companyNameCtrl.text;
+    if (!_isUnitNameManuallyEdited) {
+      _unitNameCtrl.text = compText;
+      _unitSiglaCtrl.text = SiglaGenerator.generate(compText);
+    }
+  }
+
+  void _onUnitNameChanged() {
+    // Si el usuario escribe algo diferente a la empresa, marcar como manual y recalcular sigla
+    if (_unitNameCtrl.text != _companyNameCtrl.text) {
+      _isUnitNameManuallyEdited = _unitNameCtrl.text.trim().isNotEmpty;
+    }
+    _unitSiglaCtrl.text = SiglaGenerator.generate(
+      _unitNameCtrl.text.trim().isNotEmpty ? _unitNameCtrl.text : _companyNameCtrl.text,
+    );
   }
 
   final List<String> _allAvailableSpecies = [
@@ -322,10 +348,15 @@ class _OnboardingEmpresaScreenState extends ConsumerState<OnboardingEmpresaScree
                               Expanded(
                                 flex: 2,
                                 child: GlassFormField(
-                                  label: 'SIGLA SEDE',
-                                  hint: 'ej. PRI',
+                                  label: 'SIGLA (AUTO)',
+                                  hint: 'PRI',
                                   controller: _unitSiglaCtrl,
                                   prefixIcon: Icons.short_text_rounded,
+                                  suffixWidget: const Padding(
+                                    padding: EdgeInsets.only(right: 10),
+                                    child: Icon(Icons.lock_outline_rounded, color: AppColors.cyanWater, size: 16),
+                                  ),
+                                  isReadOnly: true,
                                   validator: (val) => val == null || val.trim().isEmpty ? 'Sigla' : null,
                                 ),
                               ),
