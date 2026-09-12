@@ -56,11 +56,21 @@ class _SiembraModalState extends ConsumerState<SiembraModal> {
   void initState() {
     super.initState();
     _selectedPondId = widget.initialPond?.id;
+    final company = ref.read(authProvider).currentCompany;
+    if (company != null && company.especiesHabilitadas.isNotEmpty) {
+      _selectedEspecie = company.especiesHabilitadas.first;
+    }
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    final company = ref.read(authProvider).currentCompany;
+    if (company != null && company.especiesHabilitadas.isNotEmpty) {
+      if (!company.especiesHabilitadas.contains(_selectedEspecie)) {
+        _selectedEspecie = company.especiesHabilitadas.first;
+      }
+    }
     _actualizarCodigoLote();
     _recalcularCostoAutomatico();
   }

@@ -84,6 +84,10 @@ class _NuevoItemModalState extends ConsumerState<NuevoItemModal> {
     if (widget.initialType == InventoryItemType.farmacia) {
       _fechaVencimiento = DateTime.now().add(const Duration(days: 365));
     }
+    final company = ref.read(authProvider).currentCompany;
+    if (company != null && company.especiesHabilitadas.isNotEmpty) {
+      _especieAlevino = company.especiesHabilitadas.first;
+    }
   }
 
   @override
@@ -630,46 +634,73 @@ class _NuevoItemModalState extends ConsumerState<NuevoItemModal> {
                     ),
                     const SizedBox(height: 14),
                   ] else if (widget.initialType == InventoryItemType.alevino) ...[
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                            decoration: BoxDecoration(
-                              color: AppColors.greenBiomass.withValues(alpha: 0.08),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: AppColors.greenBiomass.withValues(alpha: 0.25)),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text('ESPECIE', style: TextStyle(color: AppColors.greenBiomass, fontSize: 9.5, fontWeight: FontWeight.w800)),
-                                Text(_especieAlevino, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: AppColors.greenBiomass)),
-                              ],
+                    Builder(builder: (context) {
+                      final company = ref.watch(authProvider).currentCompany;
+                      final availableSpecies = (company != null && company.especiesHabilitadas.isNotEmpty)
+                          ? company.especiesHabilitadas
+                          : ['Trucha Arcoíris', 'Tilapia Roja', 'Tilapia Nilótica', 'Cachama Blanca', 'Bocachico'];
+
+                      return Row(
+                        children: [
+                          Expanded(
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: AppColors.greenBiomass.withValues(alpha: 0.08),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: AppColors.greenBiomass.withValues(alpha: 0.25)),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Text('ESPECIE', style: TextStyle(color: AppColors.greenBiomass, fontSize: 9.5, fontWeight: FontWeight.w800)),
+                                  DropdownButtonHideUnderline(
+                                    child: DropdownButton<String>(
+                                      value: availableSpecies.contains(_especieAlevino) ? _especieAlevino : availableSpecies.first,
+                                      isExpanded: true,
+                                      dropdownColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+                                      icon: const Icon(Icons.arrow_drop_down_rounded, color: AppColors.greenBiomass),
+                                      style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: isDark ? Colors.white : AppColors.textPrimaryLight),
+                                      items: availableSpecies.map((esp) {
+                                        return DropdownMenuItem<String>(
+                                          value: esp,
+                                          child: Text(esp, overflow: TextOverflow.ellipsis),
+                                        );
+                                      }).toList(),
+                                      onChanged: (val) {
+                                        if (val != null) {
+                                          setState(() => _especieAlevino = val);
+                                        }
+                                      },
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: TextFormField(
-                            controller: _pesoPromedioCtrl,
-                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                            style: TextStyle(color: isDark ? Colors.white : AppColors.textPrimaryLight, fontSize: 13, fontWeight: FontWeight.w700),
-                            decoration: InputDecoration(
-                              labelText: 'Peso Promedio (g)',
-                              floatingLabelBehavior: FloatingLabelBehavior.auto,
-                              labelStyle: const TextStyle(color: AppColors.textSecondaryDark, fontSize: 12),
-                              floatingLabelStyle: const TextStyle(color: AppColors.greenBiomass, fontSize: 12, fontWeight: FontWeight.w800),
-                              filled: true,
-                              fillColor: isDark ? Colors.white.withValues(alpha: 0.04) : Colors.white,
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.greenBiomass, width: 1.8)),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: TextFormField(
+                              controller: _pesoPromedioCtrl,
+                              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                              style: TextStyle(color: isDark ? Colors.white : AppColors.textPrimaryLight, fontSize: 13, fontWeight: FontWeight.w700),
+                              decoration: InputDecoration(
+                                labelText: 'Peso Promedio (g)',
+                                floatingLabelBehavior: FloatingLabelBehavior.auto,
+                                labelStyle: const TextStyle(color: AppColors.textSecondaryDark, fontSize: 12),
+                                floatingLabelStyle: const TextStyle(color: AppColors.greenBiomass, fontSize: 12, fontWeight: FontWeight.w800),
+                                filled: true,
+                                fillColor: isDark ? Colors.white.withValues(alpha: 0.04) : Colors.white,
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.greenBiomass, width: 1.8)),
+                              ),
                             ),
                           ),
-                        ),
-                      ],
-                    ),
+                        ],
+                      );
+                    }),
                     const SizedBox(height: 14),
                   ],
 

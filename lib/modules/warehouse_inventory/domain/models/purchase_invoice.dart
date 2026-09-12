@@ -96,6 +96,7 @@ class PurchaseInvoice {
   final String id;
   final String empresaId;
   final String unidadAcuicolaId;
+  final String unidadAcuicolaSigla;
   final String tipoFactura; // 'concentrados' | 'insumos' | 'farmacia' | 'oxigenadores' | 'alevinos'
   final String numeroFactura;
   final String proveedorNombre;
@@ -120,6 +121,7 @@ class PurchaseInvoice {
     required this.id,
     required this.empresaId,
     required this.unidadAcuicolaId,
+    this.unidadAcuicolaSigla = 'SEDE',
     required this.tipoFactura,
     required this.numeroFactura,
     required this.proveedorNombre,
@@ -163,6 +165,7 @@ class PurchaseInvoice {
       id: json['id'] as String,
       empresaId: json['empresa_id'] as String? ?? '',
       unidadAcuicolaId: json['unidad_acuicola_id'] as String? ?? '',
+      unidadAcuicolaSigla: json['unidad_acuicola_sigla'] as String? ?? 'SEDE',
       tipoFactura: json['tipo_factura'] as String? ?? 'concentrados',
       numeroFactura: json['numero_factura'] as String? ?? '',
       proveedorNombre: json['proveedor_nombre'] as String? ?? '',
@@ -187,8 +190,9 @@ class PurchaseInvoice {
 
   Map<String, dynamic> toJson() => {
         'id': id,
-        'empresa_id': empresaId,
-        'unidad_acuicola_id': unidadAcuicolaId,
+        'empresa_id': empresaId.isNotEmpty ? empresaId : null,
+        'unidad_acuicola_id': (unidadAcuicolaId.isNotEmpty && !unidadAcuicolaId.startsWith('u1000000-')) ? unidadAcuicolaId : null,
+        'unidad_acuicola_sigla': unidadAcuicolaSigla.isNotEmpty ? unidadAcuicolaSigla : 'SEDE',
         'tipo_factura': tipoFactura,
         'numero_factura': numeroFactura,
         'proveedor_nombre': proveedorNombre,

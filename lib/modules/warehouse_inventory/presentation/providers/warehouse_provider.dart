@@ -556,7 +556,7 @@ class WarehouseNotifier extends StateNotifier<WarehouseState> {
       state = state.copyWith(
         isLoading: false,
         items: finalItems,
-        suppliers: isMockCompany ? kDefaultSuppliers : [],
+        suppliers: kDefaultSuppliers,
         invoices: invoices,
         bioPurchases: bioPurchases,
       );
@@ -565,7 +565,7 @@ class WarehouseNotifier extends StateNotifier<WarehouseState> {
       state = state.copyWith(
         isLoading: false,
         items: isMock ? kDefaultInventoryItems : [],
-        suppliers: isMock ? kDefaultSuppliers : [],
+        suppliers: kDefaultSuppliers,
         errorMessage: e.toString(),
       );
     }

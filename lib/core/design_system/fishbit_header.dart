@@ -29,6 +29,7 @@ class FishBitHeader extends ConsumerWidget {
     final user = authState.currentUser;
 
     final companyName = company?.nombreComercial ?? 'Piscícola';
+    final sedeName = activeUnit?.nombre ?? 'Sede Principal';
     final sigla = activeUnit?.sigla ?? 'PRIN';
 
     return SliverAppBar(
@@ -83,8 +84,9 @@ class FishBitHeader extends ConsumerWidget {
                         child: FittedBox(
                           fit: BoxFit.scaleDown,
                           child: CompanyPillButton(
-                            key: ValueKey('pill_${company?.id}_${activeUnit?.id}_${sigla}_$companyName'),
+                            key: ValueKey('pill_${company?.id}_${activeUnit?.id}_${sigla}_${companyName}_$sedeName'),
                             companyName: companyName,
+                            sedeName: sedeName,
                             sigla: sigla,
                             onTap: () => SedeSelectorModal.show(context),
                           ),
@@ -179,12 +181,14 @@ class _HeaderAvatarButtonState extends State<HeaderAvatarButton> {
 
 class CompanyPillButton extends StatefulWidget {
   final String companyName;
+  final String sedeName;
   final String sigla;
   final VoidCallback onTap;
 
   const CompanyPillButton({
     super.key,
     required this.companyName,
+    required this.sedeName,
     required this.sigla,
     required this.onTap,
   });
@@ -243,7 +247,7 @@ class _CompanyPillButtonState extends State<CompanyPillButton> {
               const SizedBox(width: 6),
               Flexible(
                 child: Text(
-                  widget.companyName,
+                  widget.sedeName.isNotEmpty ? widget.sedeName : widget.companyName,
                   style: TextStyle(
                     color: isDark ? Colors.white : AppColors.textPrimaryLight,
                     fontSize: 11.5,
@@ -254,7 +258,7 @@ class _CompanyPillButtonState extends State<CompanyPillButton> {
                 ),
               ),
               Text(
-                ' • ${widget.sigla}',
+                widget.sigla.isNotEmpty ? ' • ${widget.sigla}' : '',
                 style: const TextStyle(
                   color: AppColors.cyanWater,
                   fontSize: 11,

@@ -637,6 +637,8 @@ class _NuevaFacturaModalState extends ConsumerState<NuevaFacturaModal> {
                       final authState = ref.read(authProvider);
                       final empresaId = authState.currentUser?.empresaId ?? 'c1000000-0000-0000-0000-000000000001';
                       final unidadId = authState.activeUnitId ?? 'u1000000-0000-0000-0000-000000000001';
+                      final activeUnit = authState.units.where((u) => u.id == authState.activeUnitId).firstOrNull ?? (authState.units.isNotEmpty ? authState.units.first : null);
+                      final sigla = activeUnit?.sigla ?? 'SEDE';
                       final supName = _selectedSupplier?.nombre ?? 'Proveedor Oficial';
                       final supNit = _selectedSupplier?.nit ?? '860.026.895-8';
 
@@ -667,6 +669,7 @@ class _NuevaFacturaModalState extends ConsumerState<NuevaFacturaModal> {
                         id: const Uuid().v4(),
                         empresaId: empresaId,
                         unidadAcuicolaId: unidadId,
+                        unidadAcuicolaSigla: sigla,
                         tipoFactura: _categoriaSeleccionada,
                         numeroFactura: _facturaCtrl.text.trim(),
                         proveedorNombre: supName,

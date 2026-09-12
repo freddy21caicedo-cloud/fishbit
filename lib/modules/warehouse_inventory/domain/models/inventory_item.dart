@@ -202,9 +202,9 @@ class InventoryItem {
 
   Map<String, dynamic> toSupabaseJson() => {
         'id': id,
-        'empresa_id': empresaId,
-        'unit_id': unidadAcuicolaId,
-        'category': typeToString(tipo),
+        'empresa_id': empresaId.isNotEmpty ? empresaId : null,
+        'unit_id': (unidadAcuicolaId != null && unidadAcuicolaId!.isNotEmpty && !unidadAcuicolaId!.startsWith('u1000000-')) ? unidadAcuicolaId : null,
+        'category': typeToString(tipo).toLowerCase(),
         'name': nombre,
         'brand': marcaProveedor,
         'unit': presentacionUnidad,
@@ -214,13 +214,11 @@ class InventoryItem {
         'stock_minimo_alerta': stockMinimoAlerta,
         'proteina_pct': proteinaCrudaPct,
         'calibre_mm': calibrePelletMm,
-        'especie_alevino': especieAlevino,
         'potencia_hp': potenciaHp,
         'fase_electrica': faseElectrica,
-        'dias_retiro_sanitario': diasRetiroSanitario,
+        'dias_retiro_sanitario': diasRetiroSanitario ?? 0,
         'principio_activo': principioActivo,
         'lote_fabricante': loteFabricante,
-        'fecha_vencimiento': fechaVencimiento?.toIso8601String().split('T')[0],
         'created_at': creadoEn.toIso8601String(),
       };
 }
