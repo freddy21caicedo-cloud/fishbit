@@ -292,126 +292,52 @@ class SupabaseAuthRepository implements AuthRepository {
     double? primerEstanqueCapacidadM3,
     String? primerEstanqueTipo,
   }) async {
-    final companyId = const Uuid().v4();
-    final unitId = const Uuid().v4();
-    final memberId = userId.isNotEmpty ? userId : const Uuid().v4();
     final especies = especiesHabilitadas ?? ['Tilapia Roja', 'Cachama Negra', 'Bocachico', 'Pangasius'];
 
-    final newAdmin = UserMember(
-      id: memberId,
-      empresaId: companyId,
-      unidadAcuicolaId: unitId,
-      nombre: userName.trim(),
-      email: userEmail.trim().toLowerCase(),
-      cedula: adminCedula?.trim(),
-      role: UserRole.admin,
-      permisoGlobalEmpresa: true,
-      estado: MemberStatus.active,
-      creadoEn: DateTime.now(),
-    );
-
-    // Persistir en Supabase (empresas, unidades_acuicolas, miembros_equipo, profiles, user_units, estanques)
     try {
-      await _supabase.from('empresas').insert({
-        'id': companyId,
-        'nombre': companyNombre.trim(),
-        'nit': companyNit.trim(),
-        'moneda': 'COP',
-        'especies_habilitadas': especies,
+      final res = await _supabase.rpc<dynamic>('setup_company_for_user', params: {
+        'p_user_id': userId,
+        'p_user_email': userEmail.trim().toLowerCase(),
+        'p_user_name': userName.trim(),
+        'p_admin_cedula': adminCedula?.trim(),
+        'p_admin_telefono': adminTelefono?.trim(),
+        'p_company_nombre': companyNombre.trim(),
+        'p_company_nit': companyNit.trim(),
+        'p_company_ubicacion': companyUbicacion.trim(),
+        'p_unit_nombre': unitNombre.trim(),
+        'p_unit_sigla': unitSigla.trim().toUpperCase(),
+        'p_especies': especies,
+        'p_estanque_nombre': primerEstanqueNombre?.trim(),
+        'p_estanque_capacidad': primerEstanqueCapacidadM3 ?? 250.0,
+        'p_estanque_tipo': primerEstanqueTipo?.trim() ?? 'Geomembrana',
       });
 
-      await _supabase.from('unidades_acuicolas').insert({
-        'id': unitId,
-        'nombre': unitNombre.trim(),
-        'sigla': unitSigla.trim().toUpperCase(),
-        'ubicacion': companyUbicacion.trim(),
-      });
+      final Map<String, dynamic> rpcData = res is Map<String, dynamic>
+          ? res
+          : Map<String, dynamic>.from(res as Map);
 
-      // También en tabla units si existe
-      try {
-        await _supabase.from('units').insert({
-          'id': unitId,
-          'empresa_id': companyId,
-          'name': unitNombre.trim(),
-          'sigla': unitSigla.trim().toUpperCase(),
-          'location': companyUbicacion.trim(),
-        });
-      } catch (e) {
-        debugPrint('[setupCompanyForUser] Info: insert en units omitido o fallido: $e');
-      }
+      final companyId = rpcData['company_id'] as String;
+      final unitId = rpcData['unit_id'] as String;
 
-      // Check constraints en Postgres:
-      // role: 'Admin', 'Tecnico', 'Operario', 'Creador'
-      // estado: 'Activo', 'Invitado', 'PendienteAprobacion', 'Suspendido'
-      await _supabase.from('miembros_equipo').insert({
-        'id': memberId,
-        'empresa_id': companyId,
-        'unidad_acuicola_id': unitId,
-        'nombre': userName.trim(),
-        'email': userEmail.trim().toLowerCase(),
-        'cedula': adminCedula?.trim(),
-        'role': UserMember.roleToString(UserRole.admin),
-        'permiso_global_empresa': true,
-        'estado': UserMember.statusToString(MemberStatus.active),
-      });
+      await _storage.setSessionUserId(userId);
+      await _storage.setActiveSedeId(unitId);
 
-      // Sincronizar o actualizar registro en profiles para el usuario autenticado
-      try {
-        await _supabase.from('profiles').upsert({
-          'id': memberId,
-          'email': userEmail.trim().toLowerCase(),
-          'full_name': userName.trim(),
-          'empresa_id': companyId,
-          'role': UserMember.roleToString(UserRole.admin),
-          if (adminTelefono != null && adminTelefono.trim().isNotEmpty) 'phone': adminTelefono.trim(),
-          'updated_at': DateTime.now().toIso8601String(),
-        });
-      } catch (e) {
-        debugPrint('[setupCompanyForUser] Error al actualizar profiles: $e');
-      }
-
-      // Asociar en user_units para RLS y pertenencia de sede
-      try {
-        await _supabase.from('user_units').upsert({
-          'user_id': memberId,
-          'unit_id': unitId,
-        });
-      } catch (e) {
-        debugPrint('[setupCompanyForUser] Error al vincular user_units: $e');
-      }
-
-      // Crear el primer estanque si se especificó
-      final estanqueNombre = (primerEstanqueNombre != null && primerEstanqueNombre.trim().isNotEmpty)
-          ? primerEstanqueNombre.trim()
-          : 'Estanque 01';
-      final capacidadM3 = primerEstanqueCapacidadM3 ?? 250.0;
-      final estanqueId = const Uuid().v4();
-
-      try {
-        await _supabase.from('estanques').insert({
-          'id': estanqueId,
-          'empresa_id': companyId,
-          'unit_id': unitId,
-          'unidad_acuicola_id': unitId,
-          'nombre': estanqueNombre,
-          'sigla': 'E-01',
-          'capacidad_m3': capacidadM3,
-          'especie': especies.isNotEmpty ? especies.first : 'Tilapia Roja',
-          'biomasa_kg': 0.0,
-          'costo_acumulado_biologico': 0.0,
-          'estado': 'Disponible',
-          'aireacion_activa': false,
-        });
-      } catch (e) {
-        debugPrint('[setupCompanyForUser] Error al crear estanque inicial: $e');
-      }
+      return UserMember(
+        id: userId,
+        empresaId: companyId,
+        unidadAcuicolaId: unitId,
+        nombre: userName.trim(),
+        email: userEmail.trim().toLowerCase(),
+        cedula: adminCedula?.trim(),
+        role: UserRole.admin,
+        permisoGlobalEmpresa: true,
+        estado: MemberStatus.active,
+        creadoEn: DateTime.now(),
+      );
     } catch (e) {
-      debugPrint('[setupCompanyForUser] Error crítico al persistir empresa/admin: $e');
+      debugPrint('[setupCompanyForUser] Error en RPC setup_company_for_user: $e');
+      throw AuthFailure('Error al configurar la empresa: $e');
     }
-
-    await _storage.setSessionUserId(memberId);
-    await _storage.setActiveSedeId(unitId);
-    return newAdmin;
   }
 
   @override
@@ -623,15 +549,37 @@ class SupabaseAuthRepository implements AuthRepository {
         )).toList();
       }
 
-      // 2. Consultar unidades_acuicolas si es necesario
-      final res = await _supabase
-          .from('unidades_acuicolas')
-          .select('*')
-          .eq('id', empresaId);
+      // 2. Fallback: consultar unidades asociadas al usuario actual en user_units
+      final currentUserId = _supabase.auth.currentUser?.id ?? _storage.getSessionUserId();
+      if (currentUserId != null && currentUserId.isNotEmpty) {
+        final userUnitsRes = await _supabase
+            .from('user_units')
+            .select('unit_id')
+            .eq('user_id', currentUserId);
 
-      final rawList = res as List;
-      if (rawList.isNotEmpty) {
-        return rawList.map((row) => AquacultureUnit.fromJson(row as Map<String, dynamic>)).toList();
+        final unitIds = (userUnitsRes as List)
+            .map((r) => r['unit_id'] as String?)
+            .whereType<String>()
+            .toList();
+
+        if (unitIds.isNotEmpty) {
+          final res = await _supabase
+              .from('unidades_acuicolas')
+              .select('*')
+              .inFilter('id', unitIds);
+
+          final rawList = res as List;
+          if (rawList.isNotEmpty) {
+            return rawList.map((row) => AquacultureUnit(
+              id: row['id'] as String,
+              empresaId: empresaId,
+              nombre: row['nombre'] as String? ?? 'Sede',
+              sigla: row['sigla'] as String? ?? '',
+              ubicacion: row['ubicacion'] as String?,
+              creadoEn: row['creado_en'] != null ? DateTime.parse(row['creado_en'] as String) : DateTime.now(),
+            )).toList();
+          }
+        }
       }
     } catch (_) {}
 

@@ -7,6 +7,7 @@ import 'package:fishbit_finance/core/design_system/glass_container.dart';
 import 'package:fishbit_finance/core/design_system/glass_form_field.dart';
 import 'package:fishbit_finance/core/design_system/glass_button.dart';
 import 'package:fishbit_finance/modules/auth_tenant/presentation/providers/auth_provider.dart';
+import 'package:fishbit_finance/modules/ponds_batches/presentation/providers/ponds_provider.dart';
 import 'package:fishbit_finance/core/utils/sigla_generator.dart';
 
 class OnboardingEmpresaScreen extends ConsumerStatefulWidget {
@@ -120,13 +121,17 @@ class _OnboardingEmpresaScreenState extends ConsumerState<OnboardingEmpresaScree
         );
 
     if (success && mounted) {
-      context.go('/');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('¡Bienvenido Administrador! ${_companyNameCtrl.text} y su primer estanque han sido creados con éxito.'),
-          backgroundColor: AppColors.greenBiomass,
-        ),
-      );
+      // Recargar datos de estanques inmediatamente para el nuevo tenant
+      await ref.read(pondsProvider.notifier).loadPondsAndBatches();
+      if (mounted) {
+        context.go('/');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('¡Bienvenido Administrador! ${_companyNameCtrl.text} y su primer estanque han sido creados con éxito.'),
+            backgroundColor: AppColors.greenBiomass,
+          ),
+        );
+      }
     }
   }
 
