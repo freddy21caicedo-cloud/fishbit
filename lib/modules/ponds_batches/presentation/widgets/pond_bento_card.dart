@@ -264,14 +264,14 @@ class _PondBentoCardState extends State<PondBentoCard> with SingleTickerProvider
                   label: 'DENSIDAD',
                   value: isRealActive ? '${displayDensidad.toStringAsFixed(1)} kg/m³' : '0.0 kg/m³',
                   caption: isRealActive
-                      ? (widget.pond.nivelRiesgoDensidad == 'Óptimo'
+                      ? (displayDensidad < 8.0
                           ? '🟢 Óptima'
-                          : (widget.pond.nivelRiesgoDensidad == 'Alerta' ? '🟡 Alerta' : '🔴 Crítica'))
+                          : (displayDensidad <= 16.0 ? '🟡 Alerta' : '🔴 Crítica'))
                       : '⚪ Disponible',
                   color: isRealActive
-                      ? (widget.pond.nivelRiesgoDensidad == 'Óptimo'
+                      ? (displayDensidad < 8.0
                           ? AppColors.purpleAnalytics
-                          : (widget.pond.nivelRiesgoDensidad == 'Alerta' ? AppColors.amberWarning : AppColors.coralAction))
+                          : (displayDensidad <= 16.0 ? AppColors.amberWarning : AppColors.coralAction))
                       : AppColors.textTertiaryDark,
                 ),
               ),

@@ -87,13 +87,14 @@ class NutritionNotifier extends StateNotifier<NutritionState> {
   }) async {
     final auth = _ref.read(authProvider);
     final user = auth.currentUser;
-    final unitId = auth.activeUnitId;
+    final unitId = auth.activeUnitId ?? user?.unidadAcuicolaId ?? user?.empresaId;
+    final empresaId = auth.currentCompany?.id ?? user?.empresaId ?? unitId;
 
-    if (user == null || user.empresaId == null || unitId == null) return;
+    if (empresaId == null || empresaId.isEmpty || unitId == null || unitId.isEmpty) return;
 
     try {
       final rec = await _repository.recordFeeding(
-        empresaId: user.empresaId!,
+        empresaId: empresaId,
         unidadAcuicolaId: unitId,
         estanqueId: estanqueId,
         loteId: loteId,

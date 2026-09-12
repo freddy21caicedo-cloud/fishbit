@@ -599,16 +599,16 @@ class _BitacoraScreenState extends ConsumerState<BitacoraScreen> with SingleTick
     final latestParam = filteredParams.firstOrNull;
     final oxigenoDisplay = latestParam?.oxigenoMgL != null
         ? '${latestParam!.oxigenoMgL!.toStringAsFixed(1)} mg/L'
-        : (filteredParams.isEmpty ? '—' : '5.5 - 7.0 mg/L');
+        : '—';
     final oxigenoSub = latestParam != null && latestParam.oxigenoMgL != null
         ? 'Último registro (${latestParam.fecha.hour.toString().padLeft(2, '0')}:${latestParam.fecha.minute.toString().padLeft(2, '0')})'
-        : (filteredParams.isEmpty ? 'Sin mediciones' : 'Rango recomendado');
+        : 'Sin mediciones registradas';
     final phDisplay = latestParam?.ph != null
         ? latestParam!.ph!.toStringAsFixed(1)
-        : (filteredParams.isEmpty ? '—' : '6.8 - 7.8');
+        : '—';
     final phSub = latestParam != null && latestParam.ph != null
         ? (latestParam.ph! >= 6.5 && latestParam.ph! <= 8.5 ? 'pH en equilibrio' : 'pH fuera de rango')
-        : (filteredParams.isEmpty ? 'Sin mediciones' : 'Rango recomendado');
+        : 'Sin mediciones registradas';
 
     return Center(
       child: ConstrainedBox(

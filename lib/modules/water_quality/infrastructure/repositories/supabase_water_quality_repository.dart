@@ -61,9 +61,9 @@ class SupabaseWaterQualityRepository implements WaterQualityRepository {
         return rawList.map((row) => WaterParameter.fromJson(row as Map<String, dynamic>)).toList();
       }
 
-      return _demoParameters.where((p) => p.estanqueId == estanqueId).toList();
+      return [];
     } catch (_) {
-      return _demoParameters.where((p) => p.estanqueId == estanqueId).toList();
+      return [];
     }
   }
 
