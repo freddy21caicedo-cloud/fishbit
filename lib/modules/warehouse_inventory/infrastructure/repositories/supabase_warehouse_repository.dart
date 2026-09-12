@@ -2,6 +2,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:fishbit_finance/modules/warehouse_inventory/domain/models/inventory_item.dart';
 import 'package:fishbit_finance/modules/warehouse_inventory/domain/models/purchase_invoice.dart';
 import 'package:fishbit_finance/modules/warehouse_inventory/domain/models/biological_purchase.dart';
+import 'package:fishbit_finance/modules/warehouse_inventory/domain/models/supplier.dart';
 import 'package:fishbit_finance/modules/warehouse_inventory/domain/repositories/warehouse_repository.dart';
 
 class SupabaseWarehouseRepository implements WarehouseRepository {
@@ -183,6 +184,47 @@ class SupabaseWarehouseRepository implements WarehouseRepository {
     } catch (_) {
       _demoBioPurchases.add(purchase);
       return purchase;
+    }
+  }
+
+  static final List<Supplier> _demoCustomSuppliers = [];
+
+  @override
+  Future<List<Supplier>> fetchCustomSuppliers(String empresaId) async {
+    if (empresaId.startsWith('c1000000-')) {
+      return _demoCustomSuppliers;
+    }
+    try {
+      final res = await _supabase
+          .from('proveedores')
+          .select('*')
+          .eq('empresa_id', empresaId)
+          .order('creado_en', ascending: false);
+
+      final list = (res as List).map((row) => Supplier.fromJson(row as Map<String, dynamic>)).toList();
+      return list;
+    } catch (_) {
+      return [];
+    }
+  }
+
+  @override
+  Future<Supplier> createSupplier(Supplier supplier) async {
+    if (supplier.empresaId == null || supplier.empresaId!.startsWith('c1000000-')) {
+      _demoCustomSuppliers.add(supplier);
+      return supplier;
+    }
+    try {
+      final res = await _supabase
+          .from('proveedores')
+          .insert(supplier.toSupabaseJson())
+          .select()
+          .single();
+
+      return Supplier.fromJson(res);
+    } catch (_) {
+      _demoCustomSuppliers.add(supplier);
+      return supplier;
     }
   }
 }

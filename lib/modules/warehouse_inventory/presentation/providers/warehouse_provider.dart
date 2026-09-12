@@ -8,6 +8,8 @@ import 'package:fishbit_finance/modules/warehouse_inventory/domain/models/biolog
 import 'package:fishbit_finance/modules/warehouse_inventory/domain/repositories/warehouse_repository.dart';
 import 'package:fishbit_finance/modules/warehouse_inventory/infrastructure/repositories/supabase_warehouse_repository.dart';
 
+import 'package:fishbit_finance/modules/warehouse_inventory/domain/services/product_catalog_service.dart';
+
 final warehouseRepositoryProvider = Provider<WarehouseRepository>((ref) {
   final supabase = ref.watch(supabaseClientProvider);
   return SupabaseWarehouseRepository(supabase);
@@ -15,251 +17,8 @@ final warehouseRepositoryProvider = Provider<WarehouseRepository>((ref) {
 
 // Proveedores Colombianos Oficiales Pre-cargados
 final List<Supplier> kDefaultSuppliers = [
-  const Supplier(
-    id: 'sup-italcol',
-    nit: '860.026.895-8',
-    nombre: 'Italcol S.A.',
-    telefono: '+57 (601) 369-2000',
-    ciudad: 'Bogotá / Ibagué',
-    categoriaPrincipal: 'concentrados',
-    productosOfrecidos: [
-      'Aquatilapia 45% E (Iniciador)',
-      'Aquatilapia Micro Extruido 48%',
-      'Aquatilapia 45% Harina',
-      'Aquatilapia 38% E (Levante I)',
-      'Aquatilapia 34% E (Levante II)',
-      'Aquatilapia 32% E (Engorde)',
-      'Aquatilapia 30% E (Engorde I)',
-      'Aquatilapia 25% E (Engorde Final)',
-      'Aquatilapia 20% E',
-      'Aquatruchas Iniciación 50% E',
-      'Aquatruchas Levante 45% E Pigmento',
-      'Aquatrucha Finalización 40% E Pigmento',
-      'Aquatropico 22% E',
-    ],
-  ),
-  const Supplier(
-    id: 'sup-vgr-italcol',
-    nit: '901.378.925-0',
-    nombre: 'VGR Italcol del Norte S.A.S.',
-    telefono: '+57 (605) 385-2000',
-    ciudad: 'Barranquilla / Costa Caribe',
-    categoriaPrincipal: 'concentrados',
-    productosOfrecidos: [
-      'Aquatilapia 45% E (Iniciador)',
-      'Aquatilapia Micro Extruido 48%',
-      'Aquatilapia 45% Harina',
-      'Aquatilapia 38% E (Levante I)',
-      'Aquatilapia 34% E (Levante II)',
-      'Aquatilapia 32% E (Engorde)',
-      'Aquatilapia 30% E (Engorde I)',
-      'Aquatilapia 25% E (Engorde Final)',
-      'Aquatilapia 20% E',
-      'Aquatruchas Iniciación 50% E',
-      'Aquatruchas Levante 45% E Pigmento',
-      'Aquatrucha Finalización 40% E Pigmento',
-      'Aquatropico 22% E',
-    ],
-  ),
-  const Supplier(
-    id: 'sup-solla',
-    nit: '890.900.291-8',
-    nombre: 'Solla S.A.',
-    telefono: '+57 (604) 448-0020',
-    ciudad: 'Medellín / Buga',
-    categoriaPrincipal: 'concentrados',
-    productosOfrecidos: [
-      'Solla Mojarra 45% (Alevines)',
-      'Mojarras 38% PB',
-      'Mojarras 32% PB',
-      'Mojarras 24% PB',
-      'Mojarra Reproductores',
-      'Solla Trucha Arco Iris Levante',
-      'Trucha Arco Iris Engorde Pigmento',
-      'Solla Peces 20% (Introducción)',
-    ],
-  ),
-  const Supplier(
-    id: 'sup-contegral',
-    nit: '890.901.271-5',
-    nombre: 'Contegral S.A.S.',
-    telefono: '+57 (604) 370-5000',
-    ciudad: 'Envigado / Barranquilla',
-    categoriaPrincipal: 'concentrados',
-    productosOfrecidos: [
-      'Tilapias Reproducción',
-      'Tilapias Iniciación 45%',
-      'Peces Iniciación 45%',
-      'Peces Prelevante 38%',
-      'Peces Levante 32%',
-      'Maxi-Peces 38%',
-      'Maxi-Peces 36%',
-      'Maxi-Peces 34%',
-      'Maxi-Peces 32%',
-      'Maxi-Peces 28%',
-      'Maxi-Peces 25%',
-      'Peces Engorde 25%',
-      'Peces Engorde 22%',
-      'Maxi Truchas 45 SP',
-      'Truchas Iniciación',
-      'Truchas 40',
-    ],
-  ),
-  const Supplier(
-    id: 'sup-agrinal',
-    nit: '890.400.514-1',
-    nombre: 'Agrinal Colombia S.A.S.',
-    telefono: '+57 (601) 825-8800',
-    ciudad: 'Buga / Villavicencio',
-    categoriaPrincipal: 'concentrados',
-    productosOfrecidos: [
-      'Tilapia 45% Extruida (Iniciación)',
-      'Tilapia 38% Extruida (Levante)',
-      'Tilapia 30% Extruida (Desarrollo)',
-      'Tilapia 24% Extruida (Engorde)',
-      'Truchas 40% Con Pigmento Extruido',
-      'Truchas 45% Sin Pigmento Extruido',
-      'Trucha 48% Iniciación Sin Pigmento Extruida',
-    ],
-  ),
-  const Supplier(
-    id: 'sup-finca',
-    nit: '860.004.828-1',
-    nombre: 'Finca S.A.S.',
-    telefono: '+57 (601) 422-1000',
-    ciudad: 'Buga / Girardot',
-    categoriaPrincipal: 'concentrados',
-    productosOfrecidos: [
-      'Tilapia Iniciación 45%',
-      'Tilapia Levante 38%',
-      'Tilapia Desarrollo 32%',
-      'Tilapia Engorde 24%',
-    ],
-  ),
-  const Supplier(
-    id: 'sup-suministros-caribe',
-    nit: '901.123.456-1',
-    nombre: 'Suministros Acuícolas del Caribe',
-    telefono: '+57 (605) 385-1122',
-    ciudad: 'Barranquilla / Cartagena',
-    categoriaPrincipal: 'insumos',
-    productosOfrecidos: [
-      'Sal Marina sin Yodo (Saco 50 Kg)',
-      'Cal Agrícola Carbonato de Calcio (Saco 40 Kg)',
-      'Cal Viva Óxido de Calcio (Saco 40 Kg)',
-      'Melaza de Caña Pura (Caneca 25 Kg)',
-      'Complejo Vitamínico C Hidrosoluble (Galón 5L)',
-    ],
-  ),
-  const Supplier(
-    id: 'sup-bio-acuaticos',
-    nit: '890.333.444-3',
-    nombre: 'Bio-Acuáticos de Colombia',
-    telefono: '+57 (602) 667-8899',
-    ciudad: 'Cali / Neiva',
-    categoriaPrincipal: 'insumos',
-    productosOfrecidos: [
-      'Bacterias Probióticas Bacillus (Litro)',
-      'Levadura Activa Industrial (Bolsa 10 Kg)',
-      'Zeolita Micronizada para Fondos (Saco 25 Kg)',
-    ],
-  ),
-  const Supplier(
-    id: 'sup-tecnoaqua',
-    nit: '900.789.091-1',
-    nombre: 'Tecnoaqua S.A.S. (TecnoAqua)',
-    telefono: '+57 (601) 745-9988',
-    ciudad: 'Bogotá / Villavicencio',
-    categoriaPrincipal: 'farmacia',
-    productosOfrecidos: [
-      'Oxitetraciclina Polvo 50% (Bolsa 5 Kg)',
-      'Florfenicol 50% Grado Acuícola',
-      'Formalina Terapéutica 37% (Galón 4L)',
-      'Azul de Metileno Grado Farmacéutico',
-      'Sulfato de Cobre Pentahidratado',
-    ],
-  ),
-  const Supplier(
-    id: 'sup-acuagranja',
-    nit: '890.324.487-3',
-    nombre: 'Acuagranja S.A.S. (Acuagranja)',
-    telefono: '+57 (602) 555-1234',
-    ciudad: 'Cali / Valle',
-    categoriaPrincipal: 'farmacia',
-    productosOfrecidos: [
-      'Complejo Vitamínico B (Frasco 1 Kg)',
-      'Probiótico Clínico (Litro)',
-      'Oxitetraciclina Polvo 50% (Bolsa 5 Kg)',
-    ],
-  ),
-  const Supplier(
-    id: 'sup-dr-tilapia',
-    nit: '901.473.921-6',
-    nombre: 'Doctor Tilapia y Doña Trucha S.A.S.',
-    telefono: '+57 (608) 871-3322',
-    ciudad: 'Neiva / Huila',
-    categoriaPrincipal: 'farmacia',
-    productosOfrecidos: [
-      'Oxitetraciclina Polvo 50% (Bolsa 5 Kg)',
-      'Complejo Vitamínico B (Frasco 1 Kg)',
-      'Formalina Terapéutica 37% (Galón 4L)',
-    ],
-  ),
-  const Supplier(
-    id: 'sup-truchas-surala',
-    nit: '800.190.239-9',
-    nombre: 'Truchas Surala S.A.S. (Surala)',
-    telefono: '+57 (601) 862-4455',
-    ciudad: 'Cundinamarca / Boyacá',
-    categoriaPrincipal: 'farmacia',
-    productosOfrecidos: [
-      'Oxitetraciclina Polvo 50% (Bolsa 5 Kg)',
-      'Formalina Terapéutica 37% (Galón 4L)',
-    ],
-  ),
-  const Supplier(
-    id: 'sup-equipos-aquapower',
-    nit: '901.887.654-9',
-    nombre: 'AquaPower Equipos y Motores',
-    telefono: '+57 (604) 321-4455',
-    ciudad: 'Medellín',
-    categoriaPrincipal: 'oxigenadores',
-    productosOfrecidos: [
-      'Aireador de Paletas 1.0 HP (Monofásico)',
-      'Aireador de Paletas 2.0 HP (Trifásico)',
-      'Aireador Splash Tipo Hongo 1.5 HP',
-      'Soplador Blower Regenerativo 2.5 HP',
-      'Motobomba Sumergible 3.0 HP',
-    ],
-  ),
-  const Supplier(
-    id: 'sup-gtc-bio',
-    nit: '800.092.799-4',
-    nombre: 'Genética Tilapieira de Colombia S.A. (GTC)',
-    telefono: '+57 (608) 835-9900',
-    ciudad: 'Neiva / Betania',
-    categoriaPrincipal: 'alevinos',
-    productosOfrecidos: [
-      'Alevinos Tilapia Roja Reversada',
-      'Alevinos Tilapia Plateada Nilótica',
-      'Ovas Embrionadas de Tilapia',
-      'Reproductores Seleccionados GTC',
-    ],
-  ),
-  const Supplier(
-    id: 'sup-aquagen-bio',
-    nit: '900.123.456-1',
-    nombre: 'Aquagén Colombia S.A.S.',
-    telefono: '+57 (601) 620-7711',
-    ciudad: 'Bogotá / Llanos',
-    categoriaPrincipal: 'alevinos',
-    productosOfrecidos: [
-      'Alevinos Cachama Blanca',
-      'Alevinos Bocachico del Magdalena',
-      'Alevinos Bagre Rayado / Yaque',
-      'Alevinos Trucha Arcoíris Ovas All-Female',
-    ],
-  ),
+  ...ProductCatalogService.kOfficialFeedSuppliers,
+  ProductCatalogService.kSanoaSupplier,
 ];
 
 // Inventario Inicial Acuícola Demo V2.0
@@ -467,12 +226,27 @@ class WarehouseState {
   /// Obtener items o compras de alevinos/larvas disponibles para una especie
   List<InventoryItem> getAlevinosForSpecies(String especie) {
     final cleanEspecie = especie.trim().toLowerCase();
+    // Extraer palabras clave de especie (ej. "trucha", "tilapia", "cachama")
+    final speciesKeywords = cleanEspecie
+        .split(RegExp(r'\s+'))
+        .where((k) => k.length > 3)
+        .toList();
+
     return items.where((i) {
       final isAlevino = i.tipo == InventoryItemType.alevino;
-      final matchesSpecies = i.nombre.toLowerCase().contains(cleanEspecie) ||
-          (i.especieAlevino != null && i.especieAlevino!.toLowerCase().contains(cleanEspecie)) ||
-          cleanEspecie.contains(i.nombre.toLowerCase());
-      return isAlevino && matchesSpecies;
+      if (!isAlevino) return false;
+
+      final itemName = i.nombre.toLowerCase();
+      final itemSpecies = (i.especieAlevino ?? '').toLowerCase();
+
+      final directMatch = itemName.contains(cleanEspecie) ||
+          itemSpecies.contains(cleanEspecie) ||
+          cleanEspecie.contains(itemName);
+
+      if (directMatch) return true;
+
+      // Coincidencia por palabra clave principal (ej: "trucha")
+      return speciesKeywords.any((k) => itemName.contains(k) || itemSpecies.contains(k));
     }).toList();
   }
 
@@ -548,15 +322,17 @@ class WarehouseNotifier extends StateNotifier<WarehouseState> {
       final remoteItems = await _repository.fetchInventory(empresaId);
       final invoices = await _repository.fetchInvoices(empresaId, unitId ?? empresaId);
       final bioPurchases = await _repository.fetchBiologicalPurchases(empresaId, unitId ?? empresaId);
+      final customSuppliers = await _repository.fetchCustomSuppliers(empresaId);
 
       final isMockCompany = empresaId.startsWith('c1000000-');
       // Solo inicializar con catálogo demo si es una empresa de demostración/mock explícita
       final finalItems = (remoteItems.isNotEmpty || !isMockCompany) ? remoteItems : kDefaultInventoryItems;
+      final mergedSuppliers = [...kDefaultSuppliers, ...customSuppliers];
 
       state = state.copyWith(
         isLoading: false,
         items: finalItems,
-        suppliers: kDefaultSuppliers,
+        suppliers: mergedSuppliers,
         invoices: invoices,
         bioPurchases: bioPurchases,
       );
@@ -572,7 +348,12 @@ class WarehouseNotifier extends StateNotifier<WarehouseState> {
   }
 
   Future<void> addSupplier(Supplier supplier) async {
-    state = state.copyWith(suppliers: [...state.suppliers, supplier]);
+    try {
+      final created = await _repository.createSupplier(supplier);
+      state = state.copyWith(suppliers: [...state.suppliers, created]);
+    } catch (_) {
+      state = state.copyWith(suppliers: [...state.suppliers, supplier]);
+    }
   }
 
   Future<void> addInventory(InventoryItem item) async {

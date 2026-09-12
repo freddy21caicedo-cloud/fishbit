@@ -9,6 +9,8 @@ import 'package:fishbit_finance/core/design_system/glass_button.dart';
 import 'package:fishbit_finance/modules/warehouse_inventory/domain/models/supplier.dart';
 import 'package:fishbit_finance/modules/warehouse_inventory/presentation/providers/warehouse_provider.dart';
 
+import 'package:fishbit_finance/modules/auth_tenant/presentation/providers/auth_provider.dart';
+
 class ProveedoresModal extends ConsumerStatefulWidget {
   const ProveedoresModal({super.key});
 
@@ -50,8 +52,13 @@ class _ProveedoresModalState extends ConsumerState<ProveedoresModal> {
     super.dispose();
   }
 
-  void _guardarProveedor() {
+  void _guardarProveedor() async {
     if (!_formKey.currentState!.validate()) return;
+
+    final auth = ref.read(authProvider);
+    final empresaId = auth.currentUser?.empresaId ?? auth.currentCompany?.id ?? 'c1000000-0000-0000-0000-000000000001';
+    final activeUnit = auth.units.where((u) => u.id == auth.activeUnitId).firstOrNull ?? (auth.units.isNotEmpty ? auth.units.first : null);
+    final sigla = activeUnit?.sigla ?? 'SEDE';
 
     final newSupplier = Supplier(
       id: const Uuid().v4(),
@@ -60,10 +67,14 @@ class _ProveedoresModalState extends ConsumerState<ProveedoresModal> {
       telefono: _telCtrl.text.trim().isNotEmpty ? _telCtrl.text.trim() : null,
       ciudad: _ciudadCtrl.text.trim().isNotEmpty ? _ciudadCtrl.text.trim() : null,
       categoriaPrincipal: _categoriaSeleccionada,
+      empresaId: empresaId,
+      unidadAcuicolaSigla: sigla,
+      isCustom: true,
     );
 
-    ref.read(warehouseProvider.notifier).addSupplier(newSupplier);
+    await ref.read(warehouseProvider.notifier).addSupplier(newSupplier);
 
+    if (!mounted) return;
     setState(() {
       _showForm = false;
       _nombreCtrl.clear();
@@ -74,7 +85,7 @@ class _ProveedoresModalState extends ConsumerState<ProveedoresModal> {
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Proveedor "${newSupplier.nombre}" registrado exitosamente.'),
+        content: Text('Proveedor "${newSupplier.nombre}" guardado exitosamente.'),
         backgroundColor: AppColors.greenBiomass,
       ),
     );
@@ -292,16 +303,38 @@ class _ProveedoresModalState extends ConsumerState<ProveedoresModal> {
                       style: AppTypography.titleSmall.copyWith(color: Colors.white, fontWeight: FontWeight.w800),
                     ),
                   ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: AppColors.amberWarning.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      s.categoriaPrincipal.toUpperCase(),
-                      style: const TextStyle(color: AppColors.amberWarning, fontSize: 10, fontWeight: FontWeight.w800),
-                    ),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: s.isCustom ? AppColors.greenBiomass.withValues(alpha: 0.15) : Colors.white.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: s.isCustom ? AppColors.greenBiomass.withValues(alpha: 0.3) : Colors.white12),
+                        ),
+                        child: Text(
+                          s.isCustom ? 'PROPIO' : 'OFICIAL',
+                          style: TextStyle(
+                            color: s.isCustom ? AppColors.greenBiomass : AppColors.cyanWater,
+                            fontSize: 9,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: AppColors.amberWarning.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          s.categoriaPrincipal.toUpperCase(),
+                          style: const TextStyle(color: AppColors.amberWarning, fontSize: 10, fontWeight: FontWeight.w800),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
