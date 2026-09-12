@@ -232,10 +232,10 @@ class WarehouseState {
         .where((k) => k.length > 3)
         .toList();
 
-    return items.where((i) {
-      final isAlevino = i.tipo == InventoryItemType.alevino;
-      if (!isAlevino) return false;
+    final allAlevinos = items.where((i) => i.tipo == InventoryItemType.alevino).toList();
+    if (allAlevinos.isEmpty) return [];
 
+    final matched = allAlevinos.where((i) {
       final itemName = i.nombre.toLowerCase();
       final itemSpecies = (i.especieAlevino ?? '').toLowerCase();
 
@@ -248,6 +248,23 @@ class WarehouseState {
       // Coincidencia por palabra clave principal (ej: "trucha")
       return speciesKeywords.any((k) => itemName.contains(k) || itemSpecies.contains(k));
     }).toList();
+
+    if (matched.isNotEmpty) return matched;
+
+    // Fallback de resiliencia: si los ítems de alevino en bodega no especifican otra especie rival,
+    // o solo hay un lote de alevinos disponible en la empresa, asociarlo para no bloquear al productor.
+    final rivalKeywords = ['trucha', 'tilapia', 'cachama', 'bocachico', 'salmón', 'bagre', 'carpa', 'camarón'];
+    final requestedRivals = rivalKeywords.where((rk) => !cleanEspecie.contains(rk)).toList();
+
+    final fallback = allAlevinos.where((i) {
+      final name = i.nombre.toLowerCase();
+      final spec = (i.especieAlevino ?? '').toLowerCase();
+      // Si el ítem no contiene explícitamente una especie rival distinta a la solicitada
+      final hasOtherSpecies = requestedRivals.any((rk) => name.contains(rk) || spec.contains(rk));
+      return !hasOtherSpecies;
+    }).toList();
+
+    return fallback;
   }
 
   /// Total de alevinos disponibles en almacén para una especie

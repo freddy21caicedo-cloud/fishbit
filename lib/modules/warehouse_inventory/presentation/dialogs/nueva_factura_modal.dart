@@ -145,7 +145,33 @@ class _NuevaFacturaModalState extends ConsumerState<NuevaFacturaModal> {
 
   void _addNewItem([String? defaultName, String? defaultCode, String? defaultLote, String? defaultPrice]) {
     final sup = _selectedSupplier;
-    final String prodName = defaultName ?? (sup?.productosOfrecidos.isNotEmpty == true ? sup!.productosOfrecidos.first : 'Producto');
+    final company = ref.read(authProvider).currentCompany;
+    final companySpecies = company?.especiesHabilitadas ?? ['Trucha Arcoíris'];
+
+    String prodName = defaultName ?? '';
+    if (prodName.isEmpty) {
+      if (_categoriaSeleccionada == 'alevinos') {
+        final bioProducts = ProductCatalogService.getBiologicalProducts(companySpecies);
+        // Default to "Alevinos de [Especie]" if available
+        final defaultAlevino = bioProducts.firstWhere(
+          (p) => p.toLowerCase().startsWith('alevinos de'),
+          orElse: () => bioProducts.isNotEmpty ? bioProducts.first : 'Alevinos de Trucha Arcoíris',
+        );
+        prodName = defaultAlevino;
+      } else if (sup?.productosOfrecidos.isNotEmpty == true) {
+        prodName = sup!.productosOfrecidos.first;
+      } else if (_categoriaSeleccionada == 'concentrados') {
+        final feedProds = ProductCatalogService.getFeedProductsForSupplier(sup?.nombre ?? '', companySpecies);
+        prodName = feedProds.isNotEmpty ? feedProds.first : 'Concentrado Comercial';
+      } else {
+        prodName = switch (_categoriaSeleccionada) {
+          'insumos' => 'Insumo Acuícola',
+          'farmacia' => 'Fármaco Veterinario',
+          'oxigenadores' => 'Oxigenador / Aireador',
+          _ => 'Producto General',
+        };
+      }
+    }
     
     final (defUnidad, defFactor, defIva) = switch (_categoriaSeleccionada) {
       'concentrados' => ('Bulto 40 Kg', '40', '5.0'),
@@ -363,6 +389,26 @@ class _NuevaFacturaModalState extends ConsumerState<NuevaFacturaModal> {
       final fleteItem = _flete * ratio;
       final totalConFlete = it.valorTotal + fleteItem;
       final costoUnit = it.totalCantidadFisica > 0 ? (totalConFlete / it.totalCantidadFisica) : 0.0;
+
+      String? especieAlevino;
+      if (_inventoryTypeFromCategory == InventoryItemType.alevino) {
+        final lower = it.nombre.toLowerCase();
+        final company = ref.read(authProvider).currentCompany;
+        final companySpecies = company?.especiesHabilitadas ?? ['Trucha Arcoíris'];
+        
+        if (lower.contains('trucha')) {
+          especieAlevino = companySpecies.firstWhere((s) => s.toLowerCase().contains('trucha'), orElse: () => 'Trucha Arcoíris');
+        } else if (lower.contains('tilapia')) {
+          especieAlevino = companySpecies.firstWhere((s) => s.toLowerCase().contains('tilapia'), orElse: () => 'Tilapia Roja');
+        } else if (lower.contains('cachama')) {
+          especieAlevino = companySpecies.firstWhere((s) => s.toLowerCase().contains('cachama'), orElse: () => 'Cachama Negra');
+        } else if (lower.contains('bocachico')) {
+          especieAlevino = companySpecies.firstWhere((s) => s.toLowerCase().contains('bocachico'), orElse: () => 'Bocachico');
+        } else {
+          especieAlevino = companySpecies.isNotEmpty ? companySpecies.first : 'Trucha Arcoíris';
+        }
+      }
+
       return InventoryItem(
         id: const Uuid().v4(),
         empresaId: empresaId,
@@ -375,6 +421,7 @@ class _NuevaFacturaModalState extends ConsumerState<NuevaFacturaModal> {
         cantidadActualKg: it.totalCantidadFisica,
         costoTotal: totalConFlete,
         costoUnitarioHistorico: costoUnit,
+        especieAlevino: especieAlevino,
         loteFabricante: it.loteFabricante.isNotEmpty ? it.loteFabricante : null,
         creadoEn: DateTime.now(),
       );
@@ -1360,6 +1407,18 @@ class _NuevaFacturaModalState extends ConsumerState<NuevaFacturaModal> {
   }
 
   Widget _buildProductDropdown(EditableInvoiceItem item, List<String> availableProducts, bool isDark) {
+    if (availableProducts.isNotEmpty && !availableProducts.contains(item.nombre)) {
+      final defaultProduct = availableProducts.first;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && item.nombre != defaultProduct) {
+          setState(() {
+            item.nombre = defaultProduct;
+            item.costoUnitarioCtrl.text = _guessPrice(defaultProduct);
+          });
+        }
+      });
+    }
+
     final currentVal = availableProducts.contains(item.nombre) ? item.nombre : (availableProducts.isNotEmpty ? availableProducts.first : null);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
