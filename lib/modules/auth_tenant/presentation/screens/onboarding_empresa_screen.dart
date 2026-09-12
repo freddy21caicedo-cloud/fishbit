@@ -132,6 +132,27 @@ class _OnboardingEmpresaScreenState extends ConsumerState<OnboardingEmpresaScree
           ),
         );
       }
+    } else if (mounted) {
+      final errorMsg = ref.read(authProvider).errorMessage ?? 'Ocurrió un error al configurar la empresa y administrador.';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.error_outline_rounded, color: Colors.white),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  errorMsg,
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                ),
+              ),
+            ],
+          ),
+          backgroundColor: Colors.redAccent,
+          duration: const Duration(seconds: 5),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
     }
   }
 

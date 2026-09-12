@@ -5,6 +5,7 @@ import 'package:fishbit_finance/core/design_system/app_typography.dart';
 import 'package:fishbit_finance/core/design_system/glass_card.dart';
 import 'package:fishbit_finance/core/design_system/glass_badge.dart';
 import 'package:fishbit_finance/core/utils/currency_formatters.dart';
+import 'package:fishbit_finance/modules/ponds_batches/domain/models/fish_batch.dart';
 import 'package:fishbit_finance/modules/ponds_batches/presentation/providers/ponds_provider.dart';
 import 'package:fishbit_finance/modules/warehouse_inventory/presentation/providers/warehouse_provider.dart';
 import 'package:fishbit_finance/modules/finance_payroll/presentation/providers/finance_provider.dart';
@@ -24,17 +25,24 @@ class _CpkBreakdownCardState extends ConsumerState<CpkBreakdownCard> {
 
   @override
   Widget build(BuildContext context) {
-    final ponds = ref.watch(pondsProvider).ponds;
+    final pondsState = ref.watch(pondsProvider);
+    final ponds = pondsState.ponds;
+    final batches = pondsState.batches.where((b) => b.estado == BatchStatus.active).toList();
     final warehouseState = ref.watch(warehouseProvider);
     final financeState = ref.watch(financeProvider);
     final equipmentState = ref.watch(equipmentProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
+    // Costo de Insumos Real Consumido en Agua:
+    // Si los lotes tienen registrado su consumo acumulado de alimento, se usa la suma real.
+    // De lo contrario, se usa fallback con facturas o estimación biológica en ProductionCostEngine.
+    final costoInsumosRealLotes = batches.fold(0.0, (sum, b) => sum + b.costoAcumuladoInsumos);
     final totalAlimentoFacturas = warehouseState.invoices.fold(0.0, (sum, inv) => sum + inv.totalFactura);
+    final totalAlimentoInsumosEfectivo = costoInsumosRealLotes > 0 ? costoInsumosRealLotes : totalAlimentoFacturas;
 
     final summary = ProductionCostEngine.calculate(
       ponds: ponds,
-      totalAlimentoInsumos: totalAlimentoFacturas,
+      totalAlimentoInsumos: totalAlimentoInsumosEfectivo,
       totalNominaFija: financeState.totalCostoNomina,
       totalJornales: financeState.totalCostoJornales,
       totalEnergia: financeState.totalCostoEnergia,

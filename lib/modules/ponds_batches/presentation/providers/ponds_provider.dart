@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fishbit_finance/core/network/supabase_client_provider.dart';
+import 'package:fishbit_finance/core/events/app_event_bus.dart';
 import 'package:fishbit_finance/modules/auth_tenant/presentation/providers/auth_provider.dart';
 import 'package:fishbit_finance/modules/ponds_batches/domain/models/pond.dart';
 import 'package:fishbit_finance/modules/ponds_batches/domain/models/fish_batch.dart';
@@ -61,6 +63,8 @@ class PondsState {
 class PondsNotifier extends StateNotifier<PondsState> {
   final PondsRepository _repository;
   final Ref _ref;
+  StreamSubscription<dynamic>? _feedingSub;
+  StreamSubscription<dynamic>? _harvestSub;
 
   PondsNotifier(this._repository, this._ref) : super(const PondsState(isLoading: true)) {
     loadPondsAndBatches();
@@ -72,6 +76,83 @@ class PondsNotifier extends StateNotifier<PondsState> {
         loadPondsAndBatches();
       }
     });
+
+    // Suscripción al EventBus para cerrar la cadena de costos (Precision Aquaculture)
+    final eventBus = _ref.read(eventBusProvider);
+    _feedingSub = eventBus.on<DailyFeedingRecordedEvent>().listen((event) {
+      _handleDailyFeedingRecorded(event);
+    });
+    _harvestSub = eventBus.on<HarvestSaleRecordedEvent>().listen((event) {
+      _handleHarvestSaleRecorded(event);
+    });
+  }
+
+  @override
+  void dispose() {
+    _feedingSub?.cancel();
+    _harvestSub?.cancel();
+    super.dispose();
+  }
+
+  void _handleDailyFeedingRecorded(DailyFeedingRecordedEvent event) {
+    final bIndex = state.batches.indexWhere((b) => b.id == event.loteId);
+    if (bIndex != -1) {
+      final oldBatch = state.batches[bIndex];
+      final updatedBatch = oldBatch.copyWith(
+        alimentoAcumuladoKg: oldBatch.alimentoAcumuladoKg + event.kgConsumidos,
+        costoAcumuladoInsumos: oldBatch.costoAcumuladoInsumos + event.costoTotal,
+      );
+
+      final updatedBatches = List<FishBatch>.from(state.batches);
+      updatedBatches[bIndex] = updatedBatch;
+
+      // Actualizar también costo acumulado biológico en el estanque
+      final updatedPonds = state.ponds.map((p) {
+        if (p.id == event.estanqueId) {
+          return p.copyWith(
+            costoAcumuladoBiologico: p.costoAcumuladoBiologico + event.costoTotal,
+          );
+        }
+        return p;
+      }).toList();
+
+      state = state.copyWith(batches: updatedBatches, ponds: updatedPonds);
+
+      // Persistir actualización en base de datos
+      _repository.updateBatch(updatedBatch);
+    }
+  }
+
+  void _handleHarvestSaleRecorded(HarvestSaleRecordedEvent event) {
+    final bIndex = state.batches.indexWhere((b) => b.id == event.loteId);
+    if (bIndex != -1) {
+      final oldBatch = state.batches[bIndex];
+      final remanenteBiomasa = (oldBatch.biomasaActualKg - event.biomasaVendidaKg).clamp(0.0, double.infinity);
+      final isTotalHarvest = remanenteBiomasa <= 5.0; // margen técnico de cierre
+
+      final updatedBatch = oldBatch.copyWith(
+        biomasaActualKg: remanenteBiomasa,
+        estado: isTotalHarvest ? BatchStatus.harvested : oldBatch.estado,
+      );
+
+      final updatedBatches = List<FishBatch>.from(state.batches);
+      updatedBatches[bIndex] = updatedBatch;
+
+      final updatedPonds = state.ponds.map((p) {
+        if (p.id == oldBatch.estanqueId) {
+          return p.copyWith(
+            biomasaKg: remanenteBiomasa,
+            estado: isTotalHarvest ? PondStatus.available : p.estado,
+            especieActual: isTotalHarvest ? '' : p.especieActual,
+            costoAcumuladoBiologico: isTotalHarvest ? 0.0 : (p.costoAcumuladoBiologico - event.cogs).clamp(0.0, double.infinity),
+          );
+        }
+        return p;
+      }).toList();
+
+      state = state.copyWith(batches: updatedBatches, ponds: updatedPonds);
+      _repository.updateBatch(updatedBatch);
+    }
   }
 
   Future<void> loadData([String? unitId]) async {
