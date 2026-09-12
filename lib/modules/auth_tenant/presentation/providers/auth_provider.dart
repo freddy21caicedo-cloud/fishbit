@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide AuthState;
 import 'package:fishbit_finance/core/network/supabase_client_provider.dart';
@@ -118,21 +119,39 @@ class AuthNotifier extends StateNotifier<AuthState> {
     final isSuperAdmin = user.email.toLowerCase() == 'especialistaacuicola@gmail.com';
 
     if (!isSuperAdmin) {
-      allCompanies = await _repository.fetchUserCompanies(user.id);
+      try {
+        allCompanies = await _repository.fetchUserCompanies(user.id);
+      } catch (e) {
+        debugPrint('[_hydrateUserData] Error al obtener compañías: $e');
+      }
 
-      if (user.empresaId != null && user.empresaId!.isNotEmpty) {
-        company = await _repository.fetchCompany(user.empresaId!);
-        units = await _repository.fetchUnits(user.empresaId!);
-        team = await _repository.fetchTeamMembers(user.empresaId!);
-      } else if (allCompanies.isNotEmpty) {
-        company = allCompanies.first;
-        units = await _repository.fetchUnits(company.id);
-        team = await _repository.fetchTeamMembers(company.id);
+      final targetEmpresaId = (user.empresaId != null && user.empresaId!.isNotEmpty)
+          ? user.empresaId!
+          : (allCompanies.isNotEmpty ? allCompanies.first.id : null);
+
+      if (targetEmpresaId != null && targetEmpresaId.isNotEmpty) {
+        try {
+          company = await _repository.fetchCompany(targetEmpresaId);
+        } catch (e) {
+          debugPrint('[_hydrateUserData] Error al obtener empresa: $e');
+        }
+
+        try {
+          units = await _repository.fetchUnits(targetEmpresaId);
+        } catch (e) {
+          debugPrint('[_hydrateUserData] Error al obtener sedes: $e');
+        }
+
+        try {
+          team = await _repository.fetchTeamMembers(targetEmpresaId);
+        } catch (e) {
+          debugPrint('[_hydrateUserData] Error al obtener miembros: $e');
+        }
       }
     }
 
     String? activeId = user.unidadAcuicolaId ?? _storage.getActiveSedeId();
-    if (activeId == null && units.isNotEmpty) {
+    if ((activeId == null || activeId.isEmpty) && units.isNotEmpty) {
       activeId = units.first.id;
     }
 
@@ -215,9 +234,14 @@ class AuthNotifier extends StateNotifier<AuthState> {
         primerEstanqueCapacidadM3: primerEstanqueCapacidadM3,
         primerEstanqueTipo: primerEstanqueTipo,
       );
+
+      // Sincronizar inmediatamente el currentUser para que el Router Guard detecte hasCompany = true
+      state = state.copyWith(currentUser: admin);
+
       await _hydrateUserData(admin);
       return true;
     } catch (e) {
+      debugPrint('[setupCompanyForUser] Error capturado: $e');
       state = state.copyWith(isLoading: false, errorMessage: e.toString());
       return false;
     }

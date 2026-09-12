@@ -52,10 +52,19 @@ class Company {
       }
     }
 
+    final resolvedName = json['nombre'] as String? ??
+        json['nombre_comercial'] as String? ??
+        json['razon_social'] as String? ??
+        'Piscícola';
+
     return Company(
       id: json['id'] as String,
-      nombreComercial: json['nombre_comercial'] as String? ?? '',
-      razonSocial: json['razon_social'] as String? ?? '',
+      nombreComercial: (json['nombre_comercial'] as String?)?.trim().isNotEmpty == true
+          ? (json['nombre_comercial'] as String).trim()
+          : resolvedName,
+      razonSocial: (json['razon_social'] as String?)?.trim().isNotEmpty == true
+          ? (json['razon_social'] as String).trim()
+          : resolvedName,
       nit: json['nit'] as String? ?? '',
       direccion: json['direccion'] as String?,
       telefono: json['telefono'] as String?,
@@ -78,6 +87,7 @@ class Company {
 
   Map<String, dynamic> toJson() => {
         'id': id,
+        'nombre': nombreComercial,
         'nombre_comercial': nombreComercial,
         'razon_social': razonSocial,
         'nit': nit,
