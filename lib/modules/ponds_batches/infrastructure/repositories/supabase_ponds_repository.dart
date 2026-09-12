@@ -303,32 +303,39 @@ class SupabasePondsRepository implements PondsRepository {
     }
 
     try {
+      final insertData = Map<String, dynamic>.from(batch.toJson());
+
+      // Si falta unidad_acuicola_sigla, consultarla del estanque para garantizar la restricción chk_lote_unidad_acuicola_sigla_not_null
+      if (insertData['unidad_acuicola_sigla'] == null || insertData['unidad_acuicola_sigla'].toString().trim().isEmpty) {
+        try {
+          final pondRow = await _supabase.from('estanques').select('sigla, unidad_acuicola_sigla').eq('id', batch.estanqueId).maybeSingle();
+          if (pondRow != null) {
+            final siglaPond = pondRow['unidad_acuicola_sigla'] ??
+                (pondRow['sigla'] != null && pondRow['sigla'].toString().contains('-')
+                    ? pondRow['sigla'].toString().split('-').last
+                    : 'PRIN');
+            insertData['unidad_acuicola_sigla'] = siglaPond;
+          }
+        } catch (_) {}
+      }
+
       final res = await _supabase
           .from('lotes')
-          .insert(batch.toJson())
+          .insert(insertData)
           .select()
           .single();
 
       await _supabase.from('estanques').update({
         'estado': 'Activo',
-        'especie_actual': batch.especie,
+        'especie': batch.especie,
         'biomasa_kg': batch.biomasaActualKg,
         'costo_acumulado_biologico': batch.costoTotal,
       }).eq('id', batch.estanqueId);
 
       return FishBatch.fromJson(res);
-    } catch (_) {
-      _demoBatches.add(batch);
-      final pondIdx = _demoPonds.indexWhere((p) => p.id == batch.estanqueId);
-      if (pondIdx != -1) {
-        _demoPonds[pondIdx] = _demoPonds[pondIdx].copyWith(
-          estado: PondStatus.active,
-          especieActual: batch.especie,
-          biomasaKg: batch.biomasaActualKg,
-          costoAcumuladoBiologico: batch.costoTotal,
-        );
-      }
-      return batch;
+    } catch (e) {
+      // Re-lanzar la excepción para alertar al usuario y no engañar a la UI con datos temporales que desaparecen
+      rethrow;
     }
   }
 

@@ -123,18 +123,21 @@ class _PondBentoCardState extends State<PondBentoCard> with SingleTickerProvider
     final displayDensidad = widget.pond.capacidadM3 > 0 ? (displayBiomasa / widget.pond.capacidadM3) : widget.pond.densidadKgM3;
     final activeBatch = allBatches.isNotEmpty ? allBatches.first : widget.batch;
 
+    final isRealActive = (widget.pond.estado == PondStatus.active || allBatches.isNotEmpty) && totalPeces > 0;
     final avgWeightGrams = totalPeces > 0
         ? (displayBiomasa * 1000 / totalPeces)
-        : (activeBatch?.pesoActualGramos ?? 0.0);
+        : (isRealActive ? (activeBatch?.pesoActualGramos ?? 0.0) : 0.0);
 
     const targetWeight = 500.0;
-    final harvestProgress = (avgWeightGrams / targetWeight).clamp(0.05, 1.0);
+    final harvestProgress = isRealActive && avgWeightGrams > 0
+        ? (avgWeightGrams / targetWeight).clamp(0.01, 1.0)
+        : 0.0;
 
     return GlassCard(
       borderRadius: 24,
       glowColor: isPolyculture
           ? Colors.purpleAccent
-          : (isActive ? AppColors.cyanWater : AppColors.textTertiaryDark),
+          : (isRealActive ? AppColors.cyanWater : AppColors.textTertiaryDark),
       title: widget.pond.sigla,
       subtitle: '${widget.pond.nombre} • ${widget.pond.capacidadM3.toInt()} m³',
       trailingWidget: Row(
@@ -158,12 +161,30 @@ class _PondBentoCardState extends State<PondBentoCard> with SingleTickerProvider
                 ],
               ),
             ),
-          isPolyculture
-              ? const GlassBadge(text: 'POLICULTIVO', color: Colors.purpleAccent)
-              : GlassBadge(
-                  text: isActive ? 'ACTIVO' : 'DISPONIBLE',
-                  color: isActive ? AppColors.greenBiomass : AppColors.amberWarning,
-                ),
+          // Chip de Estado Operativo
+          GlassBadge(
+            text: isRealActive ? (isPolyculture ? 'POLICULTIVO' : 'ACTIVO') : 'VACÍO',
+            color: isRealActive ? AppColors.greenBiomass : AppColors.textTertiaryDark,
+          ),
+          const SizedBox(width: 6),
+          // Botón Rotar 3D hacia la Radiografía Biológica
+          InkWell(
+            onTap: isRealActive ? _flipCard : null,
+            borderRadius: BorderRadius.circular(8),
+            child: Container(
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                color: isDark ? Colors.white.withValues(alpha: 0.06) : Colors.white.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: isDark ? Colors.white.withValues(alpha: 0.12) : Colors.grey.withValues(alpha: 0.2)),
+              ),
+              child: Icon(
+                Icons.flip_camera_android_rounded,
+                size: 15,
+                color: isRealActive ? (isDark ? Colors.white : AppColors.textPrimaryDark) : AppColors.textTertiaryDark,
+              ),
+            ),
+          ),
         ],
       ),
       child: Column(
@@ -202,7 +223,7 @@ class _PondBentoCardState extends State<PondBentoCard> with SingleTickerProvider
               children: [
                 Expanded(
                   child: Text(
-                    isActive && allBatches.isNotEmpty ? allBatches.first.especie : 'Estanque Vacío / Disponible',
+                    isRealActive && allBatches.isNotEmpty ? allBatches.first.especie : 'Estanque Vacío / Disponible',
                     overflow: TextOverflow.ellipsis,
                     style: AppTypography.titleMedium.copyWith(
                       color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
@@ -210,7 +231,7 @@ class _PondBentoCardState extends State<PondBentoCard> with SingleTickerProvider
                     ),
                   ),
                 ),
-                if (isActive && allBatches.isNotEmpty) ...[
+                if (isRealActive && allBatches.isNotEmpty) ...[
                   const SizedBox(width: 8),
                   Text(
                     '${CurrencyFormatters.formatInt(totalPeces)} peces',
@@ -232,8 +253,8 @@ class _PondBentoCardState extends State<PondBentoCard> with SingleTickerProvider
               Expanded(
                 child: _buildMetricTile(
                   label: 'BIOMASA TOTAL',
-                  value: CurrencyFormatters.formatKg(displayBiomasa),
-                  caption: totalPeces > 0 ? '${avgWeightGrams.toStringAsFixed(1)} g/pez' : null,
+                  value: CurrencyFormatters.formatKg(isRealActive ? displayBiomasa : 0.0),
+                  caption: totalPeces > 0 ? '${avgWeightGrams.toStringAsFixed(1)} g/pez' : (isRealActive ? null : 'Sin biomasa'),
                   color: AppColors.cyanWater,
                 ),
               ),
@@ -241,22 +262,32 @@ class _PondBentoCardState extends State<PondBentoCard> with SingleTickerProvider
               Expanded(
                 child: _buildMetricTile(
                   label: 'DENSIDAD',
-                  value: '${displayDensidad.toStringAsFixed(1)} kg/m³',
-                  caption: widget.pond.nivelRiesgoDensidad == 'Óptimo'
-                      ? '🟢 Óptima'
-                      : (widget.pond.nivelRiesgoDensidad == 'Alerta' ? '🟡 Alerta' : '🔴 Crítica'),
-                  color: widget.pond.nivelRiesgoDensidad == 'Óptimo'
-                      ? AppColors.purpleAnalytics
-                      : (widget.pond.nivelRiesgoDensidad == 'Alerta' ? AppColors.amberWarning : AppColors.coralAction),
+                  value: isRealActive ? '${displayDensidad.toStringAsFixed(1)} kg/m³' : '0.0 kg/m³',
+                  caption: isRealActive
+                      ? (widget.pond.nivelRiesgoDensidad == 'Óptimo'
+                          ? '🟢 Óptima'
+                          : (widget.pond.nivelRiesgoDensidad == 'Alerta' ? '🟡 Alerta' : '🔴 Crítica'))
+                      : '⚪ Disponible',
+                  color: isRealActive
+                      ? (widget.pond.nivelRiesgoDensidad == 'Óptimo'
+                          ? AppColors.purpleAnalytics
+                          : (widget.pond.nivelRiesgoDensidad == 'Alerta' ? AppColors.amberWarning : AppColors.coralAction))
+                      : AppColors.textTertiaryDark,
                 ),
               ),
               const SizedBox(width: 8),
               Expanded(
                 child: _buildMetricTile(
                   label: 'FCR CONVERSIÓN',
-                  value: isActive && activeBatch != null ? activeBatch.fcr.toStringAsFixed(2) : '1.25',
-                  caption: activeBatch != null ? 'GPD: ${activeBatch.gpd.toStringAsFixed(2)} g/d' : 'Eficiencia 98%',
-                  color: AppColors.greenBiomass,
+                  value: isRealActive && activeBatch != null
+                      ? (activeBatch.fcrOrNull != null ? activeBatch.fcrOrNull!.toStringAsFixed(2) : '—')
+                      : '—',
+                  caption: isRealActive && activeBatch != null
+                      ? (activeBatch.diasDeCultivo <= 0
+                          ? 'Sembrado hoy'
+                          : 'GPD: ${activeBatch.gpd.toStringAsFixed(2)} g/d')
+                      : 'Sin lote activo',
+                  color: isRealActive ? AppColors.greenBiomass : AppColors.textTertiaryDark,
                 ),
               ),
             ],
@@ -664,8 +695,7 @@ class _PondBentoCardState extends State<PondBentoCard> with SingleTickerProvider
     final initialWeight = activeBatch?.pesoInicialGramos ?? 1.0;
     final currentWeight = activeBatch?.pesoActualGramos ?? 1.0;
     final daysInCulture = _getDaysInCulture(activeBatch);
-    final effectiveDays = daysInCulture > 0 ? daysInCulture : 1;
-    final gdp = ((currentWeight - initialWeight) / effectiveDays).clamp(0.0, 50.0);
+    final gdp = daysInCulture > 0 ? ((currentWeight - initialWeight) / daysInCulture).clamp(0.0, 50.0) : 0.0;
 
     final costoAlevines = activeBatch?.costoInicialAlevinos ?? 0.0;
     final costoInsumos = activeBatch?.costoAcumuladoInsumos ?? 0.0;
@@ -701,7 +731,7 @@ class _PondBentoCardState extends State<PondBentoCard> with SingleTickerProvider
                 context: context,
                 label: 'Peso Promedio:',
                 value: '${currentWeight.toStringAsFixed(1)} g (Inicial: ${initialWeight.toStringAsFixed(1)} g)',
-                extra: 'GDP: +${gdp.toStringAsFixed(2)} g/día',
+                extra: daysInCulture > 0 ? 'GDP: +${gdp.toStringAsFixed(2)} g/día' : 'Sembrado hoy',
                 extraColor: AppColors.cyanWater,
               ),
               const Divider(height: 10, color: Colors.white12),

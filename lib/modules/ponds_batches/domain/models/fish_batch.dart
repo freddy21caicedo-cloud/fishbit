@@ -5,6 +5,7 @@ class FishBatch {
   final String id;
   final String empresaId;
   final String unidadAcuicolaId;
+  final String? unidadAcuicolaSigla;
   final String estanqueId;
   final String? lotePadreId;
   final String codigoLote;
@@ -30,6 +31,7 @@ class FishBatch {
     required this.id,
     required this.empresaId,
     required this.unidadAcuicolaId,
+    this.unidadAcuicolaSigla,
     required this.estanqueId,
     this.lotePadreId,
     required this.codigoLote,
@@ -54,23 +56,22 @@ class FishBatch {
 
   int get diasDeCultivo {
     final diff = DateTime.now().difference(fechaSiembra).inDays;
-    return diff > 0 ? diff : 1;
+    return diff > 0 ? diff : 0;
   }
 
   /// Factor de Conversión Alimenticia (FCR) = Kg Alimento / Ganancia de Biomasa
-  double get fcr {
+  /// Retorna null si aún no hay consumo registrado de alimento o ganancia para evitar métricas ficticias
+  double? get fcrOrNull {
     final gananciaBiomasa = biomasaActualKg - biomasaInicialKg;
     if (alimentoAcumuladoKg > 0 && gananciaBiomasa > 0) {
       return alimentoAcumuladoKg / gananciaBiomasa;
     }
-    // Estimación técnica por peso si no hay registro consolidado de alimento
-    if (pesoActualGramos > pesoInicialGramos) {
-      if (pesoActualGramos < 50) return 1.1;
-      if (pesoActualGramos < 200) return 1.3;
-      if (pesoActualGramos < 450) return 1.45;
-      return 1.6;
-    }
-    return 1.35;
+    return null;
+  }
+
+  /// Getter retrocompatible para compatibilidad interna
+  double get fcr {
+    return fcrOrNull ?? 0.0;
   }
 
   /// Ganancia de Peso Diario (GPD en gramos/día)
@@ -88,6 +89,7 @@ class FishBatch {
     String? id,
     String? empresaId,
     String? unidadAcuicolaId,
+    String? unidadAcuicolaSigla,
     String? estanqueId,
     String? lotePadreId,
     String? codigoLote,
@@ -113,6 +115,7 @@ class FishBatch {
       id: id ?? this.id,
       empresaId: empresaId ?? this.empresaId,
       unidadAcuicolaId: unidadAcuicolaId ?? this.unidadAcuicolaId,
+      unidadAcuicolaSigla: unidadAcuicolaSigla ?? this.unidadAcuicolaSigla,
       estanqueId: estanqueId ?? this.estanqueId,
       lotePadreId: lotePadreId ?? this.lotePadreId,
       codigoLote: codigoLote ?? this.codigoLote,
@@ -174,10 +177,12 @@ class FishBatch {
   }
 
   factory FishBatch.fromJson(Map<String, dynamic> json) {
+    final unitId = (json['unit_id'] ?? json['unidad_acuicola_id'] ?? '').toString();
     return FishBatch(
       id: json['id'] as String,
       empresaId: json['empresa_id'] as String? ?? '',
-      unidadAcuicolaId: json['unidad_acuicola_id'] as String? ?? '',
+      unidadAcuicolaId: unitId,
+      unidadAcuicolaSigla: json['unidad_acuicola_sigla'] as String?,
       estanqueId: json['estanque_id'] as String? ?? '',
       lotePadreId: json['lote_padre_id'] as String?,
       codigoLote: json['codigo_lote'] as String? ?? '',
@@ -186,7 +191,7 @@ class FishBatch {
       cantidadInicialPeces: json['cantidad_inicial_peces'] as int? ?? 0,
       cantidadActualPeces: json['cantidad_actual_peces'] as int? ?? 0,
       pesoInicialGramos: (json['peso_inicial_gramos'] as num?)?.toDouble() ?? 1.0,
-      pesoActualGramos: (json['peso_actual_gramos'] as num?)?.toDouble() ?? 1.0,
+      pesoActualGramos: (json['peso_actual_gramos'] as num?)?.toDouble() ?? (json['peso_inicial_gramos'] as num?)?.toDouble() ?? 1.0,
       biomasaInicialKg: (json['biomasa_inicial_kg'] as num?)?.toDouble() ?? 0.0,
       biomasaActualKg: (json['biomasa_actual_kg'] as num?)?.toDouble() ?? 0.0,
       alimentoAcumuladoKg: (json['alimento_acumulado_kg'] as num?)?.toDouble() ?? 0.0,
@@ -197,7 +202,7 @@ class FishBatch {
       estado: parseStatus(json['estado'] as String? ?? 'Activo'),
       fechaSiembra: json['fecha_siembra'] != null
           ? DateTime.parse(json['fecha_siembra'] as String)
-          : DateTime.now(),
+          : (json['creado_en'] != null ? DateTime.parse(json['creado_en'] as String) : DateTime.now()),
       fechaCosechaEstimada: json['fecha_cosecha_estimada'] != null
           ? DateTime.parse(json['fecha_cosecha_estimada'] as String)
           : null,
@@ -207,25 +212,35 @@ class FishBatch {
     );
   }
 
-  Map<String, dynamic> toJson() => {
-        'id': id,
-        'empresa_id': empresaId,
-        'unidad_acuicola_id': unidadAcuicolaId,
-        'estanque_id': estanqueId,
-        'lote_padre_id': lotePadreId,
-        'codigo_lote': codigoLote,
-        'especie': especie,
-        'rol_policultivo': rolPolicultivo,
-        'cantidad_inicial_peces': cantidadInicialPeces,
-        'cantidad_actual_peces': cantidadActualPeces,
-        'peso_inicial_gramos': pesoInicialGramos,
-        'peso_actual_gramos': pesoActualGramos,
-        'biomasa_inicial_kg': biomasaInicialKg,
-        'biomasa_actual_kg': biomasaActualKg,
-        'costo_inicial_alevinos': costoInicialAlevinos,
-        'costo_acumulado_insumos': costoAcumuladoInsumos,
-        'costo_acumulado_fijo': costoAcumuladoFijo,
-        'estado': statusToString(estado),
-        'fecha_siembra': fechaSiembra.toIso8601String().split('T')[0],
-      };
+  /// Mapeo fiel al esquema de la tabla 'lotes' en Supabase Postgres
+  Map<String, dynamic> toJson() {
+    final map = <String, dynamic>{
+      'id': id,
+      'empresa_id': empresaId,
+      'estanque_id': estanqueId,
+      'codigo_lote': codigoLote,
+      'especie': especie,
+      'cantidad_inicial_peces': cantidadInicialPeces,
+      'cantidad_actual_peces': cantidadActualPeces,
+      'peso_inicial_gramos': pesoInicialGramos,
+      'biomasa_inicial_kg': biomasaInicialKg,
+      'biomasa_actual_kg': biomasaActualKg,
+      'costo_inicial_alevines': costoInicialAlevinos,
+      'costo_acumulado_insumos': costoAcumuladoInsumos,
+      'costo_acumulado_fijo': costoAcumuladoFijo,
+      'estado': statusToString(estado),
+    };
+
+    if (lotePadreId != null && lotePadreId!.isNotEmpty) {
+      map['lote_padre_id'] = lotePadreId;
+    }
+    if (unidadAcuicolaSigla != null && unidadAcuicolaSigla!.isNotEmpty) {
+      map['unidad_acuicola_sigla'] = unidadAcuicolaSigla;
+    }
+    if (unidadAcuicolaId.isNotEmpty) {
+      map['unit_id'] = unidadAcuicolaId;
+    }
+
+    return map;
+  }
 }

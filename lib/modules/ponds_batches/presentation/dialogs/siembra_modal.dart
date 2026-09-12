@@ -165,13 +165,22 @@ class _SiembraModalState extends ConsumerState<SiembraModal> {
     final costoAlevinos = double.tryParse(_costoAlevinosCtrl.text) ?? 0.0;
     final biomasaKg = _biomasaCalculadaKg;
 
-    final existingBatches = ref.read(pondsProvider).batches.where((b) => b.estanqueId == _selectedPondId && b.estado == BatchStatus.active).toList();
+    final pondsState = ref.read(pondsProvider);
+    final selectedPond = pondsState.ponds.where((p) => p.id == _selectedPondId).firstOrNull;
+    final activeUnitSigla = authState.units.where((u) => u.id == authState.activeUnitId).firstOrNull?.sigla;
+    final pondSigla = selectedPond?.unidadAcuicolaSigla ??
+        (selectedPond?.sigla.contains('-') == true ? selectedPond!.sigla.split('-').last : null) ??
+        activeUnitSigla ??
+        'PRIN';
+
+    final existingBatches = pondsState.batches.where((b) => b.estanqueId == _selectedPondId && b.estado == BatchStatus.active).toList();
     final isPolyculture = existingBatches.isNotEmpty;
 
     final batch = FishBatch(
       id: const Uuid().v4(),
       empresaId: empresaId,
       unidadAcuicolaId: unidadId,
+      unidadAcuicolaSigla: pondSigla,
       estanqueId: _selectedPondId!,
       codigoLote: _codigoCtrl.text.trim(),
       especie: _selectedEspecie,
@@ -193,21 +202,32 @@ class _SiembraModalState extends ConsumerState<SiembraModal> {
     final nav = Navigator.of(context);
     final messenger = ScaffoldMessenger.of(context);
 
-    // 1. Plantar el lote
-    final success = await ref.read(pondsProvider.notifier).plantBatch(batch);
-    if (success) {
-      // 2. Descontar automáticamente del almacén de material genético
-      await ref.read(warehouseProvider.notifier).discountAlevinosSiembra(
-        especie: _selectedEspecie,
-        cantidadPeces: peces.toDouble(),
-      );
+    try {
+      // 1. Plantar el lote
+      final success = await ref.read(pondsProvider.notifier).plantBatch(batch);
+      if (success) {
+        // 2. Descontar automáticamente del almacén de material genético
+        await ref.read(warehouseProvider.notifier).discountAlevinosSiembra(
+          especie: _selectedEspecie,
+          cantidadPeces: peces.toDouble(),
+        );
 
+        if (mounted) {
+          nav.pop();
+          messenger.showSnackBar(
+            SnackBar(
+              content: Text('¡Lote ${batch.codigoLote} sembrado con éxito y stock descontado del almacén!'),
+              backgroundColor: AppColors.greenBiomass,
+            ),
+          );
+        }
+      }
+    } catch (e) {
       if (mounted) {
-        nav.pop();
         messenger.showSnackBar(
           SnackBar(
-            content: Text('¡Lote ${batch.codigoLote} sembrado con éxito y stock descontado del almacén!'),
-            backgroundColor: AppColors.greenBiomass,
+            content: Text('Error al sembrar lote: $e'),
+            backgroundColor: AppColors.waterCritical,
           ),
         );
       }
