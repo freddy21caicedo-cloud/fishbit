@@ -4,7 +4,6 @@ import 'package:uuid/uuid.dart';
 import 'package:fishbit_finance/core/design_system/app_colors.dart';
 import 'package:fishbit_finance/core/design_system/app_typography.dart';
 import 'package:fishbit_finance/core/design_system/glass_container.dart';
-import 'package:fishbit_finance/core/design_system/glass_button.dart';
 import 'package:fishbit_finance/core/utils/currency_formatters.dart';
 import 'package:fishbit_finance/modules/auth_tenant/presentation/providers/auth_provider.dart';
 import 'package:fishbit_finance/modules/warehouse_inventory/domain/models/inventory_item.dart';
@@ -1466,6 +1465,33 @@ class _NuevoItemModalState extends ConsumerState<NuevoItemModal> {
                   ),
                 ],
               ),
+              const SizedBox(height: 16),
+
+              // Botón de Confirmación Principal dentro del Ticket
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: _isSubmitting ? null : _guardarItem,
+                  icon: _isSubmitting
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black),
+                        )
+                      : const Icon(Icons.check_circle_rounded, color: Colors.black, size: 20),
+                  label: Text(
+                    _isSubmitting ? 'Registrando en Bodega...' : 'Confirmar e Ingresar a Bodega',
+                    style: const TextStyle(color: Colors.black, fontSize: 13.5, fontWeight: FontWeight.w900),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.greenBiomass,
+                    elevation: 4,
+                    shadowColor: AppColors.greenBiomass.withValues(alpha: 0.4),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+                  ),
+                ),
+              ),
             ],
           ),
         ),
@@ -1476,7 +1502,6 @@ class _NuevoItemModalState extends ConsumerState<NuevoItemModal> {
   /// Botones de Navegación Inferior (Atrás / Continuar / Confirmar)
   Widget _buildNavigationButtons(Color accentColor) {
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         // Botón Atrás / Cancelar
         TextButton.icon(
@@ -1487,6 +1512,7 @@ class _NuevoItemModalState extends ConsumerState<NuevoItemModal> {
             style: const TextStyle(color: AppColors.textSecondaryDark, fontSize: 13, fontWeight: FontWeight.w600),
           ),
         ),
+        const Spacer(),
 
         // Botón Continuar o Confirmar Ingreso
         if (_currentStep < 3)
@@ -1501,10 +1527,18 @@ class _NuevoItemModalState extends ConsumerState<NuevoItemModal> {
             ),
           )
         else
-          GlassButton(
-            label: _isSubmitting ? 'Registrando en Bodega...' : 'Confirmar e Ingresar a Bodega',
-            backgroundColor: AppColors.greenBiomass,
-            onPressed: _isSubmitting ? () {} : _guardarItem,
+          ElevatedButton.icon(
+            onPressed: _isSubmitting ? null : _guardarItem,
+            icon: const Icon(Icons.check_circle_rounded, color: Colors.black, size: 18),
+            label: Text(
+              _isSubmitting ? 'Guardando...' : 'Confirmar Ingreso',
+              style: const TextStyle(color: Colors.black, fontSize: 13, fontWeight: FontWeight.w800),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.greenBiomass,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            ),
           ),
       ],
     );

@@ -5,7 +5,6 @@ import 'package:uuid/uuid.dart';
 import 'package:fishbit_finance/core/design_system/app_colors.dart';
 import 'package:fishbit_finance/core/design_system/app_typography.dart';
 import 'package:fishbit_finance/core/design_system/glass_container.dart';
-import 'package:fishbit_finance/core/design_system/glass_button.dart';
 import 'package:fishbit_finance/core/design_system/glass_date_picker.dart';
 import 'package:fishbit_finance/core/utils/currency_formatters.dart';
 import 'package:fishbit_finance/modules/auth_tenant/presentation/providers/auth_provider.dart';
@@ -966,6 +965,37 @@ class _NuevaFacturaModalState extends ConsumerState<NuevaFacturaModal> {
                   ),
                 ],
               ),
+              const SizedBox(height: 16),
+
+              // Botón de Confirmación Principal dentro del Ticket
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: _isSubmitting ? null : _guardarFactura,
+                  icon: _isSubmitting
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black),
+                        )
+                      : const Icon(Icons.check_circle_rounded, color: Colors.black, size: 20),
+                  label: Text(
+                    _isSubmitting
+                        ? 'Registrando Factura...'
+                        : (_categoriaSeleccionada == 'concentrados' || _categoriaSeleccionada == 'insumos'
+                            ? 'Confirmar Factura e Ingresar ${CurrencyFormatters.formatKg(_totalCantidadFisica)}'
+                            : 'Confirmar Factura e Ingresar ${_totalItemsCantidad.toInt()} Unidades'),
+                    style: const TextStyle(color: Colors.black, fontSize: 13.5, fontWeight: FontWeight.w900),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.greenBiomass,
+                    elevation: 4,
+                    shadowColor: AppColors.greenBiomass.withValues(alpha: 0.4),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+                  ),
+                ),
+              ),
             ],
           ),
         ),
@@ -976,7 +1006,6 @@ class _NuevaFacturaModalState extends ConsumerState<NuevaFacturaModal> {
   /// Botones de Navegación Inferior (Atrás / Continuar / Confirmar)
   Widget _buildNavigationButtons() {
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         // Botón Atrás / Cancelar
         TextButton.icon(
@@ -987,6 +1016,7 @@ class _NuevaFacturaModalState extends ConsumerState<NuevaFacturaModal> {
             style: const TextStyle(color: AppColors.textSecondaryDark, fontSize: 13, fontWeight: FontWeight.w600),
           ),
         ),
+        const Spacer(),
 
         // Botón Continuar o Confirmar Factura
         if (_currentStep < 3)
@@ -1001,14 +1031,18 @@ class _NuevaFacturaModalState extends ConsumerState<NuevaFacturaModal> {
             ),
           )
         else
-          GlassButton(
-            label: _isSubmitting
-                ? 'Registrando Factura...'
-                : (_categoriaSeleccionada == 'concentrados' || _categoriaSeleccionada == 'insumos'
-                    ? 'Confirmar y Actualizar Bodega (${CurrencyFormatters.formatKg(_totalCantidadFisica)})'
-                    : 'Confirmar y Actualizar Bodega (${_totalItemsCantidad.toInt()} unid.)'),
-            backgroundColor: AppColors.greenBiomass,
-            onPressed: _isSubmitting ? () {} : _guardarFactura,
+          ElevatedButton.icon(
+            onPressed: _isSubmitting ? null : _guardarFactura,
+            icon: const Icon(Icons.check_circle_rounded, color: Colors.black, size: 18),
+            label: Text(
+              _isSubmitting ? 'Guardando...' : 'Confirmar Factura',
+              style: const TextStyle(color: Colors.black, fontSize: 13, fontWeight: FontWeight.w800),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.greenBiomass,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            ),
           ),
       ],
     );
