@@ -85,8 +85,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
       final session = data.session;
 
       if (event == AuthChangeEvent.signedIn && session?.user != null) {
-        // Al regresar del flujo de OAuth de Google en Web o móvil
-        if (state.currentUser?.id != session!.user.id) {
+        // Al regresar del flujo de OAuth de Google en Web o móvil,
+        // rehidratar si cambió el usuario O si el usuario en memoria no tiene empresa asignada
+        final current = state.currentUser;
+        if (current == null || current.id != session!.user.id || (current.empresaId?.isEmpty ?? true)) {
           await _initSession();
         }
       } else if (event == AuthChangeEvent.signedOut) {

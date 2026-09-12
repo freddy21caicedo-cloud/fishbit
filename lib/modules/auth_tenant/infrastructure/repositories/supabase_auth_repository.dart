@@ -44,8 +44,28 @@ class SupabaseAuthRepository implements AuthRepository {
           }
         } catch (_) {}
 
-        // Si empresa_id es nulo, se mantiene estrictamente nulo sin asignar empresas al azar
-        final String? resolvedEmpresaId = profileRow['empresa_id'] as String?;
+        // Si empresa_id es nulo o vacío, verificar si está registrado en miembros_equipo
+        String? resolvedEmpresaId = profileRow['empresa_id'] as String?;
+        if (resolvedEmpresaId == null || resolvedEmpresaId.trim().isEmpty) {
+          try {
+            final email = (supabaseUser?.email ?? profileRow['email'] as String? ?? '').toLowerCase();
+            final memberMatch = await _supabase
+                .from('miembros_equipo')
+                .select('empresa_id, unidad_acuicola_id')
+                .or('id.eq.$uid,email.eq.$email')
+                .maybeSingle();
+
+            if (memberMatch != null && memberMatch['empresa_id'] != null) {
+              resolvedEmpresaId = memberMatch['empresa_id'] as String?;
+              assignedUnitId ??= memberMatch['unidad_acuicola_id'] as String?;
+              // Auto-sincronizar profiles para futuras consultas
+              await _supabase
+                  .from('profiles')
+                  .update({'empresa_id': resolvedEmpresaId})
+                  .eq('id', uid);
+            }
+          } catch (_) {}
+        }
 
         final member = UserMember.fromJson({
           ...profileRow,
@@ -224,36 +244,15 @@ class SupabaseAuthRepository implements AuthRepository {
       final email = sessionUser.email ?? '';
       if (email.isEmpty) return null;
 
-      // 2. Verificar perfil creado automáticamente por el trigger en profiles
-      final profileRow = await _supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', sessionUser.id)
-          .maybeSingle();
+      await _storage.setSessionUserId(sessionUser.id);
 
-      if (profileRow != null && profileRow['empresa_id'] != null) {
-        final member = UserMember.fromJson(profileRow);
-        await _storage.setSessionUserId(member.id);
-        if (member.unidadAcuicolaId != null) {
-          await _storage.setActiveSedeId(member.unidadAcuicolaId!);
+      // 2. Intentar resolver la sesión completa y perfil vinculado
+      final existingMember = await getCurrentSession();
+      if (existingMember != null && (existingMember.empresaId?.isNotEmpty ?? false)) {
+        if (existingMember.unidadAcuicolaId != null) {
+          await _storage.setActiveSedeId(existingMember.unidadAcuicolaId!);
         }
-        return member;
-      }
-
-      // Fallback a miembros_equipo
-      final memberRow = await _supabase
-          .from('miembros_equipo')
-          .select('*')
-          .eq('email', email.toLowerCase())
-          .maybeSingle();
-
-      if (memberRow != null) {
-        final member = UserMember.fromJson(memberRow);
-        await _storage.setSessionUserId(member.id);
-        if (member.unidadAcuicolaId != null) {
-          await _storage.setActiveSedeId(member.unidadAcuicolaId!);
-        }
-        return member;
+        return existingMember;
       }
 
       // 3. Usuario nuevo de Google -> Retornar perfil temporal para Onboarding de Empresa
