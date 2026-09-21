@@ -67,6 +67,7 @@ class FakeNutritionRepository implements NutritionRepository {
     String? insumoId,
     required double kgConsumidos,
     required double costoUnitarioAlimento,
+    DateTime? fecha,
   }) async {
     final r = FeedingRecord(
       id: 'feed-new',
@@ -77,7 +78,7 @@ class FakeNutritionRepository implements NutritionRepository {
       insumoId: insumoId ?? 'ins-1',
       cantidadConsumidaKg: kgConsumidos,
       costoCalculado: kgConsumidos * costoUnitarioAlimento,
-      fecha: DateTime.now(),
+      fecha: fecha ?? DateTime.now(),
       creadoEn: DateTime.now(),
     );
     records.insert(0, r);

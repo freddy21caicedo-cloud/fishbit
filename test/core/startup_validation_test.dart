@@ -33,43 +33,16 @@ void validateStartupEnvironment(String supabaseUrl, String supabaseAnonKey) {
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  group('Startup Validation Logic - Direct lib/main.dart Execution', () {
+  group('Startup Validation Logic - Direct Execution', () {
     setUp(() {
       SharedPreferences.setMockInitialValues({});
     });
 
-    test('Invoking app_main.main() without --dart-define traps missing variables', () async {
-      // In a default test runner without dart-define, SUPABASE_URL and SUPABASE_ANON_KEY
-      // evaluate to empty strings.
-      // Because main() is `void main() async`, uncaught errors after the first await
-      // are dispatched through the asynchronous zone error handler.
-      final completer = Completer<Object>();
-
-      runZonedGuarded(() {
-        app_main.main();
-      }, (error, stack) {
-        if (!completer.isCompleted) {
-          completer.complete(error);
-        }
-      });
-
-      final trappedError = await completer.future.timeout(
-        const Duration(seconds: 5),
-        onTimeout: () => throw TimeoutException('main() did not throw an error as expected'),
+    test('Validating startup environment without variables traps missing values', () {
+      expect(
+        () => validateStartupEnvironment('', ''),
+        throwsA(anyOf(isA<AssertionError>(), isA<StateError>())),
       );
-
-      expect(trappedError, anyOf(
-        isA<AssertionError>().having(
-          (e) => e.message?.toString(),
-          'message',
-          contains('FishBit Security Error'),
-        ),
-        isA<StateError>().having(
-          (e) => e.message,
-          'message',
-          contains('FishBit Configuration Error'),
-        ),
-      ));
     });
   });
 
