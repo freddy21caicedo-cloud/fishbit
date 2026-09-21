@@ -5,6 +5,7 @@ import 'package:fishbit_finance/core/design_system/app_colors.dart';
 import 'package:fishbit_finance/core/design_system/app_typography.dart';
 import 'package:fishbit_finance/core/design_system/fishbit_header.dart';
 import 'package:fishbit_finance/core/design_system/glass_card.dart';
+import 'package:fishbit_finance/core/design_system/floating_dock_layout.dart';
 import 'package:fishbit_finance/core/design_system/glass_badge.dart';
 import 'package:fishbit_finance/core/design_system/glass_container.dart';
 import 'package:fishbit_finance/core/utils/currency_formatters.dart';
@@ -330,7 +331,7 @@ class HomeDashboardScreen extends ConsumerWidget {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 100), // Espacio para el Dock de navegación
+                  const DockBottomSpacer(), // Espacio para el Dock de navegación
                 ],
               ),
             ),

@@ -34,9 +34,9 @@ class VentaRapidaModal extends ConsumerStatefulWidget {
 
 class _VentaRapidaModalState extends ConsumerState<VentaRapidaModal> {
   final _formKey = GlobalKey<FormState>();
-  final _clienteNombreCtrl = TextEditingController(text: 'Distribuidora del Mar S.A.S.');
-  String? _selectedClientId = 'cl100000-0000-0000-0000-000000000001';
-  final _kgCtrl = TextEditingController(text: '500.0');
+  final _clienteNombreCtrl = TextEditingController();
+  String? _selectedClientId;
+  final _kgCtrl = TextEditingController();
   final _precioKgCtrl = TextEditingController(text: '9200');
   CivilDate _fechaVenta = CivilDate.today();
 
@@ -69,7 +69,13 @@ class _VentaRapidaModalState extends ConsumerState<VentaRapidaModal> {
     final selectedBatch = activeBatches.where((b) => b.id == _selectedBatchId).firstOrNull;
     final pond = pondsState.ponds.where((p) => p.id == selectedBatch?.estanqueId).firstOrNull;
 
-    final kg = double.tryParse(_kgCtrl.text) ?? 500.0;
+    final stockDisponibleKg = selectedBatch?.biomasaActualKg ?? 0.0;
+    if (_kgCtrl.text.isEmpty && stockDisponibleKg > 0) {
+      _kgCtrl.text = stockDisponibleKg.toStringAsFixed(1);
+    }
+
+    final kg = double.tryParse(_kgCtrl.text) ?? 0.0;
+    final stockInsuficiente = selectedBatch != null && (kg <= 0 || kg > stockDisponibleKg);
     final precioKg = double.tryParse(_precioKgCtrl.text) ?? 9200.0;
     final ingresoBruto = kg * precioKg;
 
@@ -107,7 +113,38 @@ class _VentaRapidaModalState extends ConsumerState<VentaRapidaModal> {
                   ),
                   const SizedBox(height: 16),
 
-                  Text('LOTE A COSECHAR / VENDER', style: AppTypography.labelMicro.copyWith(color: AppColors.textSecondaryDark)),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('LOTE A COSECHAR / VENDER', style: AppTypography.labelMicro.copyWith(color: AppColors.textSecondaryDark)),
+                      if (selectedBatch != null && stockDisponibleKg > 0)
+                        InkWell(
+                          onTap: () {
+                            setState(() {
+                              _kgCtrl.text = stockDisponibleKg.toStringAsFixed(1);
+                            });
+                          },
+                          borderRadius: BorderRadius.circular(6),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.all_inclusive_rounded, size: 13, color: AppColors.cyanWater),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'Cosechar Todo (100%)',
+                                  style: AppTypography.labelMicro.copyWith(
+                                    color: AppColors.cyanWater,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
                   const SizedBox(height: 6),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -131,7 +168,15 @@ class _VentaRapidaModalState extends ConsumerState<VentaRapidaModal> {
                             ),
                           );
                         }).toList(),
-                        onChanged: (val) => setState(() => _selectedBatchId = val),
+                        onChanged: (val) {
+                          setState(() {
+                            _selectedBatchId = val;
+                            final b = activeBatches.where((item) => item.id == val).firstOrNull;
+                            if (b != null) {
+                              _kgCtrl.text = b.biomasaActualKg.toStringAsFixed(1);
+                            }
+                          });
+                        },
                       ),
                     ),
                   ),
@@ -321,37 +366,65 @@ class _VentaRapidaModalState extends ConsumerState<VentaRapidaModal> {
                       ],
                     ),
                   ),
+                  if (stockInsuficiente) ...[
+                    const SizedBox(height: 10),
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: AppColors.coralAction.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppColors.coralAction.withValues(alpha: 0.4)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.warning_amber_rounded, color: AppColors.coralAction, size: 18),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              kg <= 0
+                                  ? 'Ingresa una cantidad mayor a 0 kg para cosechar.'
+                                  : '⚠️ La cantidad a vender (${kg.toStringAsFixed(1)} kg) supera la biomasa actual del lote (${stockDisponibleKg.toStringAsFixed(1)} kg).',
+                              style: const TextStyle(color: Colors.white, fontSize: 11.5, fontWeight: FontWeight.w700),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 20),
 
                   GlassButton(
                     label: 'Registrar Cosecha y Venta',
                     isLoading: salesState.isLoading,
                     backgroundColor: AppColors.greenBiomass,
-                    onPressed: () async {
-                      if (!_formKey.currentState!.validate() || selectedBatch == null) return;
+                    onPressed: (selectedBatch == null || stockInsuficiente)
+                        ? null
+                        : () async {
+                            if (!_formKey.currentState!.validate()) return;
 
-                      final authState = ref.read(authProvider);
-                      final empresaId = authState.currentUser?.empresaId ?? 'c1000000-0000-0000-0000-000000000001';
-                      final unidadId = authState.activeUnitId ?? 'u1000000-0000-0000-0000-000000000001';
+                            final authState = ref.read(authProvider);
+                            final user = authState.currentUser;
+                            final unitId = authState.activeUnitId ?? user?.unidadAcuicolaId ?? user?.empresaId ?? 'u1000000-0000-0000-0000-000000000001';
+                            final empresaId = authState.currentCompany?.id ?? user?.empresaId ?? unitId;
 
-                      final sale = BatchSale(
-                        id: const Uuid().v4(),
-                        empresaId: empresaId,
-                        unidadAcuicolaId: unidadId,
-                        loteId: selectedBatch.id,
-                        codigoLote: selectedBatch.codigoLote,
-                        estanqueNombre: pond?.nombre ?? 'Estanque',
-                        clienteId: _selectedClientId,
-                        clienteNombre: _clienteNombreCtrl.text.trim(),
-                        especie: selectedBatch.especie,
-                        biomasaVendidaKg: kg,
-                        precioUnitarioKg: precioKg,
-                        ingresoBruto: ingresoBruto,
-                        cogs: cogs,
-                        utilidadNeta: utilidadNeta,
-                        estadoPago: 'Pagado',
-                        creadoEn: _fechaVenta.toDateTime(),
-                      );
+                            final sale = BatchSale(
+                              id: const Uuid().v4(),
+                              empresaId: empresaId,
+                              unidadAcuicolaId: unitId,
+                              loteId: selectedBatch.id,
+                              codigoLote: selectedBatch.codigoLote,
+                              estanqueNombre: pond?.nombre ?? 'Estanque',
+                              clienteId: _selectedClientId,
+                              clienteNombre: _clienteNombreCtrl.text.trim(),
+                              especie: selectedBatch.especie,
+                              biomasaVendidaKg: kg,
+                              precioUnitarioKg: precioKg,
+                              ingresoBruto: ingresoBruto,
+                              cogs: cogs,
+                              utilidadNeta: utilidadNeta,
+                              estadoPago: 'Pagado',
+                              creadoEn: _fechaVenta.toDateTime(),
+                            );
 
                       final nav = Navigator.of(context);
                       final messenger = ScaffoldMessenger.of(context);

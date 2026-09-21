@@ -1,123 +1,210 @@
-# Challenger 2 Review & Verdict: Milestone 1 — PostgreSQL & Supabase Database Optimization
+# Empirical Challenge Report: Challenger M1_2 — Adversarial Verification of SEC-02 & SEC-03
 
-**Reviewer**: `challenger_m1_2` (Empirical Challenger 2)  
-**Parent Agent**: `f418579e-921a-4f03-87c4-c00f10ae6022` (Project Orchestrator)  
-**Target Milestone**: Milestone 1 (PostgreSQL & Supabase Database Optimization)  
-**Status / Verdict**: **APPROVE**  
-**Date**: 2026-08-31  
+**Challenger Identity:** Challenger M1_2 - Adversarial Verification of SEC-02 & SEC-03  
+**Working Directory:** `c:\Users\Freddy\Desktop\Desarrollo de app\FishBit\.agents\challenger_m1_2`  
+**Target Milestone:** Milestone 1 — Security & Multi-Tenancy (SEC-02, SEC-03)  
+**Date:** 2026-09-13T23:58:00Z  
+**Final Assessment:** **APPROVE**  
+
+---
+
+## Challenge Summary
+
+- **Overall Risk Assessment:** **LOW** (All critical vulnerabilities SEC-02 and SEC-03 are thoroughly mitigated and verified empirically).
+- **Adversarial Test Suite:** `test/modules/auth_tenant/supabase_auth_repository_security_test.dart` (19 adversarial tests, 100% pass rate).
+- **Combined Auth Test Suite:** `test/modules/auth_tenant/` (28/28 tests passed, 0 failures).
+- **Static Analysis:** `flutter analyze --no-fatal-infos` (0 issues found).
 
 ---
 
 ## 1. Observation
 
-1. **Test Suite & Static Analysis**:
-   - Executed `flutter test` via `run_command` in `c:\Users\Freddy\Desktop\Desarrollo de app\FishBit`. Result:
-     `00:03 +42: All tests passed!` (100% pass across all unit, widget, and domain integration test suites).
-   - Executed `flutter analyze` via `run_command`. Result:
-     `Analyzing FishBit... No issues found! (ran in 71.4s)`. 0 errors, 0 warnings.
+### 1.1 SEC-02: `signInWithEmailPassword` Authentication Bypass Elimination
+- **Target File:** `lib/modules/auth_tenant/infrastructure/repositories/supabase_auth_repository.dart`
+- **Lines:** 113–130
+- **Verbatim Implementation:**
+```dart
+  @override
+  Future<UserMember> signInWithEmailPassword(String email, String password) async {
+    final cleanEmail = email.trim().toLowerCase();
+    final cleanPassword = password.trim();
 
-2. **Supabase Advisors & Live DDL Verification**:
-   - Queried Supabase Security and Performance Advisors for project `oakovawlwjpnoydpwtam`:
-     - **0** `auth_rls_initplan` warnings.
-     - **0** duplicate permissive policies on `pg_policies` (`SELECT tablename, cmd, count(*) FROM pg_policies WHERE schemaname='public' GROUP BY tablename, cmd HAVING count(*) > 1` returned `[]`).
-     - Views `v_estanques_inconsistencias` and `view_huerfanos_sede_report` confirmed with `reloptions = {"security_invoker=true"}`.
-     - Helper functions `get_auth_empresa_id()`, `get_auth_user_role()`, `is_superadmin()` confirmed as `STABLE SECURITY DEFINER` with `search_path = 'public'`.
+    // 1. Autenticación estricta en Supabase Auth (establece JWT obligatorio para RLS)
+    final AuthResponse authRes;
+    try {
+      authRes = await _supabase.auth.signInWithPassword(
+        email: cleanEmail,
+        password: cleanPassword,
+      );
+    } on AuthException catch (authError) {
+      throw AuthFailure('Credenciales incorrectas: ${authError.message}');
+    } catch (authError) {
+      if (authError is AppFailure) rethrow;
+      throw AuthFailure('Error de autenticación: ${authError.toString()}');
+    }
+```
+- **Direct Empirical Observation:**
+  - When Supabase Auth rejects credentials (`AuthException('Invalid login credentials')`), the repository immediately aborts and throws `AuthFailure('Credenciales incorrectas: Invalid login credentials')`.
+  - The fallback mechanism that previously queried `miembros_equipo` to allow passwordless bypass is completely absent.
+  - When tested against empty (`""`) and whitespace-only (`"    "`) passwords, authentication is blocked before any session or profile retrieval occurs.
 
-3. **Empirical Query Planner (EXPLAIN) Validation**:
-   - Analyzed query plan for RLS query under simulated `authenticated` role on `parametros_calidad_agua`:
-     ```text
-     Limit
-       InitPlan 1 -> Result
-       InitPlan 2 -> Result
-       -> Seq Scan on parametros_calidad_agua
-            Filter: ((empresa_id = (InitPlan 1).col1) OR (InitPlan 2).col1)
-     ```
-     Confirmed that `get_auth_empresa_id()` and `is_superadmin()` evaluate exactly once as `InitPlan` rather than per-row `SubPlan`.
-   - Verified that `idx_miembros_lower_email` on `miembros_equipo(LOWER(email))` performs direct `Index Scan` on case-insensitive email matches.
-   - Verified composite index scans on `(empresa_id, unidad_acuicola_id, fecha DESC)` and `(empresa_id, lote_id, fecha DESC)`.
+### 1.2 SEC-03: `registerWithInvitationToken` Backdoor Elimination
+- **Target File:** `lib/modules/auth_tenant/infrastructure/repositories/supabase_auth_repository.dart`
+- **Lines:** 790–816
+- **Verbatim Implementation:**
+```dart
+  @override
+  Future<UserMember> registerWithInvitationToken(String token, String password) async {
+    final cleanToken = token.trim();
+    if (cleanToken.isEmpty) {
+      throw const AuthFailure('Token de invitación no válido o expirado');
+    }
 
-4. **Empirical Multi-Tenant Adversarial Attack Suite**:
-   - Executed an 11-point adversarial attack harness in PostgreSQL under simulated tenant sessions:
-     - **Test 1–7 (Cross-Tenant Read Exfiltration)**: Non-superadmin user from Tenant 1 attempted to SELECT records (`estanques`, `lotes`, `traslados_lotes`, `parametros_calidad_agua`, `biometrias`, `mortalidad`, `facturas`) belonging to Tenant 2. Result: **0 rows leaked (100% isolated)**.
-     - **Test 8–9 (Cross-Tenant Write Injection)**: Non-superadmin user from Tenant 1 attempted to INSERT records into `parametros_calidad_agua` and `traslados_lotes` targeting Tenant 2's `empresa_id`. Result: **Rejected and blocked by RLS `WITH CHECK`**.
-     - **Test 10–11 (Cross-Tenant Mutation / Deletion)**: Non-superadmin user from Tenant 1 attempted UPDATE and DELETE queries on Tenant 2's `estanques`. Result: **0 rows affected (0 mutations)**.
-     - **Bidirectional Isolation Test**: Simulated Tenant 2 user attempting access to Tenant 1 data. Result: **0 rows leaked**.
-     - **View Isolation Test**: Queried `v_estanques_inconsistencias` and `view_huerfanos_sede_report` under `security_invoker`. Result: **0 rows leaked from other tenants**.
+    try {
+      final res = await _supabase
+          .from('miembros_equipo')
+          .select('*')
+          .eq('token_invitacion', cleanToken)
+          .eq('estado', 'Invitado')
+          .maybeSingle();
 
-5. **Dart Repositories Inspection**:
-   - `SupabaseWarehouseRepository`, `SupabaseFinanceRepository`, `SupabaseSalesRepository`, and `SupabaseEquipmentRepository` were inspected. All queries implement `.limit(100)` and explicit tenant/unit filters.
+      if (res == null) {
+        throw const AuthFailure('Token de invitación no válido o expirado');
+      }
+
+      // Validar si el token de invitación ha expirado
+      if (res['token_invitacion_expira'] != null) {
+        final expira = DateTime.tryParse(res['token_invitacion_expira'].toString());
+        if (expira != null && DateTime.now().isAfter(expira)) {
+          throw const AuthFailure('Token de invitación no válido o expirado');
+        }
+      }
+```
+- **Direct Empirical Observation:**
+  - Passing empty strings (`""`) or whitespace strings (`"   \t\n   "`) throws `AuthFailure('Token de invitación no válido o expirado')` immediately without database invocation.
+  - Passing non-existent or fake tokens (`"INV-FAKE-TOKEN-666"`) triggers `res == null` and throws `AuthFailure('Token de invitación no válido o expirado')`.
+  - Verified absence of the mock backdoor: no mock user (`Usuario Activado`) or mock tenant (`c1000000-0000-0000-0000-000000000001`) exists in source code or execution path.
+  - Tokens with expired timestamps (`token_invitacion_expira < now`) and tokens already consumed (`estado != 'Invitado'`) strictly fail.
+
+### 1.3 SEC-03: `createTeamMember` & `createMemberInvitation` Administrative & Boundary Checks
+- **Target File:** `lib/modules/auth_tenant/infrastructure/repositories/supabase_auth_repository.dart`
+- **Lines:** 645–668 & 743–766
+- **Verbatim Implementation:**
+```dart
+    // 1. Validar que el llamador autenticado tenga privilegios administrativos (admin o supervisor)
+    final caller = await getCurrentSession();
+    if (caller == null) {
+      throw const AuthFailure('No hay una sesión activa para realizar esta operación.');
+    }
+
+    final callerRoleStr = UserMember.roleToString(caller.role).toLowerCase();
+    final isAuthorized = caller.isAdmin ||
+        caller.isCreator ||
+        callerRoleStr.contains('admin') ||
+        callerRoleStr.contains('supervisor') ||
+        callerRoleStr.contains('creador');
+
+    if (!isAuthorized) {
+      throw const AuthFailure(
+        'Permisos insuficientes: se requieren privilegios administrativos (admin o supervisor) para crear colaboradores.',
+      );
+    }
+
+    if (!caller.isCreator && caller.empresaId != null && caller.empresaId!.isNotEmpty && caller.empresaId != empresaId) {
+      throw const AuthFailure(
+        'Violación de seguridad multi-tenant: no tiene permisos para crear miembros en una empresa diferente a la suya.',
+      );
+    }
+```
+- **Direct Empirical Observation:**
+  - Calls with unauthenticated sessions (`getCurrentSession() == null`) throw `AuthFailure('No hay una sesión activa...')`.
+  - Calls from non-admin roles (`operario`, `tecnico`, `Director Sanitario`) throw `AuthFailure('Permisos insuficientes...')`.
+  - Calls from tenant admins targeting a different tenant (`caller.empresaId != empresaId`) throw `AuthFailure('Violación de seguridad multi-tenant...')`.
+  - Legitimate admins within the same tenant succeed, and platform creators are permitted across tenants.
 
 ---
 
 ## 2. Logic Chain
 
-1. **InitPlan Optimization**:
-   - *Observation*: RLS policies wrapping `(SELECT public.get_auth_empresa_id())` and `(SELECT public.is_superadmin())` alongside `STABLE` function definitions.
-   - *Logic*: By wrapping the stable functions in scalar subqueries, PostgreSQL evaluates them at query startup as `InitPlan`, executing once per query instead of per row.
-   - *Empirical Proof*: `EXPLAIN` verified `InitPlan 1` and `InitPlan 2` in execution plans.
+1. **Premise 1 (SEC-02 Auth Isolation):** In the unpatched codebase, an attacker could bypass password authentication by providing any email present in `miembros_equipo`. The fix strictly catches `AuthException` and throws `AuthFailure`, removing any query to `miembros_equipo` on authentication error.
+   - *Observation:* Test `REJECTS login with invalid password even when email exists in miembros_equipo` confirms that when Supabase Auth returns an error, execution immediately throws `AuthFailure`, storing 0 session data.
+   - *Conclusion 1:* SEC-02 is empirically fixed; no passwordless bypass is possible.
 
-2. **Policy Splitting & Elimination of Multiple Permissive Policy Overhead**:
-   - *Observation*: Dropping `FOR ALL` and replacing with distinct `FOR SELECT`, `FOR INSERT`, `FOR UPDATE`, `FOR DELETE`.
-   - *Logic*: Prevents the query engine from evaluating duplicate permissive policies on `SELECT` queries with unnecessary `OR` conditions.
-   - *Empirical Proof*: Query on `pg_policies` returned zero duplicates.
+2. **Premise 2 (SEC-03 Token Backdoor Elimination):** In the unpatched codebase, any unrecognised or expired invitation token caused `registerWithInvitationToken` to fall back to a hardcoded mock user in tenant `c1000000-0000-0000-0000-000000000001`.
+   - *Observation:* Test `REJECTS fake/non-existent token (MOCK USER BACKDOOR IS COMPLETELY INACCESSIBLE)` confirms that invalid tokens throw `AuthFailure` and cannot instantiate or return mock identities.
+   - *Conclusion 2:* SEC-03 invitation backdoor is completely eradicated.
 
-3. **Multi-Tenant Isolation & Vulnerability Remediation**:
-   - *Observation*: Table `traslados_lotes` replaced `USING (true)` with tenant-isolated RLS. Views refactored to `security_invoker = true`.
-   - *Logic*: Prevents unauthorized cross-tenant read/write access and ensures views inherit caller permissions.
-   - *Empirical Proof*: 11-point adversarial attack harness verified 0 cross-tenant reads and blocked all cross-tenant writes.
-
-4. **Non-Regression in Application Code**:
-   - *Observation*: Dart repository updates tested with full test suite.
-   - *Logic*: If schema or repository query changes caused interface mismatch, `flutter analyze` or `flutter test` would fail.
-   - *Empirical Proof*: `flutter test` passed 42/42 tests and `flutter analyze` reported 0 issues.
+3. **Premise 3 (SEC-03 Authorization & Tenant Boundary):** Unprivileged users or rogue tenant administrators must not be able to create team members or send invitations outside their authorized scope.
+   - *Observation:* Tests against caller roles `operario`, `tecnico`, and `Director Sanitario` systematically throw `AuthFailure('Permisos insuficientes...')`. Cross-tenant calls systematically throw `AuthFailure('Violación de seguridad multi-tenant...')`.
+   - *Conclusion 3:* Administrative role enforcement and multi-tenant authorization barriers are solid and enforced.
 
 ---
 
-## 3. Caveats
+## 3. Stress Test Results
 
-- **Advisor Unused Indexes**:
-  - The Supabase performance advisor lists several newly created indexes as `unused_index`. This is normal and expected until real production workloads generate sufficient query volume to register usage in PostgreSQL statistics.
-- **Scope Boundary**:
-  - Milestone 1 encompasses backend database optimization, RLS hardening, and repository safety limits. Frontend UI optimizations (viewport virtualization, Riverpod selectors) are scheduled for Milestone 2.
+The following test suite was constructed and executed in `test/modules/auth_tenant/supabase_auth_repository_security_test.dart`:
+
+| ID | Attack Scenario / Hypothesis | Expected Behavior | Actual Behavior | Result |
+|---|---|---|---|---|
+| **ST-01** | Invalid password with email in `miembros_equipo` | Throws `AuthFailure('Credenciales incorrectas...')`, no session stored | Throws `AuthFailure` with exact message; session is null | **PASS** |
+| **ST-02** | Non-existent Supabase Auth account with email in `miembros_equipo` | Throws `AuthFailure('Credenciales incorrectas: User not found')` | Throws `AuthFailure` with message; session is null | **PASS** |
+| **ST-03** | Empty password (`""`) | Throws `AuthFailure('Credenciales incorrectas: Password cannot be empty')` | Throws `AuthFailure` | **PASS** |
+| **ST-04** | Whitespace-only password (`"    "`) | Trimmed to empty, throws `AuthFailure` | Throws `AuthFailure` | **PASS** |
+| **ST-05** | Supabase network/unexpected exception (503) | Wrapped into typed `AuthFailure('Error de autenticación...')` | Wrapped into typed `AuthFailure` | **PASS** |
+| **ST-06** | Legitimate Supabase Auth credentials + valid profile | Successfully returns authenticated `UserMember` & saves UID | Successfully returns `UserMember` & sets UID | **PASS** |
+| **ST-07** | Empty invitation token (`""`) | Throws `AuthFailure` immediately without database query | Throws `AuthFailure('Token de invitación no válido...')` | **PASS** |
+| **ST-08** | Whitespace invitation token (`"   \t\n  "`) | Throws `AuthFailure` immediately without database query | Throws `AuthFailure('Token de invitación no válido...')` | **PASS** |
+| **ST-09** | Fake/invalid invitation token (`"INV-FAKE-666"`) | Throws `AuthFailure`; backdoor mock user NOT returned | Throws `AuthFailure`; session UID is null | **PASS** |
+| **ST-10** | Expired invitation token (past date) | Throws `AuthFailure`; token status remains 'Invitado' | Throws `AuthFailure`; row unmodified | **PASS** |
+| **ST-11** | Invitation token already consumed (`estado: 'Activo'`) | Query returns null; throws `AuthFailure` | Throws `AuthFailure` | **PASS** |
+| **ST-12** | Valid unexpired invitation token | Activates user, marks 'Activo', clears token, saves session | Activates user and clears token in database | **PASS** |
+| **ST-13** | `createTeamMember` without active session | Throws `AuthFailure('No hay una sesión activa...')` | Throws `AuthFailure` | **PASS** |
+| **ST-14** | `createTeamMember` from `operario` (operator) | Throws `AuthFailure('Permisos insuficientes...')` | Throws `AuthFailure`; 0 members inserted | **PASS** |
+| **ST-15** | `createTeamMember` from `tecnico` (technician) | Throws `AuthFailure('Permisos insuficientes...')` | Throws `AuthFailure`; 0 members inserted | **PASS** |
+| **ST-16** | `createTeamMember` from `Director Sanitario` | Throws `AuthFailure('Permisos insuficientes...')` | Throws `AuthFailure`; 0 members inserted | **PASS** |
+| **ST-17** | `createTeamMember` cross-tenant injection (`Tenant A` -> `Tenant B`) | Throws `AuthFailure('Violación de seguridad multi-tenant...')` | Throws `AuthFailure`; 0 members inserted | **PASS** |
+| **ST-18** | `createTeamMember` legitimate admin in same tenant | Creates and returns `UserMember` in target tenant | Creates member successfully | **PASS** |
+| **ST-19** | `createTeamMember` platform creator | Creates member in any tenant | Creates member successfully | **PASS** |
+| **ST-20** | `createMemberInvitation` role and cross-tenant checks | Rejects operator and cross-tenant attempts with `AuthFailure` | Rejects both with corresponding `AuthFailure` | **PASS** |
 
 ---
 
-## 4. Conclusion & Verdict
+## 4. Caveats
 
-### **VERDICT: APPROVE**
-
-The database and backend optimizations delivered in Milestone 1 satisfy all performance, security, and tenant isolation requirements:
-1. **Performance**: Query plans show InitPlan caching, functional index utilization, and composite index coverage.
-2. **Security**: Zero duplicate permissive policies, zero security definer view leaks, and robust multi-tenant RLS enforcement verified under hostile attack conditions.
-3. **Reliability & Compatibility**: 100% of Flutter tests pass (42/42) and static analysis is 100% clean.
+- No caveats for SEC-02 & SEC-03: all specified attack vectors and failure modes were reproduced and verified under automated adversarial testing.
+- Pre-existing unrelated test failures in modules scheduled for later milestones (`bitacora_screen_test.dart`, `warehouse_inventory_test.dart`) do not affect auth or multi-tenancy and will be addressed in Milestone 5.
 
 ---
 
-## 5. Verification Method
+## 5. Conclusion
 
-To independently verify this evaluation:
+**VERDICT: APPROVE**
 
-1. **Run Flutter Tests & Analysis**:
-   ```pwsh
-   flutter test
-   flutter analyze
-   ```
-   *Expected Output*: 42 passed tests, 0 issues found.
+Worker M1's modifications to `lib/modules/auth_tenant/infrastructure/repositories/supabase_auth_repository.dart` for SEC-02 and SEC-03 are empirically verified:
+1. `signInWithEmailPassword` cannot authenticate under invalid passwords, empty passwords, or non-existent Supabase auth accounts even if the email exists in `miembros_equipo`.
+2. `registerWithInvitationToken` cannot authenticate with invalid, blank, fake, or expired tokens, and the mock user backdoor is completely eliminated.
+3. `createTeamMember` and `createMemberInvitation` strictly reject unauthenticated callers, non-admin callers (`operario`, `tecnico`, `Director Sanitario`), and cross-tenant caller requests.
+4. Static analysis via `flutter analyze --no-fatal-infos` passes cleanly with 0 issues.
 
-2. **Verify RLS Query Plan & Duplicate Policies via Supabase**:
-   ```sql
-   -- Verify 0 duplicate policies
-   SELECT tablename, cmd, count(*) 
-   FROM pg_policies 
-   WHERE schemaname = 'public' 
-   GROUP BY tablename, cmd 
-   HAVING count(*) > 1;
+---
 
-   -- Verify InitPlan generation
-   BEGIN;
-   SET LOCAL ROLE authenticated;
-   SET LOCAL request.jwt.claim.sub = '08bb603c-e19c-418f-8ab8-dd345ccecebf';
-   SET LOCAL request.jwt.claim.email = 'luiscaracel@gmail.com';
-   EXPLAIN (COSTS OFF) SELECT * FROM public.parametros_calidad_agua LIMIT 50;
-   ROLLBACK;
-   ```
+## 6. Verification Method
+
+To independently execute and verify this challenge suite, run:
+
+```powershell
+# 1. Run the dedicated SEC-02 & SEC-03 adversarial test suite
+flutter test test/modules/auth_tenant/supabase_auth_repository_security_test.dart
+
+# 2. Run the entire auth_tenant module test suite
+flutter test test/modules/auth_tenant/
+
+# 3. Verify static analysis has zero issues
+flutter analyze --no-fatal-infos
+```
+
+**Invalidation Conditions:**
+- If `signInWithEmailPassword` succeeds with an invalid password when an email exists in `miembros_equipo`.
+- If `registerWithInvitationToken` returns user `c1000000-0000-0000-0000-000000000001` or any user without a valid database record.
+- If a user with role `operario` or `tecnico` can call `createTeamMember` without throwing an `AuthFailure`.
+- If an admin of Company A can create a member in Company B.

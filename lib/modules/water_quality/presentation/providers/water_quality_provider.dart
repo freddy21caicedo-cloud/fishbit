@@ -71,17 +71,18 @@ class WaterQualityNotifier extends StateNotifier<WaterQualityState> {
   }
 
   Future<void> addParameter(WaterParameter param) async {
-    try {
-      final saved = await _repository.recordParameters(param);
-      state = state.copyWith(recentParameters: [saved, ...state.recentParameters]);
-    } catch (e) {
-      state = state.copyWith(errorMessage: e.toString());
-    }
+    await recordWaterQuality(param);
   }
 
   Future<bool> recordWaterQuality(WaterParameter param) async {
-    await addParameter(param);
-    return true;
+    try {
+      final saved = await _repository.recordParameters(param);
+      state = state.copyWith(recentParameters: [saved, ...state.recentParameters]);
+      return true;
+    } catch (e) {
+      state = state.copyWith(errorMessage: e.toString());
+      return false;
+    }
   }
 }
 

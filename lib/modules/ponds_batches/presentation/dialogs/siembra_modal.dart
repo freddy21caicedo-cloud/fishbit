@@ -13,6 +13,7 @@ import 'package:fishbit_finance/modules/ponds_batches/domain/models/pond.dart';
 import 'package:fishbit_finance/modules/ponds_batches/presentation/providers/ponds_provider.dart';
 import 'package:fishbit_finance/modules/warehouse_inventory/domain/models/inventory_item.dart';
 import 'package:fishbit_finance/modules/warehouse_inventory/presentation/dialogs/nuevo_item_modal.dart';
+import 'package:fishbit_finance/modules/warehouse_inventory/presentation/dialogs/nueva_factura_modal.dart';
 import 'package:fishbit_finance/modules/warehouse_inventory/presentation/providers/warehouse_provider.dart';
 
 class SiembraModal extends ConsumerStatefulWidget {
@@ -41,6 +42,7 @@ class _SiembraModalState extends ConsumerState<SiembraModal> {
 
   String _selectedEspecie = 'Tilapia Roja';
   String? _selectedPondId;
+  String? _selectedInventoryItemId;
   CivilDate _fechaSiembra = CivilDate.today();
   bool _costoModificadoManualmente = false;
 
@@ -103,11 +105,24 @@ class _SiembraModalState extends ConsumerState<SiembraModal> {
     _codigoCtrl.text = 'LOT-$sigla-$fechaStr-$especieSanitized';
   }
 
-  /// Recalcular costo total de alevinos según stock y costo unitario en almacén
+  /// Recalcular costo total de alevinos según lote seleccionado en almacén o promedio
   void _recalcularCostoAutomatico() {
     if (_costoModificadoManualmente) return;
     final warehouseState = ref.read(warehouseProvider);
-    final costoUnitario = warehouseState.getCostoUnitarioAlevino(_selectedEspecie);
+    final alevinosDisponibles = warehouseState.getAlevinosForSpecies(_selectedEspecie);
+
+    double costoUnitario = 0.0;
+    if (_selectedInventoryItemId != null) {
+      final selectedItem = alevinosDisponibles.where((i) => i.id == _selectedInventoryItemId).firstOrNull;
+      if (selectedItem != null) {
+        costoUnitario = selectedItem.costoUnitarioHistorico;
+      }
+    }
+
+    if (costoUnitario <= 0) {
+      costoUnitario = warehouseState.getCostoUnitarioAlevino(_selectedEspecie);
+    }
+
     final peces = int.tryParse(_pecesCtrl.text) ?? 0;
 
     if (costoUnitario > 0) {
@@ -134,23 +149,45 @@ class _SiembraModalState extends ConsumerState<SiembraModal> {
     }
 
     final warehouseState = ref.read(warehouseProvider);
+    final alevinosDisponibles = warehouseState.getAlevinosForSpecies(_selectedEspecie);
     final stockDisponible = warehouseState.getTotalAlevinosDisponibles(_selectedEspecie);
     final peces = int.tryParse(_pecesCtrl.text) ?? 0;
 
-    if (stockDisponible <= 0) {
+    if (stockDisponible <= 0 || alevinosDisponibles.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('No hay material genético disponible de $_selectedEspecie en almacén. Debe ingresar una compra primero.'),
+          content: Text('No hay material genético disponible de $_selectedEspecie en almacén. Debe registrar una compra primero.'),
           backgroundColor: AppColors.waterCritical,
         ),
       );
       return;
     }
 
-    if (peces > stockDisponible) {
+    if (_selectedInventoryItemId == null || _selectedInventoryItemId!.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Por favor selecciona el lote específico de alevinos de almacén para garantizar trazabilidad.'),
+          backgroundColor: AppColors.amberWarning,
+        ),
+      );
+      return;
+    }
+
+    final selectedSeedItem = alevinosDisponibles.where((i) => i.id == _selectedInventoryItemId).firstOrNull;
+    if (selectedSeedItem == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('El lote de semilla seleccionado ya no se encuentra disponible.'),
+          backgroundColor: AppColors.waterCritical,
+        ),
+      );
+      return;
+    }
+
+    if (peces > selectedSeedItem.cantidadActualKg) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('La cantidad a sembrar ($peces) supera el stock disponible en almacén (${stockDisponible.toInt()}).'),
+          content: Text('La cantidad a sembrar ($peces) supera el saldo disponible del lote seleccionado (${selectedSeedItem.cantidadActualKg.toInt()} pcs).'),
           backgroundColor: AppColors.waterCritical,
         ),
       );
@@ -206,17 +243,18 @@ class _SiembraModalState extends ConsumerState<SiembraModal> {
       // 1. Plantar el lote
       final success = await ref.read(pondsProvider.notifier).plantBatch(batch);
       if (success) {
-        // 2. Descontar automáticamente del almacén de material genético
+        // 2. Descontar con trazabilidad estricta del lote específico en almacén
         await ref.read(warehouseProvider.notifier).discountAlevinosSiembra(
           especie: _selectedEspecie,
           cantidadPeces: peces.toDouble(),
+          specificItemId: _selectedInventoryItemId,
         );
 
         if (mounted) {
           nav.pop();
           messenger.showSnackBar(
             SnackBar(
-              content: Text('¡Lote ${batch.codigoLote} sembrado con éxito y stock descontado del almacén!'),
+              content: Text('¡Lote ${batch.codigoLote} sembrado con éxito! Stock descontado de "${selectedSeedItem.nombre}".'),
               backgroundColor: AppColors.greenBiomass,
             ),
           );
@@ -246,9 +284,16 @@ class _SiembraModalState extends ConsumerState<SiembraModal> {
         : <FishBatch>[];
     final isPolycultureTarget = activeBatchesInSelected.isNotEmpty;
 
+    final alevinosDisponibles = warehouseState.getAlevinosForSpecies(_selectedEspecie).where((i) => i.cantidadActualKg > 0).toList();
     final stockDisponible = warehouseState.getTotalAlevinosDisponibles(_selectedEspecie);
-    final costoUnitario = warehouseState.getCostoUnitarioAlevino(_selectedEspecie);
     final bool sinMaterialGenetico = stockDisponible <= 0;
+
+    if (_selectedInventoryItemId != null && !alevinosDisponibles.any((i) => i.id == _selectedInventoryItemId)) {
+      _selectedInventoryItemId = null;
+    }
+    if (_selectedInventoryItemId == null && alevinosDisponibles.length == 1) {
+      _selectedInventoryItemId = alevinosDisponibles.first.id;
+    }
 
     return Dialog(
       backgroundColor: Colors.transparent,
@@ -404,8 +449,8 @@ class _SiembraModalState extends ConsumerState<SiembraModal> {
                   ),
                   const SizedBox(height: 12),
 
-                  // Estado de Almacén / Material Genético (Bento Glass Banner)
-                  if (sinMaterialGenetico) ...[
+                  // Estado de Almacén / Material Genético (Bento Glass Banner & Selector Estricto de Lote)
+                  if (sinMaterialGenetico || alevinosDisponibles.isEmpty) ...[
                     Container(
                       padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(
@@ -434,51 +479,122 @@ class _SiembraModalState extends ConsumerState<SiembraModal> {
                             style: AppTypography.bodySmall.copyWith(color: Colors.white70, fontSize: 11.5),
                           ),
                           const SizedBox(height: 10),
-                          SizedBox(
-                            width: double.infinity,
-                            child: ElevatedButton.icon(
-                              icon: const Icon(Icons.add_shopping_cart_rounded, size: 16),
-                              label: const Text('Registrar Compra de Alevinos / Semilla', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppColors.waterCritical,
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: ElevatedButton.icon(
+                                  icon: const Icon(Icons.receipt_long_rounded, size: 16),
+                                  label: const Text('Ingresar Factura', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppColors.cyanWater,
+                                    foregroundColor: Colors.black,
+                                    padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                  ),
+                                  onPressed: () async {
+                                    await NuevaFacturaModal.show(context, initialCategory: 'alevinos');
+                                    await ref.read(warehouseProvider.notifier).loadWarehouseData();
+                                  },
+                                ),
                               ),
-                              onPressed: () async {
-                                await NuevoItemModal.show(context, initialType: InventoryItemType.alevino);
-                                await ref.read(warehouseProvider.notifier).loadWarehouseData();
-                              },
-                            ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  icon: const Icon(Icons.add_box_outlined, size: 16),
+                                  label: const Text('Entrada Directa', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: Colors.white,
+                                    side: const BorderSide(color: Colors.white24),
+                                    padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                  ),
+                                  onPressed: () async {
+                                    await NuevoItemModal.show(context, initialType: InventoryItemType.alevino);
+                                    await ref.read(warehouseProvider.notifier).loadWarehouseData();
+                                  },
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),
                     ),
                   ] else ...[
+                    // Selector Estricto de Lote de Alevinos / Semilla de Almacén
+                    Text(
+                      'LOTE ESPECÍFICO DE ALEVINOS (TRAZABILIDAD EN BODEGA)',
+                      style: AppTypography.labelMicro.copyWith(color: AppColors.cyanWater, fontWeight: FontWeight.w800),
+                    ),
+                    const SizedBox(height: 6),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: isDark ? Colors.white.withValues(alpha: 0.06) : Colors.white,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: _selectedInventoryItemId != null ? AppColors.greenBiomass : AppColors.amberWarning.withValues(alpha: 0.6)),
+                      ),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<String>(
+                          value: _selectedInventoryItemId,
+                          hint: const Text(
+                            'Seleccionar lote / factura de alevinos...',
+                            style: TextStyle(color: AppColors.textSecondaryDark, fontSize: 12),
+                          ),
+                          dropdownColor: isDark ? AppColors.surfaceDark : Colors.white,
+                          isExpanded: true,
+                          icon: const Icon(Icons.keyboard_arrow_down_rounded, color: AppColors.cyanWater),
+                          items: alevinosDisponibles.map((item) {
+                            final prov = item.marcaProveedor?.isNotEmpty == true ? ' • ${item.marcaProveedor}' : '';
+                            final lote = item.loteFabricante?.isNotEmpty == true ? ' [Lote: ${item.loteFabricante}]' : '';
+                            return DropdownMenuItem<String>(
+                              value: item.id,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Text(
+                                    '${item.nombre}$prov$lote',
+                                    style: TextStyle(
+                                      color: isDark ? Colors.white : AppColors.textPrimaryLight,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  Text(
+                                    'Disponible: ${item.cantidadActualKg.toInt()} pcs • CPP: \$${item.costoUnitarioHistorico.toStringAsFixed(0)} COP/pez',
+                                    style: const TextStyle(color: AppColors.cyanWater, fontSize: 10),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }).toList(),
+                          onChanged: (val) {
+                            setState(() {
+                              _selectedInventoryItemId = val;
+                              _costoModificadoManualmente = false;
+                              _recalcularCostoAutomatico();
+                            });
+                          },
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                       decoration: BoxDecoration(
                         color: AppColors.greenBiomass.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(14),
+                        borderRadius: BorderRadius.circular(12),
                         border: Border.all(color: AppColors.greenBiomass.withValues(alpha: 0.35)),
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.inventory_2_rounded, color: AppColors.greenBiomass, size: 18),
-                          const SizedBox(width: 10),
+                          const Icon(Icons.inventory_2_rounded, color: AppColors.greenBiomass, size: 16),
+                          const SizedBox(width: 8),
                           Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Almacén: ${stockDisponible.toInt()} alevinos disponibles',
-                                  style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
-                                ),
-                                Text(
-                                  'Costo unitario registrado: \$${costoUnitario.toStringAsFixed(0)} COP/pez',
-                                  style: const TextStyle(color: AppColors.cyanWater, fontSize: 11),
-                                ),
-                              ],
+                            child: Text(
+                              'Stock Total Especie: ${stockDisponible.toInt()} alevinos en almacén',
+                              style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600),
                             ),
                           ),
                         ],

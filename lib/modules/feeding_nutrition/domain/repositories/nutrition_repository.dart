@@ -11,6 +11,7 @@ abstract class NutritionRepository {
     String? insumoId,
     required double kgConsumidos,
     required double costoUnitarioAlimento,
+    DateTime? fecha,
   });
 
   Future<List<NutritionTable>> fetchNutritionTables(String empresaId);

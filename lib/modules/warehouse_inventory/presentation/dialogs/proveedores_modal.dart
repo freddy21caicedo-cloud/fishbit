@@ -14,8 +14,8 @@ import 'package:fishbit_finance/modules/auth_tenant/presentation/providers/auth_
 class ProveedoresModal extends ConsumerStatefulWidget {
   const ProveedoresModal({super.key});
 
-  static Future<void> show(BuildContext context) {
-    return showDialog(
+  static Future<Supplier?> show(BuildContext context) {
+    return showDialog<Supplier?>(
       context: context,
       barrierDismissible: true,
       builder: (context) => const ProveedoresModal(),
@@ -75,20 +75,14 @@ class _ProveedoresModalState extends ConsumerState<ProveedoresModal> {
     await ref.read(warehouseProvider.notifier).addSupplier(newSupplier);
 
     if (!mounted) return;
-    setState(() {
-      _showForm = false;
-      _nombreCtrl.clear();
-      _nitCtrl.clear();
-      _telCtrl.clear();
-      _ciudadCtrl.clear();
-    });
-
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('Proveedor "${newSupplier.nombre}" guardado exitosamente.'),
         backgroundColor: AppColors.greenBiomass,
       ),
     );
+
+    Navigator.of(context).pop(newSupplier);
   }
 
   @override
@@ -284,25 +278,28 @@ class _ProveedoresModalState extends ConsumerState<ProveedoresModal> {
       separatorBuilder: (_, __) => const SizedBox(height: 10),
       itemBuilder: (context, index) {
         final s = suppliers[index];
-        return Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.04),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(
-                    child: Text(
-                      s.nombre,
-                      style: AppTypography.titleSmall.copyWith(color: Colors.white, fontWeight: FontWeight.w800),
+        return InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: () => Navigator.of(context).pop(s),
+          child: Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.04),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        s.nombre,
+                        style: AppTypography.titleSmall.copyWith(color: Colors.white, fontWeight: FontWeight.w800),
+                      ),
                     ),
-                  ),
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -366,8 +363,9 @@ class _ProveedoresModalState extends ConsumerState<ProveedoresModal> {
               ],
             ],
           ),
-        );
-      },
-    );
-  }
+        ),
+      );
+    },
+  );
+}
 }

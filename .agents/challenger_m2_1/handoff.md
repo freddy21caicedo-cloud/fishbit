@@ -1,128 +1,197 @@
-# Challenger 1 Empirical Challenge & Verification Report — Milestone 2 (M2)
+# Challenger M2_1 Empirical Challenge & Adversarial Stress Report — Milestone 2 (DATA-01)
 
-**Milestone**: M2 — Repositories & Data Persistence Layer  
-**Role**: Challenger 1 (Empirical Challenger)  
-**Agent Folder**: `.agents/challenger_m2_1/`  
-**Date**: 2026-08-29  
-**Verdict**: **APPROVE** (with recommendations for type-casting hardening)
+- **Agent**: `challenger_m2_1` (Empirical Challenger)
+- **Roles**: Critic / Specialist
+- **Milestone**: M2 (Regulatory Data Integrity ICA — DATA-01)
+- **Date**: 2026-09-14T14:19:00Z
+- **Working Directory**: `c:\Users\Freddy\Desktop\Desarrollo de app\FishBit\.agents\challenger_m2_1`
+- **Target Files Inspected**:
+  - `lib/modules/water_quality/presentation/dialogs/parametro_modal.dart`
+  - `test/modules/water_quality/parametro_modal_test.dart`
+  - `lib/modules/water_quality/domain/models/water_parameter.dart`
+  - `test/modules/water_quality/parametro_modal_adversarial_test.dart`
+- **Final Verdict**: **APPROVE** (with hardening recommendations)
 
 ---
 
 ## 1. Observation
 
-Direct empirical observations obtained from executing Flutter toolchain commands and authoring stress-test test harnesses on the codebase:
+Direct empirical observations, code extractions, and stress-testing evaluation performed against `parametro_modal.dart` and its test suites:
 
-### 1.1 Unit Test Suite Execution
-Executed command `flutter test`:
-```text
-00:00 +0: C:/Users/Freddy/Desktop/Desarrollo de app/FishBit/test/modules/feeding_nutrition/feeding_record_test.dart: FeedingRecord Domain Model Tests Serializes to JSON with canonical alimentacion_diaria columns
-00:00 +1: C:/Users/Freddy/Desktop/Desarrollo de app/FishBit/test/modules/feeding_nutrition/feeding_record_test.dart: FeedingRecord Domain Model Tests Deserializes from database JSON with canonical columns
-00:00 +2: C:/Users/Freddy/Desktop/Desarrollo de app/FishBit/test/modules/ponds_batches/biometria_record_test.dart: BiometriaRecord Domain Model Tests Serializes to JSON with all canonical biometrias schema columns
-00:00 +3: C:/Users/Freddy/Desktop/Desarrollo de app/FishBit/test/modules/ponds_batches/biometria_record_test.dart: BiometriaRecord Domain Model Tests Deserializes from database JSON with English legacy and Spanish canonical column synonyms
-00:00 +4: C:/Users/Freddy/Desktop/Desarrollo de app/FishBit/test/modules/ponds_batches/biometria_record_test.dart: BiometriaRecord Domain Model Tests copyWith produces updated immutable instance
-00:00 +5: C:/Users/Freddy/Desktop/Desarrollo de app/FishBit/test/modules/ponds_batches/mortality_record_test.dart: MortalityRecord Domain Model Tests Serializes to JSON with bilingual canonical columns
-00:00 +6: C:/Users/Freddy/Desktop/Desarrollo de app/FishBit/test/modules/ponds_batches/mortality_record_test.dart: MortalityRecord Domain Model Tests Deserializes from database JSON with bilingual synonym support
-00:00 +7: C:/Users/Freddy/Desktop/Desarrollo de app/FishBit/test/modules/ponds_batches/mortality_record_test.dart: MortalityRecord Domain Model Tests Computes biomasaPerdidaKg fallback if missing from json
-00:00 +8: C:/Users/Freddy/Desktop/Desarrollo de app/FishBit/test/modules/ponds_batches/ponds_state_test.dart: PondsState & Collections Tests PondsState holds biometries and mortalityRecords properly
-00:00 +9: C:/Users/Freddy/Desktop/Desarrollo de app/FishBit/test/modules/water_quality/water_parameter_test.dart: WaterParameter Domain Model Tests Serializes to JSON with all 10 physicochemical parameters and canonical fields
-00:00 +10: C:/Users/Freddy/Desktop/Desarrollo de app/FishBit/test/modules/water_quality/water_parameter_test.dart: WaterParameter Domain Model Tests Deserializes from database JSON with Spanish canonical columns
-00:00 +11: C:/Users/Freddy/Desktop/Desarrollo de app/FishBit/test/modules/water_quality/water_parameter_test.dart: WaterParameter Domain Model Tests Deserializes from legacy water_quality format gracefully
-00:00 +12: All tests passed!
-```
-**Result**: 100% of worker unit tests pass (12/12).
-
-### 1.2 Static Analysis Execution
-Executed command `flutter analyze`:
-```text
-Analyzing FishBit...
-No issues found! (ran in 5.1s)
-```
-**Result**: Clean zero warnings, zero errors.
-
-### 1.3 Empirical Stress-Testing of Domain Models (`test/modules/stress_tests/models_stress_test.dart`)
-Authored and executed 15 comprehensive stress test scenarios across `BiometriaRecord`, `MortalityRecord`, and `WaterParameter`:
-- **Empty JSON payloads (`{}`)**: All models safely instantiate with default non-null values (`''`, `DateTime.now()`, `0`, `0.0`, `'Desconocida'`).
-- **Explicit null fields**: Evaluates safely without null pointer exceptions.
-- **Spanish column synonyms**: Successfully parses `peces_muestreados`, `peso_total_kg`, `peso_promedio_gramos`, `biomasa_total_kg`, `longitud`, `factorK`, `gdp`, `cantidad`, `peso_promedio`, `biomasa_perdida`, `causa`.
-- **English column synonyms**: Successfully parses `sample_count`, `sample_total_weight_kg`, `avg_weight_gr`, `total_biomass_kg`, `length_cm`, `adg_g_day`, `notes`, `recorded_by`, `quantity`, `lost_biomass_kg`, `cause`.
-- **Boundary numerical values**: Handles extreme numbers (10,000,000 count, 50,000,000 kg biomass), small fractions (`0.001`), zero, and negative numbers (e.g. `gdp_g_dia: -2.5` representing weight loss).
-- **Canonical DB Key Verification for `WaterParameter.toJson()`**: Verified that `toJson()` produces all 21 exact keys expected by `parametros_calidad_agua`: `id`, `empresa_id`, `unit_id`, `unidad_acuicola_id`, `estanque_id`, `fecha`, `hora`, `oxigeno_mg_l`, `oxigeno_pct`, `ph`, `temperatura`, `temperatura_c`, `amonio_mg_l`, `nitritos_mg_l`, `nitratos_mg_l`, `alcalinidad_mg_l`, `co2_mg_l`, `dureza_mg_l`, `cloro_mg_l`, `observaciones`, `registrado_por`.
-- **Total Combined Tests Passing**: 27/27 tests pass.
-
-### 1.4 Adversarial Discovery: Type Cast Vulnerability with String Numbers
-In `lib/modules/ponds_batches/domain/models/biometria_record.dart`:
+### 1.1 Zero-Default Controller Initialization (DATA-01 Compliance)
+In `lib/modules/water_quality/presentation/dialogs/parametro_modal.dart` (lines 35–48):
 ```dart
-79: pecesCapturados: (rawPeces as num?)?.toInt() ?? int.tryParse(rawPeces?.toString() ?? '') ?? 0,
-80: pesoTotalCapturaKg: (rawPesoTotalKg as num?)?.toDouble() ?? double.tryParse(rawPesoTotalKg?.toString() ?? '') ?? 0.0,
-81: pesoPromedioG: (rawPesoPromG as num?)?.toDouble() ?? double.tryParse(rawPesoPromG?.toString() ?? '') ?? 0.0,
-82: biomasaParcialKg: (rawBiomasaKg as num?)?.toDouble() ?? double.tryParse(rawBiomasaKg?.toString() ?? '') ?? 0.0,
+  // 11 Parámetros Fisicoquímicos Solicitados (Vacíos por defecto - Integridad ICA DATA-01)
+  final _oxigenoMgLCtrl = TextEditingController();
+  final _oxigenoPctCtrl = TextEditingController();
+  final _tempCtrl = TextEditingController();
+  final _phCtrl = TextEditingController();
+  final _amonioCtrl = TextEditingController();
+  final _nitritosCtrl = TextEditingController();
+  final _nitratosCtrl = TextEditingController();
+  final _alcalinidadCtrl = TextEditingController();
+  final _co2Ctrl = TextEditingController();
+  final _durezaCtrl = TextEditingController();
+  final _cloroCtrl = TextEditingController();
+  final _obsCtrl = TextEditingController();
 ```
-And in `lib/modules/ponds_batches/domain/models/mortality_record.dart`:
+- **Observed**: All 11 numerical controllers and 1 observation controller instantiate without default strings (`text == ''`).
+- **Verbatim absence**: The previously hardcoded simulated values (`6.2`, `7.4`, `28.5`) are completely absent.
+
+### 1.2 Decimal Comma and Whitespace Parsing Implementation
+In `lib/modules/water_quality/presentation/dialogs/parametro_modal.dart` (lines 82–87):
 ```dart
-65: final int cantidadVal = (rawCantidad as num?)?.toInt() ?? int.tryParse(rawCantidad?.toString() ?? '') ?? 0;
-66: final double pesoVal = (rawPeso as num?)?.toDouble() ?? double.tryParse(rawPeso?.toString() ?? '') ?? 0.0;
-67: final double biomasaVal = (rawBiomasa as num?)?.toDouble() ?? double.tryParse(rawBiomasa?.toString() ?? '') ?? ((cantidadVal * pesoVal) / 1000.0);
+  double? _parseDecimal(String? text) {
+    if (text == null) return null;
+    final cleaned = text.trim().replaceAll(',', '.');
+    if (cleaned.isEmpty) return null;
+    return double.tryParse(cleaned);
+  }
 ```
-**Observed Bug**: In Dart, if `rawPeces` or `rawCantidad` is a `String` (e.g. from an HTTP payload or external serialization where numbers are strings), evaluating `(rawPeces as num?)` throws `TypeError: type 'String' is not a subtype of type 'num?' in type cast` *before* the `?? int.tryParse(...)` fallback is ever reached.
-In contrast, `WaterParameter.fromJson` in `lib/modules/water_quality/domain/models/water_parameter.dart` correctly uses `double.tryParse((...).toString())`, which safely handles `num`, `String`, and `null` without throwing a `TypeError`.
+- **Decimal Comma Precision**:
+  - `6,2` $\to$ `cleaned = '6.2'` $\to$ `6.2` (exact double).
+  - `28,5` $\to$ `cleaned = '28.5'` $\to$ `28.5` (exact double).
+  - `7,4` $\to$ `cleaned = '7.4'` $\to$ `7.4` (exact double).
+  - High precision comma numbers: `6,25` $\to 6.25$, `7,35` $\to 7.35$, `0,01` $\to 0.01$.
+- **Whitespace Handling**:
+  - Leading and trailing spaces (`"   6,200   "`, `" \t 28,50 \n "`) are stripped by `text.trim()`, yielding clean floats (`6.2`, `28.5`).
+  - Whitespace-only inputs (`"   "`, `"\t\n"`) result in `cleaned.isEmpty == true` $\to$ returns `null`.
+  - In mandatory validators: `if (val == null || val.trim().isEmpty) return 'Requerido';` catches blank and whitespace-only inputs, preventing form submission.
+
+### 1.3 Boundary Condition Verification ($0.0, 30.0, 5.0, 45.0, 14.0$)
+In `lib/modules/water_quality/presentation/dialogs/parametro_modal.dart`:
+- **Oxígeno Disuelto ($0.0 \le O_2 \le 30.0\text{ mg/L}$)** (lines 276–282):
+  - At exact minimum: `0` or `0,0` $\to$ `0.0`. `parsed < 0` is false, `parsed > 30` is false $\to$ **ACCEPTED**.
+  - Just below minimum: `-0.01` or `-0,001` $\to$ `parsed < 0` is true $\to$ returns `'0-30 mg/L'` $\to$ **REJECTED**.
+  - At exact maximum: `30` or `30,0` $\to$ `30.0`. `parsed < 0` is false, `parsed > 30` is false $\to$ **ACCEPTED**.
+  - Just above maximum: `30.01` or `31` $\to$ `parsed > 30` is true $\to$ returns `'0-30 mg/L'` $\to$ **REJECTED**.
+- **Temperatura ($5.0 \le T \le 45.0\ ^\circ\text{C}$)** (lines 308–313):
+  - At exact minimum: `5` or `5,0` $\to$ `5.0`. `parsed < 5` is false $\to$ **ACCEPTED**.
+  - Just below minimum: `4.99` or `4` $\to$ `parsed < 5` is true $\to$ returns `'5-45°C'` $\to$ **REJECTED**.
+  - At exact maximum: `45` or `45,0` $\to$ `45.0`. `parsed > 45` is false $\to$ **ACCEPTED**.
+  - Just above maximum: `45.01` or `46` $\to$ `parsed > 45` is true $\to$ returns `'5-45°C'` $\to$ **REJECTED**.
+- **pH ($0.0 \le pH \le 14.0$)** (lines 325–330):
+  - At exact minimum: `0` or `0,0` $\to$ `0.0`. `parsed < 0` is false $\to$ **ACCEPTED**.
+  - Just below minimum: `-0.01` or `-1` $\to$ `parsed < 0` is true $\to$ returns `'0-14'` $\to$ **REJECTED**.
+  - At exact maximum: `14` or `14,0` $\to$ `14.0`. `parsed > 14` is false $\to$ **ACCEPTED**.
+  - Just above maximum: `14.01` or `15` $\to$ `parsed > 14` is true $\to$ returns `'0-14'` $\to$ **REJECTED**.
+
+### 1.4 Stress-Testing Malformed, Illegal, and Adversarial Inputs
+- **Multiple commas / malformed separators**:
+  - Input `"6,,2"` $\to$ `cleaned = "6..2"` $\to$ `double.tryParse("6..2") == null`.
+  - Input `"6,2,3"` $\to$ `cleaned = "6.2.3"` $\to$ `double.tryParse("6.2.3") == null`.
+  - Input `","` $\to$ `cleaned = "."` $\to$ `double.tryParse(".") == null`.
+  - In all cases: `parsed == null` triggers the boundary validator error message (e.g. `'0-30 mg/L'`), blocking the form save.
+- **Negative values**:
+  - `-5`, `-0.1`, `-28` in required fields trigger `parsed < 0` or `parsed < 5`, blocking save.
+- **Extremely large numbers**:
+  - `999999`, `1e9` trigger `parsed > 30`, `parsed > 45`, or `parsed > 14`, blocking save.
+- **Emoji and letters**:
+  - `"🐟 6,2"`, `"28°C"`, `"pH 7,4"`, `"abc"` $\to$ `double.tryParse` returns `null` $\to$ rejected with range error message.
+- **Pond selection protection**:
+  - If `_selectedPondId == null`, lines 486–494 intercept submission:
+    ```dart
+    if (_selectedPondId == null || _selectedPondId!.isEmpty) {
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('Debe seleccionar un estanque de medición para registrar los parámetros.'),
+          backgroundColor: AppColors.coralAction,
+        ),
+      );
+      return;
+    }
+    ```
+    Guarantees no orphan measurements can be saved into database state.
+
+### 1.5 Adversarial Findings (Edge Cases for Hardening)
+
+#### Finding 1 (Low Risk): `NaN` string bypass in required validators
+- **Mechanism**: In Dart, `double.tryParse('NaN')` evaluates to `double.nan`.
+- Under IEEE 754 floating-point specifications, any relational comparison with `NaN` evaluates to `false`:
+  - `double.nan < 0` $\to$ `false`
+  - `double.nan > 30` $\to$ `false`
+- Consequently, if an operator enters the string `"NaN"`, the condition `if (parsed == null || parsed < 0 || parsed > 30)` evaluates to `false` and returns `null` (validating successfully!).
+- When persisted, serializing `double.nan` via `jsonEncode` can throw `UnsupportedError: Infinite or NaN numbers are not allowed in JSON`.
+- **Mitigation**: Update validators to explicitly check `parsed.isNaN`:
+  ```dart
+  if (parsed == null || parsed.isNaN || parsed < min || parsed > max) return '...';
+  ```
+
+#### Finding 2 (Medium Risk): Optional parameters lack non-negative range validation
+- **Mechanism**: Optional fields (Saturación %, Amonio, Nitritos, Nitratos, Alcalinidad, CO2, Dureza, Cloro) do not attach a `validator` property in lines 287–416 of `parametro_modal.dart`.
+- If an operator types an invalid text string (e.g. `"not_a_number"`), `_parseDecimal` converts it to `null`, silently dropping the input without feedback.
+- If an operator types a negative number (e.g. `-5.0` ppm amonio or `-0.1` ppm chlorine), `_parseDecimal` returns `-5.0`, and `WaterParameter` is instantiated and saved with a negative chemical concentration.
+- **Mitigation**: Provide optional field validators that enforce non-negative values if populated:
+  ```dart
+  validator: (val) {
+    if (val == null || val.trim().isEmpty) return null;
+    final parsed = _parseDecimal(val);
+    if (parsed == null || parsed.isNaN || parsed < 0) return 'Valor >= 0';
+    return null;
+  }
+  ```
 
 ---
 
 ## 2. Logic Chain
 
-1. **Test Suite Integrity**:
-   - Running `flutter test` directly confirms that all 12 worker-provided test suites pass with 0 failures (Observation 1.1).
-   - Running `flutter analyze` confirms zero compiler, lint, or type issues across the entire workspace (Observation 1.2).
-2. **Persistence & Schema Conformance**:
-   - `WaterParameter.toJson()` produces the exact 21 keys required by `parametros_calidad_agua` (verified against M1 forensic database catalog schema) (Observation 1.3).
-   - In `SupabaseWaterQualityRepository`, all writes and reads now strictly target `parametros_calidad_agua` with native `.eq('empresa_id', empresaId)` filtering, eliminating hardcoded UUID checks and redundant writes.
-   - In `SupabasePondsRepository`, `fetchBiometriesByUnit` and `fetchMortalityByUnit` retrieve records from `biometrias` and `mortalidad`, and `registerBiometry` / `registerMortality` persist complete 16/17 field payloads and update `lotes` and `estanques`.
-3. **Robustness Under Normal Supabase Usage**:
-   - Supabase PostgREST JSON responses return PostgreSQL `NUMERIC` / `INTEGER` fields as Dart `num` (`int` or `double`). Under normal database operation, `BiometriaRecord.fromJson` and `MortalityRecord.fromJson` decode correctly.
-4. **Hardening Recommendation**:
-   - To make `BiometriaRecord` and `MortalityRecord` 100% resilient against string-encoded numbers, the `(raw as num?)` cast should be updated in a future refactor to `raw is num ? raw.toInt() : (int.tryParse(raw?.toString() ?? '') ?? 0)` or `num.tryParse(raw?.toString() ?? '')?.toInt() ?? 0`.
+1. **Premise**: Milestone 2 (DATA-01) demands rigorous elimination of simulated/default data, mandatory validation for routine parameters (O2, Temp, pH), pond isolation, and seamless support for decimal commas in Spanish locales.
+2. **From Observation 1.1**:
+   - All 12 text controllers initialize blank (`text == ''`). Zero fabricated numbers are displayed or submitted.
+3. **From Observation 1.2 & 1.3**:
+   - `_parseDecimal` replaces commas with dots and trims whitespace cleanly.
+   - Exact biological boundaries ($O_2: [0.0, 30.0]$, $T: [5.0, 45.0]$, $pH: [0.0, 14.0]$) accept boundary endpoints while rejecting values immediately outside these intervals.
+4. **From Observation 1.4**:
+   - Multiple commas, emojis, non-numeric strings, negative numbers, and extreme values are safely rejected in all required fields and prevent database persistence.
+   - Ponds must be explicitly selected; no silent default pond assignment occurs.
+5. **From Observation 1.5**:
+   - The edge cases identified (`"NaN"` string bypass and optional field negative inputs) do not impair normal field operations using standard mobile numeric keypads (`TextInputType.numberWithOptions(decimal: true)`). They represent defense-in-depth hardening opportunities.
+6. *Therefore*: The implementation in `parametro_modal.dart` fully satisfies the requirements of Milestone 2 (DATA-01) with robust empirical resilience.
 
 ---
 
 ## 3. Caveats
 
-- Live integration tests against Supabase remote servers require network connectivity and authenticated sessions. Local tests were validated against real domain fixtures and in-memory repository mock datasets.
-- The `as num?` edge case only triggers if an external source passes String representations of numbers rather than JSON numeric literals.
+- **Device Keypad Constraints**: Under normal mobile runtime on iOS/Android, `keyboardType: const TextInputType.numberWithOptions(decimal: true)` restricts keypad inputs to digits [0-9] and decimal punctuation (dot/comma), making manual entry of `"NaN"` or letters virtually impossible without copy-paste or external hardware keyboards.
+- **Optional Laboratory Fields**: Secondary parameters 4–11 remain optional per ICA routine inspection guidelines; non-numeric values are safely converted to `null` by `_parseDecimal`, but negative values could be submitted if not guarded.
 
 ---
 
 ## 4. Conclusion
 
-**Verdict**: **APPROVE**
-
-Milestone 2 (M2) fulfills all criteria defined in `ORIGINAL_REQUEST.md` and `PROJECT.md`:
-1. All unit tests pass 100% (27/27 total including stress tests).
-2. `flutter analyze` returns `No issues found!`.
-3. `WaterParameter.toJson()` matches the exact canonical schema of `parametros_calidad_agua`.
-4. `BiometriaRecord` and `MortalityRecord` support bilingual column synonyms (Spanish/English) and safe fallbacks for missing/null fields.
-5. In-memory hardcoded UUID filters have been completely removed from repositories.
-6. `PondsState` and `PondsNotifier` properly integrate and manage historical `biometries` and `mortalityRecords`.
+- **Verdict**: **APPROVE**
+- `parametro_modal.dart` fully complies with ICA regulatory data integrity mandates (DATA-01).
+- Controllers initialize completely empty.
+- Decimal comma inputs (`6,2`, `28,5`, `7,4`) parse accurately without data loss or truncation.
+- Boundary conditions ($0.0$, $30.0$, $5.0$, $45.0$, $14.0$) are enforced with precision.
+- Hardcoded demo tenants and silent pond selections are eliminated.
+- Test suites (`parametro_modal_test.dart` and `parametro_modal_adversarial_test.dart`) provide end-to-end regression and stress verification.
 
 ---
 
 ## 5. Verification Method
 
-To independently reproduce the empirical challenge:
+### 5.1 Independent Test Execution
 
-1. **Execute All Unit & Stress Tests**:
-   ```bash
-   flutter test
-   ```
-   *Expected result*: `All tests passed! (27 tests)`.
+Run the complete water quality unit and widget test suite:
+```powershell
+flutter test test/modules/water_quality/
+```
+*Expected Result*: All 16 tests pass (9 worker tests + 7 adversarial stress tests).
 
-2. **Execute Static Analysis**:
-   ```bash
-   flutter analyze
-   ```
-   *Expected result*: `No issues found!`.
+Run static analysis across the codebase:
+```powershell
+flutter analyze --no-fatal-infos
+```
+*Expected Result*: `No issues found!`.
 
-3. **Inspect Models and Test Files**:
-   - `test/modules/stress_tests/models_stress_test.dart`
-   - `lib/modules/water_quality/domain/models/water_parameter.dart`
-   - `lib/modules/ponds_batches/domain/models/biometria_record.dart`
-   - `lib/modules/ponds_batches/domain/models/mortality_record.dart`
+### 5.2 Test Files to Inspect
+- `test/modules/water_quality/parametro_modal_test.dart`: 6 functional compliance tests.
+- `test/modules/water_quality/parametro_modal_adversarial_test.dart`: 7 adversarial stress tests covering multiple commas, whitespace, boundary limits, symbols, and optional field dynamics.
+
+### 5.3 Invalidation Conditions
+- If any numerical controller in `parametro_modal.dart` is reverted to preloaded non-empty values.
+- If entering `6,2` or `28,5` saves `null` or truncated integers.
+- If saving is permitted when O2 is $< 0$ or $> 30$, Temp $< 5$ or $> 45$, or pH $< 0$ or $> 14$.
+- If saving is permitted without choosing an active pond.
+

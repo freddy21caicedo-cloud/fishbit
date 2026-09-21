@@ -4,6 +4,7 @@ import 'package:fishbit_finance/core/design_system/app_colors.dart';
 import 'package:fishbit_finance/core/design_system/app_typography.dart';
 import 'package:fishbit_finance/core/design_system/fishbit_header.dart';
 import 'package:fishbit_finance/core/design_system/glass_card.dart';
+import 'package:fishbit_finance/core/design_system/floating_dock_layout.dart';
 import 'package:fishbit_finance/core/design_system/glass_badge.dart';
 import 'package:fishbit_finance/core/design_system/glass_date_picker.dart';
 import 'package:fishbit_finance/core/utils/currency_formatters.dart';
@@ -53,9 +54,8 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      floatingActionButton: Padding(
-        padding: const EdgeInsets.only(bottom: 78),
-        child: LayoutBuilder(
+      floatingActionButtonLocation: FloatingDockFabLocation.endFloat,
+      floatingActionButton: LayoutBuilder(
           builder: (context, constraints) {
             final screenWidth = MediaQuery.sizeOf(context).width;
             if (screenWidth < 440) {
@@ -97,7 +97,6 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
             );
           },
         ),
-      ),
       body: CustomScrollView(
         slivers: [
           FishBitHeader(
@@ -379,7 +378,7 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
                 ),
               ),
             ),
-          const SliverToBoxAdapter(child: SizedBox(height: 100)),
+          const SliverDockBottomSpacer(),
         ],
       ),
     );

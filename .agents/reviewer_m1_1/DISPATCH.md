@@ -1,21 +1,16 @@
-## 2026-09-01T01:01:02Z
-You are Reviewer 1 for Milestone 1: PostgreSQL & Supabase Database Optimization.
+## 2026-09-13T23:52:48Z
+You are Reviewer M1_1.
+Your identity: Reviewer M1_1 - Code Review & Interface Conformance
+Your working directory: c:\Users\Freddy\Desktop\Desarrollo de app\FishBit\.agents\reviewer_m1_1
+Project root workspace: c:\Users\Freddy\Desktop\Desarrollo de app\FishBit
+Authoritative request file: c:\Users\Freddy\Desktop\Desarrollo de app\FishBit\.agents\ORIGINAL_REQUEST.md
+Worker handoff report: c:\Users\Freddy\Desktop\Desarrollo de app\FishBit\.agents\worker_m1\handoff.md
+Project index: c:\Users\Freddy\Desktop\Desarrollo de app\FishBit\.agents\orchestrator_impl_1\PROJECT.md
 
-Your working directory is:
-c:\Users\Freddy\Desktop\Desarrollo de app\FishBit\.agents\reviewer_m1_1
-
-Read the authoritative files:
-1. c:\Users\Freddy\Desktop\Desarrollo de app\FishBit\.agents\ORIGINAL_REQUEST.md
-2. c:\Users\Freddy\Desktop\Desarrollo de app\FishBit\PROJECT.md
-3. c:\Users\Freddy\Desktop\Desarrollo de app\FishBit\.agents\worker_m1_db\handoff.md
-4. `supabase/migrations/20260831_database_performance_and_rls_optimization.sql`
-5. Modified Dart repositories:
-   - `lib/modules/warehouse_inventory/infrastructure/repositories/supabase_warehouse_repository.dart`
-   - `lib/modules/finance_payroll/infrastructure/repositories/supabase_finance_repository.dart`
-   - `lib/modules/sales_harvest/infrastructure/repositories/supabase_sales_repository.dart`
-   - `lib/modules/equipment_capex/infrastructure/repositories/supabase_equipment_repository.dart`
-
-Evaluate:
-- Correctness, completeness, and robustness of SQL migrations and Dart repositories.
-- Run `flutter test` via `run_command`.
-- Deliver a clear verdict: APPROVE or REQUEST_CHANGES in `c:\Users\Freddy\Desktop\Desarrollo de app\FishBit\.agents\reviewer_m1_1\handoff.md` and send a message back.
+You MUST read c:\Users\Freddy\Desktop\Desarrollo de app\FishBit\.agents\ORIGINAL_REQUEST.md before starting.
+Review the changes made by Worker M1:
+1. `lib/main.dart`: verify that all hardcoded URL and anonKey JWT defaults are removed; verify strict `String.fromEnvironment`, debug `assert`, and release `StateError` pre-validation with URI scheme checks.
+2. `supabase_migration_v10_canonical_v2.sql`: verify that `OR empresa_id IS NULL` is eliminated from all 8 transactional table RLS policies (`units`, `estanques`, `inventory`, `providers`, `siembras`, `water_quality`, `biometrias`, `mortality`); verify strict tenant isolation in `USING` and `WITH CHECK`.
+3. `lib/modules/auth_tenant/infrastructure/repositories/supabase_auth_repository.dart`: verify removal of SEC-02 passwordless bypass and SEC-03 invitation backdoor; verify admin role validation.
+4. Run `flutter analyze --no-fatal-infos` and `flutter test test/modules/auth_tenant/`.
+5. Write your report to `c:\Users\Freddy\Desktop\Desarrollo de app\FishBit\.agents\reviewer_m1_1\handoff.md` stating explicitly APPROVE or REQUEST_CHANGES and send a completion message.

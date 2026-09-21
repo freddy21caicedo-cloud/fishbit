@@ -56,8 +56,10 @@ class SupabaseNutritionRepository implements NutritionRepository {
     String? insumoId,
     required double kgConsumidos,
     required double costoUnitarioAlimento,
+    DateTime? fecha,
   }) async {
     final costoTotal = kgConsumidos * costoUnitarioAlimento;
+    final recordDate = fecha ?? DateTime.now();
     final now = DateTime.now();
     final record = FeedingRecord(
       id: const Uuid().v4(),
@@ -68,7 +70,7 @@ class SupabaseNutritionRepository implements NutritionRepository {
       insumoId: insumoId,
       cantidadConsumidaKg: kgConsumidos,
       costoCalculado: costoTotal,
-      fecha: now,
+      fecha: recordDate,
       creadoEn: now,
     );
 
@@ -95,7 +97,7 @@ class SupabaseNutritionRepository implements NutritionRepository {
         if (insumoId != null) 'insumo_id': insumoId,
         'cantidad_consumida_kg': kgConsumidos,
         'costo_calculado': costoTotal,
-        'fecha': now.toIso8601String().split('T')[0],
+        'fecha': recordDate.toIso8601String().split('T')[0],
         'creado_en': now.toIso8601String(),
       };
 
@@ -109,22 +111,13 @@ class SupabaseNutritionRepository implements NutritionRepository {
             'lote_id': loteId,
             'cantidad_kg': kgConsumidos,
             'costo_total': costoTotal,
-            'fecha': now.toIso8601String().split('T')[0],
+            'fecha': recordDate.toIso8601String().split('T')[0],
           });
         } catch (_) {}
       }
 
-      // 2. Descontar stock del insumo de bodega si existe insumoId
-      if (insumoId != null && insumoId.isNotEmpty) {
-        try {
-          final item = await _supabase.from('inventory').select('current_stock').eq('id', insumoId).maybeSingle();
-          if (item != null) {
-            final curr = (item['current_stock'] as num?)?.toDouble() ?? 0.0;
-            final updatedStock = (curr - kgConsumidos).clamp(0.0, double.infinity);
-            await _supabase.from('inventory').update({'current_stock': updatedStock}).eq('id', insumoId);
-          }
-        } catch (_) {}
-      }
+      // El descuento de inventario en bodega es gestionado centralizadamente por WarehouseNotifier.discountStock
+      // para evitar doble decremento al sincronizar estados.
 
       _eventBus.fire(DailyFeedingRecordedEvent(
         estanqueId: estanqueId,

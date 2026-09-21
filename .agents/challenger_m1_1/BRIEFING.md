@@ -1,57 +1,57 @@
-# BRIEFING — 2026-08-31T20:03:30Z
+# BRIEFING — 2026-09-13T23:58:30Z
 
 ## Mission
-Adversarial empirical challenge of Milestone 1 database optimizations and Dart repository updates.
+Adversarial verification and empirical stress-testing of SEC-01 security changes in FishBit.
 
 ## 🔒 My Identity
-- Archetype: EMPIRICAL CHALLENGER
+- Archetype: empirical-challenger
 - Roles: critic, specialist
 - Working directory: c:\Users\Freddy\Desktop\Desarrollo de app\FishBit\.agents\challenger_m1_1
-- Original parent: f418579e-921a-4f03-87c4-c00f10ae6022
-- Milestone: Milestone 1: PostgreSQL & Supabase Database Optimization
+- Original parent: 18547dc8-fb6c-49bd-b058-468f6abda585
+- Milestone: M1 (SEC-01)
 - Instance: 1 of 1
 
 ## 🔒 Key Constraints
-- Review-only — do NOT modify implementation code (report findings/bugs, do not fix them yourself)
-- Empirical verification: must run SQL queries, inspect database via Supabase MCP, and execute flutter test directly
+- Review-only — do NOT modify implementation code
+- Empirical verification required — write and execute verification tests/scripts
+- If you cannot reproduce a bug empirically, it does not count
+- Do not trust worker's claims or logs
+- Report APPROVE or FAIL explicitly in handoff.md
 
 ## Current Parent
-- Conversation ID: f418579e-921a-4f03-87c4-c00f10ae6022
-- Updated: 2026-08-31T20:03:30Z
+- Conversation ID: 18547dc8-fb6c-49bd-b058-468f6abda585
+- Updated: 2026-09-13T23:58:30Z
 
 ## Review Scope
-- **Files to review**:
-  - `c:\Users\Freddy\Desktop\Desarrollo de app\FishBit\.agents\ORIGINAL_REQUEST.md`
-  - `c:\Users\Freddy\Desktop\Desarrollo de app\FishBit\PROJECT.md`
-  - `c:\Users\Freddy\Desktop\Desarrollo de app\FishBit\.agents\worker_m1_db\handoff.md`
-  - `supabase/migrations/20260831_database_performance_and_rls_optimization.sql`
-  - Dart repositories in `lib/modules/*/infrastructure/repositories/`
-- **Interface contracts**: Supabase project `oakovawlwjpnoydpwtam`
-- **Review criteria**:
-  - Duplicate policies removed
-  - InitPlan subquery wrapping `(select auth.uid())` / `(select get_auth_empresa_id())` applied to RLS policies
-  - Security invoker views configured and functional
-  - Supabase linter / advisors clean (0 `auth_rls_initplan`, 0 `security_definer_view`)
-  - Flutter tests pass with high fidelity (42/42 tests pass)
-
-## Attack Surface
-- **Hypotheses tested**:
-  1. *Hypothesis: Duplicate RLS policies might still exist on public tables.* -> **Disproven**: `SELECT ... HAVING count(*) > 1` returned 0 rows.
-  2. *Hypothesis: Postgres planner might still execute RLS policies as per-row SubPlans.* -> **Disproven**: EXPLAIN ANALYZE on `parametros_calidad_agua` and `traslados_lotes` confirmed execution as `InitPlan 1` and `InitPlan 2` evaluated once at startup.
-  3. *Hypothesis: Views `v_estanques_inconsistencias` and `view_huerfanos_sede_report` might expose tenant data via security definer.* -> **Disproven**: `pg_class.reloptions` confirmed `security_invoker=true` on both views.
-  4. *Hypothesis: Helper functions might lack `search_path` protection or stability flags.* -> **Disproven**: `pg_proc` confirmed `provolatile='s'`, `prosecdef=true`, `proconfig=['search_path=public']`.
-  5. *Hypothesis: Unauthenticated access might fail catastrophically or leak data.* -> **Disproven**: `get_auth_empresa_id()` returns NULL when unauthenticated, failing equality checks safely.
-  6. *Hypothesis: Dart repository queries might cause test failures or regressions.* -> **Disproven**: `flutter test` executed and 100% of 42 tests passed.
-- **Vulnerabilities found**: None in Milestone 1 scope.
-- **Untested angles**: Live multi-gigabyte production load testing (out of scope for unit/integration suite).
-
-## Loaded Skills
-- Source: supabase-postgres-best-practices
+- Files reviewed:
+  - `lib/main.dart`
+  - `supabase_migration_v10_canonical_v2.sql`
+  - All 6 SQL files in repository
+  - `test/core/startup_validation_test.dart` (written & executed)
+  - `test/modules/auth_tenant/` (28 tests executed)
+  - `.gitignore`, `.env.local`, `.vercel/`
+- Interface contracts: PROJECT.md, ORIGINAL_REQUEST.md
+- Review criteria: SEC-01 credentials purge, RLS multi-tenant strict isolation, startup validation
 
 ## Key Decisions Made
-- Confirmed database migration, RLS policies, indexes, and Dart repository behavior.
-- Verdict: **APPROVE**.
+- Implemented and executed empirical test harness `test/core/startup_validation_test.dart` covering direct `main()` execution, missing env vars, and adversarial input matrix (ftp schemes, file schemes, missing schemes).
+- Scanned all 127 SQL policies across the repository via regex harness for `IS NULL` leaks; verified 0 occurrences.
+- Scanned repository for JWTs and project credentials via `git grep`; verified 0 occurrences in application source code.
+- Verified static analysis `flutter analyze --no-fatal-infos` (0 issues).
 
 ## Artifact Index
-- `c:\Users\Freddy\Desktop\Desarrollo de app\FishBit\.agents\challenger_m1_1\handoff.md` — Final Challenger Verdict & Report (APPROVE)
-- `c:\Users\Freddy\Desktop\Desarrollo de app\FishBit\.agents\challenger_m1_1\progress.md` — Progress tracker
+- `c:\Users\Freddy\Desktop\Desarrollo de app\FishBit\.agents\challenger_m1_1\DISPATCH.md` — Dispatch log
+- `c:\Users\Freddy\Desktop\Desarrollo de app\FishBit\.agents\challenger_m1_1\progress.md` — Liveness & progress tracker
+- `c:\Users\Freddy\Desktop\Desarrollo de app\FishBit\.agents\challenger_m1_1\handoff.md` — Final handoff report
+- `c:\Users\Freddy\Desktop\Desarrollo de app\FishBit\test\core\startup_validation_test.dart` — Empirical startup validation test suite
+
+## Attack Surface
+- Hypotheses tested:
+  - Leaked credentials or JWT defaults in source/configs: DISPROVED (clean).
+  - Multi-tenant data leakage via `OR empresa_id IS NULL` in SQL: DISPROVED (0 occurrences in 127 policies).
+  - Missing or invalid env vars bypass startup validation: DISPROVED (trapped by debug assert and runtime StateError).
+- Vulnerabilities found: 0 vulnerabilities found in SEC-01 implementation.
+- Untested angles: Network-level Supabase edge firewall (outside local codebase scope).
+
+## Loaded Skills
+- None explicitly assigned in dispatch.

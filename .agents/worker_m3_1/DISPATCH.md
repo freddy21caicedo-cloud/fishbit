@@ -1,35 +1,72 @@
-## 2026-08-29T04:37:37Z
-You are the Bitácora UI/UX & Presentation Worker for Milestone 3 (M3).
+# Task Dispatch: Worker M3 (Field Ergonomics & WCAG Accessibility: UX-01, UX-02, A11Y-01)
+
+## Mission
+Implement all Milestone 3 requirements across `pond_bento_card.dart`, `main_navigation_shell.dart`, `app_typography.dart`, `theme_provider.dart`, and the 7 FAB padding screens, create verification widget/contrast tests, and ensure `flutter analyze --no-fatal-infos` returns `No issues found!`.
+
+## Mandatory Paths to Read First
+- `c:\Users\Freddy\Desktop\Desarrollo de app\FishBit\.agents\ORIGINAL_REQUEST.md` (MANDATORY)
+- `c:\Users\Freddy\Desktop\Desarrollo de app\FishBit\.agents\orchestrator_impl_gen2\PROJECT.md`
+- `c:\Users\Freddy\Desktop\Desarrollo de app\FishBit\.agents\explorer_m3_1\handoff.md` (MUST READ: exact code diff for pond_bento_card.dart)
+- `c:\Users\Freddy\Desktop\Desarrollo de app\FishBit\.agents\explorer_m3_2\handoff.md` (MUST READ: exact code diff for navigation dock & FABs)
+- `c:\Users\Freddy\Desktop\Desarrollo de app\FishBit\.agents\explorer_m3_3\handoff.md` (MUST READ: exact code diff for typography & themes)
+
+## File Ownership
+You have EXCLUSIVE write access to:
+- `lib/modules/ponds_batches/presentation/widgets/pond_bento_card.dart`
+- `lib/core/design_system/floating_dock_layout.dart` (new)
+- `lib/app/main_navigation_shell.dart`
+- `lib/core/design_system/app_typography.dart`
+- `lib/core/design_system/theme_provider.dart`
+- `lib/core/design_system/app_colors.dart`
+- The 7 screens with `bottom: 78` FAB padding:
+  - `lib/modules/ponds_batches/presentation/screens/ponds_dashboard_screen.dart`
+  - `lib/modules/warehouse_inventory/presentation/screens/warehouse_screen.dart`
+  - `lib/modules/bitacora/presentation/screens/bitacora_screen.dart`
+  - `lib/modules/water_quality/presentation/screens/water_quality_records_screen.dart`
+  - `lib/modules/finances/presentation/screens/finance_screen.dart`
+  - `lib/modules/commercial_sales/presentation/screens/sales_screen.dart`
+  - `lib/modules/auth_tenant/presentation/screens/gestion_equipo_screen.dart`
+- Tests:
+  - `test/modules/ponds_batches/pond_bento_card_test.dart`
+  - `test/core/theme_contrast_test.dart`
+
+## Mandatory Requirements
+1. **UX-01 (Bento Card Touch Targets & Operational Sheet)**:
+   - Implement `SizedBox(width: double.infinity, height: 52)` primary action button on card front face.
+   - Implement `_showOperationsBottomSheet` and `_PondOperationsSheetContent` with large 60 dp action tiles for Alimentar, Calidad de Agua (with `preselectedPondId: widget.pond.id`), Muestreo Biometría, Registrar Bajas, and Traslado/Cosecha.
+   - Upgrade all micro-buttons on front and back card faces to >=48x48 dp (WCAG 2.5.5).
+2. **UX-02 (Navigation Dock & Gesture Bar SafeArea)**:
+   - Create `lib/core/design_system/floating_dock_layout.dart` with `FloatingDockFabLocation.endFloat` and `DockBottomSpacer`.
+   - Update `main_navigation_shell.dart` to wrap dock in `SafeArea(bottom: true)` with bottom padding and keyboard suppression.
+   - Eliminate all 7 occurrences of `Padding(padding: const EdgeInsets.only(bottom: 78))` on FABs, replacing with `floatingActionButtonLocation: FloatingDockFabLocation.endFloat`.
+3. **A11Y-01 (High-Contrast Typography & Reactive Theme)**:
+   - Decouple static constants in `AppTypography` by removing hardcoded dark colors (`color: null` fallback).
+   - Wire `AppTypography.createTextTheme(brightness)` into both `appDarkTheme` and `appLightTheme` in `theme_provider.dart`.
+   - Ensure text contrast >=4.5:1 (WCAG 2.2 AA) against card surfaces in both themes.
+4. **Verification & Cleanliness**:
+   - Run `flutter analyze --no-fatal-infos` -> MUST return `No issues found!`.
+   - Run tests: `flutter test test/modules/ponds_batches/` and `flutter test test/core/`.
+
+## MANDATORY INTEGRITY WARNING
+DO NOT CHEAT. All implementations must be genuine. DO NOT hardcode test results, create dummy/facade implementations, or circumvent the intended task. A teamwork_preview_auditor will independently verify your work. Integrity violations WILL be detected and your work WILL be rejected.
+
+Write your report to:
+`c:\Users\Freddy\Desktop\Desarrollo de app\FishBit\.agents\worker_m3_1\handoff.md`
+Notify orchestrator via `send_message`.
+
+## 2026-09-14T14:43:11Z
+You are Worker M3_1.
 Your working directory is: c:\Users\Freddy\Desktop\Desarrollo de app\FishBit\.agents\worker_m3_1
-Workspace root: c:\Users\Freddy\Desktop\Desarrollo de app\FishBit
+Read your instructions in c:\Users\Freddy\Desktop\Desarrollo de app\FishBit\.agents\worker_m3_1\DISPATCH.md.
+MANDATORY: Read c:\Users\Freddy\Desktop\Desarrollo de app\FishBit\.agents\ORIGINAL_REQUEST.md first.
+Also read handoffs:
+- c:\Users\Freddy\Desktop\Desarrollo de app\FishBit\.agents\explorer_m3_1\handoff.md
+- c:\Users\Freddy\Desktop\Desarrollo de app\FishBit\.agents\explorer_m3_2\handoff.md
+- c:\Users\Freddy\Desktop\Desarrollo de app\FishBit\.agents\explorer_m3_3\handoff.md
 
-Read the following reference files:
-1. ORIGINAL_REQUEST.md: c:\Users\Freddy\Desktop\Desarrollo de app\FishBit\.agents\ORIGINAL_REQUEST.md
-2. PROJECT.md: c:\Users\Freddy\Desktop\Desarrollo de app\FishBit\.agents\orchestrator_main_1\PROJECT.md
-3. M2 Worker Handoff: c:\Users\Freddy\Desktop\Desarrollo de app\FishBit\.agents\worker_m2_1\handoff.md
-4. UI Survey Handoff: c:\Users\Freddy\Desktop\Desarrollo de app\FishBit\.agents\survey_ui_1\handoff.md
-5. UI Survey Analysis: c:\Users\Freddy\Desktop\Desarrollo de app\FishBit\.agents\survey_ui_1\analysis.md
-
-Milestone 3 Scope & Objectives:
-1. `lib/modules/bitacora/presentation/screens/bitacora_screen.dart`:
-   - Tab 3 ("Biometrías y Curvas" / "Biometrías y GDP"):
-     - Connect to `pondsState.biometries`. Filter by `_selectedPondId` if selected.
-     - Implement chronological sorting and accurate period GDP calculation between consecutive sampling dates: `(W_k - W_{k-1}) / (t_k - t_{k-1})` in g/day, with fallback to stocking date if first sample.
-     - Render historical sampling cards with sampling date, pond name, batch code, species, sample count (`pecesCapturados`), average weight (`pesoPromedioG` g), biomass (`biomasaParcialKg` kg), length (`longitudCm` cm), period GDP (`gdpGDia` g/día), and notes.
-     - Include a summary header card with aggregated biometric KPIs (latest average weight, period GDP, total samplings).
-   - Tab 4 ("Mortalidad y Sanidad" / "Bajas y Sanidad"):
-     - Connect to `pondsState.mortalityRecords`. Filter by `_selectedPondId` if selected.
-     - Render real mortality incident cards with date/hour, pond name, batch code, species, quantity of losses, cause of death, lost biomass, and cumulative mortality %.
-     - Include a summary header card with mortality KPIs (total bajas, biomasa perdida acumulada, causa predominante, tasa de supervivencia).
-   - Reactive Pond Filter & Header:
-     - In `_buildPondFilter`: wrap the pond name column and text in `Expanded` with `TextOverflow.ellipsis` so selecting long pond names with the "Limpiar" button never triggers a RenderFlex overflow on 360px mobile viewports.
-     - In `_showPondFilterBottomSheet`: list all available active ponds from `pondsState.ponds` (so any pond can be filtered, not just ponds that already had records).
-     - Ensure selecting a pond reactively filters all 4 tabs simultaneously (Water Quality, Feeding, Biometrics, Mortality).
-     - Ensure tapping "Limpiar" clears the filter for all 4 tabs simultaneously.
-   - Responsive Layout (Mobile 360px & Web >768px):
-     - Wrap list views or cards with `ConstrainedBox(constraints: BoxConstraints(maxWidth: 1024))` centered for wide web displays.
-     - Ensure all cards, badges, and action buttons render without overflow on 360px screens.
-2. Modals (`ParametroModal`, `BiometriaModal`, `MortalidadModal`, `AlimentarModal`):
-   - Review and fix any 360px responsive constraint issues if present.
-3. Run `flutter analyze` and ensure `No issues found!`.
-4. Run `flutter test` across the project test suite.
+Implement all UX-01, UX-02, and A11Y-01 requirements:
+1. pond_bento_card.dart: 52 dp primary field action button, 60 dp operational bottom sheet with all 5 field routines, all micro-buttons >=48x48 dp.
+2. floating_dock_layout.dart & main_navigation_shell.dart: SafeArea(bottom: true), FloatingDockFabLocation.endFloat, eliminate all 7 occurrences of bottom: 78 FAB padding hacks.
+3. app_typography.dart & theme_provider.dart: decouple hardcoded dark colors, wire createTextTheme(brightness) for WCAG 2.2 AA (>=4.5:1) reactive contrast.
+4. Add tests in test/modules/ponds_batches/ and test/core/.
+5. Verify flutter analyze --no-fatal-infos and tests pass 100%.

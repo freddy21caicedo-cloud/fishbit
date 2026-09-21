@@ -4,6 +4,7 @@ import 'package:fishbit_finance/core/design_system/app_colors.dart';
 import 'package:fishbit_finance/core/design_system/app_typography.dart';
 import 'package:fishbit_finance/core/design_system/fishbit_header.dart';
 import 'package:fishbit_finance/core/design_system/glass_card.dart';
+import 'package:fishbit_finance/core/design_system/floating_dock_layout.dart';
 import 'package:fishbit_finance/core/design_system/glass_badge.dart';
 import 'package:fishbit_finance/core/design_system/glass_date_picker.dart';
 import 'package:fishbit_finance/modules/water_quality/presentation/dialogs/parametro_modal.dart';
@@ -50,14 +51,12 @@ class _WaterQualityRecordsScreenState extends ConsumerState<WaterQualityRecordsS
       length: 2,
       child: Scaffold(
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-        floatingActionButton: Padding(
-          padding: const EdgeInsets.only(bottom: 78),
-          child: FloatingActionButton.extended(
-            backgroundColor: AppColors.cyanWater,
-            icon: const Icon(Icons.water_drop_rounded, color: Colors.black),
-            label: const Text('Registrar O₂/pH', style: TextStyle(color: Colors.black, fontWeight: FontWeight.w800)),
-            onPressed: () => ParametroModal.show(context),
-          ),
+        floatingActionButtonLocation: FloatingDockFabLocation.endFloat,
+        floatingActionButton: FloatingActionButton.extended(
+          backgroundColor: AppColors.cyanWater,
+          icon: const Icon(Icons.water_drop_rounded, color: Colors.black),
+          label: const Text('Registrar O₂/pH', style: TextStyle(color: Colors.black, fontWeight: FontWeight.w800)),
+          onPressed: () => ParametroModal.show(context),
         ),
         body: NestedScrollView(
           headerSliverBuilder: (context, innerBoxIsScrolled) => [
@@ -198,7 +197,7 @@ class _WaterQualityRecordsScreenState extends ConsumerState<WaterQualityRecordsS
                         ),
                       );
                     }),
-                  const SizedBox(height: 100),
+                  const DockBottomSpacer(),
                 ],
               ),
 
@@ -216,19 +215,26 @@ class _WaterQualityRecordsScreenState extends ConsumerState<WaterQualityRecordsS
                       ),
                     )
                   else
-                    ...filteredFeeding.map((rec) => Padding(
-                          padding: const EdgeInsets.only(bottom: 10),
-                          child: GlassCard(
-                            title: 'Lote ${rec.loteId.substring(0, 6)}',
-                            subtitle: 'Fecha: ${rec.fecha.day}/${rec.fecha.month}/${rec.fecha.year}',
-                            trailingWidget: GlassBadge(text: '${rec.cantidadConsumidaKg} kg', color: AppColors.greenBiomass),
-                            child: Text(
-                              'Costo Alimento: \$${rec.costoCalculado.toStringAsFixed(0)}',
-                              style: AppTypography.bodySmall.copyWith(color: AppColors.textSecondaryDark),
-                            ),
+                    ...filteredFeeding.map((rec) {
+                      final batch = pondsState.batches.where((b) => b.id == rec.loteId).firstOrNull;
+                      final pond = pondsState.ponds.where((p) => p.id == rec.estanqueId).firstOrNull;
+                      final loteLabel = batch?.codigoLote ?? (rec.loteId.length >= 6 ? rec.loteId.substring(0, 6) : rec.loteId);
+                      final estanqueLabel = pond != null ? '${pond.sigla} - ${pond.nombre}' : 'Estanque';
+
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: GlassCard(
+                          title: 'Lote $loteLabel • $estanqueLabel',
+                          subtitle: 'Fecha: ${rec.fecha.day.toString().padLeft(2, '0')}/${rec.fecha.month.toString().padLeft(2, '0')}/${rec.fecha.year}',
+                          trailingWidget: GlassBadge(text: '${rec.cantidadConsumidaKg} kg', color: AppColors.greenBiomass),
+                          child: Text(
+                            'Costo Alimento: \$${rec.costoCalculado.toStringAsFixed(0)} COP',
+                            style: AppTypography.bodySmall.copyWith(color: AppColors.textSecondaryDark),
                           ),
-                        )),
-                  const SizedBox(height: 100),
+                        ),
+                      );
+                    }),
+                  const DockBottomSpacer(),
                 ],
               ),
             ],

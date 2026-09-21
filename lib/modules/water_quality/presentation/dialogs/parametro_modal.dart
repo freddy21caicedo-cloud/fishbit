@@ -32,19 +32,21 @@ class ParametroModal extends ConsumerStatefulWidget {
 class _ParametroModalState extends ConsumerState<ParametroModal> {
   final _formKey = GlobalKey<FormState>();
 
-  // 11 Parámetros Fisicoquímicos Solicitados
-  final _oxigenoMgLCtrl = TextEditingController(text: '6.2');
-  final _oxigenoPctCtrl = TextEditingController(text: '85.0');
-  final _tempCtrl = TextEditingController(text: '28.5');
-  final _phCtrl = TextEditingController(text: '7.4');
-  final _amonioCtrl = TextEditingController(text: '0.15');
-  final _nitritosCtrl = TextEditingController(text: '0.05');
-  final _nitratosCtrl = TextEditingController(text: '10.0');
-  final _alcalinidadCtrl = TextEditingController(text: '120.0');
-  final _co2Ctrl = TextEditingController(text: '5.0');
-  final _durezaCtrl = TextEditingController(text: '140.0');
-  final _cloroCtrl = TextEditingController(text: '0.00');
+  // 11 Parámetros Fisicoquímicos Solicitados (Vacíos por defecto - Integridad ICA DATA-01)
+  final _oxigenoMgLCtrl = TextEditingController();
+  final _oxigenoPctCtrl = TextEditingController();
+  final _tempCtrl = TextEditingController();
+  final _phCtrl = TextEditingController();
+  final _amonioCtrl = TextEditingController();
+  final _nitritosCtrl = TextEditingController();
+  final _nitratosCtrl = TextEditingController();
+  final _alcalinidadCtrl = TextEditingController();
+  final _co2Ctrl = TextEditingController();
+  final _durezaCtrl = TextEditingController();
+  final _cloroCtrl = TextEditingController();
   final _obsCtrl = TextEditingController();
+
+  bool _isSubmitting = false;
 
   String? _selectedPondId;
   CivilDate _fechaMedicion = CivilDate.today();
@@ -79,25 +81,30 @@ class _ParametroModalState extends ConsumerState<ParametroModal> {
     return '$hour:$minute';
   }
 
+  double? _parseDecimal(String? text) {
+    if (text == null) return null;
+    final cleaned = text.trim().replaceAll(',', '.');
+    if (cleaned.isEmpty) return null;
+    final parsed = double.tryParse(cleaned);
+    if (parsed == null || parsed.isNaN || parsed.isInfinite) return null;
+    return parsed;
+  }
+
   @override
   Widget build(BuildContext context) {
     final pondsState = ref.watch(pondsProvider);
     final waterState = ref.watch(waterQualityProvider);
     final ponds = pondsState.ponds;
 
-    if (_selectedPondId == null && ponds.isNotEmpty) {
-      _selectedPondId = ponds.first.id;
-    }
+    final oxigeno = _parseDecimal(_oxigenoMgLCtrl.text);
+    final amonio = _parseDecimal(_amonioCtrl.text);
+    final nitritos = _parseDecimal(_nitritosCtrl.text);
+    final cloro = _parseDecimal(_cloroCtrl.text);
 
-    final oxigeno = double.tryParse(_oxigenoMgLCtrl.text) ?? 6.2;
-    final amonio = double.tryParse(_amonioCtrl.text) ?? 0.15;
-    final nitritos = double.tryParse(_nitritosCtrl.text) ?? 0.05;
-    final cloro = double.tryParse(_cloroCtrl.text) ?? 0.00;
-
-    final isHypoxia = oxigeno < 4.0;
-    final isAmmoniaCritical = amonio > 0.5;
-    final isNitriteCritical = nitritos > 0.2;
-    final isChlorineAlert = cloro > 0.05;
+    final isHypoxia = oxigeno != null && oxigeno < 4.0;
+    final isAmmoniaCritical = amonio != null && amonio > 0.5;
+    final isNitriteCritical = nitritos != null && nitritos > 0.2;
+    final isChlorineAlert = cloro != null && cloro > 0.05;
 
     return Dialog(
       backgroundColor: Colors.transparent,
@@ -159,9 +166,13 @@ class _ParametroModalState extends ConsumerState<ParametroModal> {
                     ),
                     child: DropdownButtonHideUnderline(
                       child: DropdownButton<String>(
-                        value: _selectedPondId,
+                        value: ponds.any((p) => p.id == _selectedPondId) ? _selectedPondId : null,
                         dropdownColor: AppColors.surfaceDark,
                         isExpanded: true,
+                        hint: const Text(
+                          'Selecciona un estanque *',
+                          style: TextStyle(color: AppColors.textSecondaryDark, fontSize: 13, fontWeight: FontWeight.w500),
+                        ),
                         icon: const Icon(Icons.keyboard_arrow_down_rounded, color: AppColors.cyanWater),
                         items: ponds.map((p) {
                           return DropdownMenuItem<String>(
@@ -260,10 +271,18 @@ class _ParametroModalState extends ConsumerState<ParametroModal> {
                     children: [
                       Expanded(
                         child: GlassFormField(
-                          label: 'OXÍGENO (mg/L)',
+                          label: 'OXÍGENO (mg/L) *',
+                          hint: 'Ej: 6.2',
+                          isRequired: true,
                           controller: _oxigenoMgLCtrl,
                           keyboardType: const TextInputType.numberWithOptions(decimal: true),
                           prefixIcon: Icons.air_rounded,
+                          validator: (val) {
+                            if (val == null || val.trim().isEmpty) return 'Requerido';
+                            final parsed = _parseDecimal(val);
+                            if (parsed == null || parsed < 0 || parsed > 30) return '0-30 mg/L';
+                            return null;
+                          },
                           onChanged: (_) => setState(() {}),
                         ),
                       ),
@@ -271,6 +290,7 @@ class _ParametroModalState extends ConsumerState<ParametroModal> {
                       Expanded(
                         child: GlassFormField(
                           label: 'SATURACIÓN (%)',
+                          hint: 'Ej: 85.0',
                           controller: _oxigenoPctCtrl,
                           keyboardType: const TextInputType.numberWithOptions(decimal: true),
                           prefixIcon: Icons.percent_rounded,
@@ -283,19 +303,35 @@ class _ParametroModalState extends ConsumerState<ParametroModal> {
                     children: [
                       Expanded(
                         child: GlassFormField(
-                          label: 'TEMPERATURA (°C)',
+                          label: 'TEMPERATURA (°C) *',
+                          hint: 'Ej: 24.5',
+                          isRequired: true,
                           controller: _tempCtrl,
                           keyboardType: const TextInputType.numberWithOptions(decimal: true),
                           prefixIcon: Icons.thermostat_rounded,
+                          validator: (val) {
+                            if (val == null || val.trim().isEmpty) return 'Requerido';
+                            final parsed = _parseDecimal(val);
+                            if (parsed == null || parsed < 5 || parsed > 45) return '5-45°C';
+                            return null;
+                          },
                         ),
                       ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: GlassFormField(
-                          label: 'pH DEL AGUA',
+                          label: 'pH DEL AGUA *',
+                          hint: 'Ej: 7.2',
+                          isRequired: true,
                           controller: _phCtrl,
                           keyboardType: const TextInputType.numberWithOptions(decimal: true),
                           prefixIcon: Icons.science_outlined,
+                          validator: (val) {
+                            if (val == null || val.trim().isEmpty) return 'Requerido';
+                            final parsed = _parseDecimal(val);
+                            if (parsed == null || parsed < 0 || parsed > 14) return '0-14';
+                            return null;
+                          },
                         ),
                       ),
                     ],
@@ -425,8 +461,23 @@ class _ParametroModalState extends ConsumerState<ParametroModal> {
                               ],
                             ),
                           ],
+                          if (isNitriteCritical) ...[
+                            if (isHypoxia || isAmmoniaCritical) const SizedBox(height: 4),
+                            const Row(
+                              children: [
+                                Icon(Icons.warning_rounded, color: AppColors.coralAction, size: 16),
+                                SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    '¡Alerta Crítica! Nitritos NO₂⁻ > 0.2 ppm. Alto riesgo de toxicidad e hipoxia tisular.',
+                                    style: TextStyle(color: AppColors.coralAction, fontSize: 11, fontWeight: FontWeight.w700),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
                           if (isChlorineAlert) ...[
-                            const SizedBox(height: 4),
+                            if (isHypoxia || isAmmoniaCritical || isNitriteCritical) const SizedBox(height: 4),
                             const Row(
                               children: [
                                 Icon(Icons.warning_rounded, color: AppColors.amberWarning, size: 16),
@@ -443,57 +494,100 @@ class _ParametroModalState extends ConsumerState<ParametroModal> {
 
                   GlassButton(
                     label: 'Guardar Medición de Calidad de Agua',
-                    isLoading: waterState.isLoading,
+                    isLoading: _isSubmitting || waterState.isLoading,
                     backgroundColor: AppColors.cyanWater,
                     onPressed: () async {
-                      if (!_formKey.currentState!.validate() || _selectedPondId == null) return;
+                      if (_isSubmitting) return;
+                      setState(() => _isSubmitting = true);
 
-                      final authState = ref.read(authProvider);
-                      final empresaId = authState.currentCompany?.id ?? authState.currentUser?.empresaId ?? 'c1000000-0000-0000-0000-000000000001';
-                      final unidadId = authState.activeUnitId ?? authState.currentUser?.unidadAcuicolaId ?? empresaId;
+                      try {
+                        final messenger = ScaffoldMessenger.of(context);
+                        final nav = Navigator.of(context);
 
-                      final baseDate = _fechaMedicion.toDateTime();
-                      final fullDateTime = DateTime(
-                        baseDate.year,
-                        baseDate.month,
-                        baseDate.day,
-                        _horaMedicion.hour,
-                        _horaMedicion.minute,
-                      );
+                        final isFormValid = _formKey.currentState!.validate();
 
-                      final param = WaterParameter(
-                        id: const Uuid().v4(),
-                        empresaId: empresaId,
-                        unidadAcuicolaId: unidadId,
-                        estanqueId: _selectedPondId!,
-                        fecha: fullDateTime,
-                        oxigenoMgL: double.tryParse(_oxigenoMgLCtrl.text),
-                        oxigenoPct: double.tryParse(_oxigenoPctCtrl.text),
-                        ph: double.tryParse(_phCtrl.text),
-                        temperaturaC: double.tryParse(_tempCtrl.text),
-                        amonioMgL: double.tryParse(_amonioCtrl.text),
-                        nitritosMgL: double.tryParse(_nitritosCtrl.text),
-                        nitratosMgL: double.tryParse(_nitratosCtrl.text),
-                        alcalinidadMgL: double.tryParse(_alcalinidadCtrl.text),
-                        co2MgL: double.tryParse(_co2Ctrl.text),
-                        durezaMgL: double.tryParse(_durezaCtrl.text),
-                        cloroMgL: double.tryParse(_cloroCtrl.text),
-                        observaciones: _obsCtrl.text.trim().isNotEmpty ? _obsCtrl.text.trim() : null,
-                        registradoPor: authState.currentUser?.nombre,
-                      );
+                        if (_selectedPondId == null || _selectedPondId!.isEmpty || !ponds.any((p) => p.id == _selectedPondId)) {
+                          messenger.showSnackBar(
+                            const SnackBar(
+                              content: Text('Debe seleccionar un estanque de medición válido para registrar los parámetros.'),
+                              backgroundColor: AppColors.coralAction,
+                            ),
+                          );
+                          return;
+                        }
 
-                      final nav = Navigator.of(context);
-                      final messenger = ScaffoldMessenger.of(context);
+                        if (!isFormValid) {
+                          messenger.showSnackBar(
+                            const SnackBar(
+                              content: Text('Por favor complete los campos obligatorios (O₂, Temp, pH) dentro de los rangos válidos.'),
+                              backgroundColor: AppColors.coralAction,
+                            ),
+                          );
+                          return;
+                        }
 
-                      final success = await ref.read(waterQualityProvider.notifier).recordWaterQuality(param);
-                      if (success && mounted) {
-                        nav.pop();
-                        messenger.showSnackBar(
-                          const SnackBar(
-                            content: Text('¡Medición registrada con éxito con 11 parámetros y hora de toma!'),
-                            backgroundColor: AppColors.cyanWater,
-                          ),
+                        final authState = ref.read(authProvider);
+                        final empresaId = authState.currentCompany?.id ?? authState.currentUser?.empresaId;
+                        if (empresaId == null || empresaId.isEmpty) {
+                          messenger.showSnackBar(
+                            const SnackBar(
+                              content: Text('Error: No se encontró una empresa activa para registrar la medición.'),
+                              backgroundColor: AppColors.coralAction,
+                            ),
+                          );
+                          return;
+                        }
+                        final unidadId = authState.activeUnitId ?? authState.currentUser?.unidadAcuicolaId ?? empresaId;
+
+                        final baseDate = _fechaMedicion.toDateTime();
+                        final fullDateTime = DateTime(
+                          baseDate.year,
+                          baseDate.month,
+                          baseDate.day,
+                          _horaMedicion.hour,
+                          _horaMedicion.minute,
                         );
+
+                        final param = WaterParameter(
+                          id: const Uuid().v4(),
+                          empresaId: empresaId,
+                          unidadAcuicolaId: unidadId,
+                          estanqueId: _selectedPondId!,
+                          fecha: fullDateTime,
+                          oxigenoMgL: _parseDecimal(_oxigenoMgLCtrl.text),
+                          oxigenoPct: _parseDecimal(_oxigenoPctCtrl.text),
+                          ph: _parseDecimal(_phCtrl.text),
+                          temperaturaC: _parseDecimal(_tempCtrl.text),
+                          amonioMgL: _parseDecimal(_amonioCtrl.text),
+                          nitritosMgL: _parseDecimal(_nitritosCtrl.text),
+                          nitratosMgL: _parseDecimal(_nitratosCtrl.text),
+                          alcalinidadMgL: _parseDecimal(_alcalinidadCtrl.text),
+                          co2MgL: _parseDecimal(_co2Ctrl.text),
+                          durezaMgL: _parseDecimal(_durezaCtrl.text),
+                          cloroMgL: _parseDecimal(_cloroCtrl.text),
+                          observaciones: _obsCtrl.text.trim().isNotEmpty ? _obsCtrl.text.trim() : null,
+                          registradoPor: authState.currentUser?.nombre,
+                        );
+
+                        final success = await ref.read(waterQualityProvider.notifier).recordWaterQuality(param);
+                        if (success && mounted) {
+                          nav.pop();
+                          messenger.showSnackBar(
+                            const SnackBar(
+                              content: Text('¡Medición registrada con éxito con 11 parámetros y hora de toma!'),
+                              backgroundColor: AppColors.cyanWater,
+                            ),
+                          );
+                        } else if (!success && mounted) {
+                          messenger.showSnackBar(
+                            SnackBar(
+                              content: Text('Error al registrar medición: ${ref.read(waterQualityProvider).errorMessage ?? "Error de red"}'),
+                              backgroundColor: AppColors.coralAction,
+                            ),
+                          );
+                        }
+                      } finally {
+                        if (mounted) setState(() => _isSubmitting = false);
                       }
                     },
                   ),

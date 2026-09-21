@@ -515,9 +515,10 @@ void main() {
       expect(find.textContaining('Todos los Estanques'), findsOneWidget);
 
       // Tab 1 (Calidad de Agua) default view
-      expect(find.text('OXÍGENO ÓPTIMO'), findsOneWidget);
-      expect(find.text('PH RANGO'), findsOneWidget);
-      expect(find.textContaining('O₂: 6.2 mg/L'), findsOneWidget);
+      expect(find.text('OXÍGENO DISUELTO'), findsOneWidget);
+      expect(find.text('PH DE AGUA'), findsOneWidget);
+      expect(find.text('6.2 mg/L'), findsOneWidget);
+      expect(find.text('7.3'), findsOneWidget);
     });
 
     testWidgets('Tab 3 (Biometrías y GDP) displays sampling history and chronological period GDP calculation', (tester) async {
@@ -593,16 +594,16 @@ void main() {
       await tester.pumpAndSettle();
 
       // Check header shows Estanque 02 and "Limpiar" button appears without overflow
-      expect(find.textContaining('Estanque 02'), findsOneWidget);
+      expect(find.text('E-02 • Estanque 02'), findsOneWidget);
       expect(find.text('Limpiar'), findsOneWidget);
 
       // Tab 1 (Calidad de Agua): should show empty state because Pond 2 has no water parameter records
-      expect(find.text('No hay mediciones registradas para este estanque.'), findsOneWidget);
+      expect(find.textContaining('Sin mediciones en Estanque 02'), findsOneWidget);
 
       // Tab 2 (Alimentación): should show empty state because Pond 2 has no feeding records
       await tester.tap(find.byKey(const Key('tab_alimentacion')));
       await tester.pumpAndSettle();
-      expect(find.text('No hay registros de alimentación para este estanque.'), findsOneWidget);
+      expect(find.textContaining('Sin raciones registradas en Estanque 02'), findsOneWidget);
 
       // Tab 3 (Biometrías): should only show Pond 2 sampling (400.0 g)
       await tester.tap(find.byKey(const Key('tab_biometrias')));

@@ -52,6 +52,15 @@ class FakeWarehouseRepository implements WarehouseRepository {
   Future<PurchaseInvoice> createPurchaseInvoice(PurchaseInvoice invoice) async => invoice;
 
   @override
+  Future<List<Supplier>> fetchCustomSuppliers(String empresaId) async => [];
+
+  @override
+  Future<Supplier> createSupplier(Supplier supplier) async => supplier;
+
+  @override
+  Future<BiologicalPurchase> createBiologicalPurchase(BiologicalPurchase purchase) async => purchase;
+
+  @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
@@ -108,7 +117,7 @@ void main() {
 
       final json = item.toJson();
       expect(json['id'], 'inv-test-01');
-      expect(json['category'], 'Concentrado');
+      expect(json['category'], 'concentrado');
       expect(json['current_stock'], 1600.0);
       expect(json['costo_unitario_historico'], 3400.0);
 

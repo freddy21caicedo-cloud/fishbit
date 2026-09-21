@@ -1,40 +1,62 @@
-## 2026-08-28T23:22:13Z
-You are the Flutter Data Layer & Persistence Worker for Milestone 2 (M2).
-Your working directory is: c:\Users\Freddy\Desktop\Desarrollo de app\FishBit\.agents\worker_m2_1
-Workspace root: c:\Users\Freddy\Desktop\Desarrollo de app\FishBit
-Supabase Project ID: oakovawlwjpnoydpwtam
+# Task Dispatch: Worker M2 (Regulatory Data Integrity ICA: DATA-01)
 
-Read the following reference files:
-1. ORIGINAL_REQUEST.md: c:\Users\Freddy\Desktop\Desarrollo de app\FishBit\.agents\ORIGINAL_REQUEST.md
-2. PROJECT.md: c:\Users\Freddy\Desktop\Desarrollo de app\FishBit\.agents\orchestrator_main_1\PROJECT.md
-3. M1 Worker Handoff: c:\Users\Freddy\Desktop\Desarrollo de app\FishBit\.agents\worker_m1_1\handoff.md
-4. Repos Survey Analysis: c:\Users\Freddy\Desktop\Desarrollo de app\FishBit\.agents\survey_repos_1\analysis.md
+## Mission
+Implement all DATA-01 requirements in `lib/modules/water_quality/presentation/dialogs/parametro_modal.dart`, create comprehensive widget test suite in `test/modules/water_quality/parametro_modal_test.dart`, and update `test/modules/bitacora/bitacora_screen_test.dart` so all water quality and bitacora tests pass and `flutter analyze --no-fatal-infos` returns `No issues found!`.
 
-MANDATORY INTEGRITY WARNING:
+## Mandatory Paths to Read First
+- `c:\Users\Freddy\Desktop\Desarrollo de app\FishBit\.agents\ORIGINAL_REQUEST.md` (MANDATORY)
+- `c:\Users\Freddy\Desktop\Desarrollo de app\FishBit\.agents\orchestrator_impl_gen2\PROJECT.md`
+- `c:\Users\Freddy\Desktop\Desarrollo de app\FishBit\.agents\explorer_m2_1\handoff.md`
+- `c:\Users\Freddy\Desktop\Desarrollo de app\FishBit\.agents\explorer_m2_2\handoff.md`
+- `c:\Users\Freddy\Desktop\Desarrollo de app\FishBit\.agents\explorer_m2_3\handoff.md`
+
+## File Ownership
+You have EXCLUSIVE write access to:
+- `lib/modules/water_quality/presentation/dialogs/parametro_modal.dart`
+- `test/modules/water_quality/parametro_modal_test.dart`
+- `test/modules/bitacora/bitacora_screen_test.dart`
+
+DO NOT modify files outside these paths.
+
+## Mandatory Requirements
+1. **Zero-Defaults & No Fabricated Data**:
+   - Ensure all 11 parameter controllers initialize completely empty (`text = ''`).
+   - Eliminate hardcoded demo tenant ID (`?? 'c1000000-0000-0000-0000-000000000001'`).
+   - Ensure an active pond selection is required before submission.
+2. **Robust Decimal Comma Handling**:
+   - Implement `double? _parseDecimal(String? text)` that trims whitespace and substitutes `,` with `.`.
+   - Apply `_parseDecimal` across all real-time alert triggers, field validators, and `WaterParameter` save payload construction.
+3. **Strict ICA Regulatory Range Validation**:
+   - **Oxígeno Disuelto**: Required, range 0.0 to 30.0 mg/L.
+   - **Temperatura**: Required, range 5.0 to 45.0 °C.
+   - **pH**: Required, range 0.0 to 14.0.
+   - **Pond Selection**: Mandatory.
+4. **User Feedback**:
+   - If pond is not selected, display descriptive SnackBar: `'Debe seleccionar un estanque de medición para registrar los parámetros.'`.
+   - If form validation fails, display descriptive SnackBar directing the user to fix required parameters within valid ranges.
+5. **Widget Test Suite**:
+   - Implement `test/modules/water_quality/parametro_modal_test.dart` using the 5-test suite designed in `explorer_m2_3/handoff.md` (empty state, mandatory validation, biological bounds, comma parsing, and dynamic alerts).
+6. **Fix `bitacora_screen_test.dart`**:
+   - Update out-of-sync assertions in `test/modules/bitacora/bitacora_screen_test.dart` (lines 518-520 and 596-600) as identified in `explorer_m2_3/handoff.md`.
+7. **Verification & Cleanliness**:
+   - Run `flutter analyze --no-fatal-infos` -> MUST return `No issues found!`.
+   - Run `flutter test test/modules/water_quality/` -> All tests pass!
+   - Run `flutter test test/modules/bitacora/` -> All tests pass!
+
+## MANDATORY INTEGRITY WARNING
 DO NOT CHEAT. All implementations must be genuine. DO NOT hardcode test results, create dummy/facade implementations, or circumvent the intended task. A teamwork_preview_auditor will independently verify your work. Integrity violations WILL be detected and your work WILL be rejected.
 
-Milestone 2 Scope & Objectives:
-1. `SupabaseWaterQualityRepository` (`lib/modules/water_quality/infrastructure/repositories/supabase_water_quality_repository.dart`):
-   - Make `parametros_calidad_agua` the single canonical table for both reads and writes.
-   - Remove the double-write attempt to `water_quality`.
-   - Remove hardcoded UUID filters (`3500cc63-...`, `54dedaac-...`).
-   - In `fetchRecentParametersByUnit()`, query `parametros_calidad_agua` directly using `.eq('empresa_id', empresaId)` (and/or `.eq('unit_id', unitId)` / `.eq('unidad_acuicola_id', unitId)`), ordering by `fecha` DESC.
-   - In `recordParameters()`, insert into `parametros_calidad_agua` including `empresa_id`, `unit_id`, and all 10 physicochemical parameters + `hora`.
-2. `SupabaseNutritionRepository` (`lib/modules/feeding_nutrition/infrastructure/repositories/supabase_nutrition_repository.dart`):
-   - In `recordFeeding()`, ensure inserted keys match the `alimentacion_diaria` schema (`estanque_id`, `lote_id`, `fecha`, `hora`, `alimento_marca`, `alimento_tipo`, `proteina_pct`, `tamano_pellet_mm`, `cantidad_kg`, `empresa_id`, `unit_id`, `unidad_acuicola_id`, `insumo_id`, etc.).
-   - Remove hardcoded UUID in-memory filtering; use native Supabase `.eq('empresa_id', empresaId)`.
-3. Domain Models for Biometry & Mortality:
-   - Create/update `BiometriaRecord` in `lib/modules/ponds_batches/domain/models/biometria_record.dart` (or appropriate model file) with full fields: `id`, `estanqueId`, `batchId`/`loteId`, `fecha`/`date`, `hora`, `pecesCapturados`, `pesoTotalCapturaKg`, `pesoPromedioG`, `biomasaParcialKg`, `longitudCm`, `gdpGDia`, `observaciones`, `registradoPor`, `empresaId`, `unitId`, and JSON serialization methods (`fromJson`, `toJson`).
-   - Update `MortalityRecord` in `lib/modules/ponds_batches/domain/models/mortality_record.dart` to support both bilingual field synonyms (`quantity`/`cantidad`, `cause`/`causa`, `pesoPromedioGramos`, `biomasaPerdidaKg`, `fecha`/`date`, `hora`, `loteId`/`batchId`, `estanqueId`, `empresaId`, `unitId`).
-4. `PondsRepository` & `SupabasePondsRepository` (`lib/modules/ponds_batches/`):
-   - Add abstract methods to `PondsRepository`:
-     `Future<List<BiometriaRecord>> fetchBiometriesByUnit(String unitId, {String? pondId, String? batchId});`
-     `Future<List<MortalityRecord>> fetchMortalityByUnit(String unitId, {String? pondId, String? batchId});`
-   - Implement these methods in `SupabasePondsRepository`: query `biometrias` and `mortalidad` with `.eq('empresa_id', empresaId)` (and/or unit filter), ordered by date DESC.
-   - Update `registerBiometry` and `registerMortality` to save full payloads with `empresa_id`, `unit_id`, `peces_capturados`, `peso_promedio_g`, `biomasa_parcial_kg`, `longitud_cm`, `causa`, `peso_promedio_gramos`, `biomasa_perdida_kg`.
-   - Remove hardcoded UUID checks across all methods in `SupabasePondsRepository`.
-5. Riverpod State (`lib/modules/ponds_batches/presentation/providers/ponds_provider.dart`):
-   - Update `PondsState` to include `final List<BiometriaRecord> biometries;` and `final List<MortalityRecord> mortalityRecords;`.
-   - Update `PondsNotifier.loadData(String unitId)` to fetch `biometries` and `mortalityRecords` alongside ponds and batches.
-   - Update `recordBiometry` and `recordMortality` in `PondsNotifier` to prepend/refresh the newly inserted records in state so the UI updates immediately.
-6. Check other related repositories/files if necessary to ensure `flutter analyze` passes cleanly without compilation errors or type warnings.
+## Handoff Requirements
+Write your detailed report to:
+`c:\Users\Freddy\Desktop\Desarrollo de app\FishBit\.agents\worker_m2_1\handoff.md`
+Include:
+1. Observation (exact diffs and changes made)
+2. Logic Chain
+3. Caveats
+4. Conclusion (verdict: PASS)
+5. Verification commands and verbatim outputs
+Notify orchestrator via `send_message`.
+
+## 2026-09-14T13:57:35Z
+Implement all DATA-01 requirements in lib/modules/water_quality/presentation/dialogs/parametro_modal.dart, create test/modules/water_quality/parametro_modal_test.dart, update test/modules/bitacora/bitacora_screen_test.dart, run flutter analyze --no-fatal-infos and tests, and ensure all pass cleanly.
+

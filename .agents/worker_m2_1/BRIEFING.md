@@ -1,7 +1,7 @@
-# BRIEFING — 2026-08-28T23:27:30Z
+# BRIEFING — 2026-09-14T13:57:35Z
 
 ## Mission
-Implement Flutter Data Layer & Persistence enhancements for Milestone 2 (M2), fixing Supabase repositories (Water Quality, Nutrition, Ponds/Batches, Biometry, Mortality), domain models, and Riverpod state management.
+Implement all DATA-01 requirements in `lib/modules/water_quality/presentation/dialogs/parametro_modal.dart`, create comprehensive widget tests in `test/modules/water_quality/parametro_modal_test.dart`, and update `test/modules/bitacora/bitacora_screen_test.dart` so all water quality and bitacora tests pass with zero analyzer issues.
 
 ## 🔒 My Identity
 - Archetype: worker
@@ -9,67 +9,63 @@ Implement Flutter Data Layer & Persistence enhancements for Milestone 2 (M2), fi
 - Working directory: c:\Users\Freddy\Desktop\Desarrollo de app\FishBit\.agents\worker_m2_1
 - Original parent: 8d9d3925-2638-4c57-8043-da837c0e440b
 - Milestone: M2 - Flutter Data Layer & Persistence
+- Sub-assignment: Milestone M2 — Regulatory Data Integrity ICA (DATA-01)
 
 ## 🔒 Key Constraints
 - Genuine implementations only (no hardcoding, dummy facades, or shortcuts).
 - `flutter analyze` must pass with zero errors and clean output.
 - All repositories must use canonical Supabase schemas and remove hardcoded UUID filters.
 - Native Supabase `.eq('empresa_id', empresaId)` (and/or unit filters) must be used.
+- EXCLUSIVE write access: `lib/modules/water_quality/presentation/dialogs/parametro_modal.dart`, `test/modules/water_quality/parametro_modal_test.dart`, `test/modules/bitacora/bitacora_screen_test.dart`. Do NOT touch other files.
 
 ## Current Parent
-- Conversation ID: 8d9d3925-2638-4c57-8043-da837c0e440b
-- Updated: 2026-08-28T23:27:30Z
+- Conversation ID: f76e9946-db3e-4f3a-ab27-ecce6f54c08e
+- Updated: 2026-09-14T13:57:35Z
 
 ## Task Summary
-- **What was built**:
-  1. `SupabaseWaterQualityRepository`: single canonical table `parametros_calidad_agua`, removed double-writes to `water_quality`, eliminated hardcoded UUIDs, full 10 physicochemical parameters + `hora`.
-  2. `SupabaseNutritionRepository`: schema match for `alimentacion_diaria`, native `.eq('empresa_id', empresaId)` query filter, removed hardcoded UUIDs.
-  3. `BiometriaRecord` & `MortalityRecord`: full domain models with serialization, bilingual synonym support, and calculated metrics.
-  4. `PondsRepository` & `SupabasePondsRepository`: added `fetchBiometriesByUnit` & `fetchMortalityByUnit` and complete write payloads with `empresa_id`, `unit_id`, `peces_capturados`, `biomasa_parcial_kg`, `biomasa_perdida_kg`, etc.
-  5. `PondsNotifier` & `PondsState`: updated Riverpod state with `biometries` and `mortalityRecords` lists, reactive prepend updates on record.
-  6. Repository cleanups in `warehouse_repository` and `sales_repository` to eradicate hardcoded UUID comparisons.
-  7. Added unit tests in `test/modules/water_quality/`, `test/modules/ponds_batches/`, and `test/modules/feeding_nutrition/`.
-- **Success criteria**: Zero flutter analyze errors, clean test execution, proper persistence logic matching database schemas.
-- **Interface contracts**: PROJECT.md & Supabase migrations/tables.
+- **What to build**:
+  1. `parametro_modal.dart`:
+     - Guarantee all 11 parameter controllers initialize completely empty (`text = ''`).
+     - Remove auto-selection of first pond in `build()` (`_selectedPondId = ponds.first.id`).
+     - Remove hardcoded demo tenant `'c1000000-0000-0000-0000-000000000001'`.
+     - Implement `_parseDecimal` handling whitespace and `,` -> `.`.
+     - Apply `_parseDecimal` to dynamic alert triggers, field validators, and `WaterParameter` payload.
+     - Enforce mandatory validation on Oxígeno (0-30 mg/L), Temp (5-45 °C), pH (0-14), and pond selection.
+     - Display descriptive SnackBars on validation failure / missing pond.
+  2. `test/modules/water_quality/parametro_modal_test.dart`:
+     - 5 comprehensive widget tests covering empty state, mandatory fields, biological ranges, decimal comma parsing, and dynamic alerts.
+  3. `test/modules/bitacora/bitacora_screen_test.dart`:
+     - Update outdated test assertions (lines 518-520 and 596-600) matching current UI components.
+- **Success criteria**:
+  - `flutter analyze --no-fatal-infos` -> No issues found!
+  - `flutter test test/modules/water_quality/` -> All tests pass!
+  - `flutter test test/modules/bitacora/` -> All tests pass!
+- **Interface contracts**: PROJECT.md § Water Quality Modal ↔ ICA Compliance
 
 ## Key Decisions Made
-- Canonical table `parametros_calidad_agua` is used for all reads and writes; legacy writes to `water_quality` eliminated.
-- Replaced in-memory UUID filtering with native Supabase `.eq('empresa_id', empresaId)`.
-- Models support bilingual synonyms (`avg_weight_gr`/`peso_promedio_g`, `quantity`/`cantidad`, etc.) to guarantee backwards compatibility and resilience against legacy DB rows.
+- `_parseDecimal` handles commas and trailing whitespace universally across alerts, validation, and payload mapping.
+- Pond dropdown uses placeholder hint `'Selecciona un estanque *'` when no pond is preselected.
 
 ## Change Tracker
 - **Files modified**:
-  - `lib/modules/water_quality/domain/models/water_parameter.dart` — added unit_id and hora in toJson
-  - `lib/modules/water_quality/infrastructure/repositories/supabase_water_quality_repository.dart` — canonical table, removed double write & hardcoded UUIDs
-  - `lib/modules/feeding_nutrition/infrastructure/repositories/supabase_nutrition_repository.dart` — schema match, native empresa_id filter
-  - `lib/modules/ponds_batches/domain/models/biometria_record.dart` — created new domain model with bilingual JSON serialization
-  - `lib/modules/ponds_batches/domain/models/mortality_record.dart` — enhanced model with bilingual synonyms and hora
-  - `lib/modules/ponds_batches/domain/repositories/ponds_repository.dart` — added biometry/mortality methods
-  - `lib/modules/ponds_batches/infrastructure/repositories/supabase_ponds_repository.dart` — implemented biometry/mortality queries and full payloads
-  - `lib/modules/ponds_batches/presentation/providers/ponds_provider.dart` — updated PondsState & PondsNotifier
-  - `lib/modules/ponds_batches/presentation/dialogs/biometria_modal.dart` — pass full rich fields
-  - `lib/modules/ponds_batches/presentation/dialogs/mortalidad_modal.dart` — pass biomasaPerdidaKg and fecha
-  - `lib/modules/water_quality/presentation/dialogs/parametro_modal.dart` — updated tenant resolution
-  - `lib/modules/sales_harvest/infrastructure/repositories/supabase_sales_repository.dart` — removed hardcoded UUIDs
-  - `lib/modules/warehouse_inventory/infrastructure/repositories/supabase_warehouse_repository.dart` — removed hardcoded UUIDs
-  - `test/modules/water_quality/water_parameter_test.dart` — unit test suite
-  - `test/modules/ponds_batches/biometria_record_test.dart` — unit test suite
-  - `test/modules/ponds_batches/mortality_record_test.dart` — unit test suite
-  - `test/modules/feeding_nutrition/feeding_record_test.dart` — unit test suite
-  - `test/modules/ponds_batches/ponds_state_test.dart` — unit test suite
-- **Build status**: flutter analyze passed with "No issues found!"
-- **Pending issues**: None
+  - `lib/modules/water_quality/presentation/dialogs/parametro_modal.dart`: implemented DATA-01 zero-defaults, `_parseDecimal`, strict ICA range validations (O2 0-30 mg/L, Temp 5-45°C, pH 0-14), mandatory pond selection validation & SnackBars, removed hardcoded demo tenant.
+  - `test/modules/water_quality/parametro_modal_test.dart`: added 6 comprehensive widget tests covering empty state, mandatory validation, biological bounds, comma parsing, dynamic alerts, and pond validation.
+  - `test/modules/bitacora/bitacora_screen_test.dart`: updated out-of-sync assertions for Tab 1 uppercase title cards and Tab 2 empty state feeding text.
+- **Build status**: `flutter analyze --no-fatal-infos` -> No issues found! (ran in 187.6s)
+- **Pending issues**: None. All requirements fulfilled.
 
 ## Quality Status
-- **Build/test result**: flutter analyze: 0 errors
-- **Lint status**: 0 issues
-- **Tests added/modified**: 5 new test files covering models and state
+- **Build/test result**: All tests passing 100%:
+  - `flutter test test/modules/water_quality/` -> 9/9 passed (100%)
+  - `flutter test test/modules/bitacora/` -> 6/6 passed (100%)
+- **Lint status**: 0 errors, 0 warnings, 0 issues (`No issues found!`)
+- **Tests added/modified**: `test/modules/water_quality/parametro_modal_test.dart` (6 new widget tests), `test/modules/bitacora/bitacora_screen_test.dart` (2 test cases fixed)
 
 ## Loaded Skills
 - None
 
 ## Artifact Index
-- `.agents/worker_m2_1/DISPATCH.md` — Assignment instructions
-- `.agents/worker_m2_1/progress.md` — Liveness & task execution log
-- `.agents/worker_m2_1/BRIEFING.md` — Agent briefing & status index
-- `.agents/worker_m2_1/handoff.md` — Final 5-component handoff report
+- `.agents/worker_m2_1/DISPATCH.md` — Task assignment
+- `.agents/worker_m2_1/BRIEFING.md` — State & mission memory
+- `.agents/worker_m2_1/progress.md` — Heartbeat & execution log
+- `.agents/worker_m2_1/handoff.md` — 5-component handoff report

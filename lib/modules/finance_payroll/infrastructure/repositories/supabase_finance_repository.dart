@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:fishbit_finance/modules/finance_payroll/domain/models/payroll_record.dart';
 import 'package:fishbit_finance/modules/finance_payroll/domain/models/payroll_config.dart';
@@ -6,23 +7,22 @@ import 'package:fishbit_finance/modules/finance_payroll/domain/models/energy_bil
 import 'package:fishbit_finance/modules/finance_payroll/domain/models/maintenance_record.dart';
 import 'package:fishbit_finance/modules/finance_payroll/domain/repositories/finance_repository.dart';
 
-
 class SupabaseFinanceRepository implements FinanceRepository {
   final SupabaseClient _supabase;
 
   SupabaseFinanceRepository(this._supabase);
 
   static final List<PayrollRecord> _demoPayroll = [];
-
   static final List<EnergyBill> _demoEnergy = [];
-
   static final List<MaintenanceRecord> _demoMaintenances = [];
-
 
   @override
   Future<List<PayrollRecord>> fetchPayroll(String empresaId, String unidadAcuicolaId) async {
     try {
       var query = _supabase.from('registros_nomina').select('*');
+      if (empresaId.isNotEmpty && !empresaId.startsWith('c1000000-')) {
+        query = query.eq('empresa_id', empresaId);
+      }
       if (unidadAcuicolaId.isNotEmpty) {
         query = query.eq('unidad_acuicola_sigla', unidadAcuicolaId);
       }
@@ -30,7 +30,8 @@ class SupabaseFinanceRepository implements FinanceRepository {
 
       final list = (res as List).map((row) => PayrollRecord.fromJson(row as Map<String, dynamic>)).toList();
       return list;
-    } catch (_) {
+    } catch (e) {
+      debugPrint('Error obteniendo registros_nomina desde Supabase: $e');
       return _demoPayroll;
     }
   }
@@ -49,7 +50,8 @@ class SupabaseFinanceRepository implements FinanceRepository {
           .single();
 
       return PayrollRecord.fromJson(res);
-    } catch (_) {
+    } catch (e) {
+      debugPrint('Error insertando en registros_nomina en Supabase: $e');
       _demoPayroll.insert(0, record);
       return record;
     }
@@ -60,9 +62,10 @@ class SupabaseFinanceRepository implements FinanceRepository {
     _demoPayroll.removeWhere((r) => r.id == recordId);
     try {
       await _supabase.from('registros_nomina').delete().eq('id', recordId);
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('Error eliminando registros_nomina: $e');
+    }
   }
-
 
   @override
   Future<List<EnergyBill>> fetchEnergyBills(String empresaId, String unidadAcuicolaId) async {
@@ -81,7 +84,8 @@ class SupabaseFinanceRepository implements FinanceRepository {
 
       final list = (res as List).map((row) => EnergyBill.fromJson(row as Map<String, dynamic>)).toList();
       return list.isNotEmpty ? list : _demoEnergy;
-    } catch (_) {
+    } catch (e) {
+      debugPrint('Error obteniendo recibos_energia: $e');
       return _demoEnergy;
     }
   }
@@ -100,7 +104,8 @@ class SupabaseFinanceRepository implements FinanceRepository {
           .single();
 
       return EnergyBill.fromJson(res);
-    } catch (_) {
+    } catch (e) {
+      debugPrint('Error insertando recibos_energia: $e');
       _demoEnergy.insert(0, bill);
       return bill;
     }
@@ -120,7 +125,8 @@ class SupabaseFinanceRepository implements FinanceRepository {
 
       final list = (res as List).map((row) => MaintenanceRecord.fromJson(row as Map<String, dynamic>)).toList();
       return list.isNotEmpty ? list : _demoMaintenances;
-    } catch (_) {
+    } catch (e) {
+      debugPrint('Error obteniendo mantenimientos: $e');
       return _demoMaintenances;
     }
   }
@@ -139,7 +145,8 @@ class SupabaseFinanceRepository implements FinanceRepository {
           .single();
 
       return MaintenanceRecord.fromJson(res);
-    } catch (_) {
+    } catch (e) {
+      debugPrint('Error insertando mantenimientos: $e');
       _demoMaintenances.insert(0, record);
       return record;
     }
@@ -147,7 +154,6 @@ class SupabaseFinanceRepository implements FinanceRepository {
 
   static PayrollConfig _demoConfig = const PayrollConfig();
   static final List<JornalRecord> _demoJornales = [];
-
 
   @override
   Future<PayrollConfig> fetchPayrollConfig(String empresaId) async {
@@ -165,7 +171,8 @@ class SupabaseFinanceRepository implements FinanceRepository {
         return PayrollConfig.fromJson(res['configuraciones_nomina'] as Map<String, dynamic>);
       }
       return _demoConfig;
-    } catch (_) {
+    } catch (e) {
+      debugPrint('Error obteniendo configuraciones_nomina de empresa: $e');
       return _demoConfig;
     }
   }
@@ -179,7 +186,9 @@ class SupabaseFinanceRepository implements FinanceRepository {
           .from('empresas')
           .update({'configuraciones_nomina': config.toJson()})
           .eq('id', empresaId);
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('Error guardando configuraciones_nomina de empresa: $e');
+    }
   }
 
   @override
@@ -189,14 +198,18 @@ class SupabaseFinanceRepository implements FinanceRepository {
     }
     try {
       var query = _supabase.from('jornales').select('*');
+      if (empresaId.isNotEmpty) {
+        query = query.eq('empresa_id', empresaId);
+      }
       if (unidadAcuicolaId.isNotEmpty) {
-        query = query.eq('unit_id', unidadAcuicolaId);
+        query = query.or('unidad_acuicola_id.eq.$unidadAcuicolaId,unit_id.eq.$unidadAcuicolaId');
       }
       final res = await query.order('fecha', ascending: false).limit(100);
 
       final list = (res as List).map((row) => JornalRecord.fromJson(row as Map<String, dynamic>)).toList();
       return list.isNotEmpty ? list : _demoJornales;
-    } catch (_) {
+    } catch (e) {
+      debugPrint('Error obteniendo jornales: $e');
       return _demoJornales;
     }
   }
@@ -215,7 +228,8 @@ class SupabaseFinanceRepository implements FinanceRepository {
           .single();
 
       return JornalRecord.fromJson(res);
-    } catch (_) {
+    } catch (e) {
+      debugPrint('Error insertando jornales en Supabase: $e');
       _demoJornales.insert(0, record);
       return record;
     }
@@ -226,7 +240,9 @@ class SupabaseFinanceRepository implements FinanceRepository {
     _demoJornales.removeWhere((j) => j.id == recordId);
     try {
       await _supabase.from('jornales').delete().eq('id', recordId);
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('Error eliminando jornales en Supabase: $e');
+    }
   }
 }
 

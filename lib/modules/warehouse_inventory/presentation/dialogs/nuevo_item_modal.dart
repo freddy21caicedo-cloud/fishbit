@@ -248,12 +248,28 @@ class _NuevoItemModalState extends ConsumerState<NuevoItemModal> {
         final company = ref.read(authProvider).currentCompany;
         final companySpecies = company?.especiesHabilitadas ?? [];
         
-        if (lower.contains('trucha')) {
-          _especieAlevino = companySpecies.firstWhere((s) => s.toLowerCase().contains('trucha'), orElse: () => 'Trucha Arcoíris');
+        String? matchedSpecies;
+        for (final sp in companySpecies) {
+          final spLower = sp.toLowerCase();
+          final spTokens = spLower.split(RegExp(r'\s+')).where((t) => t.length > 3);
+          if (lower.contains(spLower) || spTokens.any((t) => lower.contains(t))) {
+            matchedSpecies = sp;
+            break;
+          }
+        }
+
+        if (matchedSpecies != null) {
+          _especieAlevino = matchedSpecies;
+        } else if (lower.contains('trucha')) {
+          _especieAlevino = 'Trucha Arcoíris';
         } else if (lower.contains('tilapia')) {
-          _especieAlevino = companySpecies.firstWhere((s) => s.toLowerCase().contains('tilapia'), orElse: () => 'Tilapia');
+          _especieAlevino = lower.contains('roja') ? 'Tilapia Roja' : 'Tilapia';
         } else if (lower.contains('cachama')) {
-          _especieAlevino = companySpecies.firstWhere((s) => s.toLowerCase().contains('cachama'), orElse: () => 'Cachama Blanca');
+          _especieAlevino = lower.contains('negra') ? 'Cachama Negra' : 'Cachama Blanca';
+        } else if (lower.contains('bocachico')) {
+          _especieAlevino = 'Bocachico';
+        } else if (companySpecies.isNotEmpty) {
+          _especieAlevino = companySpecies.first;
         }
       }
     });
@@ -690,7 +706,14 @@ class _NuevoItemModalState extends ConsumerState<NuevoItemModal> {
           children: [
             Text('PROVEEDOR / FABRICANTE', style: AppTypography.labelMicro.copyWith(color: AppColors.textSecondaryDark, fontWeight: FontWeight.w700)),
             GestureDetector(
-              onTap: () => ProveedoresModal.show(context),
+              onTap: () async {
+                final created = await ProveedoresModal.show(context);
+                if (created != null && mounted) {
+                  setState(() {
+                    _selectedSupplier = created.nombre;
+                  });
+                }
+              },
               child: const Text(
                 '+ Nuevo Proveedor',
                 style: TextStyle(

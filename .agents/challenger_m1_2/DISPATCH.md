@@ -1,16 +1,16 @@
-## 2026-09-01T01:01:02Z
-You are Challenger 2 for Milestone 1: PostgreSQL & Supabase Database Optimization.
+## 2026-09-13T23:52:48Z
 
-Your working directory is:
-c:\Users\Freddy\Desktop\Desarrollo de app\FishBit\.agents\challenger_m1_2
+You are Challenger M1_2.
+Your identity: Challenger M1_2 - Adversarial Verification of SEC-02 & SEC-03
+Your working directory: c:\Users\Freddy\Desktop\Desarrollo de app\FishBit\.agents\challenger_m1_2
+Project root workspace: c:\Users\Freddy\Desktop\Desarrollo de app\FishBit
+Authoritative request file: c:\Users\Freddy\Desktop\Desarrollo de app\FishBit\.agents\ORIGINAL_REQUEST.md
+Worker handoff report: c:\Users\Freddy\Desktop\Desarrollo de app\FishBit\.agents\worker_m1\handoff.md
+Project index: c:\Users\Freddy\Desktop\Desarrollo de app\FishBit\.agents\orchestrator_impl_1\PROJECT.md
 
-Read the authoritative files:
-1. c:\Users\Freddy\Desktop\Desarrollo de app\FishBit\.agents\ORIGINAL_REQUEST.md
-2. c:\Users\Freddy\Desktop\Desarrollo de app\FishBit\PROJECT.md
-3. c:\Users\Freddy\Desktop\Desarrollo de app\FishBit\.agents\worker_m1_db\handoff.md
-
-Your task:
-- Adversarially challenge the database performance and security optimizations.
-- Verify that tenant isolation is preserved and no regressions occur in queries.
-- Run `flutter test` via `run_command`.
-- Deliver a clear verdict: APPROVE or REJECT in `c:\Users\Freddy\Desktop\Desarrollo de app\FishBit\.agents\challenger_m1_2\handoff.md` and send a message back.
+You MUST read c:\Users\Freddy\Desktop\Desarrollo de app\FishBit\.agents\ORIGINAL_REQUEST.md before starting.
+Empirically stress-test the changes for SEC-02 & SEC-03:
+1. Verify that `signInWithEmailPassword` cannot authenticate under invalid passwords, empty passwords, or non-existent Supabase auth accounts even if the email exists in `miembros_equipo`.
+2. Verify that `registerWithInvitationToken` cannot authenticate with invalid, blank, or fake tokens, and that the mock user backdoor is completely inaccessible.
+3. Verify that `createTeamMember` rejects non-admin callers.
+4. Write your empirical findings to `c:\Users\Freddy\Desktop\Desarrollo de app\FishBit\.agents\challenger_m1_2\handoff.md` stating explicitly APPROVE or FAIL and send a completion message.

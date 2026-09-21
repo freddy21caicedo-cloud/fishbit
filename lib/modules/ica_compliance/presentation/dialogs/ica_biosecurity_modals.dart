@@ -781,7 +781,7 @@ class _NecropsiaModalState extends ConsumerState<NecropsiaModal> {
   final _tarjetaProfCtrl = TextEditingController();
 
   String? _selectedPondId;
-  final String _especie = 'Tilapia Roja';
+  String _especie = 'Trucha Arcoíris';
   CivilDate _fecha = CivilDate.today();
   bool _presenciaEctoparasitos = false;
   bool _envioLaboratorio = false;
@@ -790,8 +790,13 @@ class _NecropsiaModalState extends ConsumerState<NecropsiaModal> {
   @override
   void initState() {
     super.initState();
-    final user = ref.read(authProvider).currentUser;
+    final auth = ref.read(authProvider);
+    final user = auth.currentUser;
     _profesionalCtrl.text = user?.nombre ?? 'M.V. Director Técnico';
+    final company = auth.currentCompany;
+    if (company != null && company.especiesHabilitadas.isNotEmpty) {
+      _especie = company.especiesHabilitadas.first;
+    }
   }
 
   @override
@@ -961,7 +966,17 @@ class _NecropsiaModalState extends ConsumerState<NecropsiaModal> {
                               contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                             ),
                             items: ponds.map((p) => DropdownMenuItem(value: p.id, child: Text(p.nombreLimpio, style: const TextStyle(fontSize: 12)))).toList(),
-                            onChanged: (v) => setState(() => _selectedPondId = v),
+                            onChanged: (v) {
+                              setState(() {
+                                _selectedPondId = v;
+                                if (v != null) {
+                                  final p = ponds.where((element) => element.id == v).firstOrNull;
+                                  if (p != null && p.especieActual.isNotEmpty) {
+                                    _especie = p.especieActual;
+                                  }
+                                }
+                              });
+                            },
                           ),
                         ),
                     ],

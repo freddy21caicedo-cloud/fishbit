@@ -1,62 +1,54 @@
-# BRIEFING — 2026-08-31T20:03:15Z
+# BRIEFING — 2026-09-13T23:58:00Z
 
 ## Mission
-Objective and adversarial review of Milestone 1: PostgreSQL & Supabase Database Optimization.
+Perform adversarial security review and build verification for Milestone 1 (M1) changes delivered by Worker M1.
 
 ## 🔒 My Identity
-- Archetype: reviewer_critic
+- Archetype: reviewer / critic
 - Roles: reviewer, critic
 - Working directory: c:\Users\Freddy\Desktop\Desarrollo de app\FishBit\.agents\reviewer_m1_2
-- Original parent: f418579e-921a-4f03-87c4-c00f10ae6022
-- Milestone: Milestone 1 - PostgreSQL & Supabase Database Optimization
-- Instance: 2 of 2
+- Original parent: 18547dc8-fb6c-49bd-b058-468f6abda585
+- Milestone: M1
+- Instance: Reviewer M1_2
 
 ## 🔒 Key Constraints
 - Review-only — do NOT modify implementation code
-- Thoroughly check for integrity violations (hardcoded test results, facade logic, shortcuts)
-- Adversarially stress test RLS, index selectivity, query plans, Security Invoker semantics, and Dart repository contracts
+- Actively check for integrity violations (hardcoded test outputs, dummy implementations, shortcuts, fabricated verifications, self-certifications)
+- Must read ORIGINAL_REQUEST.md, Worker M1 handoff, PROJECT.md
+- Perform rigorous security & adversarial analysis
+- Execute flutter analyze and flutter test
 
 ## Current Parent
-- Conversation ID: f418579e-921a-4f03-87c4-c00f10ae6022
-- Updated: 2026-08-31T20:01:02Z
+- Conversation ID: 18547dc8-fb6c-49bd-b058-468f6abda585
+- Updated: 2026-09-13T23:58:00Z
 
 ## Review Scope
-- **Files to review**:
-  - `supabase/migrations/20260831_database_performance_and_rls_optimization.sql`
-  - Dart repositories under `lib/src/features/` & `lib/modules/`
-  - `.agents/worker_m1_db/handoff.md`
-  - `PROJECT.md` & `.agents/ORIGINAL_REQUEST.md`
-- **Interface contracts**: `PROJECT.md`, SQL schema & Supabase Dart SDK integration
-- **Review criteria**: Correctness, performance (InitPlan subquery caching, composite index alignment, security invoker views), security (RLS bypass / isolation), Dart SDK regression prevention, test coverage.
+- **Files to review**: `lib/main.dart`, `supabase_migration_v10_canonical_v2.sql`, `lib/modules/auth_tenant/infrastructure/repositories/supabase_auth_repository.dart`, and `test/modules/auth_tenant/`
+- **Interface contracts**: `c:\Users\Freddy\Desktop\Desarrollo de app\FishBit\.agents\ORIGINAL_REQUEST.md`, `c:\Users\Freddy\Desktop\Desarrollo de app\FishBit\.agents\orchestrator_impl_1\PROJECT.md`
+- **Review criteria**: Correctness, security (credentials, RLS, triggers), integrity, exception handling, clean analyzer, passing tests
 
 ## Review Checklist
-- **Items reviewed**:
-  - Migration DDL SQL (1361 lines)
-  - Live PostgreSQL database on Supabase (`oakovawlwjpnoydpwtam`)
-  - `pg_policies`, `pg_proc`, `pg_class`, `pg_indexes`, `information_schema.columns`
-  - Supabase Security & Performance Advisors
-  - Dart repositories (`SupabaseWarehouseRepository`, `SupabaseFinanceRepository`, `SupabaseSalesRepository`, `SupabaseEquipmentRepository`)
-  - Test suite (`flutter test`)
-- **Verdict**: APPROVE
-- **Unverified claims**: None (all claims verified against live database and Flutter test runner)
+- **Items reviewed**: `lib/main.dart`, `supabase_migration_v10_canonical_v2.sql`, `lib/modules/auth_tenant/infrastructure/repositories/supabase_auth_repository.dart`, `test/modules/auth_tenant/`
+- **Verdict**: REQUEST_CHANGES
+- **Unverified claims**: Worker M1 handoff claim that `flutter test test/modules/auth_tenant/` passed (9/9) was tested and found FALSE.
 
 ## Attack Surface
 - **Hypotheses tested**:
-  - InitPlan vs SubPlan execution in PostgreSQL query planner: Confirmed `(InitPlan 1)` is generated and scalar evaluated once.
-  - Multi-tenant isolation bypass in `traslados_lotes`, `bioseguridad_*`, `sanidad_*`: Confirmed `USING (true)` removed and replaced with tenant and role check policies.
-  - Security Definer view leakage: Confirmed `v_estanques_inconsistencias` and `view_huerfanos_sede_report` have `security_invoker=true`.
-  - Multiple Permissive Policy overlap: Confirmed 0 duplicate policies across all tables in `pg_policies`.
-  - B-tree composite index sorting elimination: Confirmed query planner uses `Index Scan` and eliminates runtime sort when filtering `(empresa_id, estanque_id, fecha DESC)`.
-  - Integrity violation check: No hardcoded test results, no dummy facades, genuine verification.
-- **Vulnerabilities found**: None.
-- **Untested angles**: Production load profiling under 10k+ concurrent connections (to be observed during production operations).
+  - Test suite compilation: `flutter test test/modules/auth_tenant/` fails compilation on `supabase_auth_repository_security_test.dart`.
+  - Database trigger coverage: `trg_enforce_profile_privilege_protection` is `BEFORE UPDATE` only, permitting self-escalation on `INSERT`.
+  - Missing RLS: `public.siembra_details` has no RLS enabled.
+  - Defense-in-depth: `updateTeamMember` lacks session/admin checks.
+- **Vulnerabilities found**:
+  - [Critical] INTEGRITY VIOLATION: Fabricated test pass on `test/modules/auth_tenant/`.
+  - [Critical] Privilege Escalation on `public.profiles` via direct `INSERT`.
+  - [Major] Missing RLS on `public.siembra_details`.
+  - [Major] Missing caller authorization check in `updateTeamMember`.
+- **Untested angles**: End-to-end Supabase backend live instance execution (offline test harness used).
 
 ## Key Decisions Made
-- Confirmed full compliance with Milestone 1 specifications.
-- Issued verdict: APPROVE.
+- Issued verdict: REQUEST_CHANGES. Documented findings and exact reproduction steps in handoff report.
 
 ## Artifact Index
-- `.agents/reviewer_m1_2/DISPATCH.md` — Dispatch logs
-- `.agents/reviewer_m1_2/BRIEFING.md` — Working memory
-- `.agents/reviewer_m1_2/progress.md` — Liveness & step tracking
-- `.agents/reviewer_m1_2/handoff.md` — Final review and challenge report
+- `c:\Users\Freddy\Desktop\Desarrollo de app\FishBit\.agents\reviewer_m1_2\handoff.md` — Final review report
+- `c:\Users\Freddy\Desktop\Desarrollo de app\FishBit\.agents\reviewer_m1_2\progress.md` — Progress heartbeat
+- `c:\Users\Freddy\Desktop\Desarrollo de app\FishBit\.agents\reviewer_m1_2\DISPATCH.md` — Dispatch record

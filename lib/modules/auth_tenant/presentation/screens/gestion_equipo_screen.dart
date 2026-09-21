@@ -4,6 +4,7 @@ import 'package:fishbit_finance/core/design_system/app_colors.dart';
 import 'package:fishbit_finance/core/design_system/app_typography.dart';
 import 'package:fishbit_finance/core/design_system/glass_container.dart';
 import 'package:fishbit_finance/core/design_system/fishbit_header.dart';
+import 'package:fishbit_finance/core/design_system/floating_dock_layout.dart';
 import 'package:fishbit_finance/modules/auth_tenant/domain/models/user_member.dart';
 import 'package:fishbit_finance/modules/auth_tenant/presentation/providers/auth_provider.dart';
 import 'package:fishbit_finance/modules/auth_tenant/presentation/dialogs/crear_colaborador_modal.dart';
@@ -22,15 +23,13 @@ class GestionEquipoScreen extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      floatingActionButton: Padding(
-        padding: const EdgeInsets.only(bottom: 78),
-        child: FloatingActionButton.extended(
-          backgroundColor: AppColors.cyanWater,
-          foregroundColor: Colors.black,
-          icon: const Icon(Icons.person_add_alt_1_rounded),
-          label: const Text('Nuevo Colaborador', style: TextStyle(fontWeight: FontWeight.w800)),
-          onPressed: () => CrearColaboradorModal.show(context),
-        ),
+      floatingActionButtonLocation: FloatingDockFabLocation.endFloat,
+      floatingActionButton: FloatingActionButton.extended(
+        backgroundColor: AppColors.cyanWater,
+        foregroundColor: Colors.black,
+        icon: const Icon(Icons.person_add_alt_1_rounded),
+        label: const Text('Nuevo Colaborador', style: TextStyle(fontWeight: FontWeight.w800)),
+        onPressed: () => CrearColaboradorModal.show(context),
       ),
       body: CustomScrollView(
         slivers: [

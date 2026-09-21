@@ -1,20 +1,30 @@
-## 2026-08-28T23:28:03Z
-You are Forensic Auditor for Milestone 2 (M2 - Repositories & Data Persistence Layer).
+# Task Dispatch: Forensic Auditor M2_1 (Integrity Forensics)
+
+## Mission
+Conduct forensic integrity audit of Milestone 2 (DATA-01) deliverables in `lib/modules/water_quality/presentation/dialogs/parametro_modal.dart` and `test/modules/water_quality/parametro_modal_test.dart`.
+
+## Mandatory Paths to Read First
+- `c:\Users\Freddy\Desktop\Desarrollo de app\FishBit\.agents\ORIGINAL_REQUEST.md` (MANDATORY)
+- `c:\Users\Freddy\Desktop\Desarrollo de app\FishBit\.agents\worker_m2_1\handoff.md`
+- `c:\Users\Freddy\Desktop\Desarrollo de app\FishBit\lib/modules/water_quality/presentation/dialogs/parametro_modal.dart`
+- `c:\Users\Freddy\Desktop\Desarrollo de app\FishBit\test/modules/water_quality/parametro_modal_test.dart`
+
+## Forensic Verification Checks
+1. **Zero Facades / Dummy Implementations**: Verify that `_parseDecimal`, form validators, dynamic alerts, and `WaterParameter` constructions contain authentic logic without test mocking bypasses.
+2. **Zero Preloaded / Simulated Defaults**: Verify no hardcoded default numbers or demo tenant UUIDs exist.
+3. **Real Test Execution**: Verify that `test/modules/water_quality/parametro_modal_test.dart` truly executes genuine widget trees and tests actual user interactions, rather than dummy `expect(true, isTrue)`.
+4. Run `flutter analyze --no-fatal-infos` and tests to verify claims made in `worker_m2_1/handoff.md`.
+5. Issue clear forensic verdict: `CLEAN` or `INTEGRITY VIOLATION`.
+
+Write your report to:
+`c:\Users\Freddy\Desktop\Desarrollo de app\FishBit\.agents\auditor_m2_1\handoff.md`
+Notify orchestrator via `send_message`.
+
+## 2026-09-14T14:14:14Z
+You are Forensic Auditor M2_1.
 Your working directory is: c:\Users\Freddy\Desktop\Desarrollo de app\FishBit\.agents\auditor_m2_1
-Workspace root: c:\Users\Freddy\Desktop\Desarrollo de app\FishBit
-
-Read:
-1. ORIGINAL_REQUEST.md: c:\Users\Freddy\Desktop\Desarrollo de app\FishBit\.agents\ORIGINAL_REQUEST.md
-2. PROJECT.md: c:\Users\Freddy\Desktop\Desarrollo de app\FishBit\.agents\orchestrator_main_1\PROJECT.md
-3. M2 Worker Handoff: c:\Users\Freddy\Desktop\Desarrollo de app\FishBit\.agents\worker_m2_1\handoff.md
-
-Your Mission:
-Perform forensic integrity checks on the data persistence layer changes:
-1. Verify that repository queries and inserts are authentic Supabase SDK calls with real parameter mapping, not dummy or simulated stubs.
-2. Verify that hardcoded UUID checks were genuinely eliminated from repositories.
-3. Verify that `BiometriaRecord` and `MortalityRecord` domain models genuinely represent the data without hardcoded mocks.
-4. Give your binary audit verdict: CLEAN or INTEGRITY VIOLATION.
-
-Write your audit report to:
-c:\Users\Freddy\Desktop\Desarrollo de app\FishBit\.agents\auditor_m2_1\handoff.md
-Then notify me with send_message.
+Read your instructions in c:\Users\Freddy\Desktop\Desarrollo de app\FishBit\.agents\auditor_m2_1\DISPATCH.md.
+MANDATORY: Read c:\Users\Freddy\Desktop\Desarrollo de app\FishBit\.agents\ORIGINAL_REQUEST.md first.
+Perform forensic integrity audit of Milestone 2 deliverables in lib/modules/water_quality/presentation/dialogs/parametro_modal.dart and test/modules/water_quality/parametro_modal_test.dart. Check for zero dummy facades, authentic validation logic, real test execution, and static analysis.
+Issue clear forensic verdict (CLEAN or INTEGRITY VIOLATION).
+Write your report to c:\Users\Freddy\Desktop\Desarrollo de app\FishBit\.agents\auditor_m2_1\handoff.md and notify orchestrator via send_message.

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:fishbit_finance/core/design_system/app_colors.dart';
+import 'package:fishbit_finance/core/design_system/app_typography.dart';
 
 class ThemeModeNotifier extends StateNotifier<ThemeMode> {
   static const _themePrefKey = 'fishbit_app_theme_mode';
@@ -47,10 +48,21 @@ final appDarkTheme = ThemeData.dark().copyWith(
     primary: AppColors.cyanWater,
     secondary: AppColors.coralAction,
     surface: AppColors.surfaceDark,
+    onSurface: AppColors.textPrimaryDark,
   ),
   appBarTheme: const AppBarTheme(
     backgroundColor: AppColors.backgroundDark,
     elevation: 0,
+    iconTheme: IconThemeData(color: AppColors.textPrimaryDark),
+    titleTextStyle: TextStyle(
+      color: AppColors.textPrimaryDark,
+      fontSize: 17,
+      fontWeight: FontWeight.w600,
+    ),
+  ),
+  textTheme: AppTypography.createTextTheme(Brightness.dark),
+  dialogTheme: const DialogThemeData(
+    backgroundColor: AppColors.surfaceDark,
   ),
 );
 
@@ -70,6 +82,15 @@ final appLightTheme = ThemeData.light().copyWith(
     backgroundColor: AppColors.backgroundLight,
     elevation: 0,
     iconTheme: IconThemeData(color: AppColors.textPrimaryLight),
+    titleTextStyle: TextStyle(
+      color: AppColors.textPrimaryLight,
+      fontSize: 17,
+      fontWeight: FontWeight.w600,
+    ),
+  ),
+  textTheme: AppTypography.createTextTheme(Brightness.light),
+  dialogTheme: const DialogThemeData(
+    backgroundColor: AppColors.surfaceLight,
   ),
   dividerColor: AppColors.glassBorderLight,
 );

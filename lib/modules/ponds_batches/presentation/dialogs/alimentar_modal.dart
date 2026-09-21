@@ -12,6 +12,8 @@ import 'package:fishbit_finance/modules/ponds_batches/domain/models/pond.dart';
 import 'package:fishbit_finance/modules/ponds_batches/presentation/providers/ponds_provider.dart';
 import 'package:fishbit_finance/modules/warehouse_inventory/domain/models/inventory_item.dart';
 import 'package:fishbit_finance/modules/warehouse_inventory/presentation/providers/warehouse_provider.dart';
+import 'package:fishbit_finance/modules/warehouse_inventory/presentation/dialogs/nueva_factura_modal.dart';
+import 'package:fishbit_finance/modules/warehouse_inventory/presentation/dialogs/nuevo_item_modal.dart';
 
 class AlimentarModal extends ConsumerStatefulWidget {
   final Pond? pond;
@@ -111,7 +113,8 @@ class _AlimentarModalState extends ConsumerState<AlimentarModal> {
     final stockDisponibleKg = selectedItem?.cantidadActualKg ?? 0.0;
     final costoUnitario = selectedItem?.costoUnitarioHistorico ?? 4800.0;
     final kgSuministrados = double.tryParse(_kgCtrl.text) ?? racionSugeridaDiaKg;
-    final stockInsuficiente = selectedItem != null && stockDisponibleKg > 0 && kgSuministrados > stockDisponibleKg;
+    final sinStock = selectedItem == null || stockDisponibleKg <= 0;
+    final stockInsuficiente = sinStock || (kgSuministrados > stockDisponibleKg);
     final costoTotal = kgSuministrados * costoUnitario;
     final racionesNum = int.tryParse(_racionesCtrl.text) ?? 3;
     final kgPorRacion = racionesNum > 0 ? (kgSuministrados / racionesNum) : kgSuministrados;
@@ -290,7 +293,72 @@ class _AlimentarModalState extends ConsumerState<AlimentarModal> {
                     ),
                   ),
                 ),
-                if (stockInsuficiente) ...[
+                if (feedItems.isEmpty || sinStock) ...[
+                  const SizedBox(height: 10),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppColors.coralAction.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppColors.coralAction.withValues(alpha: 0.4)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(Icons.warning_amber_rounded, color: AppColors.coralAction, size: 18),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                feedItems.isEmpty
+                                    ? 'No hay concentrados registrados en bodega.'
+                                    : 'El alimento seleccionado no tiene existencias en bodega.',
+                                style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton.icon(
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: Colors.white,
+                                  side: BorderSide(color: Colors.white.withValues(alpha: 0.3)),
+                                  padding: const EdgeInsets.symmetric(vertical: 8),
+                                ),
+                                icon: const Icon(Icons.receipt_long_rounded, size: 16),
+                                label: const Text('Factura Compra', style: TextStyle(fontSize: 11)),
+                                onPressed: () async {
+                                  await NuevaFacturaModal.show(context, initialCategory: 'concentrados');
+                                  await ref.read(warehouseProvider.notifier).loadWarehouseData();
+                                },
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: OutlinedButton.icon(
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: Colors.white,
+                                  side: BorderSide(color: Colors.white.withValues(alpha: 0.3)),
+                                  padding: const EdgeInsets.symmetric(vertical: 8),
+                                ),
+                                icon: const Icon(Icons.add_box_rounded, size: 16),
+                                label: const Text('Entrada Rápida', style: TextStyle(fontSize: 11)),
+                                onPressed: () async {
+                                  await NuevoItemModal.show(context, initialType: InventoryItemType.concentrado);
+                                  await ref.read(warehouseProvider.notifier).loadWarehouseData();
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ] else if (stockInsuficiente) ...[
                   const SizedBox(height: 6),
                   Text(
                     '⚠️ La cantidad a suministrar (${kgSuministrados.toStringAsFixed(1)} kg) supera el stock en bodega (${stockDisponibleKg.toStringAsFixed(1)} kg).',
@@ -391,6 +459,7 @@ class _AlimentarModalState extends ConsumerState<AlimentarModal> {
                                 insumoId: _selectedInsumoId,
                                 kgConsumidos: kgSuministrados,
                                 costoUnitarioAlimento: costoUnitario,
+                                fecha: _fechaAlimentacion.toDateTime(),
                               );
                           // 3. Recargar estanques para actualizar FCR y costo
                           await ref.read(pondsProvider.notifier).loadPondsAndBatches();

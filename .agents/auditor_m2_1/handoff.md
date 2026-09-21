@@ -1,92 +1,198 @@
-# Forensic Audit Report — Milestone 2 (M2): Repositories & Data Persistence Layer
+# Forensic Audit Report — Milestone 2 (M2): Regulatory Data Integrity ICA (DATA-01)
 
 **Auditor**: `auditor_m2_1` (Forensic Auditor)  
-**Target Milestone**: M2 — Repositories, Domain Models & Riverpod State Integration  
-**Integrity Mode**: General Project (Development Mode)  
+**Target Deliverables**:
+- `lib/modules/water_quality/presentation/dialogs/parametro_modal.dart`
+- `test/modules/water_quality/parametro_modal_test.dart`  
+**Integrity Mode**: General Project (Development Mode per `ORIGINAL_REQUEST.md`)  
 **Verdict**: **CLEAN**
 
 ---
 
 ## 1. Observation
 
-Direct empirical inspection of the Milestone 2 codebase and artifacts revealed the following:
+Direct empirical inspection of the Milestone 2 deliverables and independent test execution yielded the following observations:
 
-### A. Repositories & Authentic Supabase SDK Invocations
-1. **`SupabaseWaterQualityRepository`** (`lib/modules/water_quality/infrastructure/repositories/supabase_water_quality_repository.dart`):
-   - Canonical table `parametros_calidad_agua` is now used for both reads (`fetchRecentParametersByUnit`, lines 77-82; `fetchParametersByEstanque`, lines 51-57) and writes (`recordParameters`, lines 104-129).
-   - Removed double-writes to legacy `water_quality`.
-   - Complete payload mapping for all 10 physicochemical parameters (`oxigeno_mg_l`, `oxigeno_pct`, `ph`, `temperatura`, `amonio_mg_l`, `nitritos_mg_l`, `nitratos_mg_l`, `alcalinidad_mg_l`, `co2_mg_l`, `dureza_mg_l`, `cloro_mg_l`), `hora` (`HH:mm:ss`), `empresa_id`, `unit_id`, `unidad_acuicola_id`, `estanque_id`, `fecha`, `observaciones`, `registrado_por`.
-   - Native Supabase `.eq('empresa_id', empresaId)` filtering is used.
+### 1.1 Source Code Verification: `parametro_modal.dart`
+- **Zero Preloaded Numerical Defaults**:
+  Lines 36–47 of `lib/modules/water_quality/presentation/dialogs/parametro_modal.dart`:
+  ```dart
+  final _oxigenoMgLCtrl = TextEditingController();
+  final _oxigenoPctCtrl = TextEditingController();
+  final _tempCtrl = TextEditingController();
+  final _phCtrl = TextEditingController();
+  final _amonioCtrl = TextEditingController();
+  final _nitritosCtrl = TextEditingController();
+  final _nitratosCtrl = TextEditingController();
+  final _alcalinidadCtrl = TextEditingController();
+  final _co2Ctrl = TextEditingController();
+  final _durezaCtrl = TextEditingController();
+  final _cloroCtrl = TextEditingController();
+  final _obsCtrl = TextEditingController();
+  ```
+  All 12 controllers are instantiated without default arguments (`text == ''`). Zero simulated values (`6.2`, `7.4`, `28.5`, etc.) are preloaded or injected in `initState` or `build`.
 
-2. **`SupabaseNutritionRepository`** (`lib/modules/feeding_nutrition/infrastructure/repositories/supabase_nutrition_repository.dart`):
-   - In `fetchFeedingRecords` (lines 36-41), queries canonical `alimentacion_diaria` with native `.eq('empresa_id', empresaId)` ordered by `fecha DESC`.
-   - In `recordFeeding` (lines 90-118), inserts aligned columns into `alimentacion_diaria`, decrements stock from `inventory` (lines 121-130), and broadcasts `DailyFeedingRecordedEvent` via `AppEventBus` (lines 132-137).
+- **Elimination of Silent Default Pond Auto-Selection**:
+  Lines 49–57, 163–182:
+  ```dart
+  String? _selectedPondId;
+  ...
+  @override
+  void initState() {
+    super.initState();
+    _selectedPondId = widget.preselectedPondId;
+  }
+  ...
+  value: ponds.any((p) => p.id == _selectedPondId) ? _selectedPondId : null,
+  hint: const Text('Selecciona un estanque *', ...),
+  ```
+  Silent assignment of `ponds.first.id` has been eliminated. The form requires the user to pick an aquaculture pond explicitly unless opened with an explicit `preselectedPondId`.
 
-3. **`SupabasePondsRepository`** (`lib/modules/ponds_batches/infrastructure/repositories/supabase_ponds_repository.dart`):
-   - Implemented `fetchBiometriesByUnit` (lines 422-459) querying `biometrias` with `.eq('empresa_id', empresaId)` and optional `estanque_id` / `batch_id` filters.
-   - Implemented `fetchMortalityByUnit` (lines 469-506) querying `mortalidad` with `.eq('empresa_id', empresaId)` and optional `estanque_id` / `batch_id` filters.
-   - Implemented `registerBiometry` (lines 630-746) inserting full 17-field payloads into `biometrias` and updating batch biomass/weight metrics in `lotes` and `estanques`.
-   - Implemented `registerMortality` (lines 516-627) inserting full 16-field payloads into `mortalidad` and updating mortality counts and biomass in `lotes` and `estanques`.
+- **Mandatory Field Validation & Biological Range Enforcement**:
+  - Oxígeno Disuelto (lines 276–281):
+    ```dart
+    validator: (val) {
+      if (val == null || val.trim().isEmpty) return 'Requerido';
+      final parsed = _parseDecimal(val);
+      if (parsed == null || parsed < 0 || parsed > 30) return '0-30 mg/L';
+      return null;
+    },
+    ```
+  - Temperatura (lines 308–313):
+    ```dart
+    validator: (val) {
+      if (val == null || val.trim().isEmpty) return 'Requerido';
+      final parsed = _parseDecimal(val);
+      if (parsed == null || parsed < 5 || parsed > 45) return '5-45°C';
+      return null;
+    },
+    ```
+  - pH (lines 325–330):
+    ```dart
+    validator: (val) {
+      if (val == null || val.trim().isEmpty) return 'Requerido';
+      final parsed = _parseDecimal(val);
+      if (parsed == null || parsed < 0 || parsed > 14) return '0-14';
+      return null;
+    },
+    ```
+  - Pond Selection Guard (lines 486–494):
+    ```dart
+    if (_selectedPondId == null || _selectedPondId!.isEmpty) {
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('Debe seleccionar un estanque de medición para registrar los parámetros.'),
+          backgroundColor: AppColors.coralAction,
+        ),
+      );
+      return;
+    }
+    ```
 
-### B. Elimination of Hardcoded Company UUIDs
-- Scanned all repositories in `lib/`:
-  - `SupabaseWaterQualityRepository`: Zero occurrences of hardcoded UUID filters (`3500cc63-...`, `54dedaac-...`).
-  - `SupabaseNutritionRepository`: Zero occurrences of hardcoded UUID filters.
-  - `SupabasePondsRepository`: Zero occurrences of hardcoded UUID filters.
-  - `SupabaseWarehouseRepository` & `SupabaseSalesRepository`: Zero occurrences of hardcoded UUID filters.
-- All repositories use native `.eq('empresa_id', empresaId)` directly against Supabase PostgreSQL backend.
+- **Authentic Spanish Decimal Comma Parsing (`_parseDecimal`)**:
+  Lines 82–87:
+  ```dart
+  double? _parseDecimal(String? text) {
+    if (text == null) return null;
+    final cleaned = text.trim().replaceAll(',', '.');
+    if (cleaned.isEmpty) return null;
+    return double.tryParse(cleaned);
+  }
+  ```
+  Applied consistently across dynamic alerts (lines 95–98), form field validators (lines 278, 310, 327), and `WaterParameter` construction (lines 534–544) for all 11 physicochemical attributes.
 
-### C. Domain Models & Data Integrity
-1. **`BiometriaRecord`** (`lib/modules/ponds_batches/domain/models/biometria_record.dart`):
-   - 17 structured fields representing sampling data.
-   - Bilingual / synonym getters (`batchId`, `date`, `unidadAcuicolaId`, `avgWeightGr`, `totalBiomassKg`, `pecesMuestreados`).
-   - `fromJson` and `toJson` supporting both canonical Spanish schema columns and English legacy column synonyms.
-2. **`MortalityRecord`** (`lib/modules/ponds_batches/domain/models/mortality_record.dart`):
-   - 14 structured fields representing sanitary mortality losses.
-   - Bilingual / synonym getters (`unitId`, `batchId`, `date`, `quantity`, `cantidad`, `cause`, `causa`, `avgWeightGr`, `lostBiomassKg`).
-   - Calculation fallback for `biomasaPerdidaKg = (cantidad * peso) / 1000.0` when not provided in raw map.
+- **Tenant Isolation & Zero Hardcoded UUIDs**:
+  Lines 506–516:
+  ```dart
+  final authState = ref.read(authProvider);
+  final empresaId = authState.currentCompany?.id ?? authState.currentUser?.empresaId;
+  if (empresaId == null || empresaId.isEmpty) {
+    messenger.showSnackBar(
+      const SnackBar(
+        content: Text('Error: No se encontró una empresa activa para registrar la medición.'),
+        backgroundColor: AppColors.coralAction,
+      ),
+    );
+    return;
+  }
+  ```
+  Zero hardcoded demo UUIDs (`c1000000-0000-0000-0000-000000000001`) exist. If no active company is bound to session, record creation is rejected with an explicit error.
 
-### D. Independent Build & Test Execution Results
-1. `flutter analyze`:
+---
+
+### 1.2 Test Suite Inspection: `parametro_modal_test.dart`
+- Contains 6 genuine widget tests executing real UI interactions:
+  1. `1. Initial State: All 11 numerical controllers initialize completely blank`: verifies all 12 controllers initialize empty and confirms absence of `6.2`, `7.4`, `28.5`.
+  2. `2. Mandatory Field Validation: Rejects save when required fields are blank`: tests save refusal and displays `'Requerido'` on O2, Temp, pH.
+  3. `3. Biological Range Validation: Rejects out-of-range O2, Temp, and pH`: verifies rejection of `45.0` (O2), `2.0` (Temp), and `15.5` (pH).
+  4. `4. Spanish Decimal Comma: Correctly parses values formatted with comma and saves`: exercises inputs `'6,5'`, `'92,5'`, `'28,4'`, `'7,35'`, `'0,18'`, `'0,04'`, `'4,5'`, `'120,5'`, `'5,0'`, `'140,0'`, `'0,01'`, verifying persistence as numeric doubles and dialog dismissal.
+  5. `5. Dynamic Alerts: Triggers hypoxia and ammonia toxicity alerts with comma numbers`: exercises comma input on reactive alerts (`3,2` -> hypoxia banner, `0,85` -> ammonia toxicity banner).
+  6. `6. Mandatory Pond Selection: Blocks save and shows SnackBar when no pond is selected`: verifies save blockage and specific error message when `preselectedPondId` is null and dropdown unselected.
+- Zero self-certifying tests (e.g. `expect(true, isTrue)`).
+
+---
+
+### 1.3 Independent Verification Execution Results
+
+1. **Independent Test Execution — `parametro_modal_test.dart`**:
+   Command: `flutter test test/modules/water_quality/parametro_modal_test.dart`  
+   Exit Code: `0`  
+   Output verbatim:
    ```text
-   Analyzing FishBit...
-   No issues found! (ran in 5.0s)
+   00:00 +0: loading C:/Users/Freddy/Desktop/Desarrollo de app/FishBit/test/modules/water_quality/parametro_modal_test.dart
+   00:00 +0: ParametroModal ICA Regulatory Compliance & Data Integrity Tests 1. Initial State: All 11 numerical controllers initialize completely blank
+   00:02 +1: ParametroModal ICA Regulatory Compliance & Data Integrity Tests 2. Mandatory Field Validation: Rejects save when required fields are blank
+   00:03 +2: ParametroModal ICA Regulatory Compliance & Data Integrity Tests 3. Biological Range Validation: Rejects out-of-range O2, Temp, and pH
+   00:04 +3: ParametroModal ICA Regulatory Compliance & Data Integrity Tests 4. Spanish Decimal Comma: Correctly parses values formatted with comma and saves
+   00:05 +4: ParametroModal ICA Regulatory Compliance & Data Integrity Tests 5. Dynamic Alerts: Triggers hypoxia and ammonia toxicity alerts with comma numbers
+   00:06 +5: ParametroModal ICA Regulatory Compliance & Data Integrity Tests 6. Mandatory Pond Selection: Blocks save and shows SnackBar when no pond is selected
+   00:06 +6: All tests passed!
    ```
-2. Worker Unit Test Suite (`test/modules/water_quality/`, `test/modules/ponds_batches/`, `test/modules/feeding_nutrition/`):
-   ```text
-   All tests passed! (12 tests passed)
-   ```
+
+2. **Full Water Quality Module Suite Execution**:
+   Command: `flutter test test/modules/water_quality/`  
+   Exit Code: `0`  
+   Output: 17/17 tests passed (including both compliance and adversarial suites).
+
+3. **Static Analysis**:
+   Command: `flutter analyze --no-fatal-infos`  
+   Exit Code: `0`  
+   Deliverable files (`parametro_modal.dart` and `parametro_modal_test.dart`) had 0 errors, 0 warnings, and 0 infos.
 
 ---
 
 ## 2. Logic Chain
 
-1. **Authentic Data Flow**:
-   - The persistence layer interfaces directly with Supabase tables without relying on hardcoded return constants or facade wrappers.
-   - Inserts write to real Supabase tables (`parametros_calidad_agua`, `alimentacion_diaria`, `biometrias`, `mortalidad`, `lotes`, `estanques`, `inventory`) with real user parameters.
-   - Reads query Supabase with native `.eq('empresa_id', empresaId)` parameters, respecting database indexes and RLS policies established in Milestone 1.
-
-2. **Absence of Integrity Prohibitions**:
-   - No hardcoded test results embedded in source to fake test passes.
-   - No facade implementations returning dummy data in place of real logic.
-   - No fabricated verification outputs.
-   - Multi-tenant data segregation is genuinely delegated to Supabase backend queries.
-
-3. **Domain Representation**:
-   - `BiometriaRecord` and `MortalityRecord` provide complete, strongly-typed data structures without mocking behavior.
+1. **Premise**: `ORIGINAL_REQUEST.md` (R2: DATA-01) demands:
+   - Numerical controllers initialize completely empty without preloaded simulated values.
+   - Mandatory field validation on routine parameters (O2, Temp, pH) prior to saving.
+   - `flutter analyze --no-fatal-infos` exits with code 0.
+2. **From Observation 1.1**:
+   - `_oxigenoMgLCtrl` through `_cloroCtrl` and `_obsCtrl` are instantiated as bare `TextEditingController()`. No values are seeded anywhere in lifecycle methods.
+   - Form validators explicitly guard `_oxigenoMgLCtrl`, `_tempCtrl`, and `_phCtrl` against null/empty strings and enforce biological boundaries ($0 \le O_2 \le 30$, $5 \le T \le 45$, $0 \le pH \le 14$).
+   - `_selectedPondId` is strictly checked; missing pond aborts submission with user guidance.
+   - Hardcoded demo company UUIDs have been eradicated in favor of dynamic session resolution.
+3. **From Observation 1.2**:
+   - The test suite in `parametro_modal_test.dart` exercises genuine widget rendering, form interaction, controller validation, comma transformation, and repository recording.
+4. **From Observation 1.3**:
+   - Independent execution of `flutter test` confirmed 100% pass rate.
+   - Independent execution of `flutter analyze --no-fatal-infos` confirmed 0 fatal issues.
+5. **Conclusion**:
+   - Deliverables are authentic, non-facade implementations fully satisfying `ORIGINAL_REQUEST.md`.
 
 ---
 
-## 3. Caveats & Adversarial Findings (For M3 / M4 Hardening)
+## 3. Caveats & Adversarial Review Findings
 
-While no integrity violations exist, adversarial review surfaced two edge cases to address during upcoming milestones:
+While no integrity violations exist, adversarial stress-testing identified two edge cases for future hardening:
 
-1. **Type-Casting in JSON Deserialization (Adversarial Edge Case)**:
-   - In `BiometriaRecord.fromJson` (line 79) and `MortalityRecord.fromJson` (line 65), casting with `(raw as num?)` throws a `TypeError: type 'String' is not a subtype of type 'num?' in type cast` if an API or JSON serializer passes numbers as string primitives (e.g. `'35'`, `'500.0'`).
-   - *Recommendation*: Use `raw is num ? raw : (double.tryParse(raw?.toString() ?? ''))` or `(raw is num ? raw.toInt() : int.tryParse(raw?.toString() ?? '') ?? 0)`.
-2. **Empty Table Fallback Behavior**:
-   - In `SupabaseWaterQualityRepository` (lines 64, 89), `SupabaseNutritionRepository` (line 47), and `SupabasePondsRepository` (lines 175, 257, 454, 501), if `rawList.isEmpty` on a successful query, the repository falls back to returning `_demo...` fixtures instead of `[]`. For an authenticated tenant with 0 records, this will show demo records instead of an empty state.
-   - *Recommendation*: Distinguish between a successful query returning 0 rows (`return []`) and a network error (`catch (_) { return _demo... }`).
+1. **IEEE-754 `NaN` String Parsing Bypass (Adversarial Edge Case)**:
+   - In Dart, `double.tryParse("NaN")` evaluates to `double.nan`. Under IEEE-754 semantics, any relational comparison (`<`, `>`, `<=`, `>=`) against `NaN` evaluates to `false`.
+   - In the validator `if (parsed == null || parsed < 0 || parsed > 30)`, `double.nan < 0` is `false` and `double.nan > 30` is `false`, permitting literal text `"NaN"` to pass the validator if typed by an operator.
+   - *Recommendation*: Update `_parseDecimal` or validators to guard: `if (parsed == null || parsed.isNaN || parsed.isInfinite || parsed < 0 || parsed > 30)`.
+2. **Optional Parameter Non-Negativity**:
+   - Optional parameters (Amonio, Nitritos, Nitratos, Alcalinidad, CO2, Dureza, Cloro) do not currently have form validators enforcing non-negativity. If a user enters negative numbers (e.g. `-5.5`), they are parsed and stored.
+   - *Recommendation*: Add non-negative validators (`parsed < 0 ? 'Debe ser >= 0' : null`) to optional chemical fields.
 
 ---
 
@@ -94,11 +200,13 @@ While no integrity violations exist, adversarial review surfaced two edge cases 
 
 **Verdict: CLEAN**
 
-Milestone 2 (M2) successfully satisfies all forensic integrity criteria:
-1. Supabase queries and inserts are authentic SDK calls with complete parameter mappings.
-2. In-memory hardcoded company UUID filters have been completely removed from repositories in favor of native Supabase filtering.
-3. `BiometriaRecord` and `MortalityRecord` domain models genuinely represent aquaculture operational data.
-4. `flutter analyze` passes with 0 issues and the unit test suite passes 100%.
+Milestone 2 (DATA-01) deliverables in `lib/modules/water_quality/presentation/dialogs/parametro_modal.dart` and `test/modules/water_quality/parametro_modal_test.dart` satisfy all forensic integrity criteria:
+1. Zero dummy facades or mock bypasses.
+2. Zero preloaded simulated numbers in controllers.
+3. Zero hardcoded demo tenant UUIDs.
+4. Authentic decimal comma handling and biological range validation.
+5. Real widget tests executing genuine widget trees and state interactions.
+6. 100% pass rate across test suites and static analysis.
 
 ---
 
@@ -106,20 +214,33 @@ Milestone 2 (M2) successfully satisfies all forensic integrity criteria:
 
 To independently reproduce this verification:
 
-1. **Run Static Analysis**:
-   ```bash
-   flutter analyze
+1. **Run Unit & Widget Tests**:
+   ```powershell
+   flutter test test/modules/water_quality/parametro_modal_test.dart
    ```
-   *Expected Output*: `No issues found!`.
+   *Expected Output*: `All tests passed! (6 passed)`.
 
-2. **Execute Worker Unit Tests**:
-   ```bash
-   flutter test test/modules/water_quality/water_parameter_test.dart test/modules/ponds_batches/biometria_record_test.dart test/modules/ponds_batches/mortality_record_test.dart test/modules/feeding_nutrition/feeding_record_test.dart test/modules/ponds_batches/ponds_state_test.dart
+2. **Run Module Test Suite**:
+   ```powershell
+   flutter test test/modules/water_quality/
    ```
    *Expected Output*: `All tests passed!`.
 
-3. **Verify Zero Hardcoded UUID Filters in Repositories**:
+3. **Run Static Analysis**:
    ```powershell
-   Get-ChildItem -Path "lib/modules" -Recurse -File -Filter "*repository*.dart" | Select-String -Pattern "3500cc63|54dedaac"
+   flutter analyze --no-fatal-infos
    ```
-   *Expected Output*: Empty (0 matches).
+   *Expected Output*: Exit code 0 with 0 errors/warnings.
+
+4. **Verify Controller Initializers**:
+   ```powershell
+   Get-Content "lib/modules/water_quality/presentation/dialogs/parametro_modal.dart" | Select-String -Pattern "TextEditingController\("
+   ```
+   *Expected Output*: Only bare `TextEditingController();` without preloaded string arguments.
+
+5. **Invalidation Conditions**:
+   - Any numerical controller initializing with non-empty default text.
+   - Bypassing mandatory validation for O2, Temp, or pH.
+   - Restoring hardcoded demo tenant `'c1000000-0000-0000-0000-000000000001'`.
+   - Any test failure in `parametro_modal_test.dart`.
+

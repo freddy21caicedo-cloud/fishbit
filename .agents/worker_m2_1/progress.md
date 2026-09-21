@@ -1,21 +1,17 @@
-# Progress Log — M2 Flutter Data Layer & Persistence Worker
+# Progress Log — M2 Worker (Regulatory Data Integrity ICA: DATA-01)
 
-Last visited: 2026-08-28T23:27:30Z
+Last visited: 2026-09-14T14:11:45Z
 
 ## Status
 - [x] Initialized DISPATCH.md and BRIEFING.md
-- [x] Read reference files (ORIGINAL_REQUEST.md, PROJECT.md, M1 handoff, survey analysis)
-- [x] Baseline verified: flutter analyze passed with "No issues found!"
-- [x] Created `BiometriaRecord` domain model with full fields and bilingual serialization
-- [x] Updated `MortalityRecord` domain model with bilingual synonyms and `hora`
-- [x] Updated `WaterParameter` model with `unit_id` and `hora` in `toJson()`
-- [x] Updated `SupabaseWaterQualityRepository`: `parametros_calidad_agua` canonical table, removed double write and hardcoded UUIDs
-- [x] Updated `SupabaseNutritionRepository`: schema match for `alimentacion_diaria`, native `empresa_id` filter
-- [x] Updated `PondsRepository` interface: added `fetchBiometriesByUnit` & `fetchMortalityByUnit`
-- [x] Updated `SupabasePondsRepository`: implemented biometry/mortality queries and full payloads, removed hardcoded UUIDs
-- [x] Updated `PondsState` & `PondsNotifier`: added `biometries` and `mortalityRecords` lists, reactive updates
-- [x] Cleaned up hardcoded UUIDs in `sales_repository` and `warehouse_repository`
-- [x] Updated modals (`ParametroModal`, `BiometriaModal`, `MortalidadModal`) to pass full parameters
-- [x] Added unit test suites for all modified models and state
-- [x] Verified with flutter analyze: "No issues found!"
-- [x] Write handoff.md and notify orchestrator
+- [x] Read reference files (ORIGINAL_REQUEST.md, PROJECT.md, handoffs M2_1, M2_2, M2_3)
+- [x] Inspect current `lib/modules/water_quality/presentation/dialogs/parametro_modal.dart`
+- [x] Implement zero-defaults, `_parseDecimal`, required validations, pond validation in `parametro_modal.dart`
+- [x] Create widget test suite `test/modules/water_quality/parametro_modal_test.dart` (6/6 tests passing)
+- [x] Fix outdated assertions in `test/modules/bitacora/bitacora_screen_test.dart` (6/6 tests passing)
+- [x] Verify `flutter test test/modules/water_quality/` (9/9 tests pass 100%)
+- [x] Verify `flutter test test/modules/bitacora/` (6/6 tests pass 100%)
+- [x] Verify `flutter analyze --no-fatal-infos` returns 0 issues (passed with "No issues found!")
+- [x] Generate handoff.md and notify orchestrator
+
+

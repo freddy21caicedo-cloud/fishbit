@@ -1,14 +1,14 @@
-# Progress — Challenger 2 (Milestone 2)
+# Progress — Challenger M2_2 (Boundary Value Analysis & Form State Lifecycle)
 
-- Last visited: 2026-08-31T20:23:15-05:00
+- Last visited: 2026-09-14T14:17:00Z
 - Status: Completed
-- Current Action: Writing handoff report and verdict for Milestone 2
+- Current Action: Issuing REQUEST_CHANGES verdict and final handoff report
 
 ## Steps Completed:
-1. Executed `flutter test` -> 42/42 tests passed (100%).
-2. Executed `flutter analyze --no-fatal-infos` -> No issues found (0 warnings, 0 errors).
-3. Adversarially verified Memory Management & Controller Disposal across all modified screens/dialogs (`WarehouseScreen`, `NuevaFacturaModal`, `_QuickEntryDialog`, `BitacoraScreen`, `PondBentoCard`, `IcaCertificationScreen`).
-4. Adversarially verified Search Debouncing (200ms timer cancellation, mounted check, disposal).
-5. Adversarially verified `Future.wait` Error Resilience across `PondsNotifier`, `FinanceNotifier`, and `IcaComplianceNotifier` (try/catch blocks, non-blocking `isLoading: false`, `errorMessage` exposure).
-6. Adversarially verified Viewport Virtualization & Memoized Selectors (`ListView.builder`, `activeBatchesByPondProvider`, `icaReportsEngineProvider`, `_BiometryAnalysis.compute`).
-7. Prepared final handoff report with verdict: **APPROVE**.
+1. Reviewed `ORIGINAL_REQUEST.md`, `worker_m2_1/handoff.md`, and `parametro_modal_test.dart`.
+2. Evaluated empty vs non-empty pond list handling and discovered edge case: stale `preselectedPondId` not in `ponds` bypasses pond validation check.
+3. Evaluated asynchronous form submission flow and discovered critical concurrency bug: rapid double-tap produces duplicate inserts because modal lacks an `_isSubmitting` guard and `recordWaterQuality` does not set `isLoading: true`.
+4. Evaluated dynamic alert banners and discovered missing UI widget: `isNitriteCritical` is evaluated in condition but omitted from the `Column` children, rendering an empty red box.
+5. Evaluated error handling in async flow: discovered that repository exceptions in `recordWaterQuality` are swallowed and present a false success SnackBar to the user.
+6. Evaluated controller disposal and biological range validation: verified 12 controllers are disposed correctly and routine validation works.
+7. Prepared detailed handoff report with actionable code diffs and issued verdict: **REQUEST_CHANGES**.

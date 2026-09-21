@@ -4,6 +4,7 @@ import 'package:fishbit_finance/core/design_system/app_colors.dart';
 import 'package:fishbit_finance/core/design_system/app_typography.dart';
 import 'package:fishbit_finance/core/design_system/fishbit_header.dart';
 import 'package:fishbit_finance/core/design_system/glass_card.dart';
+import 'package:fishbit_finance/core/design_system/floating_dock_layout.dart';
 import 'package:fishbit_finance/core/utils/currency_formatters.dart';
 import 'package:fishbit_finance/modules/ponds_batches/domain/models/pond.dart';
 import 'package:fishbit_finance/modules/ponds_batches/domain/models/fish_batch.dart';
@@ -43,9 +44,8 @@ class _PondsDashboardScreenState extends ConsumerState<PondsDashboardScreen> {
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      floatingActionButton: Padding(
-        padding: const EdgeInsets.only(bottom: 78),
-        child: Column(
+      floatingActionButtonLocation: FloatingDockFabLocation.endFloat,
+      floatingActionButton: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
@@ -145,7 +145,6 @@ class _PondsDashboardScreenState extends ConsumerState<PondsDashboardScreen> {
             ),
           ],
         ),
-      ),
       body: LayoutBuilder(
         builder: (context, constraints) {
           final isWide = constraints.maxWidth > 700;
@@ -362,9 +361,7 @@ class _PondsDashboardScreenState extends ConsumerState<PondsDashboardScreen> {
                     ),
                   ),
 
-                const SliverToBoxAdapter(
-                  child: SizedBox(height: 100), // Espacio para el Dock Flotante
-                ),
+                const SliverDockBottomSpacer(),
               ],
             ),
           );

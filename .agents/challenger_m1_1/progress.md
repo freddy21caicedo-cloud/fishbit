@@ -1,16 +1,12 @@
-# Progress Tracker — Challenger 1 (Milestone 1)
+# Progress Log — Challenger M1_1
 
-Last visited: 2026-08-31T20:03:30Z
+Last visited: 2026-09-13T23:58:45Z
 
-- [x] Initialized BRIEFING.md and DISPATCH.md
-- [x] Read context: ORIGINAL_REQUEST.md, PROJECT.md, worker_m1_db/handoff.md
-- [x] Inspect Supabase remote project via MCP:
-  - [x] Run get_advisors (security & performance) on oakovawlwjpnoydpwtam (0 auth_rls_initplan, 0 security_definer_view)
-  - [x] Execute SQL to check active RLS policies, duplicate policies (0 duplicates found)
-  - [x] Execute SQL EXPLAIN to verify InitPlan generation (InitPlan 1 & 2 verified on tables)
-  - [x] Execute SQL to check security_invoker on all views (both views confirmed security_invoker=true)
-  - [x] Check helper functions and functional email index (all STABLE, SEC DEFINER with search_path=public)
-- [x] Inspect codebase changes (migrations, repositories, entities)
-- [x] Run `flutter test` via run_command (42/42 passed in 00:02)
-- [x] Formulate empirical findings and write handoff.md with verdict (APPROVE)
-- [ ] Message parent agent with report
+## Status
+- [x] Initialized workspace and briefing
+- [x] Read ORIGINAL_REQUEST.md, worker_m1 handoff.md, and PROJECT.md
+- [x] Adversarial Test 1: Scan entire codebase for burned Supabase credentials, JWT tokens, project URLs (0 in application code; gitignore verified)
+- [x] Adversarial Test 2: Scan supabase_migration_v10_canonical_v2.sql and all migrations for `OR empresa_id IS NULL` loopholes (127 policies scanned; 0 loopholes)
+- [x] Adversarial Test 3: Empirical execution of main.dart startup validation logic under missing / invalid env conditions (9/9 passed in test/core/startup_validation_test.dart)
+- [x] Static analysis: `flutter analyze --no-fatal-infos` (0 issues found)
+- [x] Final evaluation: Compile handoff.md with APPROVE verdict

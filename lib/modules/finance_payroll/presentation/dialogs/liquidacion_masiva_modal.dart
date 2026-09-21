@@ -329,7 +329,7 @@ class _LiquidacionMasivaModalState extends ConsumerState<LiquidacionMasivaModal>
                           final nav = Navigator.of(context);
                           final messenger = ScaffoldMessenger.of(context);
                           final auth = ref.read(authProvider);
-                          final empresaId = auth.currentUser?.empresaId ?? 'c1000000-0000-0000-0000-000000000001';
+                          final empresaId = auth.currentCompany?.id ?? auth.currentUser?.empresaId ?? 'c1000000-0000-0000-0000-000000000001';
                           final unidadId = auth.activeUnitId ?? 'u1000000-0000-0000-0000-000000000001';
 
                           final records = <PayrollRecord>[];

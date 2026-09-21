@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:fishbit_finance/modules/warehouse_inventory/domain/models/inventory_item.dart';
 import 'package:fishbit_finance/modules/warehouse_inventory/domain/models/purchase_invoice.dart';
@@ -96,9 +97,9 @@ class SupabaseWarehouseRepository implements WarehouseRepository {
           .single();
 
       return InventoryItem.fromJson(res);
-    } catch (_) {
-      _demoItems.add(item);
-      return item;
+    } catch (e) {
+      debugPrint('[SupabaseWarehouseRepository] Error in addInventoryItem: $e');
+      rethrow;
     }
   }
 
@@ -114,7 +115,10 @@ class SupabaseWarehouseRepository implements WarehouseRepository {
             .update(item.toJson())
             .eq('id', item.id)
             .eq('empresa_id', item.empresaId);
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('[SupabaseWarehouseRepository] Error in updateInventoryItem: $e');
+        rethrow;
+      }
     }
   }
 
@@ -140,6 +144,10 @@ class SupabaseWarehouseRepository implements WarehouseRepository {
 
   @override
   Future<PurchaseInvoice> createPurchaseInvoice(PurchaseInvoice invoice) async {
+    if (invoice.empresaId.startsWith('c1000000-')) {
+      _demoInvoices.add(invoice);
+      return invoice;
+    }
     try {
       final res = await _supabase
           .from('facturas')
@@ -148,9 +156,9 @@ class SupabaseWarehouseRepository implements WarehouseRepository {
           .single();
 
       return PurchaseInvoice.fromJson(res);
-    } catch (_) {
-      _demoInvoices.add(invoice);
-      return invoice;
+    } catch (e) {
+      debugPrint('[SupabaseWarehouseRepository] Error in createPurchaseInvoice: $e');
+      rethrow;
     }
   }
 
@@ -166,13 +174,18 @@ class SupabaseWarehouseRepository implements WarehouseRepository {
       final isMockCompany = empresaId.startsWith('c1000000-');
       final list = (res as List).map((row) => BiologicalPurchase.fromJson(row as Map<String, dynamic>)).toList();
       return (list.isNotEmpty || !isMockCompany) ? list : _demoBioPurchases;
-    } catch (_) {
+    } catch (e) {
+      debugPrint('[SupabaseWarehouseRepository] Error in fetchBiologicalPurchases: $e');
       return empresaId.startsWith('c1000000-') ? _demoBioPurchases : [];
     }
   }
 
   @override
   Future<BiologicalPurchase> createBiologicalPurchase(BiologicalPurchase purchase) async {
+    if (purchase.empresaId.startsWith('c1000000-')) {
+      _demoBioPurchases.add(purchase);
+      return purchase;
+    }
     try {
       final res = await _supabase
           .from('compras_mat_biologico')
@@ -181,9 +194,9 @@ class SupabaseWarehouseRepository implements WarehouseRepository {
           .single();
 
       return BiologicalPurchase.fromJson(res);
-    } catch (_) {
-      _demoBioPurchases.add(purchase);
-      return purchase;
+    } catch (e) {
+      debugPrint('[SupabaseWarehouseRepository] Error in createBiologicalPurchase: $e');
+      rethrow;
     }
   }
 
@@ -203,7 +216,8 @@ class SupabaseWarehouseRepository implements WarehouseRepository {
 
       final list = (res as List).map((row) => Supplier.fromJson(row as Map<String, dynamic>)).toList();
       return list;
-    } catch (_) {
+    } catch (e) {
+      debugPrint('[SupabaseWarehouseRepository] Error in fetchCustomSuppliers: $e');
       return [];
     }
   }
@@ -222,9 +236,9 @@ class SupabaseWarehouseRepository implements WarehouseRepository {
           .single();
 
       return Supplier.fromJson(res);
-    } catch (_) {
-      _demoCustomSuppliers.add(supplier);
-      return supplier;
+    } catch (e) {
+      debugPrint('[SupabaseWarehouseRepository] Error in createSupplier: $e');
+      rethrow;
     }
   }
 }

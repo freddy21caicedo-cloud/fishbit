@@ -114,36 +114,34 @@ class SupabaseAuthRepository implements AuthRepository {
     final cleanEmail = email.trim().toLowerCase();
     final cleanPassword = password.trim();
 
-    // 1. Intentar inicio de sesión real en Supabase Auth primero (establece JWT para RLS)
+    // 1. Autenticación estricta en Supabase Auth (establece JWT obligatorio para RLS)
+    final AuthResponse authRes;
     try {
-      AuthResponse? authRes;
-      try {
-        authRes = await _supabase.auth.signInWithPassword(email: cleanEmail, password: cleanPassword);
-      } catch (authError) {
-        // Si no pudo autenticar en Supabase Auth, verificar si existe en miembros_equipo
-        final memberCheck = await _supabase
-            .from('miembros_equipo')
-            .select('id')
-            .eq('email', cleanEmail)
-            .maybeSingle();
+      authRes = await _supabase.auth.signInWithPassword(
+        email: cleanEmail,
+        password: cleanPassword,
+      );
+    } on AuthException catch (authError) {
+      throw AuthFailure('Credenciales incorrectas: ${authError.message}');
+    } catch (authError) {
+      if (authError is AppFailure) rethrow;
+      throw AuthFailure('Error de autenticación: ${authError.toString()}');
+    }
 
-        if (memberCheck == null) {
-          throw AuthFailure('Credenciales incorrectas: ${authError.toString()}');
-        }
-      }
-
-      final authUser = authRes?.user ?? _supabase.auth.currentUser;
+    try {
+      final authUser = authRes.user ?? _supabase.auth.currentUser;
       final userId = authUser?.id;
 
-      // Consultar tabla profiles
-      Map<String, dynamic>? profileRow;
-      if (userId != null) {
-        profileRow = await _supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', userId)
-            .maybeSingle();
+      if (userId == null) {
+        throw const AuthFailure('No se pudo verificar la sesión del usuario autenticado.');
       }
+
+      // Consultar tabla profiles
+      Map<String, dynamic>? profileRow = await _supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', userId)
+          .maybeSingle();
 
       profileRow ??= await _supabase
           .from('profiles')
@@ -181,7 +179,7 @@ class SupabaseAuthRepository implements AuthRepository {
         return member;
       }
 
-      // Consultar tabla miembros_equipo (fallback)
+      // Consultar tabla miembros_equipo (fallback de perfil para usuario autenticado)
       final memberRow = await _supabase
           .from('miembros_equipo')
           .select('*')
@@ -644,6 +642,31 @@ class SupabaseAuthRepository implements AuthRepository {
     String periodoPago = 'Quincenal',
     required String password,
   }) async {
+    // 1. Validar que el llamador autenticado tenga privilegios administrativos (admin o supervisor)
+    final caller = await getCurrentSession();
+    if (caller == null) {
+      throw const AuthFailure('No hay una sesión activa para realizar esta operación.');
+    }
+
+    final callerRoleStr = UserMember.roleToString(caller.role).toLowerCase();
+    final isAuthorized = caller.isAdmin ||
+        caller.isCreator ||
+        callerRoleStr.contains('admin') ||
+        callerRoleStr.contains('supervisor') ||
+        callerRoleStr.contains('creador');
+
+    if (!isAuthorized) {
+      throw const AuthFailure(
+        'Permisos insuficientes: se requieren privilegios administrativos (admin o supervisor) para crear colaboradores.',
+      );
+    }
+
+    if (!caller.isCreator && (caller.empresaId == null || caller.empresaId!.isEmpty || caller.empresaId != empresaId)) {
+      throw const AuthFailure(
+        'Violación de seguridad multi-tenant: no tiene permisos para crear miembros en una empresa diferente a la suya.',
+      );
+    }
+
     final cleanEmail = email.trim().toLowerCase();
     final memberId = const Uuid().v4();
     final newMember = UserMember(
@@ -662,10 +685,10 @@ class SupabaseAuthRepository implements AuthRepository {
     );
 
     try {
-      // 1. Guardar en miembros_equipo
+      // 2. Guardar en miembros_equipo
       await _supabase.from('miembros_equipo').insert(newMember.toJson());
 
-      // 2. Intentar registrar en Supabase Auth y Profiles
+      // 3. Intentar registrar en Supabase Auth y Profiles
       try {
         final authRes = await _supabase.auth.signUp(
           email: cleanEmail, 
@@ -700,9 +723,12 @@ class SupabaseAuthRepository implements AuthRepository {
           });
         } catch (_) {}
       }
-    } catch (_) {}
 
-    return newMember;
+      return newMember;
+    } catch (e) {
+      if (e is AppFailure) rethrow;
+      throw ServerFailure('Error creando miembro del equipo: ${e.toString()}');
+    }
   }
 
   @override
@@ -714,6 +740,31 @@ class SupabaseAuthRepository implements AuthRepository {
     String? unidadAcuicolaId,
     String? cedula,
   }) async {
+    // Validar privilegios administrativos del llamador
+    final caller = await getCurrentSession();
+    if (caller == null) {
+      throw const AuthFailure('No hay una sesión activa para realizar esta operación.');
+    }
+
+    final callerRoleStr = UserMember.roleToString(caller.role).toLowerCase();
+    final isAuthorized = caller.isAdmin ||
+        caller.isCreator ||
+        callerRoleStr.contains('admin') ||
+        callerRoleStr.contains('supervisor') ||
+        callerRoleStr.contains('creador');
+
+    if (!isAuthorized) {
+      throw const AuthFailure(
+        'Permisos insuficientes: se requieren privilegios administrativos para invitar colaboradores.',
+      );
+    }
+
+    if (!caller.isCreator && (caller.empresaId == null || caller.empresaId!.isEmpty || caller.empresaId != empresaId)) {
+      throw const AuthFailure(
+        'Violación de seguridad multi-tenant: no tiene permisos para invitar miembros a una empresa diferente a la suya.',
+      );
+    }
+
     final token = 'INV-${UserMember.roleToString(role).toUpperCase()}-${const Uuid().v4().substring(0, 8)}';
     try {
       await _supabase.from('miembros_equipo').insert({
@@ -730,35 +781,36 @@ class SupabaseAuthRepository implements AuthRepository {
 
       return token;
     } catch (e) {
-      return token;
+      if (e is AppFailure) rethrow;
+      throw ServerFailure('Error creando invitación: $e');
     }
   }
 
   @override
   Future<UserMember> registerWithInvitationToken(String token, String password) async {
+    final cleanToken = token.trim();
+    if (cleanToken.isEmpty) {
+      throw const AuthFailure('Token de invitación no válido o expirado');
+    }
+
     try {
       final res = await _supabase
           .from('miembros_equipo')
           .select('*')
-          .eq('token_invitacion', token.trim())
+          .eq('token_invitacion', cleanToken)
           .eq('estado', 'Invitado')
           .maybeSingle();
 
       if (res == null) {
-        // Mock fallback para tokens de prueba
-        final mockUser = UserMember(
-          id: const Uuid().v4(),
-          empresaId: 'c1000000-0000-0000-0000-000000000001',
-          unidadAcuicolaId: 'u1000000-0000-0000-0000-000000000001',
-          nombre: 'Usuario Activado',
-          email: 'invitado@fishbit.com',
-          role: UserRole.technician,
-          permisoGlobalEmpresa: false,
-          estado: MemberStatus.active,
-          creadoEn: DateTime.now(),
-        );
-        await _storage.setSessionUserId(mockUser.id);
-        return mockUser;
+        throw const AuthFailure('Token de invitación no válido o expirado');
+      }
+
+      // Validar si el token de invitación ha expirado
+      if (res['token_invitacion_expira'] != null) {
+        final expira = DateTime.tryParse(res['token_invitacion_expira'].toString());
+        if (expira != null && DateTime.now().isAfter(expira)) {
+          throw const AuthFailure('Token de invitación no válido o expirado');
+        }
       }
 
       final member = UserMember.fromJson(res);
@@ -791,6 +843,31 @@ class SupabaseAuthRepository implements AuthRepository {
 
   @override
   Future<UserMember> updateTeamMember(UserMember member) async {
+    // Validar privilegios administrativos del llamador
+    final caller = await getCurrentSession();
+    if (caller == null) {
+      throw const AuthFailure('No hay una sesión activa para realizar esta operación.');
+    }
+
+    final callerRoleStr = UserMember.roleToString(caller.role).toLowerCase();
+    final isAuthorized = caller.isAdmin ||
+        caller.isCreator ||
+        callerRoleStr.contains('admin') ||
+        callerRoleStr.contains('supervisor') ||
+        callerRoleStr.contains('creador');
+
+    if (!isAuthorized) {
+      throw const AuthFailure(
+        'Permisos insuficientes: se requieren privilegios administrativos (admin o supervisor) para modificar colaboradores.',
+      );
+    }
+
+    if (!caller.isCreator && (caller.empresaId == null || caller.empresaId!.isEmpty || caller.empresaId != member.empresaId)) {
+      throw const AuthFailure(
+        'Violación de seguridad multi-tenant: no tiene permisos para modificar miembros en una empresa diferente a la suya.',
+      );
+    }
+
     try {
       // 1. Actualizar en miembros_equipo
       await _supabase
@@ -810,30 +887,67 @@ class SupabaseAuthRepository implements AuthRepository {
 
       return member;
     } catch (e) {
-      return member;
+      if (e is AppFailure) rethrow;
+      throw ServerFailure('Error actualizando miembro: $e');
     }
   }
 
   @override
   Future<void> updateMemberStatus(String memberId, MemberStatus newStatus) async {
+    final caller = await getCurrentSession();
+    if (caller == null) {
+      throw const AuthFailure('No hay una sesión activa para realizar esta operación.');
+    }
+    final callerRoleStr = UserMember.roleToString(caller.role).toLowerCase();
+    final isAuthorized = caller.isAdmin ||
+        caller.isCreator ||
+        callerRoleStr.contains('admin') ||
+        callerRoleStr.contains('supervisor') ||
+        callerRoleStr.contains('creador');
+
+    if (!isAuthorized) {
+      throw const AuthFailure(
+        'Permisos insuficientes: se requieren privilegios administrativos para modificar el estado de un colaborador.',
+      );
+    }
+
     try {
       await _supabase
           .from('miembros_equipo')
           .update({'estado': newStatus.name})
           .eq('id', memberId);
     } catch (e) {
+      if (e is AppFailure) rethrow;
       throw ServerFailure('Error actualizando estado del miembro: $e');
     }
   }
 
   @override
   Future<void> deleteMember(String memberId) async {
+    final caller = await getCurrentSession();
+    if (caller == null) {
+      throw const AuthFailure('No hay una sesión activa para realizar esta operación.');
+    }
+    final callerRoleStr = UserMember.roleToString(caller.role).toLowerCase();
+    final isAuthorized = caller.isAdmin ||
+        caller.isCreator ||
+        callerRoleStr.contains('admin') ||
+        callerRoleStr.contains('supervisor') ||
+        callerRoleStr.contains('creador');
+
+    if (!isAuthorized) {
+      throw const AuthFailure(
+        'Permisos insuficientes: se requieren privilegios administrativos para eliminar un colaborador.',
+      );
+    }
+
     try {
       await _supabase
           .from('miembros_equipo')
           .delete()
           .eq('id', memberId);
     } catch (e) {
+      if (e is AppFailure) rethrow;
       throw ServerFailure('Error eliminando miembro: $e');
     }
   }

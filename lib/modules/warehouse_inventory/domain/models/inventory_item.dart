@@ -169,11 +169,36 @@ class InventoryItem {
     final rawCalibre = (json['calibre_mm'] as num?)?.toDouble() ?? (json['calibre_pellet_mm'] as num?)?.toDouble();
     final rawUnitId = json['unit_id'] as String? ?? json['unidad_acuicola_id'] as String?;
 
+    String? deducedSpecies = json['especie_alevino'] as String?;
+    final itemType = parseType(rawCategory);
+    if (deducedSpecies == null && itemType == InventoryItemType.alevino) {
+      final nameLower = rawName.toLowerCase();
+      if (nameLower.contains('trucha')) {
+        deducedSpecies = 'Trucha Arcoíris';
+      } else if (nameLower.contains('tilapia')) {
+        deducedSpecies = nameLower.contains('roja') ? 'Tilapia Roja' : 'Tilapia';
+      } else if (nameLower.contains('cachama')) {
+        deducedSpecies = nameLower.contains('negra') ? 'Cachama Negra' : 'Cachama Blanca';
+      } else if (nameLower.contains('bocachico')) {
+        deducedSpecies = 'Bocachico';
+      } else if (nameLower.contains('carpa')) {
+        deducedSpecies = 'Carpa';
+      } else if (nameLower.contains('piraruc') || nameLower.contains('paiche')) {
+        deducedSpecies = 'Pirarucú';
+      } else {
+        // Remover prefijos comunes como 'Alevinos de', 'Ovas de', 'Larvas de', 'Semilla de'
+        deducedSpecies = rawName
+            .replaceAll(RegExp(r'^(alevinos?\s+(de\s+)?|ovas?\s+(de\s+)?|larvas?\s+(de\s+)?|semilla\s+(de\s+)?)', caseSensitive: false), '')
+            .trim();
+        if (deducedSpecies.isEmpty) deducedSpecies = null;
+      }
+    }
+
     return InventoryItem(
       id: (json['id'] ?? '').toString(),
       empresaId: (json['empresa_id'] ?? '').toString(),
       unidadAcuicolaId: rawUnitId,
-      tipo: parseType(rawCategory),
+      tipo: itemType,
       nombre: rawName,
       marcaProveedor: rawBrand,
       presentacionUnidad: rawUnit,
@@ -184,7 +209,7 @@ class InventoryItem {
       stockMinimoAlerta: (json['stock_minimo_alerta'] as num?)?.toDouble() ?? 200.0,
       proteinaCrudaPct: rawProtein,
       calibrePelletMm: rawCalibre,
-      especieAlevino: json['especie_alevino'] as String?,
+      especieAlevino: deducedSpecies,
       potenciaHp: (json['potencia_hp'] as num?)?.toDouble(),
       faseElectrica: json['fase_electrica'] as String?,
       estanqueAsignadoId: json['estanque_asignado_id'] as String?,

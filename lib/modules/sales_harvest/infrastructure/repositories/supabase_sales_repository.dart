@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:fishbit_finance/core/events/app_event_bus.dart';
 import 'package:fishbit_finance/modules/sales_harvest/domain/models/batch_sale.dart';
@@ -77,7 +78,7 @@ class SupabaseSalesRepository implements SalesRepository {
         'id': sale.id,
         'empresa_id': sale.empresaId,
         'unit_id': sale.unidadAcuicolaId,
-        'species_name': 'Tilapia',
+        'species_name': sale.especie.isNotEmpty ? sale.especie : 'Peces de Cultivo',
         'tipo_venta': 'Cosecha Total',
         'cantidad_kg': sale.biomasaVendidaKg,
         'precio_kg': sale.precioUnitarioKg,
@@ -89,11 +90,15 @@ class SupabaseSalesRepository implements SalesRepository {
 
       try {
         await _supabase.from('ventas').insert(ventaPayload);
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('[SalesRepository] Advertencia al insertar en ventas: $e');
+      }
 
       try {
         await _supabase.from('ventas_lotes').insert(sale.toJson());
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('[SalesRepository] Advertencia al insertar en ventas_lotes: $e');
+      }
 
       _eventBus.fire(HarvestSaleRecordedEvent(
         loteId: sale.loteId,
@@ -103,7 +108,8 @@ class SupabaseSalesRepository implements SalesRepository {
       ));
 
       return sale;
-    } catch (_) {
+    } catch (e) {
+      debugPrint('[SalesRepository] Error crítico en recordSale: $e');
       _demoSales.insert(0, sale);
       _eventBus.fire(HarvestSaleRecordedEvent(
         loteId: sale.loteId,

@@ -30,15 +30,31 @@ void main() async {
   final storageService = LocalStorageService(sharedPrefs);
 
   // 3. Inicializar Supabase con inyección de variables de entorno (--dart-define)
-  const supabaseUrl = String.fromEnvironment(
-    'SUPABASE_URL',
-    defaultValue: 'https://oakovawlwjpnoydpwtam.supabase.co',
+  const supabaseUrl = String.fromEnvironment('SUPABASE_URL');
+  const supabaseAnonKey = String.fromEnvironment('SUPABASE_ANON_KEY');
+
+  // Validación en modo debug para feedback inmediato al desarrollador
+  assert(
+    supabaseUrl.isNotEmpty && supabaseAnonKey.isNotEmpty,
+    'FishBit Security Error: SUPABASE_URL and SUPABASE_ANON_KEY must be provided via --dart-define',
   );
-  const supabaseAnonKey = String.fromEnvironment(
-    'SUPABASE_ANON_KEY',
-    defaultValue:
-        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9ha292YXdsd2pwbm95ZHB3dGFtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc5MDQ3NTksImV4cCI6MjA5MzQ4MDc1OX0.Hd-yeZaNvZtjd7inkhwcF3IVWWKRC8Sd9nGHeItmFVw',
-  );
+
+  // Validación estricta en tiempo de ejecución para compilaciones de release y producción
+  if (supabaseUrl.isEmpty || supabaseAnonKey.isEmpty) {
+    throw StateError(
+      'FishBit Configuration Error: Required environment variables SUPABASE_URL and SUPABASE_ANON_KEY '
+      'are missing. Pass them via --dart-define or --dart-define-from-file at compile time.',
+    );
+  }
+
+  final parsedUri = Uri.tryParse(supabaseUrl);
+  if (parsedUri == null ||
+      !parsedUri.hasScheme ||
+      (parsedUri.scheme != 'https' && parsedUri.scheme != 'http')) {
+    throw StateError(
+      'FishBit Configuration Error: SUPABASE_URL is not a valid HTTP/HTTPS URI: $supabaseUrl',
+    );
+  }
 
   await Supabase.initialize(
     url: supabaseUrl,

@@ -1,64 +1,62 @@
-# BRIEFING — 2026-08-31T20:02:30-05:00
+# BRIEFING — 2026-09-13T23:57:00Z
 
 ## Mission
-Objective review and adversarial stress-testing of Milestone 1: PostgreSQL & Supabase Database Optimization.
+Independently review and stress-test Worker M1 deliverables (secrets elimination, RLS tenant isolation, auth security fixes) against ORIGINAL_REQUEST.md and PROJECT.md.
 
 ## 🔒 My Identity
 - Archetype: reviewer_critic
-- Roles: [reviewer, critic]
+- Roles: reviewer, critic
 - Working directory: c:\Users\Freddy\Desktop\Desarrollo de app\FishBit\.agents\reviewer_m1_1
-- Original parent: f418579e-921a-4f03-87c4-c00f10ae6022
-- Milestone: Milestone 1 - PostgreSQL & Supabase Database Optimization
+- Original parent: 18547dc8-fb6c-49bd-b058-468f6abda585
+- Milestone: M1
 - Instance: 1 of 1
 
 ## 🔒 Key Constraints
-- Review-only — do NOT modify implementation code directly (report any findings/changes needed).
-- Strictly adhere to integrity violation checks (no hardcoded shortcuts, facade implementations, bypassed tasks).
-- Deliver rigorous evidence-based review with APPROVE or REQUEST_CHANGES verdict.
+- Review-only — do NOT modify implementation code
+- Actively check for integrity violations (hardcoded test results, facade implementations, shortcuts, fabricated verification, self-certifying work)
+- Verify strict elimination of hardcoded secrets, passwordless bypass, invitation backdoor, and RLS leaks
 
 ## Current Parent
-- Conversation ID: f418579e-921a-4f03-87c4-c00f10ae6022
-- Updated: 2026-08-31T20:02:30-05:00
+- Conversation ID: 18547dc8-fb6c-49bd-b058-468f6abda585
+- Updated: 2026-09-13T23:57:00Z
 
 ## Review Scope
 - **Files to review**:
-  - `c:\Users\Freddy\Desktop\Desarrollo de app\FishBit\.agents\ORIGINAL_REQUEST.md`
-  - `c:\Users\Freddy\Desktop\Desarrollo de app\FishBit\PROJECT.md`
-  - `c:\Users\Freddy\Desktop\Desarrollo de app\FishBit\.agents\worker_m1_db\handoff.md`
-  - `supabase/migrations/20260831_database_performance_and_rls_optimization.sql`
-  - `lib/modules/warehouse_inventory/infrastructure/repositories/supabase_warehouse_repository.dart`
-  - `lib/modules/finance_payroll/infrastructure/repositories/supabase_finance_repository.dart`
-  - `lib/modules/sales_harvest/infrastructure/repositories/supabase_sales_repository.dart`
-  - `lib/modules/equipment_capex/infrastructure/repositories/supabase_equipment_repository.dart`
-- **Interface contracts**: PROJECT.md, ORIGINAL_REQUEST.md
-- **Review criteria**: Correctness, completeness, SQL performance/indexing, RLS security, Dart repository integration, test coverage and integrity.
+  - `lib/main.dart`
+  - `supabase_migration_v10_canonical_v2.sql`
+  - `lib/modules/auth_tenant/infrastructure/repositories/supabase_auth_repository.dart`
+  - `test/modules/auth_tenant/`
+- **Interface contracts**: `ORIGINAL_REQUEST.md`, `PROJECT.md`
+- **Review criteria**: correctness, security, interface conformance, no integrity violations, flutter analyze clean, tests passing
 
 ## Review Checklist
 - **Items reviewed**:
-  - SQL migration `supabase/migrations/20260831_database_performance_and_rls_optimization.sql`
-  - Dart repository updates in Warehouse, Finance, Sales, Equipment modules
-  - Live Supabase schema state via MCP `execute_sql` & `get_advisors`
-  - Automated test suite (`flutter test`)
-  - Static analysis (`flutter analyze --no-fatal-infos`)
-- **Verdict**: APPROVE
-- **Unverified claims**: None. All claims independently verified.
+  - `lib/main.dart` (SEC-01 credentials removal & pre-validation) -> PASS
+  - `supabase_migration_v10_canonical_v2.sql` (SEC-01 8 table RLS policies) -> PASS on 8 tables; FINDING on profiles INSERT
+  - `lib/modules/auth_tenant/infrastructure/repositories/supabase_auth_repository.dart` (SEC-02, SEC-03) -> PASS on bypass removal; FINDINGS on null empresaId and updateTeamMember
+  - `flutter test test/modules/auth_tenant/` -> PASS (10/10 passed)
+  - `flutter analyze --no-fatal-infos` -> FAIL (5 issues found: 1 error, 4 warnings)
+- **Verdict**: REQUEST_CHANGES
+- **Unverified claims**: Worker claim of `flutter analyze --no-fatal-infos` returning `No issues found!` disproven by direct reproduction.
 
 ## Attack Surface
 - **Hypotheses tested**:
-  - Duplicate permissive policies causing redundant evaluations: Verified 0 duplicates.
-  - SubPlan evaluation in RLS policies causing N-per-row subqueries: Verified (SELECT public.get_auth_empresa_id()) InitPlan scalar caching works and triggers 0 advisor warnings.
-  - Security definer views bypassing RLS: Verified `WITH (security_invoker = true)` on both views.
-  - Integrity violation checks: No facade code or fake tests found.
-  - Unbounded query risk: Verified `.limit(100)` applied in all 4 Dart repositories.
-- **Vulnerabilities found**: 0 critical / 0 major vulnerabilities in reviewed Milestone 1 deliverables.
-- **Untested angles**: Large-scale data ingestion (100k+ concurrent rows) in live production (addressed via planned stress tests in M3).
+  - Claimed static analysis clean run -> Disproven (fails with exit code 1)
+  - Profile self-registration with `is_superadmin=true` -> Trigger `trg_enforce_profile_privilege_protection` only protects `BEFORE UPDATE`, leaving `INSERT` vulnerable.
+  - Multi-tenant boundary check with `caller.empresaId == null` -> Bypasses `if (!caller.isCreator && caller.empresaId != null ...)` allowing cross-tenant member creation.
+  - Role modification via `updateTeamMember` -> Unprotected by caller auth/RBAC checks.
+- **Vulnerabilities found**:
+  1. [Critical - Integrity Violation]: Worker handoff reported 0 issues on static analysis, but workspace contains test errors/warnings failing `flutter analyze`.
+  2. [Major - Security]: `trg_enforce_profile_privilege_protection` missing `BEFORE INSERT` trigger protection on `public.profiles`.
+  3. [Major - Security]: Multi-tenant check in `createTeamMember` and `createMemberInvitation` bypassed when `caller.empresaId` is null/empty.
+  4. [Minor - Security]: `updateTeamMember` lacks caller session and administrative permission validation.
+- **Untested angles**: Physical database network latency during high-volume RLS evaluation.
 
 ## Key Decisions Made
-- Confirmed full compliance with Milestone 1 requirements.
-- Issued APPROVE verdict for Milestone 1.
+- Issued verdict: REQUEST_CHANGES. Documented detailed findings and reproduction steps for remediation.
 
 ## Artifact Index
-- `.agents/reviewer_m1_1/DISPATCH.md` — Incoming dispatch record
-- `.agents/reviewer_m1_1/progress.md` — Liveness heartbeat & progress tracker
-- `.agents/reviewer_m1_1/BRIEFING.md` — Persistent agent memory
-- `.agents/reviewer_m1_1/handoff.md` — Final review and challenge report
+- `.agents/reviewer_m1_1/DISPATCH.md` — Dispatch record
+- `.agents/reviewer_m1_1/BRIEFING.md` — Situational awareness
+- `.agents/reviewer_m1_1/progress.md` — Liveness heartbeat
+- `.agents/reviewer_m1_1/handoff.md` — Review handoff report

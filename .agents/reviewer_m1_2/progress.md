@@ -1,13 +1,16 @@
-# Progress — Reviewer 2 (Milestone 1: PostgreSQL & Supabase Database Optimization)
+# Progress Log - Reviewer M1_2
 
-Last visited: 2026-08-31T20:03:15Z
+Last visited: 2026-09-13T23:58:30Z
 
 ## Status
-- [x] Initialized DISPATCH.md, BRIEFING.md, progress.md
-- [x] Read authoritative context files (`ORIGINAL_REQUEST.md`, `PROJECT.md`, `worker_m1_db/handoff.md`)
-- [x] View and analyze migration file `supabase/migrations/20260831_database_performance_and_rls_optimization.sql`
-- [x] View and analyze modified Dart repositories (`SupabaseWarehouseRepository`, `SupabaseFinanceRepository`, `SupabaseSalesRepository`, `SupabaseEquipmentRepository`)
-- [x] Execute `flutter test` via `run_command` (Result: 42/42 passed in 3s)
-- [x] Adversarial challenge & stress testing (InitPlan caching via `EXPLAIN`, security invoker on `pg_class`, duplicate policy elimination on `pg_policies`, foreign key index coverage, integrity violation audit)
-- [x] Formulate verdict (APPROVE) and write `handoff.md`
-- [ ] Send handoff message to parent
+- [x] Initialized DISPATCH.md and BRIEFING.md
+- [x] Read authoritative request, worker handoff, and project index
+- [x] Inspected `lib/main.dart` for credential leaks, dotenv / env vars, startup assertions (PASSED)
+- [x] Inspected `supabase_migration_v10_canonical_v2.sql` for RLS leaks, tenant isolation, profiles trigger (GAPS FOUND)
+- [x] Inspected `supabase_auth_repository.dart` for integrity, error handling, tenant resolution (GAPS FOUND)
+- [x] Executed `flutter analyze --no-fatal-infos` (PASSED for project scope)
+- [x] Executed `flutter test test/modules/auth_tenant/` (FAILED - Exit code 1 on compilation)
+- [x] Executed adversarial stress-testing & failure mode discovery
+- [x] Wrote comprehensive handoff report with verdict REQUEST_CHANGES and INTEGRITY VIOLATION
+- [x] Updated BRIEFING.md
+- [x] Ready to notify parent orchestrator

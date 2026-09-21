@@ -5,6 +5,7 @@ import 'package:fishbit_finance/core/design_system/app_colors.dart';
 import 'package:fishbit_finance/core/design_system/app_typography.dart';
 import 'package:fishbit_finance/core/design_system/fishbit_header.dart';
 import 'package:fishbit_finance/core/design_system/glass_card.dart';
+import 'package:fishbit_finance/core/design_system/floating_dock_layout.dart';
 import 'package:fishbit_finance/core/design_system/glass_badge.dart';
 import 'package:fishbit_finance/core/design_system/glass_date_picker.dart';
 import 'package:fishbit_finance/core/utils/currency_formatters.dart';
@@ -98,15 +99,13 @@ class _WarehouseScreenState extends ConsumerState<WarehouseScreen> with SingleTi
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      floatingActionButton: Padding(
-        padding: const EdgeInsets.only(bottom: 78),
-        child: FloatingActionButton.extended(
-          backgroundColor: AppColors.amberWarning,
-          foregroundColor: Colors.black,
-          icon: const Icon(Icons.add_shopping_cart_rounded, color: Colors.black),
-          label: const Text('Factura Compra', style: TextStyle(color: Colors.black, fontWeight: FontWeight.w900)),
-          onPressed: () => NuevaFacturaModal.show(context, initialCategory: categoryKey),
-        ),
+      floatingActionButtonLocation: FloatingDockFabLocation.endFloat,
+      floatingActionButton: FloatingActionButton.extended(
+        backgroundColor: AppColors.amberWarning,
+        foregroundColor: Colors.black,
+        icon: const Icon(Icons.add_shopping_cart_rounded, color: Colors.black),
+        label: const Text('Factura Compra', style: TextStyle(color: Colors.black, fontWeight: FontWeight.w900)),
+        onPressed: () => NuevaFacturaModal.show(context, initialCategory: categoryKey),
       ),
       body: CustomScrollView(
         slivers: [
@@ -297,7 +296,7 @@ class _WarehouseScreenState extends ConsumerState<WarehouseScreen> with SingleTi
                 ),
               ),
             ),
-          const SliverToBoxAdapter(child: SizedBox(height: 100)),
+          const SliverDockBottomSpacer(),
         ],
       ),
     );

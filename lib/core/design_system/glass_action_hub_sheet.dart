@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:fishbit_finance/core/design_system/app_colors.dart';
 import 'package:fishbit_finance/core/design_system/app_typography.dart';
 import 'package:fishbit_finance/core/design_system/glass_container.dart';
+import 'package:fishbit_finance/core/design_system/floating_dock_layout.dart';
 import 'package:fishbit_finance/modules/auth_tenant/domain/models/user_member.dart';
 import 'package:fishbit_finance/modules/auth_tenant/presentation/providers/auth_provider.dart';
 import 'package:fishbit_finance/modules/auth_tenant/presentation/dialogs/sede_selector_modal.dart';
@@ -58,8 +59,8 @@ class GlassActionHubSheet extends ConsumerWidget {
           child: Align(
             alignment: Alignment.bottomCenter,
             child: Padding(
-              // Flota justo encima de la barra de navegación (bottom: 84px)
-              padding: const EdgeInsets.only(left: 16, right: 16, bottom: 84),
+              // Flota justo encima de la barra de navegación (dockHeight 58 + dockMargin 12 + 14 = 84px)
+              padding: const EdgeInsets.only(left: 16, right: 16, bottom: FloatingDockLayout.dockHeight + FloatingDockLayout.dockBottomMargin + 14.0),
               child: GestureDetector(
                 onTap: () {}, // Evitar que clics dentro cierren el popover
                 child: ConstrainedBox(

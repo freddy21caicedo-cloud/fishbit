@@ -1,13 +1,15 @@
-# Progress Log — Challenger 2 (Milestone 3)
+# Progress Log — Challenger M3_2 (Milestone 3 UX-02)
 
 - **Status**: IN_PROGRESS
-- **Last visited**: 2026-08-31T20:37:33Z
+- **Last visited**: 2026-09-14T15:05:00Z
 
 ## Steps Completed
-- [x] Initialized DISPATCH.md, BRIEFING.md, and progress.md
-- [ ] Read authoritative files: ORIGINAL_REQUEST.md, PROJECT.md, worker_m3_qa/handoff.md
-- [ ] Inspect codebase implementations (secure storage fallback, error boundary, env var defaults, etc.)
-- [ ] Run test suite (`flutter test`) and static analysis (`flutter analyze --no-fatal-infos`)
-- [ ] Conduct adversarial stress-testing and empirical checks
-- [ ] Synthesize findings and write handoff.md with verdict (APPROVE / REJECT)
-- [ ] Send handoff message to parent
+- [x] Initialized DISPATCH.md and BRIEFING.md
+- [ ] Investigate `lib/core/design_system/floating_dock_layout.dart` and `lib/app/main_navigation_shell.dart`
+- [ ] Scan codebase for `bottom: 78` or other hardcoded dock offsets
+- [ ] Verify 7 screens use `FloatingDockFabLocation.endFloat`
+- [ ] Write and run empirical stress tests (keyboard suppression, safe area variations, geometry math)
+- [ ] Run `flutter analyze --no-fatal-infos`
+- [ ] Run `flutter test`
+- [ ] Synthesize findings and write handoff.md with verdict (APPROVE / REQUEST_CHANGES)
+- [ ] Send handoff notification to orchestrator

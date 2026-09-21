@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:fishbit_finance/modules/ponds_batches/domain/models/pond.dart';
@@ -636,6 +637,28 @@ class SupabasePondsRepository implements PondsRepository {
       if (pondIdx != -1) {
         _demoPonds[pondIdx] = _demoPonds[pondIdx].copyWith(biomasaKg: newBiomass);
       }
+    } else if (!finalEmpresaId.startsWith('c1000000-')) {
+      // Para empresas reales en producción: obtener el lote real de la base de datos
+      try {
+        final lotesRes = await _supabase
+            .from('lotes')
+            .select('cantidad_actual_peces, peso_actual_gramos, empresa_id, unidad_acuicola_id')
+            .eq('id', loteId)
+            .maybeSingle();
+
+        if (lotesRes != null) {
+          final currentPeces = (lotesRes['cantidad_actual_peces'] as num?)?.toInt() ?? 0;
+          final currentPeso = (lotesRes['peso_actual_gramos'] as num?)?.toDouble() ?? pesoPromedioGramos;
+          if (finalEmpresaId.isEmpty) finalEmpresaId = lotesRes['empresa_id']?.toString() ?? '';
+          if (finalUnitId.isEmpty) finalUnitId = lotesRes['unidad_acuicola_id']?.toString() ?? '';
+
+          newCount = (currentPeces - cantidadPecesMuertos).clamp(0, 9999999);
+          final effectivePeso = pesoPromedioGramos > 0 ? pesoPromedioGramos : currentPeso;
+          newBiomass = (newCount * effectivePeso) / 1000.0;
+        }
+      } catch (e) {
+        debugPrint('[PondsRepository] Error al consultar lote para mortalidad: $e');
+      }
     }
 
     final record = MortalityRecord(
@@ -689,7 +712,7 @@ class SupabasePondsRepository implements PondsRepository {
       await _supabase.from('mortalidad').insert(insertData);
 
       // 2. Actualizar conteo y biomasa en lotes si aplica
-      if (newCount > 0) {
+      if (newCount >= 0) {
         await _supabase.from('lotes').update({
           'cantidad_actual_peces': newCount,
           'biomasa_actual_kg': newBiomass,
@@ -702,7 +725,8 @@ class SupabasePondsRepository implements PondsRepository {
 
       _demoMortalities.insert(0, record);
       return record;
-    } catch (_) {
+    } catch (e) {
+      debugPrint('[PondsRepository] Error al registrar mortalidad en Supabase: $e');
       _demoMortalities.insert(0, record);
       return record;
     }
@@ -750,6 +774,24 @@ class SupabasePondsRepository implements PondsRepository {
       final pondIdx = _demoPonds.indexWhere((p) => p.id == estanqueId);
       if (pondIdx != -1) {
         _demoPonds[pondIdx] = _demoPonds[pondIdx].copyWith(biomasaKg: newBiomass);
+      }
+    } else if (!finalEmpresaId.startsWith('c1000000-')) {
+      // Para empresas reales en producción: obtener el lote de la base de datos
+      try {
+        final lotesRes = await _supabase
+            .from('lotes')
+            .select('cantidad_actual_peces, empresa_id, unidad_acuicola_id')
+            .eq('id', loteId)
+            .maybeSingle();
+
+        if (lotesRes != null) {
+          final currentPeces = (lotesRes['cantidad_actual_peces'] as num?)?.toInt() ?? 0;
+          if (finalEmpresaId.isEmpty) finalEmpresaId = lotesRes['empresa_id']?.toString() ?? '';
+          if (finalUnitId.isEmpty) finalUnitId = lotesRes['unidad_acuicola_id']?.toString() ?? '';
+          newBiomass = (currentPeces * nuevoPesoPromedioGramos) / 1000.0;
+        }
+      } catch (e) {
+        debugPrint('[PondsRepository] Error al consultar lote para biometría: $e');
       }
     }
 
@@ -821,7 +863,8 @@ class SupabasePondsRepository implements PondsRepository {
 
       _demoBiometries.insert(0, record);
       return record;
-    } catch (_) {
+    } catch (e) {
+      debugPrint('[PondsRepository] Error al registrar biometría en Supabase: $e');
       _demoBiometries.insert(0, record);
       return record;
     }

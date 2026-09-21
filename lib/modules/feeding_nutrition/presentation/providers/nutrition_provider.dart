@@ -84,6 +84,7 @@ class NutritionNotifier extends StateNotifier<NutritionState> {
     String? insumoId,
     required double kgConsumidos,
     required double costoUnitarioAlimento,
+    DateTime? fecha,
   }) async {
     final auth = _ref.read(authProvider);
     final user = auth.currentUser;
@@ -101,6 +102,7 @@ class NutritionNotifier extends StateNotifier<NutritionState> {
         insumoId: insumoId,
         kgConsumidos: kgConsumidos,
         costoUnitarioAlimento: costoUnitarioAlimento,
+        fecha: fecha,
       );
       state = state.copyWith(records: [rec, ...state.records]);
     } catch (e) {
@@ -116,6 +118,7 @@ class NutritionNotifier extends StateNotifier<NutritionState> {
     String? insumoId,
     required double kgConsumidos,
     required double costoUnitarioAlimento,
+    DateTime? fecha,
   }) async {
     await recordDailyFeeding(
       estanqueId: estanqueId,
@@ -123,6 +126,7 @@ class NutritionNotifier extends StateNotifier<NutritionState> {
       insumoId: insumoId,
       kgConsumidos: kgConsumidos,
       costoUnitarioAlimento: costoUnitarioAlimento,
+      fecha: fecha,
     );
     return true;
   }

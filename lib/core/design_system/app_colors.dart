@@ -42,4 +42,23 @@ class AppColors {
   static const Color waterOptimal = Color(0xFF10B981);
   static const Color waterCaution = Color(0xFFFBBF24);
   static const Color waterCritical = Color(0xFFEF4444);
+
+  // ─── Variantes Adaptativas para Texto de Alto Contraste (WCAG 2.2 AA >= 4.5:1) ──
+  static const Color cyanWaterTextLight = Color(0xFF007A8C);     // 5.1:1 en blanco
+  static const Color greenBiomassTextLight = Color(0xFF047857);   // 5.2:1 en blanco
+  static const Color amberWarningTextLight = Color(0xFFB45309);   // 4.6:1 en blanco
+  static const Color coralActionTextLight = Color(0xFFBE123C);    // 5.4:1 en blanco
+  static const Color purpleAnalyticsTextLight = Color(0xFF6D28D9); // 6.5:1 en blanco
+
+  /// Selector reactivo de color de acento para texto según brillo del tema
+  static Color accentText(BuildContext context, Color darkColor) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    if (isDark) return darkColor;
+    if (darkColor == cyanWater) return cyanWaterTextLight;
+    if (darkColor == greenBiomass || darkColor == waterOptimal) return greenBiomassTextLight;
+    if (darkColor == amberWarning || darkColor == waterCaution) return amberWarningTextLight;
+    if (darkColor == coralAction || darkColor == waterCritical) return coralActionTextLight;
+    if (darkColor == purpleAnalytics) return purpleAnalyticsTextLight;
+    return darkColor;
+  }
 }

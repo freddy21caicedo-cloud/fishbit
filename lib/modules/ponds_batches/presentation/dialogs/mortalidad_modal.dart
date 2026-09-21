@@ -88,6 +88,7 @@ class _MortalidadModalState extends ConsumerState<MortalidadModal> {
     final pesoG = double.tryParse(_pesoCtrl.text) ?? (activeBatch?.pesoActualGramos ?? 250.0);
     final biomasaPerdidaKg = (muertos * pesoG) / 1000.0;
     final poblacionPrevia = activeBatch?.cantidadActualPeces ?? 1000;
+    final superacionPoblacion = muertos > poblacionPrevia;
     final nuevaPoblacion = (poblacionPrevia - muertos).clamp(0, 9999999);
     final tasaMortalidadPct = poblacionPrevia > 0 ? (muertos / poblacionPrevia) * 100.0 : 0.0;
     final esAlertaCritica = tasaMortalidadPct >= 2.0;
@@ -348,7 +349,21 @@ class _MortalidadModalState extends ConsumerState<MortalidadModal> {
                             Text('$nuevaPoblacion peces vivos', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 13)),
                           ],
                         ),
-                        if (esAlertaCritica) ...[
+                        if (superacionPoblacion) ...[
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              const Icon(Icons.error_outline_rounded, color: AppColors.coralAction, size: 16),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  'Error: La cantidad de bajas ($muertos) supera la población viva en el lote ($poblacionPrevia peces).',
+                                  style: const TextStyle(color: AppColors.coralAction, fontSize: 11, fontWeight: FontWeight.w800),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ] else if (esAlertaCritica) ...[
                           const SizedBox(height: 8),
                           const Row(
                             children: [
@@ -390,7 +405,7 @@ class _MortalidadModalState extends ConsumerState<MortalidadModal> {
                     height: 46,
                     backgroundColor: AppColors.coralAction,
                     isLoading: _isLoading,
-                    onPressed: (activePond == null || activeBatch == null || muertos <= 0)
+                    onPressed: (activePond == null || activeBatch == null || muertos <= 0 || superacionPoblacion)
                         ? null
                         : () async {
                             final nav = Navigator.of(context);

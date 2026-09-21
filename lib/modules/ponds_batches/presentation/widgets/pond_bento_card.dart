@@ -4,9 +4,16 @@ import 'package:fishbit_finance/core/design_system/app_colors.dart';
 import 'package:fishbit_finance/core/design_system/app_typography.dart';
 import 'package:fishbit_finance/core/design_system/glass_card.dart';
 import 'package:fishbit_finance/core/design_system/glass_badge.dart';
+import 'package:fishbit_finance/core/design_system/glass_container.dart';
 import 'package:fishbit_finance/core/utils/currency_formatters.dart';
 import 'package:fishbit_finance/modules/ponds_batches/domain/models/pond.dart';
 import 'package:fishbit_finance/modules/ponds_batches/domain/models/fish_batch.dart';
+import 'package:fishbit_finance/modules/water_quality/presentation/dialogs/parametro_modal.dart';
+import 'package:fishbit_finance/modules/ponds_batches/presentation/dialogs/alimentar_modal.dart';
+import 'package:fishbit_finance/modules/ponds_batches/presentation/dialogs/biometria_modal.dart';
+import 'package:fishbit_finance/modules/ponds_batches/presentation/dialogs/mortalidad_modal.dart';
+import 'package:fishbit_finance/modules/ponds_batches/presentation/dialogs/traslado_modal.dart';
+import 'package:fishbit_finance/modules/ponds_batches/presentation/dialogs/siembra_modal.dart';
 
 /// Tarjeta Bento de Estanque Interactiva Optimizada a 60/120 FPS con efecto 3D Flip de 180°
 /// - Cara Frontal: Resumen Operativo, Calidad de Agua, Densidad y Acciones Rápidas.
@@ -19,6 +26,8 @@ class PondBentoCard extends StatefulWidget {
   final VoidCallback? onTransferPressed;
   final VoidCallback? onSamplePressed;
   final VoidCallback? onMortalityPressed;
+  final VoidCallback? onWaterQualityPressed;
+  final VoidCallback? onOperationsPressed;
 
   const PondBentoCard({
     super.key,
@@ -29,6 +38,8 @@ class PondBentoCard extends StatefulWidget {
     this.onTransferPressed,
     this.onSamplePressed,
     this.onMortalityPressed,
+    this.onWaterQualityPressed,
+    this.onOperationsPressed,
   });
 
   @override
@@ -167,21 +178,29 @@ class _PondBentoCardState extends State<PondBentoCard> with SingleTickerProvider
             color: isRealActive ? AppColors.greenBiomass : AppColors.textTertiaryDark,
           ),
           const SizedBox(width: 6),
-          // Botón Rotar 3D hacia la Radiografía Biológica
-          InkWell(
-            onTap: isRealActive ? _flipCard : null,
-            borderRadius: BorderRadius.circular(8),
-            child: Container(
-              padding: const EdgeInsets.all(4),
-              decoration: BoxDecoration(
-                color: isDark ? Colors.white.withValues(alpha: 0.06) : Colors.white.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: isDark ? Colors.white.withValues(alpha: 0.12) : Colors.grey.withValues(alpha: 0.2)),
-              ),
-              child: Icon(
-                Icons.flip_camera_android_rounded,
-                size: 15,
-                color: isRealActive ? (isDark ? Colors.white : AppColors.textPrimaryDark) : AppColors.textTertiaryDark,
+          // Botón Rotar 3D hacia la Radiografía Biológica (WCAG 2.5.5 >= 48x48 dp)
+          SizedBox(
+            width: 48,
+            height: 48,
+            child: InkWell(
+              onTap: isRealActive ? _flipCard : null,
+              borderRadius: BorderRadius.circular(12),
+              child: Center(
+                child: Container(
+                  width: 36,
+                  height: 36,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: isDark ? Colors.white.withValues(alpha: 0.08) : Colors.white.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: isDark ? Colors.white.withValues(alpha: 0.16) : Colors.grey.withValues(alpha: 0.25)),
+                  ),
+                  child: Icon(
+                    Icons.flip_camera_android_rounded,
+                    size: 18,
+                    color: isRealActive ? (isDark ? Colors.white : AppColors.textPrimaryDark) : AppColors.textTertiaryDark,
+                  ),
+                ),
               ),
             ),
           ),
@@ -353,13 +372,14 @@ class _PondBentoCardState extends State<PondBentoCard> with SingleTickerProvider
 
           const SizedBox(height: 12),
 
-          // Botón Disparador del 3D Flip
+          // Botón Disparador del 3D Flip (WCAG 2.5.5 >= 48dp de altura)
           if (isActive && allBatches.isNotEmpty)
             InkWell(
               onTap: _flipCard,
               borderRadius: BorderRadius.circular(12),
               child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                constraints: const BoxConstraints(minHeight: 48),
+                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
                 decoration: BoxDecoration(
                   color: (isPolyculture ? Colors.purpleAccent : AppColors.cyanWater).withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(12),
@@ -390,118 +410,53 @@ class _PondBentoCardState extends State<PondBentoCard> with SingleTickerProvider
             ),
 
           if (isActive) ...[
-            const SizedBox(height: 10),
-            // Barra de Acciones Rápidas
-            Row(
-              children: [
-                if (widget.onFeedPressed != null)
-                  Expanded(
-                    child: OutlinedButton(
-                      style: OutlinedButton.styleFrom(
-                        backgroundColor: AppColors.greenBiomass.withValues(alpha: isDark ? 0.1 : 0.08),
-                        foregroundColor: AppColors.greenBiomass,
-                        side: const BorderSide(color: AppColors.greenBiomass),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                        visualDensity: VisualDensity.compact,
-                        minimumSize: const Size(0, 30),
-                        padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
-                      ),
-                      onPressed: widget.onFeedPressed,
-                      child: const FittedBox(
-                        fit: BoxFit.scaleDown,
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.restaurant_outlined, size: 13),
-                            SizedBox(width: 4),
-                            Text('Alimentar', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800)),
-                          ],
+            const SizedBox(height: 12),
+            // Botón de Acción Principal de Campo (WCAG 2.5.5 >= 48dp de altura táctil)
+            SizedBox(
+              width: double.infinity,
+              height: 52,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.cyanWater.withValues(alpha: isDark ? 0.20 : 0.14),
+                  foregroundColor: isDark ? AppColors.cyanWater : AppColors.blueOcean,
+                  elevation: 0,
+                  side: BorderSide(
+                    color: AppColors.cyanWater.withValues(alpha: isDark ? 0.6 : 0.8),
+                    width: 1.4,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                ),
+                onPressed: () {
+                  if (widget.onOperationsPressed != null) {
+                    widget.onOperationsPressed!();
+                  } else {
+                    _showOperationsBottomSheet(context, activeBatch);
+                  }
+                },
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.flash_on_rounded, size: 20),
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: Text(
+                        'REGISTRAR ACCIÓN DE CAMPO',
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTypography.titleSmall.copyWith(
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 0.6,
+                          fontSize: 13,
                         ),
                       ),
                     ),
-                  ),
-                const SizedBox(width: 6),
-                if (widget.onSamplePressed != null)
-                  Expanded(
-                    child: OutlinedButton(
-                      style: OutlinedButton.styleFrom(
-                        backgroundColor: AppColors.cyanWater.withValues(alpha: isDark ? 0.1 : 0.08),
-                        foregroundColor: AppColors.cyanWater,
-                        side: const BorderSide(color: AppColors.cyanWater),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                        visualDensity: VisualDensity.compact,
-                        minimumSize: const Size(0, 30),
-                        padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
-                      ),
-                      onPressed: widget.onSamplePressed,
-                      child: const FittedBox(
-                        fit: BoxFit.scaleDown,
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.scale_rounded, size: 13),
-                            SizedBox(width: 4),
-                            Text('Muestreo', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800)),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                const SizedBox(width: 6),
-                if (widget.onMortalityPressed != null)
-                  Expanded(
-                    child: OutlinedButton(
-                      style: OutlinedButton.styleFrom(
-                        backgroundColor: AppColors.coralAction.withValues(alpha: isDark ? 0.1 : 0.08),
-                        foregroundColor: AppColors.coralAction,
-                        side: BorderSide(color: AppColors.coralAction.withValues(alpha: 0.6)),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                        visualDensity: VisualDensity.compact,
-                        minimumSize: const Size(0, 30),
-                        padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
-                      ),
-                      onPressed: widget.onMortalityPressed,
-                      child: const FittedBox(
-                        fit: BoxFit.scaleDown,
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.warning_amber_rounded, size: 13),
-                            SizedBox(width: 4),
-                            Text('Bajas', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800)),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                const SizedBox(width: 6),
-                if (widget.onTransferPressed != null)
-                  Expanded(
-                    child: OutlinedButton(
-                      style: OutlinedButton.styleFrom(
-                        backgroundColor: AppColors.amberWarning.withValues(alpha: isDark ? 0.1 : 0.08),
-                        foregroundColor: AppColors.amberWarning,
-                        side: BorderSide(color: AppColors.amberWarning.withValues(alpha: 0.6)),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                        visualDensity: VisualDensity.compact,
-                        minimumSize: const Size(0, 30),
-                        padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
-                      ),
-                      onPressed: widget.onTransferPressed,
-                      child: const FittedBox(
-                        fit: BoxFit.scaleDown,
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.swap_horiz_rounded, size: 14),
-                            SizedBox(width: 4),
-                            Text('Traslado', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800)),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-              ],
+                    const SizedBox(width: 6),
+                    const Icon(Icons.keyboard_arrow_up_rounded, size: 20),
+                  ],
+                ),
+              ),
             ),
           ],
         ],
@@ -531,23 +486,27 @@ class _PondBentoCardState extends State<PondBentoCard> with SingleTickerProvider
       subtitle: isPolyculture
           ? (_showConsolidated ? '${allBatches.length} especies coexistentes' : '${activeBatch?.especie} • Día ${_getDaysInCulture(activeBatch)} de cultivo')
           : '${activeBatch?.especie ?? "Especie Principal"} • Día ${_getDaysInCulture(activeBatch)} de cultivo',
-      trailingWidget: InkWell(
-        onTap: _flipCard,
-        borderRadius: BorderRadius.circular(8),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          decoration: BoxDecoration(
-            color: isDark ? Colors.black.withValues(alpha: 0.06) : Colors.white.withValues(alpha: 0.06),
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: isDark ? Colors.white.withValues(alpha: 0.12) : Colors.black.withValues(alpha: 0.12)),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.undo_rounded, size: 12, color: isDark ? Colors.white : AppColors.textPrimaryDark),
-              const SizedBox(width: 4),
-              Text('VOLVER', style: TextStyle(color: isDark ? Colors.white : AppColors.textPrimaryDark, fontSize: 10, fontWeight: FontWeight.w800)),
-            ],
+      trailingWidget: SizedBox(
+        height: 48,
+        child: InkWell(
+          onTap: _flipCard,
+          borderRadius: BorderRadius.circular(10),
+          child: Container(
+            alignment: Alignment.center,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: isDark ? Colors.black.withValues(alpha: 0.2) : Colors.white.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: isDark ? Colors.white.withValues(alpha: 0.16) : Colors.black.withValues(alpha: 0.18)),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.undo_rounded, size: 14, color: isDark ? Colors.white : AppColors.textPrimaryDark),
+                const SizedBox(width: 6),
+                Text('VOLVER', style: TextStyle(color: isDark ? Colors.white : AppColors.textPrimaryDark, fontSize: 11, fontWeight: FontWeight.w800)),
+              ],
+            ),
           ),
         ),
       ),
@@ -577,7 +536,8 @@ class _PondBentoCardState extends State<PondBentoCard> with SingleTickerProvider
                         borderRadius: BorderRadius.circular(8),
                         child: AnimatedContainer(
                           duration: const Duration(milliseconds: 180),
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          constraints: const BoxConstraints(minHeight: 48),
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                           decoration: BoxDecoration(
                             color: isSelected
                                 ? Colors.purpleAccent.withValues(alpha: isDark ? 0.45 : 0.25)
@@ -614,7 +574,8 @@ class _PondBentoCardState extends State<PondBentoCard> with SingleTickerProvider
                     borderRadius: BorderRadius.circular(8),
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 180),
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      constraints: const BoxConstraints(minHeight: 48),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                       decoration: BoxDecoration(
                         color: _showConsolidated ? AppColors.cyanWater.withValues(alpha: 0.25) : Colors.white.withValues(alpha: 0.04),
                         borderRadius: BorderRadius.circular(8),
@@ -656,13 +617,14 @@ class _PondBentoCardState extends State<PondBentoCard> with SingleTickerProvider
 
           const SizedBox(height: 12),
 
-          // Botón para rotar al frente
+          // Botón para rotar al frente (WCAG 2.5.5 >= 48dp)
           InkWell(
             onTap: _flipCard,
             borderRadius: BorderRadius.circular(12),
             child: Container(
+              constraints: const BoxConstraints(minHeight: 48),
               width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 8),
+              padding: const EdgeInsets.symmetric(vertical: 14),
               alignment: Alignment.center,
               decoration: BoxDecoration(
                 color: Colors.white.withValues(alpha: 0.06),
@@ -970,6 +932,351 @@ class _PondBentoCardState extends State<PondBentoCard> with SingleTickerProvider
             Text(caption, style: TextStyle(color: color.withValues(alpha: 0.8), fontSize: 9, fontWeight: FontWeight.w600)),
           ],
         ],
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // MODAL OPERATIVO DE CAMPO (WCAG 2.5.5 >= 56dp por acción)
+  // ---------------------------------------------------------------------------
+  void _showOperationsBottomSheet(BuildContext context, FishBatch? activeBatch) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black.withValues(alpha: 0.65),
+      builder: (modalCtx) => _PondOperationsSheetContent(
+        pond: widget.pond,
+        batch: activeBatch,
+        onFeed: () {
+          Navigator.of(modalCtx).pop();
+          if (widget.onFeedPressed != null) {
+            widget.onFeedPressed!();
+          } else if (activeBatch != null) {
+            AlimentarModal.show(context, pond: widget.pond, batch: activeBatch);
+          } else {
+            SiembraModal.show(context, pond: widget.pond);
+          }
+        },
+        onWaterQuality: () {
+          Navigator.of(modalCtx).pop();
+          if (widget.onWaterQualityPressed != null) {
+            widget.onWaterQualityPressed!();
+          } else {
+            ParametroModal.show(context, preselectedPondId: widget.pond.id);
+          }
+        },
+        onSample: () {
+          Navigator.of(modalCtx).pop();
+          if (widget.onSamplePressed != null) {
+            widget.onSamplePressed!();
+          } else if (activeBatch != null) {
+            BiometriaModal.show(context, pond: widget.pond, batch: activeBatch);
+          }
+        },
+        onMortality: () {
+          Navigator.of(modalCtx).pop();
+          if (widget.onMortalityPressed != null) {
+            widget.onMortalityPressed!();
+          } else if (activeBatch != null) {
+            MortalidadModal.show(context, pond: widget.pond, batch: activeBatch);
+          }
+        },
+        onTransfer: () {
+          Navigator.of(modalCtx).pop();
+          if (widget.onTransferPressed != null) {
+            widget.onTransferPressed!();
+          } else if (activeBatch != null) {
+            TrasladoModal.show(context, pond: widget.pond, batch: activeBatch);
+          }
+        },
+      ),
+    );
+  }
+}
+
+/// Contenido del Bottom Sheet Operativo de Campo optimizado para manos húmedas
+class _PondOperationsSheetContent extends StatelessWidget {
+  final Pond pond;
+  final FishBatch? batch;
+  final VoidCallback onFeed;
+  final VoidCallback onWaterQuality;
+  final VoidCallback onSample;
+  final VoidCallback onMortality;
+  final VoidCallback onTransfer;
+
+  const _PondOperationsSheetContent({
+    required this.pond,
+    this.batch,
+    required this.onFeed,
+    required this.onWaterQuality,
+    required this.onSample,
+    required this.onMortality,
+    required this.onTransfer,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final hasBatch = batch != null;
+
+    return SafeArea(
+      bottom: true,
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 500),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: GlassContainer(
+              borderRadius: 28,
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              blur: 24,
+              opacity: isDark ? 0.22 : 0.16,
+              borderColor: AppColors.cyanWater.withValues(alpha: 0.35),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Indicador de arrastre táctil
+                  Center(
+                    child: Container(
+                      width: 44,
+                      height: 4,
+                      margin: const EdgeInsets.only(bottom: 12),
+                      decoration: BoxDecoration(
+                        color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.25),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  // Cabecera Operativa con Tag del Estanque y Botón Cerrar (48x48)
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: AppColors.cyanWater.withValues(alpha: 0.2),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: AppColors.cyanWater.withValues(alpha: 0.5)),
+                              ),
+                              child: Text(
+                                pond.sigla,
+                                style: const TextStyle(
+                                  color: AppColors.cyanWater,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    'ACCIONES DE CAMPO',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: AppTypography.titleSmall.copyWith(
+                                      color: isDark ? Colors.white : AppColors.textPrimaryLight,
+                                      fontWeight: FontWeight.w900,
+                                    ),
+                                  ),
+                                  Text(
+                                    '${pond.nombre} • ${hasBatch ? (batch!.especie) : "Sin lote activo"}',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: AppTypography.labelMicro.copyWith(
+                                      color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      SizedBox(
+                        width: 48,
+                        height: 48,
+                        child: IconButton(
+                          icon: const Icon(Icons.close_rounded),
+                          color: isDark ? Colors.white70 : AppColors.textPrimaryLight,
+                          onPressed: () => Navigator.of(context).pop(),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+
+                  // 1. Alimentación (Feeding)
+                  _buildLargeOperationTile(
+                    context: context,
+                    icon: Icons.restaurant_rounded,
+                    color: AppColors.greenBiomass,
+                    title: 'Registrar Alimentación',
+                    subtitle: hasBatch
+                        ? 'Ración diaria de concentrado y costo'
+                        : 'Sembrar lote previo para habilitar',
+                    onTap: onFeed,
+                  ),
+                  const SizedBox(height: 10),
+
+                  // 2. Calidad de Agua (Water Quality) - Rutina Reglamentaria ICA
+                  _buildLargeOperationTile(
+                    context: context,
+                    icon: Icons.water_drop_rounded,
+                    color: AppColors.cyanWater,
+                    title: 'Calidad de Agua (O₂, pH, Temp)',
+                    subtitle: 'Medición físico-química reglamentaria ICA',
+                    onTap: onWaterQuality,
+                  ),
+                  const SizedBox(height: 10),
+
+                  // 3. Muestreo Biométrico (Biometry)
+                  _buildLargeOperationTile(
+                    context: context,
+                    icon: Icons.scale_rounded,
+                    color: AppColors.purpleAnalytics,
+                    title: 'Muestreo y Biometría',
+                    subtitle: hasBatch
+                        ? 'Pesaje de control, talla promedio y FCR'
+                        : 'Requiere lote activo en estanque',
+                    onTap: hasBatch ? onSample : () {},
+                    enabled: hasBatch,
+                  ),
+                  const SizedBox(height: 10),
+
+                  // 4. Mortalidad / Bajas
+                  _buildLargeOperationTile(
+                    context: context,
+                    icon: Icons.warning_amber_rounded,
+                    color: AppColors.coralAction,
+                    title: 'Registrar Bajas / Mortalidad',
+                    subtitle: hasBatch
+                        ? 'Ajuste de biomasa viva y causas sanitarias'
+                        : 'Requiere lote activo en estanque',
+                    onTap: hasBatch ? onMortality : () {},
+                    enabled: hasBatch,
+                  ),
+                  const SizedBox(height: 10),
+
+                  // 5. Traslado o Cosecha
+                  _buildLargeOperationTile(
+                    context: context,
+                    icon: Icons.swap_horiz_rounded,
+                    color: AppColors.amberWarning,
+                    title: 'Traslado o Cosecha',
+                    subtitle: hasBatch
+                        ? 'Transferir a otro estanque o iniciar cosecha'
+                        : 'Requiere lote activo en estanque',
+                    onTap: hasBatch ? onTransfer : () {},
+                    enabled: hasBatch,
+                  ),
+                  const SizedBox(height: 8),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLargeOperationTile({
+    required BuildContext context,
+    required IconData icon,
+    required Color color,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+    bool enabled = true,
+  }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: enabled ? onTap : null,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          constraints: const BoxConstraints(minHeight: 60),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: enabled
+                ? color.withValues(alpha: isDark ? 0.12 : 0.08)
+                : Colors.grey.withValues(alpha: 0.05),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: enabled
+                  ? color.withValues(alpha: isDark ? 0.35 : 0.45)
+                  : Colors.grey.withValues(alpha: 0.15),
+              width: 1.2,
+            ),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: enabled
+                      ? color.withValues(alpha: isDark ? 0.22 : 0.16)
+                      : Colors.grey.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(
+                  icon,
+                  color: enabled ? color : Colors.grey,
+                  size: 22,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      title,
+                      style: AppTypography.titleSmall.copyWith(
+                        color: enabled
+                            ? (isDark ? Colors.white : AppColors.textPrimaryLight)
+                            : Colors.grey,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 13.5,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: AppTypography.labelMicro.copyWith(
+                        color: enabled
+                            ? (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight)
+                            : Colors.grey.withValues(alpha: 0.7),
+                        fontSize: 10,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              Icon(
+                Icons.arrow_forward_ios_rounded,
+                size: 14,
+                color: enabled
+                    ? (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight)
+                    : Colors.grey.withValues(alpha: 0.3),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

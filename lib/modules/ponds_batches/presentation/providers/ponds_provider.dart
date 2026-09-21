@@ -138,20 +138,26 @@ class PondsNotifier extends StateNotifier<PondsState> {
       final updatedBatches = List<FishBatch>.from(state.batches);
       updatedBatches[bIndex] = updatedBatch;
 
+      Pond? targetPondUpdated;
       final updatedPonds = state.ponds.map((p) {
         if (p.id == oldBatch.estanqueId) {
-          return p.copyWith(
+          final up = p.copyWith(
             biomasaKg: remanenteBiomasa,
             estado: isTotalHarvest ? PondStatus.available : p.estado,
             especieActual: isTotalHarvest ? '' : p.especieActual,
             costoAcumuladoBiologico: isTotalHarvest ? 0.0 : (p.costoAcumuladoBiologico - event.cogs).clamp(0.0, double.infinity),
           );
+          targetPondUpdated = up;
+          return up;
         }
         return p;
       }).toList();
 
       state = state.copyWith(batches: updatedBatches, ponds: updatedPonds);
       _repository.updateBatch(updatedBatch);
+      if (targetPondUpdated != null) {
+        _repository.updatePond(targetPondUpdated!);
+      }
     }
   }
 

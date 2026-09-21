@@ -26,6 +26,8 @@ ON CONFLICT (id) DO NOTHING;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS empresa_id UUID REFERENCES public.empresas(id) ON DELETE CASCADE;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS phone TEXT;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS avatar_url TEXT;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS role TEXT DEFAULT 'operario';
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS is_superadmin BOOLEAN DEFAULT false;
 
 ALTER TABLE public.units ADD COLUMN IF NOT EXISTS empresa_id UUID REFERENCES public.empresas(id) ON DELETE CASCADE;
 ALTER TABLE public.units ADD COLUMN IF NOT EXISTS sigla TEXT;
@@ -122,9 +124,12 @@ BEGIN
     END IF;
 
     -- siembra_details
-    IF NOT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'siembra_details') THEN
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'siembra_details') THEN
+        ALTER TABLE public.siembra_details ADD COLUMN IF NOT EXISTS empresa_id UUID REFERENCES public.empresas(id) ON DELETE CASCADE;
+    ELSE
         CREATE TABLE public.siembra_details (
             id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+            empresa_id UUID REFERENCES public.empresas(id) ON DELETE CASCADE,
             siembra_id UUID NOT NULL REFERENCES public.siembras(id) ON DELETE CASCADE,
             species_name TEXT NOT NULL,
             rol_policultivo TEXT DEFAULT 'principal',
@@ -137,6 +142,7 @@ BEGIN
             created_at TIMESTAMPTZ DEFAULT NOW()
         );
     END IF;
+
 
     -- water_quality
     IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'water_quality') THEN
@@ -223,6 +229,7 @@ ALTER TABLE public.estanques ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.inventory ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.providers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.siembras ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.siembra_details ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.water_quality ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.biometrias ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.mortality ENABLE ROW LEVEL SECURITY;
@@ -234,6 +241,7 @@ DROP POLICY IF EXISTS "estanques_tenant_isolation" ON public.estanques;
 DROP POLICY IF EXISTS "inventory_tenant_isolation" ON public.inventory;
 DROP POLICY IF EXISTS "providers_tenant_isolation" ON public.providers;
 DROP POLICY IF EXISTS "siembras_tenant_isolation" ON public.siembras;
+DROP POLICY IF EXISTS "siembra_details_tenant_isolation" ON public.siembra_details;
 DROP POLICY IF EXISTS "water_quality_tenant_isolation" ON public.water_quality;
 DROP POLICY IF EXISTS "biometrias_tenant_isolation" ON public.biometrias;
 DROP POLICY IF EXISTS "mortality_tenant_isolation" ON public.mortality;
@@ -246,40 +254,104 @@ WITH CHECK (id = auth.uid() OR empresa_id = public.get_auth_empresa_id() OR publ
 
 CREATE POLICY "units_tenant_isolation" ON public.units
 FOR ALL TO authenticated
-USING (empresa_id = public.get_auth_empresa_id() OR public.is_superadmin() OR empresa_id IS NULL)
+USING (empresa_id = public.get_auth_empresa_id() OR public.is_superadmin())
 WITH CHECK (empresa_id = public.get_auth_empresa_id() OR public.is_superadmin());
 
 CREATE POLICY "estanques_tenant_isolation" ON public.estanques
 FOR ALL TO authenticated
-USING (empresa_id = public.get_auth_empresa_id() OR public.is_superadmin() OR empresa_id IS NULL)
+USING (empresa_id = public.get_auth_empresa_id() OR public.is_superadmin())
 WITH CHECK (empresa_id = public.get_auth_empresa_id() OR public.is_superadmin());
 
 CREATE POLICY "inventory_tenant_isolation" ON public.inventory
 FOR ALL TO authenticated
-USING (empresa_id = public.get_auth_empresa_id() OR public.is_superadmin() OR empresa_id IS NULL)
+USING (empresa_id = public.get_auth_empresa_id() OR public.is_superadmin())
 WITH CHECK (empresa_id = public.get_auth_empresa_id() OR public.is_superadmin());
 
 CREATE POLICY "providers_tenant_isolation" ON public.providers
 FOR ALL TO authenticated
-USING (empresa_id = public.get_auth_empresa_id() OR public.is_superadmin() OR empresa_id IS NULL)
+USING (empresa_id = public.get_auth_empresa_id() OR public.is_superadmin())
 WITH CHECK (empresa_id = public.get_auth_empresa_id() OR public.is_superadmin());
 
 CREATE POLICY "siembras_tenant_isolation" ON public.siembras
 FOR ALL TO authenticated
-USING (empresa_id = public.get_auth_empresa_id() OR public.is_superadmin() OR empresa_id IS NULL)
+USING (empresa_id = public.get_auth_empresa_id() OR public.is_superadmin())
 WITH CHECK (empresa_id = public.get_auth_empresa_id() OR public.is_superadmin());
+
+CREATE POLICY "siembra_details_tenant_isolation" ON public.siembra_details
+FOR ALL TO authenticated
+USING (
+  empresa_id = public.get_auth_empresa_id() OR public.is_superadmin()
+  OR EXISTS (
+    SELECT 1 FROM public.siembras s
+    WHERE s.id = siembra_details.siembra_id
+      AND (s.empresa_id = public.get_auth_empresa_id() OR public.is_superadmin())
+  )
+)
+WITH CHECK (
+  empresa_id = public.get_auth_empresa_id() OR public.is_superadmin()
+  OR EXISTS (
+    SELECT 1 FROM public.siembras s
+    WHERE s.id = siembra_details.siembra_id
+      AND (s.empresa_id = public.get_auth_empresa_id() OR public.is_superadmin())
+  )
+);
 
 CREATE POLICY "water_quality_tenant_isolation" ON public.water_quality
 FOR ALL TO authenticated
-USING (empresa_id = public.get_auth_empresa_id() OR public.is_superadmin() OR empresa_id IS NULL)
+USING (empresa_id = public.get_auth_empresa_id() OR public.is_superadmin())
 WITH CHECK (empresa_id = public.get_auth_empresa_id() OR public.is_superadmin());
 
 CREATE POLICY "biometrias_tenant_isolation" ON public.biometrias
 FOR ALL TO authenticated
-USING (empresa_id = public.get_auth_empresa_id() OR public.is_superadmin() OR empresa_id IS NULL)
+USING (empresa_id = public.get_auth_empresa_id() OR public.is_superadmin())
 WITH CHECK (empresa_id = public.get_auth_empresa_id() OR public.is_superadmin());
 
 CREATE POLICY "mortality_tenant_isolation" ON public.mortality
 FOR ALL TO authenticated
-USING (empresa_id = public.get_auth_empresa_id() OR public.is_superadmin() OR empresa_id IS NULL)
+USING (empresa_id = public.get_auth_empresa_id() OR public.is_superadmin())
 WITH CHECK (empresa_id = public.get_auth_empresa_id() OR public.is_superadmin());
+
+-- 6. PROTECCIÓN CONTRA ESCALADA DE PRIVILEGIOS EN PROFILES (SEC-01)
+CREATE OR REPLACE FUNCTION public.trg_protect_profile_privileges()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+BEGIN
+  IF TG_OP = 'INSERT' THEN
+    -- Al insertar un perfil nuevo:
+    -- Si el llamador no es superadministrador ni creador
+    IF NOT (SELECT public.is_superadmin()) THEN
+      -- Forzar que is_superadmin sea falso
+      NEW.is_superadmin := false;
+      -- Bloquear cualquier intento de auto-asignarse roles privilegiados
+      IF NEW.role IN ('master', 'creador') THEN
+        RAISE EXCEPTION 'FishBit Security Violation (SEC-01): No posee autorización para asignar roles de alta jerarquía o privilegios de superadministrador.'
+          USING ERRCODE = '42501';
+      END IF;
+    END IF;
+    RETURN NEW;
+  ELSIF TG_OP = 'UPDATE' THEN
+    -- Si el usuario intenta cambiar su propio rol, estatus de superadministrador o empresa asignada
+    IF (NEW.role IS DISTINCT FROM OLD.role 
+        OR NEW.is_superadmin IS DISTINCT FROM OLD.is_superadmin 
+        OR NEW.empresa_id IS DISTINCT FROM OLD.empresa_id) THEN
+      -- Solo un superadministrador/creador autenticado puede alterar estos campos privilegiados
+      IF NOT (SELECT public.is_superadmin()) THEN
+        RAISE EXCEPTION 'FishBit Security Violation (SEC-01): No posee autorización para alterar roles, empresa asignada o privilegios de superadministrador.'
+          USING ERRCODE = '42501';
+      END IF;
+    END IF;
+    RETURN NEW;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_enforce_profile_privilege_protection ON public.profiles;
+CREATE TRIGGER trg_enforce_profile_privilege_protection
+  BEFORE INSERT OR UPDATE ON public.profiles
+  FOR EACH ROW
+  EXECUTE FUNCTION public.trg_protect_profile_privileges();
+

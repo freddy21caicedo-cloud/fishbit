@@ -1,4 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:fishbit_finance/core/storage/offline_sync_queue.dart';
 import 'package:fishbit_finance/modules/water_quality/domain/models/water_parameter.dart';
 import 'package:fishbit_finance/modules/water_quality/domain/repositories/water_quality_repository.dart';
 
@@ -123,7 +124,36 @@ class SupabaseWaterQualityRepository implements WaterQualityRepository {
 
       await _supabase.from('parametros_calidad_agua').insert(insertData);
       return parameter;
-    } catch (_) {
+    } catch (e) {
+      // DATA-02 & PERF-01: Local-first offline resilience queue
+      final hourStr = '${parameter.fecha.hour.toString().padLeft(2, '0')}:${parameter.fecha.minute.toString().padLeft(2, '0')}:00';
+      await OfflineSyncQueue.enqueue(
+        type: OfflineActionType.waterQuality,
+        table: 'parametros_calidad_agua',
+        payload: {
+          'id': parameter.id,
+          'empresa_id': parameter.empresaId,
+          'unit_id': parameter.unidadAcuicolaId,
+          'unidad_acuicola_id': parameter.unidadAcuicolaId,
+          'estanque_id': parameter.estanqueId,
+          'fecha': parameter.fecha.toIso8601String(),
+          'hora': hourStr,
+          'oxigeno_mg_l': parameter.oxigenoMgL,
+          'oxigeno_pct': parameter.oxigenoPct,
+          'ph': parameter.ph,
+          'temperatura': parameter.temperaturaC,
+          'amonio_mg_l': parameter.amonioMgL,
+          'nitritos_mg_l': parameter.nitritosMgL,
+          'nitratos_mg_l': parameter.nitratosMgL,
+          'alcalinidad_mg_l': parameter.alcalinidadMgL,
+          'co2_mg_l': parameter.co2MgL,
+          'dureza_mg_l': parameter.durezaMgL,
+          'cloro_mg_l': parameter.cloroMgL,
+          'observaciones': parameter.observaciones,
+          'registrado_por': parameter.registradoPor,
+          'creado_en': DateTime.now().toIso8601String(),
+        },
+      );
       return parameter;
     }
   }

@@ -1,65 +1,266 @@
-# Handoff Report — Reviewer 2 (Milestone 2)
+# Review & Adversarial Critic Report — Milestone 2 (M2): Regulatory Data Integrity ICA (DATA-01)
+
+- **Agent**: `reviewer_m2_2`
+- **Roles**: Reviewer (Quality & Verification) & Adversarial Critic (Stress-Testing & Failure Modes)
+- **Milestone**: M2 (Regulatory Data Integrity ICA — DATA-01)
+- **Date**: 2026-09-14T14:20:00Z
+- **Working Directory**: `c:\Users\Freddy\Desktop\Desarrollo de app\FishBit\.agents\reviewer_m2_2`
+- **Verdict**: **REQUEST_CHANGES**
+
+---
 
 ## 1. Observation
-- **Static Analysis**: Ran `flutter analyze --no-fatal-infos` via background task `task-27`.
-  - Output: `Analyzing FishBit... No issues found! (ran in 4.8s)`
-  - Exit code: `0` (0 errors, 0 warnings, 0 lints).
-- **Test Suite Execution**: Ran `flutter test` across all unit, widget, and integration tests via background task `task-32`.
-  - Output: `00:03 +42: All tests passed!`
-  - Exit code: `0` (42 tests passed, 0 failures, 0 skipped).
-- **Responsive Layout Hardening (360px – 1920px)**:
-  - `FishBitHeader` (`lib/core/design_system/fishbit_header.dart:67-158`): FishBit logo and Dynamic Island pill button are enclosed in `FittedBox(fit: BoxFit.scaleDown)` and `Flexible(child: Text(..., overflow: TextOverflow.ellipsis))` inside `Expanded`, avoiding horizontal RenderFlex overflow on 360px viewports.
-  - `FinanceScreen` FAB (`lib/modules/finance_payroll/presentation/screens/finance_screen.dart:58-99`): On screens `< 440px`, the 3 separate FAB buttons collapse into a single high-visibility `FloatingActionButton.extended` ("Acciones OPEX") opening a modal bottom sheet, eliminating FAB row overflow.
-  - `PondsDashboardScreen` (`lib/modules/ponds_batches/presentation/screens/ponds_dashboard_screen.dart:161-166`): Replaced fixed aspect ratios with `SliverGridDelegateWithMaxCrossAxisExtent(maxCrossAxisExtent: 440, mainAxisExtent: 330, crossAxisSpacing: 16, mainAxisSpacing: 16)`, maintaining consistent geometry from mobile up to 1920px ultra-wide monitors.
-  - `PondBentoCard` (`lib/modules/ponds_batches/presentation/widgets/pond_bento_card.dart:364-474`): The 4 quick-action buttons (Alimentar, Muestreo, Bajas, Traslado) use `VisualDensity.compact`, `minimumSize: const Size(0, 30)`, and `FittedBox(fit: BoxFit.scaleDown)` preventing overflow on narrow widths.
-  - `BitacoraScreen` & `IcaCertificationScreen`: Constrained by `Center(child: ConstrainedBox(constraints: BoxConstraints(maxWidth: 1024), child: ...))` and scrollable tab bars with `TabAlignment.start`.
-- **Riverpod State Granularization & Selectors**:
-  - `PondsDashboardScreen` (`lib/modules/ponds_batches/presentation/screens/ponds_dashboard_screen.dart:30-34`): `ref.watch(pondsProvider.select((s) => s.biomasaTotalKg))`, `ref.watch(pondsProvider.select((s) => s.costoTotalEnAgua))`, `ref.watch(pondsProvider.select((s) => s.isLoading))`, and `ref.watch(pondsProvider.select((s) => s.ponds))` isolate rebuilds to only the relevant state properties.
-  - `activeBatchesByPondProvider` (`lib/modules/ponds_batches/presentation/providers/ponds_provider.dart:279-288`): An `autoDispose` provider that memoizes batch grouping by pond ID using `ref.watch(pondsProvider.select((s) => s.batches))`.
-  - `icaReportsEngineProvider` (`lib/modules/ica_compliance/presentation/providers/ica_compliance_provider.dart:22-50`): Memoizes report engine creation across upstream provider updates.
-- **Network Parallelization**:
-  - `loadPondsAndBatches` (`lib/modules/ponds_batches/presentation/providers/ponds_provider.dart:95-101`): Parallelized 5 network queries with `Future.wait`.
-  - `loadFinanceData` (`lib/modules/finance_payroll/presentation/providers/finance_provider.dart:89-96`): Parallelized 5 queries with `Future.wait`.
-  - `loadAllRecords` (`lib/modules/ica_compliance/presentation/providers/ica_compliance_provider.dart:101-105`): Parallelized 3 queries with `Future.wait`.
-- **List Viewport Virtualization & Memoized Computation**:
-  - `BitacoraScreen` (`lib/modules/bitacora/presentation/screens/bitacora_screen.dart:597, 794, 959, 1241`): Converted all 4 tab bodies to `ListView.builder`.
-  - `_BiometryAnalysis.compute` (`lib/modules/bitacora/presentation/screens/bitacora_screen.dart:1602-1692`): Single O(N) pass computes chronological sampling deltas and GDP instead of O(N^2) searches inside item builders.
-  - `PondBentoCard` (`lib/modules/ponds_batches/presentation/widgets/pond_bento_card.dart:81-107`): Front and back cards are pre-built inside `RepaintBoundary` instances and rotated via hardware-accelerated 3D matrix transforms (`setEntry(3, 2, 0.0015)`).
-- **Controller Lifecycle & Memory Leak Fixes**:
-  - `_QuickEntryDialog` (`lib/modules/warehouse_inventory/presentation/screens/warehouse_screen.dart:477-507`): Encapsulated into a `ConsumerStatefulWidget` with proper `dispose()` on `_cantCtrl`, `_costCtrl`, and `_facturaCtrl`.
-  - Search debounce timer in `WarehouseScreen` is cancelled in `dispose()`.
-  - `EditableInvoiceItem` (`lib/modules/warehouse_inventory/presentation/dialogs/nueva_factura_modal.dart:54-59`): All controllers are disposed when items are removed, on category switch, and upon modal closure.
-- **Integrity Check**:
-  - No dummy/facade implementations, no hardcoded expected test results in production logic, no shortcuts, and verification logs are authentically produced by live tool invocations.
+
+### 1.1 Verified Strengths & Baseline Conformance
+Direct observations of source code, unit test suites, and static analysis:
+
+1. **Zero-Defaults on Controller Initialization (`parametro_modal.dart:36-47`)**:
+   - All 11 physicochemical controllers (`_oxigenoMgLCtrl`, `_oxigenoPctCtrl`, `_tempCtrl`, `_phCtrl`, `_amonioCtrl`, `_nitritosCtrl`, `_nitratosCtrl`, `_alcalinidadCtrl`, `_co2Ctrl`, `_durezaCtrl`, `_cloroCtrl`) and `_obsCtrl` initialize with empty constructors (`TextEditingController()`), with initial `.text == ''`.
+   - No simulated values (e.g. `6.2`, `7.4`, `28.5`) or default fallbacks (`??`) exist.
+2. **Tenant Boundary Enforcement (`parametro_modal.dart:506-516`)**:
+   - Company ID is strictly derived from the authenticated session:
+     ```dart
+     final authState = ref.read(authProvider);
+     final empresaId = authState.currentCompany?.id ?? authState.currentUser?.empresaId;
+     if (empresaId == null || empresaId.isEmpty) {
+       messenger.showSnackBar(
+         const SnackBar(
+           content: Text('Error: No se encontró una empresa activa para registrar la medición.'),
+           backgroundColor: AppColors.coralAction,
+         ),
+       );
+       return;
+     }
+     ```
+   - Eradicated the former hardcoded test UUID `'c1000000-0000-0000-0000-000000000001'`.
+3. **Spanish Decimal Comma Support (`parametro_modal.dart:82-87`)**:
+   - Implemented `_parseDecimal(String? text)`:
+     ```dart
+     double? _parseDecimal(String? text) {
+       if (text == null) return null;
+       final cleaned = text.trim().replaceAll(',', '.');
+       if (cleaned.isEmpty) return null;
+       return double.tryParse(cleaned);
+     }
+     ```
+   - Correctly translates `"6,5"` to `6.5` and `"28,4"` to `28.4`.
+4. **Unit & Widget Test Results**:
+   - `flutter test test/modules/water_quality/`: **9/9 tests passed (100%)** (exit code 0).
+   - `test/modules/bitacora/bitacora_screen_test.dart`: Verified 6/6 tests passing (updated matchers for `OXÍGENO DISUELTO`, `PH DE AGUA`, and disambiguated filter chips).
+5. **Static Analysis**:
+   - `flutter analyze --no-fatal-infos`: Completed with exit code 0. Reported 4 `avoid_print` info diagnostics located in `test/modules/water_quality/parametro_modal_adversarial_test.dart:394,396,435,436`.
+
+---
+
+### 1.2 Adversarial Findings & Critical Vulnerabilities
+
+#### Finding 1 (CRITICAL — Concurrency / Integrity): Race Condition & Duplicate Inserts on Rapid Double-Tap
+- **Location**: `lib/modules/water_quality/presentation/dialogs/parametro_modal.dart:476-560` and `lib/modules/water_quality/presentation/providers/water_quality_provider.dart:73-86`
+- **Observation**:
+  - `_ParametroModalState` does not maintain a submission lock (`_isSubmitting`).
+  - In `water_quality_provider.dart`, `recordWaterQuality` does **not** update state to `isLoading: true`.
+  - As a result, `waterState.isLoading` remains `false` throughout the asynchronous database write.
+  - When an operator double-taps the "Guardar" button (common with wet hands or mobile touch lag), two concurrent executions of `onPressed` occur. Each invocation generates a fresh `Uuid().v4()`, executing multiple distinct `recordParameters` calls with duplicate data into `parametros_calidad_agua`.
+
+#### Finding 2 (HIGH — Reliability / Data Loss): Silent False-Positive Success SnackBar on DB Failure
+- **Location**: `lib/modules/water_quality/presentation/providers/water_quality_provider.dart:82-85` and `lib/modules/water_quality/presentation/dialogs/parametro_modal.dart:549-558`
+- **Observation**:
+  - In `water_quality_provider.dart`:
+    ```dart
+    Future<bool> recordWaterQuality(WaterParameter param) async {
+      await addParameter(param);
+      return true;
+    }
+    ```
+    If `addParameter` catches an exception (RLS failure, network timeout, database constraint error), `recordWaterQuality` still unconditionally returns `true`.
+  - In `parametro_modal.dart`:
+    ```dart
+    final success = await ref.read(waterQualityProvider.notifier).recordWaterQuality(param);
+    if (success && mounted) {
+      nav.pop();
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('¡Medición registrada con éxito con 11 parámetros y hora de toma!'),
+          backgroundColor: AppColors.cyanWater,
+        ),
+      );
+    }
+    ```
+  - The modal pops and presents a success message to the operator even when the record was **never saved** to PostgreSQL. This creates false assurance of regulatory compliance and results in permanent data loss.
+
+#### Finding 3 (HIGH — Visual Defect / UX): Missing UI Banner for Critical Nitrite
+- **Location**: `lib/modules/water_quality/presentation/dialogs/parametro_modal.dart:102, 426-474`
+- **Observation**:
+  - Line 102 evaluates: `final isNitriteCritical = nitritos != null && nitritos > 0.2;`.
+  - Line 426 triggers the warning container: `if (isHypoxia || isAmmoniaCritical || isNitriteCritical || isChlorineAlert)`.
+  - However, inside the `Column` (lines 435-472), child rows exist only for `isHypoxia`, `isAmmoniaCritical`, and `isChlorineAlert`. The widget for `isNitriteCritical` is completely missing.
+  - When a user enters a toxic nitrite measurement (e.g. `0.35` ppm), an **empty red container** with no text, no icon, and no warning explanation renders on screen.
+
+#### Finding 4 (HIGH — Regulatory Boundary): Stale/Invalid Preselected Pond Bypasses Pond Validation
+- **Location**: `lib/modules/water_quality/presentation/dialogs/parametro_modal.dart:49-57, 165, 486-494`
+- **Observation**:
+  - `_selectedPondId = widget.preselectedPondId;`.
+  - In the dropdown (line 165), if `preselectedPondId` is invalid or belongs to another deleted unit, `value` defaults to `null` and displays the prompt `'Selecciona un estanque *'`.
+  - In the submit validation (line 486):
+    `if (_selectedPondId == null || _selectedPondId!.isEmpty)`
+    It does **not** verify `ponds.any((p) => p.id == _selectedPondId)`.
+  - The form allows saving with an invalid/stale pond ID while the visual UI tells the operator that no pond is selected, creating orphan records in the database.
+
+#### Finding 5 (HIGH — Input Sanitization): IEEE 754 "NaN" Input Bypasses Biological Range Validation
+- **Location**: `lib/modules/water_quality/presentation/dialogs/parametro_modal.dart:82-87, 276-281, 308-313, 325-330`
+- **Observation**:
+  - `_parseDecimal` calls `double.tryParse(cleaned)`.
+  - In Dart, `double.tryParse("NaN")` evaluates to `double.nan`.
+  - In IEEE 754 floating-point logic, all comparisons with `NaN` (`NaN < 0`, `NaN > 30`, `NaN < 5`, `NaN > 45`, `NaN > 14`) evaluate to `false`.
+  - The validators for O2, Temp, and pH return `null` (validating the field as clean).
+  - `WaterParameter` receives `double.nan`. When serializing to JSON or storing in PostgreSQL, this throws `FormatException: Double value should be finite: NaN` or causes unhandled database crashes.
+
+---
 
 ## 2. Logic Chain
-1. *Requirement 1*: Prevent UI jank, memory leaks, and redundant widget rebuilds.
-   - *Verification*: Riverpod `.select(...)` and memoized family/derived providers prevent cascading rebuilds. `RepaintBoundary` and 3D matrix caching prevent repaint thrashing during card flips. `TextEditingController` instances and timer resources are systematically disposed.
-2. *Requirement 2*: Eliminate network waterfalls.
-   - *Verification*: Sequential repository `await` chains in Ponds, Finance, and ICA providers were converted to `Future.wait(...)`, allowing concurrent I/O operations and reducing screen initialization time by ~60-80%.
-3. *Requirement 3*: Guarantee responsive fluid layouts from 360px mobile to 1920px desktop viewports.
-   - *Verification*: `FishBitHeader` uses `FittedBox` and `Flexible(overflow: ellipsis)`, `FinanceScreen` employs an adaptive FAB row collapsing into a hub on `< 440px`, and `PondsDashboardScreen` uses `SliverGridDelegateWithMaxCrossAxisExtent`. All 42 integration and unit tests (including explicit 360px viewport tests) execute cleanly with zero `RenderFlex` overflows.
-4. *Requirement 4*: Static analysis and automated test suite pass.
-   - *Verification*: `flutter analyze --no-fatal-infos` reported 0 issues, and `flutter test` passed 42/42 tests.
+
+1. **Premise**: ICA Resolución 065463 (Form F-09) and acceptance criteria DATA-01 require complete regulatory data integrity: zero simulated defaults, strict tenant isolation, valid biological bounds, robust pond association, and deterministic error handling.
+2. **From Observation 1.1**: The basic requirements of DATA-01 (removing initial controller text, eliminating default fallbacks, adding decimal comma translation, enforcing auth-derived tenant ID) have been implemented.
+3. **From Observation 1.2 (Finding 1)**: The lack of a local submission lock and lack of `isLoading: true` in `recordWaterQuality` allows rapid double-tapping to invoke concurrent writes with new UUIDs, generating duplicate rows in `parametros_calidad_agua`.
+4. **From Observation 1.2 (Finding 2)**: Unconditionally returning `true` from `recordWaterQuality` suppresses write failures, displaying false success messages to operators.
+5. **From Observation 1.2 (Finding 3)**: Omitting `isNitriteCritical` from the warning column creates a visually broken UI state when critical nitrites are registered.
+6. **From Observation 1.2 (Finding 4)**: Validating `_selectedPondId` only for null/empty without confirming membership in `ponds.any((p) => p.id == _selectedPondId)` permits orphan record creation when an invalid `preselectedPondId` is provided.
+7. **From Observation 1.2 (Finding 5)**: Using raw `double.tryParse` allows `"NaN"` to pass range checks due to IEEE 754 comparison semantics, allowing invalid numbers into the model.
+8. **Conclusion**: While the initial implementation achieved superficial test passes on happy paths, adversarial scrutiny demonstrates critical failure modes that jeopardize regulatory compliance and production stability.
+
+---
 
 ## 3. Caveats
-- Deserialization edge cases for string-encoded numbers in models (e.g. `(raw as num?)` vs `tryParse`) are scheduled for Milestone 3 (Features 14-18) in accordance with `PROJECT.md`.
-- No backend code changes were made or required in Milestone 2.
 
-## 4. Conclusion
-**VERDICT: APPROVE**
-All frontend performance optimizations, layout hardening measures, state selector granularizations, viewport virtualizations, and controller disposal routines for Milestone 2 have been correctly implemented, verified, and stress-tested without regressions or integrity violations.
+- **Scope boundary**: Implementation code must not be modified by reviewers; fixes must be applied by the implementer/worker.
+- **Repository Mocks**: Existing unit tests in `parametro_modal_test.dart` used simplified mock repositories that did not simulate network latency or exceptions, explaining why the double-tap and error-masking issues were not flagged by the baseline test suite.
+- **Optional Laboratory Parameters**: Parameters 4–11 (Amonio, Nitritos, Nitratos, Alcalinidad, CO2, Dureza, Cloro, Saturación %) are optional under ICA F-09 routine checks and are nullable in PostgreSQL.
+
+---
+
+## 4. Conclusion & Required Changes
+
+**Verdict**: **REQUEST_CHANGES**
+
+Before Milestone M2 can be approved, the following 5 remediation items must be implemented:
+
+### Remediation Item 1: Add Synchronous Submission Guard (`parametro_modal.dart`)
+1. In `_ParametroModalState`, declare `bool _isSubmitting = false;`.
+2. In `GlassButton`:
+   ```dart
+   isLoading: _isSubmitting || waterState.isLoading,
+   ```
+3. At the beginning of `onPressed`:
+   ```dart
+   if (_isSubmitting) return;
+   setState(() => _isSubmitting = true);
+   try {
+     // validation and save logic
+   } finally {
+     if (mounted) setState(() => _isSubmitting = false);
+   }
+   ```
+
+### Remediation Item 2: Fix Error Handling in `water_quality_provider.dart` & `parametro_modal.dart`
+1. Update `recordWaterQuality` in `lib/modules/water_quality/presentation/providers/water_quality_provider.dart`:
+   ```dart
+   Future<bool> recordWaterQuality(WaterParameter param) async {
+     try {
+       final saved = await _repository.recordParameters(param);
+       state = state.copyWith(recentParameters: [saved, ...state.recentParameters]);
+       return true;
+     } catch (e) {
+       state = state.copyWith(errorMessage: e.toString());
+       return false;
+     }
+   }
+   ```
+2. In `parametro_modal.dart`, handle failure:
+   ```dart
+   final success = await ref.read(waterQualityProvider.notifier).recordWaterQuality(param);
+   if (success && mounted) {
+     nav.pop();
+     messenger.showSnackBar(
+       const SnackBar(
+         content: Text('¡Medición registrada con éxito con 11 parámetros y hora de toma!'),
+         backgroundColor: AppColors.cyanWater,
+       ),
+     );
+   } else if (!success && mounted) {
+     messenger.showSnackBar(
+       SnackBar(
+         content: Text('Error al registrar medición: ${ref.read(waterQualityProvider).errorMessage ?? "Error de red"}'),
+         backgroundColor: AppColors.coralAction,
+       ),
+     );
+   }
+   ```
+
+### Remediation Item 3: Add Missing `isNitriteCritical` UI Banner Widget (`parametro_modal.dart`)
+In `parametro_modal.dart` (inside the warning banner `Column` between `isAmmoniaCritical` and `isChlorineAlert`):
+```dart
+if (isNitriteCritical) ...[
+  if (isHypoxia || isAmmoniaCritical) const SizedBox(height: 4),
+  const Row(
+    children: [
+      Icon(Icons.warning_rounded, color: AppColors.coralAction, size: 16),
+      SizedBox(width: 6),
+      Expanded(
+        child: Text(
+          '¡Alerta Crítica! Nitritos NO₂⁻ > 0.2 ppm. Alto riesgo de toxicidad e hipoxia tisular.',
+          style: TextStyle(color: AppColors.coralAction, fontSize: 11, fontWeight: FontWeight.w700),
+        ),
+      ),
+    ],
+  ),
+],
+```
+
+### Remediation Item 4: Validate Pond Exists in Active Pond List (`parametro_modal.dart`)
+Update line 486 to:
+```dart
+if (_selectedPondId == null || _selectedPondId!.isEmpty || !ponds.any((p) => p.id == _selectedPondId)) {
+  messenger.showSnackBar(
+    const SnackBar(
+      content: Text('Debe seleccionar un estanque de medición válido para registrar los parámetros.'),
+      backgroundColor: AppColors.coralAction,
+    ),
+  );
+  return;
+}
+```
+
+### Remediation Item 5: Sanitize `_parseDecimal` Against `NaN` and `Infinity` (`parametro_modal.dart`)
+Update `_parseDecimal`:
+```dart
+double? _parseDecimal(String? text) {
+  if (text == null) return null;
+  final cleaned = text.trim().replaceAll(',', '.');
+  if (cleaned.isEmpty) return null;
+  final parsed = double.tryParse(cleaned);
+  if (parsed == null || parsed.isNaN || parsed.isInfinite) return null;
+  return parsed;
+}
+```
+
+---
 
 ## 5. Verification Method
-- Static analysis:
-  ```powershell
-  flutter analyze --no-fatal-infos
-  ```
-- Test suite execution:
-  ```powershell
-  flutter test
-  ```
-- Viewport stress test:
-  ```powershell
-  flutter test test/modules/bitacora/bitacora_screen_test.dart
-  ```
+
+To independently reproduce the adversarial findings and verify the subsequent fixes:
+
+1. **Verify Double-Tap Race Condition**:
+   In `test/modules/water_quality/parametro_modal_test.dart`, simulate an asynchronous repository write delay (`await Future.delayed(Duration(milliseconds: 100))`), tap the save button twice rapidly before `tester.pumpAndSettle()`. Assert that `fakeWaterRepo.recorded.length == 1`.
+2. **Verify Error SnackBar on Repository Failure**:
+   Configure a fake repository to throw a `StateError('DB failure')`. Tap save. Assert that the modal remains open and a SnackBar with `AppColors.coralAction` and message containing `'Error al registrar'` is displayed.
+3. **Verify Nitrite Warning Banner**:
+   Enter `'0,3'` in `_nitritosCtrl`. Call `tester.pump()`. Assert that `find.textContaining('Nitritos NO₂⁻ > 0.2 ppm')` matches one widget.
+4. **Verify Stale Pond ID Rejection**:
+   Launch `ParametroModal(preselectedPondId: 'non-existent-pond')` with valid parameters and tap save. Assert that `fakeWaterRepo.recorded` is empty and `'Debe seleccionar un estanque de medición válido'` is displayed.
+5. **Verify NaN Rejection**:
+   Enter `'NaN'` in O2, Temp, or pH fields and tap save. Assert that validation errors (`0-30 mg/L`, `5-45°C`, `0-14`) appear and `fakeWaterRepo.recorded` remains empty.
+6. **Verify Static Analysis**:
+   ```powershell
+   flutter analyze --no-fatal-infos
+   ```
+   Must complete with 0 errors and 0 warnings.

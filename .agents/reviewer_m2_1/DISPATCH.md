@@ -1,19 +1,26 @@
-## 2026-09-01T01:19:25Z
-You are Reviewer 1 for Milestone 2: Flutter Frontend Performance Optimization.
+# Task Dispatch: Reviewer M2_1 (Code & Interface Review)
 
-Your working directory is:
-c:\Users\Freddy\Desktop\Desarrollo de app\FishBit\.agents\reviewer_m2_1
+## 2026-09-14T14:14:13Z
 
-Read the authoritative files:
-1. c:\Users\Freddy\Desktop\Desarrollo de app\FishBit\.agents\ORIGINAL_REQUEST.md
-2. c:\Users\Freddy\Desktop\Desarrollo de app\FishBit\PROJECT.md
-3. c:\Users\Freddy\Desktop\Desarrollo de app\FishBit\.agents\worker_m2_fe\progress.md
+## Mission
+Perform independent, objective code review of Milestone 2 deliverables in `lib/modules/water_quality/presentation/dialogs/parametro_modal.dart` and `test/modules/water_quality/parametro_modal_test.dart`.
 
-Evaluate:
-- Network waterfall parallelization via `Future.wait` in `ponds_provider.dart`, `finance_provider.dart`, `ica_compliance_provider.dart`.
-- `PondsDashboardScreen` and `PondBentoCard` rebuild optimization and `RepaintBoundary` caching.
-- `BitacoraScreen` virtualized `ListView.builder` across all 4 tabs and O(1) map indexing for historical GDP deltas.
-- `IcaCertificationScreen` report engine memoization.
-- Controller disposal and search debouncing in `WarehouseScreen` and `NuevaFacturaModal`.
-- Run `flutter test` and `flutter analyze --no-fatal-infos` via `run_command`.
-- Deliver a clear verdict: APPROVE or REQUEST_CHANGES in `c:\Users\Freddy\Desktop\Desarrollo de app\FishBit\.agents\reviewer_m2_1\handoff.md` and send a message back.
+## Scope & Mandatory Paths to Read First
+- `c:\Users\Freddy\Desktop\Desarrollo de app\FishBit\.agents\ORIGINAL_REQUEST.md` (MANDATORY)
+- `c:\Users\Freddy\Desktop\Desarrollo de app\FishBit\.agents\orchestrator_impl_gen2\PROJECT.md`
+- `c:\Users\Freddy\Desktop\Desarrollo de app\FishBit\.agents\worker_m2_1\handoff.md`
+- `c:\Users\Freddy\Desktop\Desarrollo de app\FishBit\lib/modules/water_quality/presentation/dialogs/parametro_modal.dart`
+- `c:\Users\Freddy\Desktop\Desarrollo de app\FishBit\test/modules/water_quality/parametro_modal_test.dart`
+
+## Verification Requirements
+1. Verify all 11 parameter controllers initialize empty (`text = ''`).
+2. Verify zero hardcoded demo tenant IDs (`c1000000...`).
+3. Verify `_parseDecimal` handles commas, spaces, and edge cases properly.
+4. Verify mandatory validation rules on O2 (0-30 mg/L), Temp (5-45 °C), pH (0-14), and pond selection.
+5. Verify user feedback (SnackBars) on validation failure.
+6. Run `flutter analyze --no-fatal-infos` and `flutter test test/modules/water_quality/`.
+7. Issue clear verdict: `APPROVE` or `REQUEST_CHANGES`.
+
+Write your handoff report to:
+`c:\Users\Freddy\Desktop\Desarrollo de app\FishBit\.agents\reviewer_m2_1\handoff.md`
+Notify orchestrator via `send_message`.

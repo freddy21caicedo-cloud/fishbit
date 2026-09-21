@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:fishbit_finance/core/design_system/app_colors.dart';
 import 'package:fishbit_finance/core/design_system/glass_container.dart';
 import 'package:fishbit_finance/core/design_system/glass_action_hub_sheet.dart';
+export 'package:fishbit_finance/core/design_system/floating_dock_layout.dart';
 
 class MainNavigationShell extends ConsumerWidget {
   final Widget child;
@@ -50,6 +51,7 @@ class MainNavigationShell extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final selectedIndex = _calculateSelectedIndex(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isKeyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 0;
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -59,14 +61,19 @@ class MainNavigationShell extends ConsumerWidget {
           Positioned.fill(child: child),
 
           // Barra Flotante Glassmorphic Bottom Dock (Estilo Apple macOS / iOS Dock)
-          Positioned(
-            left: 16,
-            right: 16,
-            bottom: 16,
-            child: Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 480),
-                child: GlassContainer(
+          if (!isKeyboardOpen)
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: SafeArea(
+                bottom: true,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 480),
+                      child: GlassContainer(
                   borderRadius: 28,
                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
                   blur: 24,
@@ -117,9 +124,11 @@ class MainNavigationShell extends ConsumerWidget {
               ),
             ),
           ),
-        ],
+        ),
       ),
-    );
+    ],
+  ),
+);
   }
 }
 

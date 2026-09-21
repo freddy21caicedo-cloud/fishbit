@@ -4,6 +4,7 @@ import 'package:fishbit_finance/core/design_system/app_colors.dart';
 import 'package:fishbit_finance/core/design_system/app_typography.dart';
 import 'package:fishbit_finance/core/design_system/fishbit_header.dart';
 import 'package:fishbit_finance/core/design_system/glass_card.dart';
+import 'package:fishbit_finance/core/design_system/floating_dock_layout.dart';
 import 'package:fishbit_finance/core/design_system/glass_badge.dart';
 import 'package:fishbit_finance/core/design_system/glass_date_picker.dart';
 import 'package:fishbit_finance/core/utils/currency_formatters.dart';
@@ -40,14 +41,12 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      floatingActionButton: Padding(
-        padding: const EdgeInsets.only(bottom: 78),
-        child: FloatingActionButton.extended(
-          backgroundColor: AppColors.greenBiomass,
-          icon: const Icon(Icons.point_of_sale_rounded, color: Colors.white),
-          label: const Text('Venta Rápida', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
-          onPressed: () => VentaRapidaModal.show(context),
-        ),
+      floatingActionButtonLocation: FloatingDockFabLocation.endFloat,
+      floatingActionButton: FloatingActionButton.extended(
+        backgroundColor: AppColors.greenBiomass,
+        icon: const Icon(Icons.point_of_sale_rounded, color: Colors.white),
+        label: const Text('Venta Rápida', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
+        onPressed: () => VentaRapidaModal.show(context),
       ),
       body: CustomScrollView(
         slivers: [
@@ -188,7 +187,7 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
                 ),
               ),
             ),
-          const SliverToBoxAdapter(child: SizedBox(height: 100)),
+          const SliverDockBottomSpacer(),
         ],
       ),
     );

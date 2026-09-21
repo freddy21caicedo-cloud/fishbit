@@ -396,16 +396,31 @@ class _NuevaFacturaModalState extends ConsumerState<NuevaFacturaModal> {
         final company = ref.read(authProvider).currentCompany;
         final companySpecies = company?.especiesHabilitadas ?? ['Trucha Arcoíris'];
         
-        if (lower.contains('trucha')) {
-          especieAlevino = companySpecies.firstWhere((s) => s.toLowerCase().contains('trucha'), orElse: () => 'Trucha Arcoíris');
-        } else if (lower.contains('tilapia')) {
-          especieAlevino = companySpecies.firstWhere((s) => s.toLowerCase().contains('tilapia'), orElse: () => 'Tilapia Roja');
-        } else if (lower.contains('cachama')) {
-          especieAlevino = companySpecies.firstWhere((s) => s.toLowerCase().contains('cachama'), orElse: () => 'Cachama Negra');
-        } else if (lower.contains('bocachico')) {
-          especieAlevino = companySpecies.firstWhere((s) => s.toLowerCase().contains('bocachico'), orElse: () => 'Bocachico');
-        } else {
-          especieAlevino = companySpecies.isNotEmpty ? companySpecies.first : 'Trucha Arcoíris';
+        // 1. Coincidencia directa con alguna especie habilitada de la empresa
+        for (final sp in companySpecies) {
+          final spLower = sp.toLowerCase();
+          final spTokens = spLower.split(RegExp(r'\s+')).where((t) => t.length > 3);
+          if (lower.contains(spLower) || spTokens.any((t) => lower.contains(t))) {
+            especieAlevino = sp;
+            break;
+          }
+        }
+
+        // 2. Si no hubo coincidencia con la empresa, buscar en especies estándar
+        if (especieAlevino == null) {
+          if (lower.contains('trucha')) {
+            especieAlevino = 'Trucha Arcoíris';
+          } else if (lower.contains('tilapia')) {
+            especieAlevino = lower.contains('roja') ? 'Tilapia Roja' : 'Tilapia';
+          } else if (lower.contains('cachama')) {
+            especieAlevino = lower.contains('negra') ? 'Cachama Negra' : 'Cachama Blanca';
+          } else if (lower.contains('bocachico')) {
+            especieAlevino = 'Bocachico';
+          } else if (lower.contains('carpa')) {
+            especieAlevino = 'Carpa';
+          } else {
+            especieAlevino = companySpecies.isNotEmpty ? companySpecies.first : 'Trucha Arcoíris';
+          }
         }
       }
 
@@ -1169,7 +1184,17 @@ class _NuevaFacturaModalState extends ConsumerState<NuevaFacturaModal> {
               ),
             ),
             GestureDetector(
-              onTap: () => ProveedoresModal.show(context),
+              onTap: () async {
+                final created = await ProveedoresModal.show(context);
+                if (created != null && mounted) {
+                  setState(() {
+                    _selectedSupplier = created;
+                    if (created.categoriaPrincipal != _categoriaSeleccionada) {
+                      _categoriaSeleccionada = created.categoriaPrincipal;
+                    }
+                  });
+                }
+              },
               child: const Text(
                 '+ Nuevo Proveedor',
                 style: TextStyle(
