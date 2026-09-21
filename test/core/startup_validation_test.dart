@@ -1,7 +1,5 @@
-import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:fishbit_finance/main.dart' as app_main;
 
 /// Replicate the exact validation logic in lib/main.dart lines 33-58
 /// for empirical matrix testing across invalid inputs.

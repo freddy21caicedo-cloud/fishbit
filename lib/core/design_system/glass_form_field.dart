@@ -139,29 +139,32 @@ class _GlassFormFieldState extends State<GlassFormField> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            RichText(
-              text: TextSpan(
-                text: widget.label,
-                style: AppTypography.bodySmall.copyWith(
-                  fontWeight: FontWeight.w700,
-                  fontSize: 11,
-                  letterSpacing: 0.6,
-                  color: hasError
-                      ? AppColors.coralAction
-                      : (_isFocused
-                          ? effectiveAccent
-                          : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight)),
-                ),
-                children: [
-                  if (widget.isRequired)
-                    const TextSpan(
-                      text: ' *',
-                      style: TextStyle(
-                        color: AppColors.coralAction,
-                        fontWeight: FontWeight.w900,
+            Flexible(
+              child: RichText(
+                overflow: TextOverflow.ellipsis,
+                text: TextSpan(
+                  text: widget.label,
+                  style: AppTypography.bodySmall.copyWith(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 11,
+                    letterSpacing: 0.6,
+                    color: hasError
+                        ? AppColors.coralAction
+                        : (_isFocused
+                            ? effectiveAccent
+                            : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight)),
+                  ),
+                  children: [
+                    if (widget.isRequired)
+                      const TextSpan(
+                        text: ' *',
+                        style: TextStyle(
+                          color: AppColors.coralAction,
+                          fontWeight: FontWeight.w900,
+                        ),
                       ),
-                    ),
-                ],
+                  ],
+                ),
               ),
             ),
           ],

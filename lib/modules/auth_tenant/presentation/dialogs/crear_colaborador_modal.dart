@@ -43,6 +43,7 @@ class _CrearColaboradorModalState extends ConsumerState<CrearColaboradorModal> {
   late String _periodoPago;
   late bool _permisoGlobal;
   bool _isLoading = false;
+  bool _obscurePassword = true;
 
   @override
   void initState() {
@@ -60,7 +61,7 @@ class _CrearColaboradorModalState extends ConsumerState<CrearColaboradorModal> {
     _selectedRole = m?.role ?? UserRole.technician;
     _selectedUnitId = m?.unidadAcuicolaId;
     _periodoPago = m?.periodoPago ?? 'Quincenal';
-    _permisoGlobal = m?.permisoGlobalEmpresa ?? false;
+    _permisoGlobal = m?.permisoGlobalEmpresa ?? (_selectedRole == UserRole.admin || _selectedRole == UserRole.sanitaryDirector);
   }
 
   @override
@@ -92,7 +93,7 @@ class _CrearColaboradorModalState extends ConsumerState<CrearColaboradorModal> {
         cedula: _cedulaCtrl.text.trim(),
         role: _selectedRole,
         unidadAcuicolaId: _selectedUnitId,
-        permisoGlobalEmpresa: _permisoGlobal || _selectedRole == UserRole.sanitaryDirector,
+        permisoGlobalEmpresa: _permisoGlobal || _selectedRole == UserRole.admin || _selectedRole == UserRole.sanitaryDirector,
         salarioBase: salario,
         periodoPago: _periodoPago,
       );
@@ -105,7 +106,7 @@ class _CrearColaboradorModalState extends ConsumerState<CrearColaboradorModal> {
             telefono: _telefonoCtrl.text,
             role: _selectedRole,
             unidadAcuicolaId: _selectedUnitId,
-            permisoGlobalEmpresa: _permisoGlobal || _selectedRole == UserRole.sanitaryDirector,
+            permisoGlobalEmpresa: _permisoGlobal || _selectedRole == UserRole.admin || _selectedRole == UserRole.sanitaryDirector,
             salarioBase: salario,
             periodoPago: _periodoPago,
             password: _passCtrl.text,
@@ -124,6 +125,14 @@ class _CrearColaboradorModalState extends ConsumerState<CrearColaboradorModal> {
                 : 'Colaborador ${_nombreCtrl.text} registrado con éxito como ${_selectedRole.roleDisplayName}.',
           ),
           backgroundColor: AppColors.greenBiomass,
+        ),
+      );
+    } else if (mounted) {
+      final err = ref.read(authProvider).errorMessage ?? 'Error al registrar colaborador. Verifica los datos o conexión.';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(err),
+          backgroundColor: AppColors.coralAction,
         ),
       );
     }
@@ -205,6 +214,7 @@ class _CrearColaboradorModalState extends ConsumerState<CrearColaboradorModal> {
                     spacing: 8,
                     runSpacing: 8,
                     children: [
+                      _buildRoleChip(UserRole.admin, '🛡️ Administrador', Colors.purpleAccent),
                       _buildRoleChip(UserRole.sanitaryDirector, '🩺 Dir. Sanitario', AppColors.cyanWater),
                       _buildRoleChip(UserRole.technician, '🔬 Técnico Acuícola', AppColors.greenBiomass),
                       _buildRoleChip(UserRole.operator, '🚜 Operario Campo', AppColors.coralAction),
@@ -357,18 +367,20 @@ class _CrearColaboradorModalState extends ConsumerState<CrearColaboradorModal> {
                       const SizedBox(width: 10),
                       Expanded(
                         child: InkWell(
-                          onTap: () => setState(() => _permisoGlobal = !_permisoGlobal),
+                          onTap: (_selectedRole == UserRole.admin || _selectedRole == UserRole.sanitaryDirector)
+                              ? null
+                              : () => setState(() => _permisoGlobal = !_permisoGlobal),
                           borderRadius: BorderRadius.circular(12),
                           child: Padding(
                             padding: const EdgeInsets.only(top: 14),
                             child: Row(
                               children: [
                                 Checkbox(
-                                  value: _permisoGlobal || _selectedRole == UserRole.sanitaryDirector,
+                                  value: _permisoGlobal || _selectedRole == UserRole.admin || _selectedRole == UserRole.sanitaryDirector,
                                   activeColor: AppColors.cyanWater,
                                   checkColor: Colors.black,
                                   side: BorderSide(color: Colors.white.withValues(alpha: 0.3)),
-                                  onChanged: _selectedRole == UserRole.sanitaryDirector
+                                  onChanged: (_selectedRole == UserRole.admin || _selectedRole == UserRole.sanitaryDirector)
                                       ? null
                                       : (val) => setState(() => _permisoGlobal = val ?? false),
                                 ),
@@ -387,12 +399,21 @@ class _CrearColaboradorModalState extends ConsumerState<CrearColaboradorModal> {
                   ),
                   const SizedBox(height: 12),
 
-                  // Contraseña Inicial
+                  // Contraseña Inicial con Visibilidad Interactiva
                   GlassFormField(
                     label: 'CONTRASEÑA INICIAL DE ACCESO',
                     hint: 'FishBit.2026',
                     controller: _passCtrl,
+                    obscureText: _obscurePassword,
                     prefixIcon: Icons.lock_outline_rounded,
+                    suffixWidget: IconButton(
+                      icon: Icon(
+                        _obscurePassword ? Icons.visibility_off_rounded : Icons.visibility_rounded,
+                        color: AppColors.textSecondaryDark,
+                        size: 20,
+                      ),
+                      onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                    ),
                     validator: (v) => v == null || v.isEmpty ? 'Requerida' : null,
                   ),
                   const SizedBox(height: 20),
@@ -442,7 +463,14 @@ class _CrearColaboradorModalState extends ConsumerState<CrearColaboradorModal> {
       backgroundColor: Colors.white.withValues(alpha: 0.06),
       side: BorderSide(color: isSelected ? color : Colors.white.withValues(alpha: 0.12)),
       onSelected: (selected) {
-        if (selected) setState(() => _selectedRole = role);
+        if (selected) {
+          setState(() {
+            _selectedRole = role;
+            if (role == UserRole.admin || role == UserRole.sanitaryDirector) {
+              _permisoGlobal = true;
+            }
+          });
+        }
       },
     );
   }
