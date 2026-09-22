@@ -188,12 +188,20 @@ class PurchaseInvoice {
     );
   }
 
+  static String _normalizeTipoFactura(String val) {
+    final lower = val.toLowerCase().trim();
+    if (lower == 'concentrados' || lower == 'alimento' || lower == 'concentrado') {
+      return 'Alimento';
+    }
+    return 'Insumo';
+  }
+
   Map<String, dynamic> toJson() => {
         'id': id,
         'empresa_id': empresaId.isNotEmpty ? empresaId : null,
         'unidad_acuicola_id': (unidadAcuicolaId.isNotEmpty && !unidadAcuicolaId.startsWith('u1000000-')) ? unidadAcuicolaId : null,
         'unidad_acuicola_sigla': unidadAcuicolaSigla.isNotEmpty ? unidadAcuicolaSigla : 'SEDE',
-        'tipo_factura': tipoFactura,
+        'tipo_factura': _normalizeTipoFactura(tipoFactura),
         'numero_factura': numeroFactura,
         'proveedor_nombre': proveedorNombre,
         'proveedor_nit': proveedorNit,

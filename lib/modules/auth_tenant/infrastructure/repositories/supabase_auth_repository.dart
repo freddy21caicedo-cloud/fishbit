@@ -401,16 +401,6 @@ class SupabaseAuthRepository implements AuthRepository {
       precioMercadoActualKg: 8500.0,
     );
 
-    final newUnit = AquacultureUnit(
-      id: unitId,
-      empresaId: companyId,
-      nombre: companyNombre.trim(),   // Nombre = nombre de empresa (auto)
-      sigla: uniqueSigla,             // Sigla única auto-generada
-      ubicacion: companyUbicacion.trim(),
-      isDeleted: false,
-      creadoEn: DateTime.now(),
-    );
-
     final newAdmin = UserMember(
       id: authUserId,        // ← UUID de Supabase Auth, no uno generado aparte
       empresaId: companyId,
@@ -427,9 +417,16 @@ class SupabaseAuthRepository implements AuthRepository {
     // ── Paso 4: Insertar registros en la DB ───────────────────────────────────
     try {
       await _supabase.from('empresas').insert(newCompany.toJson());
-      await _supabase.from('unidades_acuicolas').insert(newUnit.toJson());
 
-      // Inserción espejo a tabla 'units' para retrocompatibilidad
+      // Inserción en tabla canónica unidades_acuicolas (columnas reales: id, nombre, sigla, ubicacion)
+      await _supabase.from('unidades_acuicolas').insert({
+        'id': unitId,
+        'nombre': companyNombre.trim(),
+        'sigla': uniqueSigla,
+        if (companyUbicacion.trim().isNotEmpty) 'ubicacion': companyUbicacion.trim(),
+      });
+
+      // Inserción espejo a tabla 'units' (contiene empresa_id)
       try {
         await _supabase.from('units').insert({
           'id': unitId,
@@ -514,24 +511,28 @@ class SupabaseAuthRepository implements AuthRepository {
   /// Si 'PSP' ya existe, retorna 'PSP2', luego 'PSP3', etc.
   Future<String> _resolveUniqueSigla(String empresaId, String baseSigla) async {
     try {
-      // Consultar siglas existentes en ambas tablas de unidades
-      final existingRows = await _supabase
-          .from('unidades_acuicolas')
-          .select('sigla')
-          .eq('empresa_id', empresaId);
+      final existing = <String>{};
 
-      final existing = (existingRows as List)
-          .map((r) => (r['sigla'] as String? ?? '').toUpperCase())
-          .toSet();
-
-      // También consultar tabla 'units' (segunda tabla de sedes)
+      // Consultar tabla 'units' (que sí posee la columna 'empresa_id')
       try {
         final existingUnits = await _supabase
             .from('units')
             .select('sigla')
             .eq('empresa_id', empresaId);
         for (final r in (existingUnits as List)) {
-          existing.add((r['sigla'] as String? ?? '').toUpperCase());
+          final s = (r['sigla'] as String? ?? '').toUpperCase();
+          if (s.isNotEmpty) existing.add(s);
+        }
+      } catch (_) {}
+
+      // Consultar tabla canónica 'unidades_acuicolas' (sin filtrar por empresa_id porque no existe esa columna)
+      try {
+        final existingRows = await _supabase
+            .from('unidades_acuicolas')
+            .select('sigla');
+        for (final r in (existingRows as List)) {
+          final s = (r['sigla'] as String? ?? '').toUpperCase();
+          if (s.isNotEmpty) existing.add(s);
         }
       } catch (_) {}
 
@@ -750,13 +751,22 @@ class SupabaseAuthRepository implements AuthRepository {
           .from('unidades_acuicolas')
           .insert({
             'id': unitId,
-            'empresa_id': empresaId,
             'nombre': nombre,
             'sigla': uniqueSigla,
-            'ubicacion': ubicacion,
+            if (ubicacion != null && ubicacion.isNotEmpty) 'ubicacion': ubicacion,
           })
           .select()
           .single();
+
+      try {
+        await _supabase.from('units').insert({
+          'id': unitId,
+          'empresa_id': empresaId,
+          'name': nombre,
+          'sigla': uniqueSigla,
+          if (ubicacion != null && ubicacion.isNotEmpty) 'location': ubicacion,
+        });
+      } catch (_) {}
 
       return AquacultureUnit.fromJson(res);
     } catch (_) {

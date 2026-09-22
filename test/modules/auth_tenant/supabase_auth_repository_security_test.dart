@@ -328,7 +328,7 @@ void main() {
         throwsA(isA<AuthFailure>().having(
           (e) => e.message,
           'message',
-          contains('Credenciales incorrectas: Invalid login credentials'),
+          contains('Correo o contraseña incorrectos'),
         )),
       );
 
@@ -359,7 +359,7 @@ void main() {
         throwsA(isA<AuthFailure>().having(
           (e) => e.message,
           'message',
-          contains('Credenciales incorrectas: User not found'),
+          contains('No existe ningún usuario registrado con este correo electrónico'),
         )),
       );
 
@@ -380,7 +380,7 @@ void main() {
         throwsA(isA<AuthFailure>().having(
           (e) => e.message,
           'message',
-          contains('Credenciales incorrectas: Password cannot be empty'),
+          contains('Password cannot be empty'),
         )),
       );
 
@@ -390,7 +390,7 @@ void main() {
         throwsA(isA<AuthFailure>().having(
           (e) => e.message,
           'message',
-          contains('Credenciales incorrectas: Password cannot be empty'),
+          contains('Password cannot be empty'),
         )),
       );
 

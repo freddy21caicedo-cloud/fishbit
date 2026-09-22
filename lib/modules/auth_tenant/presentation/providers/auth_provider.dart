@@ -212,6 +212,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
     state = state.copyWith(
       isLoading: false,
+      isGoogleLoading: false,
       currentUser: user,
       currentCompany: company,
       availableCompanies: allCompanies,
@@ -345,6 +346,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         companyRegistroIca: companyRegistroIca,
         companyRegistroAunap: companyRegistroAunap,
       );
+      state = state.copyWith(currentUser: user);
       await _hydrateUserData(user);
       return true;
     } catch (e) {

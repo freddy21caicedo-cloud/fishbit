@@ -6,7 +6,7 @@ import 'package:fishbit_finance/core/design_system/app_typography.dart';
 import 'package:fishbit_finance/core/design_system/glass_container.dart';
 import 'package:fishbit_finance/core/design_system/glass_form_field.dart';
 import 'package:fishbit_finance/core/design_system/glass_button.dart';
-import 'package:fishbit_finance/core/design_system/widgets/glass_location_picker_sheet.dart';
+import 'package:fishbit_finance/core/design_system/widgets/glass_location_dropdown.dart';
 import 'package:fishbit_finance/core/services/geographic_service.dart';
 import 'package:fishbit_finance/modules/auth_tenant/presentation/providers/auth_provider.dart';
 
@@ -29,11 +29,14 @@ class _RegisterCompanyScreenState extends ConsumerState<RegisterCompanyScreen> {
   final _contactoCtrl = TextEditingController();
   final _emailCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
+
   final _confirmPasswordCtrl = TextEditingController();
   bool _obscurePass = true;
   bool _obscureConfirmPass = true;
 
-  // Paso 2: Empresa Controllers
+
+
+  // Paso 2: Empresa Controllers & Cascada Geográfica
   final _companyFormKey = GlobalKey<FormState>();
   final _companyNombreCtrl = TextEditingController();
   final _companyNitCtrl = TextEditingController();
@@ -41,127 +44,34 @@ class _RegisterCompanyScreenState extends ConsumerState<RegisterCompanyScreen> {
   final _companyIcaCtrl = TextEditingController();
   final _companyAunapCtrl = TextEditingController();
 
-  // Selector Geográfico en Cascada
   String _selectedCountry = GeographicService.defaultCountry;
   String _selectedState = 'Antioquia';
   String _selectedCity = 'San Jerónimo';
 
   String get _formattedUbicacion => '$_selectedCity, $_selectedState, $_selectedCountry';
 
-  Future<void> _pickCountry() async {
-    final picked = await GlassLocationPickerSheet.show(
-      context,
-      title: 'Selecciona el País',
-      subtitle: 'Elige el país de la empresa piscícola',
-      items: GeographicService.countries,
-      selectedItem: _selectedCountry,
-      prefixIcon: Icons.public_rounded,
-      searchHint: 'Buscar país...',
-    );
-
-    if (picked != null && picked != _selectedCountry) {
-      setState(() {
-        _selectedCountry = picked;
-        final states = GeographicService.getStatesForCountry(_selectedCountry);
-        _selectedState = states.isNotEmpty ? states.first : 'Principal';
-        final cities = GeographicService.getCitiesForState(_selectedCountry, _selectedState);
-        _selectedCity = cities.isNotEmpty ? cities.first : 'Principal';
-      });
-    }
+  void _onCountryChanged(String newCountry) {
+    setState(() {
+      _selectedCountry = newCountry;
+      final states = GeographicService.getStatesForCountry(_selectedCountry);
+      _selectedState = states.isNotEmpty ? states.first : 'Principal';
+      final cities = GeographicService.getCitiesForState(_selectedCountry, _selectedState);
+      _selectedCity = cities.isNotEmpty ? cities.first : 'Principal';
+    });
   }
 
-  Future<void> _pickState() async {
-    final states = GeographicService.getStatesForCountry(_selectedCountry);
-    final picked = await GlassLocationPickerSheet.show(
-      context,
-      title: 'Selecciona Departamento / Estado',
-      subtitle: 'Región de $_selectedCountry',
-      items: states,
-      selectedItem: _selectedState,
-      prefixIcon: Icons.map_rounded,
-      searchHint: 'Buscar departamento o estado...',
-    );
-
-    if (picked != null && picked != _selectedState) {
-      setState(() {
-        _selectedState = picked;
-        final cities = GeographicService.getCitiesForState(_selectedCountry, _selectedState);
-        _selectedCity = cities.isNotEmpty ? cities.first : 'Principal';
-      });
-    }
+  void _onStateChanged(String newState) {
+    setState(() {
+      _selectedState = newState;
+      final cities = GeographicService.getCitiesForState(_selectedCountry, _selectedState);
+      _selectedCity = cities.isNotEmpty ? cities.first : 'Principal';
+    });
   }
 
-  Future<void> _pickCity() async {
-    final cities = GeographicService.getCitiesForState(_selectedCountry, _selectedState);
-    final picked = await GlassLocationPickerSheet.show(
-      context,
-      title: 'Selecciona Ciudad o Municipio',
-      subtitle: 'En $_selectedState, $_selectedCountry',
-      items: cities,
-      selectedItem: _selectedCity,
-      prefixIcon: Icons.location_city_rounded,
-      searchHint: 'Buscar municipio o ciudad...',
-    );
-
-    if (picked != null && picked != _selectedCity) {
-      setState(() {
-        _selectedCity = picked;
-      });
-    }
-  }
-
-  Widget _buildLocationSelectTile({
-    required String label,
-    required String value,
-    required IconData icon,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        constraints: const BoxConstraints(minHeight: 52),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.06),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.16)),
-        ),
-        child: Row(
-          children: [
-            Icon(icon, color: AppColors.greenBiomass, size: 20),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    label,
-                    style: const TextStyle(
-                      color: AppColors.greenBiomass,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 0.6,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    value,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 13.5,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const Icon(Icons.arrow_drop_down_rounded, color: AppColors.greenBiomass, size: 24),
-          ],
-        ),
-      ),
-    );
+  void _onCityChanged(String newCity) {
+    setState(() {
+      _selectedCity = newCity;
+    });
   }
 
   @override
@@ -440,12 +350,16 @@ class _RegisterCompanyScreenState extends ConsumerState<RegisterCompanyScreen> {
           ),
         ),
         const SizedBox(width: 8),
-        Text(
-          title,
-          style: TextStyle(
-            color: isActive ? Colors.white : AppColors.textSecondaryDark,
-            fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
-            fontSize: 13,
+        Flexible(
+          child: Text(
+            title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: isActive ? Colors.white : AppColors.textSecondaryDark,
+              fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
+              fontSize: 13,
+            ),
           ),
         ),
       ],
@@ -654,31 +568,38 @@ class _RegisterCompanyScreenState extends ConsumerState<RegisterCompanyScreen> {
             ),
             const SizedBox(height: 8),
 
-            // Selector 1: País
-            _buildLocationSelectTile(
+            // Selector 1: País (Buttonlist desplegable inline)
+            GlassLocationDropdown(
               label: 'PAÍS',
               value: _selectedCountry,
+              items: GeographicService.countries,
               icon: Icons.public_rounded,
-              onTap: _pickCountry,
+              accentColor: AppColors.greenBiomass,
+              onChanged: _onCountryChanged,
             ),
             const SizedBox(height: 10),
 
-            // Selector 2: Departamento / Estado
-            _buildLocationSelectTile(
+            // Selector 2: Departamento / Estado (Buttonlist desplegable en cascada)
+            GlassLocationDropdown(
               label: 'DEPARTAMENTO / ESTADO',
               value: _selectedState,
+              items: GeographicService.getStatesForCountry(_selectedCountry),
               icon: Icons.map_rounded,
-              onTap: _pickState,
+              accentColor: AppColors.greenBiomass,
+              onChanged: _onStateChanged,
             ),
             const SizedBox(height: 10),
 
-            // Selector 3: Ciudad / Municipio
-            _buildLocationSelectTile(
+            // Selector 3: Ciudad / Municipio (Buttonlist desplegable en cascada)
+            GlassLocationDropdown(
               label: 'CIUDAD / MUNICIPIO',
               value: _selectedCity,
+              items: GeographicService.getCitiesForState(_selectedCountry, _selectedState),
               icon: Icons.location_city_rounded,
-              onTap: _pickCity,
+              accentColor: AppColors.greenBiomass,
+              onChanged: _onCityChanged,
             ),
+
             const SizedBox(height: 12),
 
             // Chip resumen de ubicación
