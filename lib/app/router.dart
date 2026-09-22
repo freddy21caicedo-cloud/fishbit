@@ -70,8 +70,11 @@ final routerProvider = Provider<GoRouter>((ref) {
       if (isSaasConsoleRoute) return '/';
 
       // 3. Sin empresa configurada → onboarding
-      final hasCompany = user?.empresaId != null && user!.empresaId!.isNotEmpty;
+      final hasCompany = (user?.empresaId != null && user!.empresaId!.isNotEmpty) ||
+          authState.currentCompany != null ||
+          authState.availableCompanies.isNotEmpty;
       if (!hasCompany) {
+        if (isAuthRoute) return null;
         return isOnboardingRoute ? null : '/onboarding-empresa';
       }
 

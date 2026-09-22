@@ -627,7 +627,7 @@ class SupabaseAuthRepository implements AuthRepository {
   @override
   Future<List<Company>> fetchUserCompanies(String userId) async {
     try {
-      // 1. Obtener la empresa vinculada directamente al usuario
+      // 1. Obtener la empresa vinculada directamente al usuario en profiles
       final profileRow = await _supabase
           .from('profiles')
           .select('empresa_id')
@@ -637,6 +637,23 @@ class SupabaseAuthRepository implements AuthRepository {
       final userEmpresaId = profileRow?['empresa_id'] as String?;
       if (userEmpresaId != null && userEmpresaId.isNotEmpty) {
         final company = await fetchCompany(userEmpresaId);
+        if (company != null) {
+          return [company];
+        }
+      }
+    } catch (_) {}
+
+    try {
+      // 2. Si no se encontró en profiles, buscar en miembros_equipo
+      final memberRow = await _supabase
+          .from('miembros_equipo')
+          .select('empresa_id')
+          .eq('id', userId)
+          .maybeSingle();
+
+      final memberEmpresaId = memberRow?['empresa_id'] as String?;
+      if (memberEmpresaId != null && memberEmpresaId.isNotEmpty) {
+        final company = await fetchCompany(memberEmpresaId);
         if (company != null) {
           return [company];
         }

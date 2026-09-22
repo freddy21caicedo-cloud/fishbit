@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:fishbit_finance/modules/auth_tenant/presentation/screens/onboarding_empresa_screen.dart';
 import 'package:fishbit_finance/modules/auth_tenant/presentation/providers/auth_provider.dart';
 import 'package:fishbit_finance/modules/auth_tenant/domain/models/user_member.dart';
@@ -23,6 +24,15 @@ class MockAuthNotifier extends StateNotifier<AuthState> implements AuthNotifier 
             ),
           ),
         );
+
+  @override
+  bool signOutCalled = false;
+
+  @override
+  Future<void> signOut() async {
+    signOutCalled = true;
+    state = const AuthState();
+  }
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
@@ -80,5 +90,56 @@ void main() {
     // Verify Step 2 is reached
     expect(find.textContaining('DATOS FISCALES DE LA EMPRESA'), findsOneWidget);
     expect(find.textContaining('UBICACIÓN GEOGRÁFICA'), findsOneWidget);
+  });
+
+  testWidgets('OnboardingEmpresaScreen displays logout in header and return to login at bottom', (tester) async {
+    tester.view.physicalSize = const Size(360 * 2, 780 * 2);
+    tester.view.devicePixelRatio = 2.0;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    final mockNotifier = MockAuthNotifier();
+    final router = GoRouter(
+      initialLocation: '/onboarding-empresa',
+      routes: [
+        GoRoute(
+          path: '/onboarding-empresa',
+          builder: (context, state) => const OnboardingEmpresaScreen(),
+        ),
+        GoRoute(
+          path: '/login',
+          builder: (context, state) => const Scaffold(body: Text('Login Screen Mock')),
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authProvider.overrideWith((ref) => mockNotifier),
+        ],
+        child: MaterialApp.router(
+          routerConfig: router,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Verify header logout button exists with tooltip
+    final headerLogout = find.byTooltip('Cerrar sesión e ir al Login');
+    expect(headerLogout, findsOneWidget);
+
+    // Verify bottom link to return to login exists
+    final returnToLoginText = find.text('¿Deseas ingresar con otra cuenta? Volver al Login');
+    expect(returnToLoginText, findsOneWidget);
+
+    // Tap header logout
+    await tester.tap(headerLogout);
+    await tester.pumpAndSettle();
+
+    expect(mockNotifier.signOutCalled, isTrue);
+    expect(find.text('Login Screen Mock'), findsOneWidget);
   });
 }

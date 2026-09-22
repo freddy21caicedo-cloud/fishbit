@@ -148,6 +148,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
           debugPrint('[_hydrateUserData] Error al obtener empresa: $e');
         }
 
+        if (user.empresaId == null || user.empresaId!.isEmpty) {
+          user = user.copyWith(empresaId: targetEmpresaId);
+        }
+
         try {
           units = await _repository.fetchUnits(targetEmpresaId);
         } catch (e) {

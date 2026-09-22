@@ -291,6 +291,35 @@ class _OnboardingEmpresaScreenState extends ConsumerState<OnboardingEmpresaScree
 
                         // Barra de Navegación del Wizard
                         _buildBottomActions(authState.isLoading),
+
+                        const SizedBox(height: 16),
+
+                        // Opción para cerrar sesión y volver al login
+                        Center(
+                          child: TextButton.icon(
+                            style: TextButton.styleFrom(
+                              foregroundColor: Colors.white60,
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            ),
+                            onPressed: authState.isLoading
+                                ? null
+                                : () async {
+                                    await ref.read(authProvider.notifier).signOut();
+                                    if (context.mounted) {
+                                      context.go('/login');
+                                    }
+                                  },
+                            icon: const Icon(Icons.arrow_back_rounded, size: 16, color: Colors.white60),
+                            label: const Text(
+                              '¿Deseas ingresar con otra cuenta? Volver al Login',
+                              style: TextStyle(
+                                color: Colors.white70,
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -331,6 +360,16 @@ class _OnboardingEmpresaScreenState extends ConsumerState<OnboardingEmpresaScree
               ),
             ],
           ),
+        ),
+        IconButton(
+          tooltip: 'Cerrar sesión e ir al Login',
+          icon: const Icon(Icons.logout_rounded, color: Colors.white70),
+          onPressed: () async {
+            await ref.read(authProvider.notifier).signOut();
+            if (context.mounted) {
+              context.go('/login');
+            }
+          },
         ),
       ],
     );
