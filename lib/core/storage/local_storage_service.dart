@@ -18,6 +18,10 @@ class LocalStorageService {
   static const String _keyAuthToken = 'fishbit_secure_auth_token';
   static const String _keyRefreshToken = 'fishbit_secure_refresh_token';
 
+  /// Clave de sede activa específica por usuario — evita contaminación entre
+  /// usuarios distintos en el mismo dispositivo.
+  String _sedeKeyForUser(String userId) => 'fishbit_active_sede_$userId';
+
   // SharedPreferences (UI & non-sensitive session metadata)
   String? getSessionUserId() => _prefs.getString(_keySessionUserId);
   Future<bool> setSessionUserId(String? uid) async {
@@ -29,6 +33,19 @@ class LocalStorageService {
     return _prefs.setString(_keySessionUserId, uid);
   }
 
+  // ── Sede activa POR USUARIO ────────────────────────────────────────────────
+  /// Lee la sede activa para un usuario concreto.
+  String? getActiveSedeIdForUser(String userId) =>
+      _prefs.getString(_sedeKeyForUser(userId));
+
+  /// Guarda (o borra si [sedeId] es null) la sede activa para un usuario concreto.
+  Future<bool> setActiveSedeIdForUser(String userId, String? sedeId) async {
+    final key = _sedeKeyForUser(userId);
+    if (sedeId == null) return _prefs.remove(key);
+    return _prefs.setString(key, sedeId);
+  }
+
+  // ── Sede activa GLOBAL (legacy — solo usado en clearSession) ───────────────
   String? getActiveSedeId() => _prefs.getString(_keyActiveSedeId);
   Future<bool> setActiveSedeId(String? sedeId) async {
     if (sedeId == null) return _prefs.remove(_keyActiveSedeId);

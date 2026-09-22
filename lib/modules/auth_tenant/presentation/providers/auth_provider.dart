@@ -29,9 +29,14 @@ class AuthState {
   final List<UserMember> teamMembers;
   final String? activeUnitId;
   final String? errorMessage;
+  final bool isGoogleLoading;
+  /// true cuando el usuario tiene ≥ 2 sedes y no hay preferencia guardada en
+  /// localStorage para este dispositivo/usuario. El router lo redirige a /sede-selection.
+  final bool needsSedeSelection;
 
   const AuthState({
     this.isLoading = false,
+    this.isGoogleLoading = false,
     this.currentUser,
     this.currentCompany,
     this.availableCompanies = const [],
@@ -39,12 +44,14 @@ class AuthState {
     this.teamMembers = const [],
     this.activeUnitId,
     this.errorMessage,
+    this.needsSedeSelection = false,
   });
 
   bool get isAuthenticated => currentUser != null;
 
   AuthState copyWith({
     bool? isLoading,
+    bool? isGoogleLoading,
     UserMember? currentUser,
     Company? currentCompany,
     List<Company>? availableCompanies,
@@ -52,9 +59,11 @@ class AuthState {
     List<UserMember>? teamMembers,
     String? activeUnitId,
     String? errorMessage,
+    bool? needsSedeSelection,
   }) {
     return AuthState(
       isLoading: isLoading ?? this.isLoading,
+      isGoogleLoading: isGoogleLoading ?? this.isGoogleLoading,
       currentUser: currentUser ?? this.currentUser,
       currentCompany: currentCompany ?? this.currentCompany,
       availableCompanies: availableCompanies ?? this.availableCompanies,
@@ -62,6 +71,7 @@ class AuthState {
       teamMembers: teamMembers ?? this.teamMembers,
       activeUnitId: activeUnitId ?? this.activeUnitId,
       errorMessage: errorMessage,
+      needsSedeSelection: needsSedeSelection ?? this.needsSedeSelection,
     );
   }
 }
@@ -144,6 +154,24 @@ class AuthNotifier extends StateNotifier<AuthState> {
           debugPrint('[_hydrateUserData] Error al obtener sedes: $e');
         }
 
+        // Auto-crear sede principal si la empresa existe pero no tiene ninguna unidad.
+        // Esto cubre el caso de wizards interrumpidos o vacíos de datos históricos.
+        if (units.isEmpty && company != null) {
+          try {
+            debugPrint('[_hydrateUserData] Empresa sin sedes, creando sede principal...');
+            final defaultUnit = await _repository.createUnit(
+              targetEmpresaId,
+              company.nombreComercial,
+              // La sigla se genera en el repositorio con unicidad garantizada
+              '',
+              company.direccion,
+            );
+            units = [defaultUnit];
+          } catch (e) {
+            debugPrint('[_hydrateUserData] Error al auto-crear sede: $e');
+          }
+        }
+
         try {
           team = await _repository.fetchTeamMembers(targetEmpresaId);
         } catch (e) {
@@ -152,9 +180,34 @@ class AuthNotifier extends StateNotifier<AuthState> {
       }
     }
 
-    String? activeId = user.unidadAcuicolaId ?? _storage.getActiveSedeId();
-    if ((activeId == null || activeId.isEmpty) && units.isNotEmpty) {
-      activeId = units.first.id;
+    // ── Resolución de sede activa ────────────────────────────────────────────
+    // Prioridad: localStorage-por-usuario > unidadAcuicolaId del perfil en DB
+    // En ambos casos, validamos que el ID pertenezca realmente a las units cargadas
+    // (evita usar sedes de una empresa anterior).
+    final unitIds = units.map((u) => u.id).toSet();
+
+    String? savedId = _storage.getActiveSedeIdForUser(user.id);
+    if (savedId != null && !unitIds.contains(savedId)) {
+      savedId = null; // Sede guardada no pertenece a esta empresa — descartar
+    }
+
+    String? profileId = user.unidadAcuicolaId;
+    if (profileId != null && !unitIds.contains(profileId)) {
+      profileId = null; // Sede del perfil no pertenece a esta empresa — descartar
+    }
+
+    String? activeId = savedId ?? profileId;
+    bool needsSedeSelection = false;
+
+    if (activeId == null && units.isNotEmpty) {
+      if (units.length == 1) {
+        // Una sola sede → activar automáticamente, sin preguntar al usuario
+        activeId = units.first.id;
+        await _storage.setActiveSedeIdForUser(user.id, activeId);
+      } else {
+        // Múltiples sedes sin preferencia → mostrar pantalla de selección
+        needsSedeSelection = true;
+      }
     }
 
     state = state.copyWith(
@@ -165,6 +218,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       units: units,
       teamMembers: team,
       activeUnitId: activeId,
+      needsSedeSelection: needsSedeSelection,
     );
   }
 
@@ -181,7 +235,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   Future<UserMember?> signInWithGoogle() async {
-    state = state.copyWith(isLoading: true, errorMessage: null);
+    state = state.copyWith(isLoading: true, isGoogleLoading: true, errorMessage: null);
     try {
       final user = await _repository.signInWithGoogle();
       if (user != null) {
@@ -189,14 +243,14 @@ class AuthNotifier extends StateNotifier<AuthState> {
           await _hydrateUserData(user);
         } else {
           // Usuario nuevo pendiente de configurar empresa
-          state = state.copyWith(isLoading: false, currentUser: user);
+          state = state.copyWith(isLoading: false, isGoogleLoading: false, currentUser: user);
         }
       } else {
-        state = state.copyWith(isLoading: false);
+        state = state.copyWith(isLoading: false, isGoogleLoading: false);
       }
       return user;
     } catch (e) {
-      state = state.copyWith(isLoading: false, errorMessage: e.toString());
+      state = state.copyWith(isLoading: false, isGoogleLoading: false, errorMessage: e.toString());
       return null;
     }
   }
@@ -375,9 +429,16 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   Future<void> selectActiveUnit(String unitId) async {
-    await _storage.setActiveSedeId(unitId);
+    final userId = state.currentUser?.id;
+    if (userId != null) {
+      await _storage.setActiveSedeIdForUser(userId, unitId);
+    }
     final updatedUser = state.currentUser?.copyWith(unidadAcuicolaId: unitId);
-    state = state.copyWith(activeUnitId: unitId, currentUser: updatedUser);
+    state = state.copyWith(
+      activeUnitId: unitId,
+      currentUser: updatedUser,
+      needsSedeSelection: false,
+    );
   }
 
   Future<void> reloadCompanyAndUnits() async {
@@ -399,9 +460,14 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   Future<void> signOut() async {
-    await _repository.signOut();
+    // Solo limpiamos tokens y sessionUserId. La preferencia de sede (por usuario)
+    // se conserva para que el próximo login la recuerde automáticamente.
+    try {
+      await _repository.signOut();
+    } catch (_) {}
     state = const AuthState();
   }
+
 
   @override
   void dispose() {

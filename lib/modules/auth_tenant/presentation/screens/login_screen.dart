@@ -18,7 +18,8 @@ class LoginScreen extends ConsumerStatefulWidget {
   ConsumerState<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends ConsumerState<LoginScreen> {
+class _LoginScreenState extends ConsumerState<LoginScreen>
+    with SingleTickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
   final _emailCtrl = TextEditingController();
   final _passCtrl = TextEditingController();
@@ -26,10 +27,30 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   bool _obscurePassword = true;
   bool _rememberMe = true;
 
+  late final AnimationController _entryCtrl;
+  late final Animation<double> _fadeAnim;
+  late final Animation<Offset> _slideAnim;
+
+  @override
+  void initState() {
+    super.initState();
+    _entryCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 450),
+    );
+    _fadeAnim = CurvedAnimation(parent: _entryCtrl, curve: Curves.easeOut);
+    _slideAnim = Tween<Offset>(
+      begin: const Offset(0, 0.04),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(parent: _entryCtrl, curve: Curves.easeOutCubic));
+    _entryCtrl.forward();
+  }
+
   @override
   void dispose() {
     _emailCtrl.dispose();
     _passCtrl.dispose();
+    _entryCtrl.dispose();
     super.dispose();
   }
 
@@ -53,10 +74,21 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   Future<void> _handleGoogleLogin() async {
     final user = await ref.read(authProvider.notifier).signInWithGoogle();
-    if (user != null && mounted) {
-      // El router GoRouter maneja la redirección automáticamente
-      // basándose en el estado de autenticación (isAuthenticated, isSuperAdmin, etc.)
-      // No se navega manualmente aquí para evitar conflictos con el redirect guard.
+    if (user == null && mounted) {
+      final err = ref.read(authProvider).errorMessage;
+      if (err != null && err.isNotEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.error_outline_rounded, color: Colors.white, size: 20),
+              const SizedBox(width: 10),
+              Expanded(child: Text(err)),
+            ],
+          ),
+          backgroundColor: Colors.redAccent,
+          behavior: SnackBarBehavior.floating,
+        ));
+      }
     }
   }
 
@@ -196,17 +228,22 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             ),
           ),
 
-          // 4. Tarjeta Glassmorphic de Autenticación (Mayor desenfoque y presencia para perfecta legibilidad)
-          Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 32),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 420),
-                child: GlassContainer(
-                  borderRadius: 28,
-                  padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 36),
-                  blur: 32,
-                  opacity: 0.65,
+          // 4. Tarjeta Glassmorphic de Autenticación con animación de entrada
+          FadeTransition(
+            opacity: _fadeAnim,
+            child: SlideTransition(
+              position: _slideAnim,
+              child: Center(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 32),
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 420),
+                    child: GlassContainer(
+                      borderRadius: 28,
+                      padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 36),
+                      blur: 32,
+                      opacity: 0.65,
+
                   tintColor: const Color(0xFF0D1522),
                   borderColor: Colors.white.withValues(alpha: 0.22),
                   child: Form(
@@ -359,22 +396,29 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
                         GlassButton(
                           label: 'Ingresar',
-                          isLoading: authState.isLoading,
-                          onPressed: _handleLogin,
+                          isLoading: authState.isLoading && !authState.isGoogleLoading,
+                          onPressed: (authState.isLoading || authState.isGoogleLoading) ? null : _handleLogin,
                         ),
                         const SizedBox(height: 12),
 
                         // Botón de Inicio con Google / Gmail
                         InkWell(
-                          onTap: _handleGoogleLogin,
+                          onTap: (authState.isLoading || authState.isGoogleLoading) ? null : _handleGoogleLogin,
                           borderRadius: BorderRadius.circular(16),
-                          child: Container(
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
                             width: double.infinity,
                             padding: const EdgeInsets.symmetric(vertical: 13, horizontal: 16),
                             decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.08),
+                              color: authState.isGoogleLoading
+                                  ? AppColors.cyanWater.withValues(alpha: 0.12)
+                                  : Colors.white.withValues(alpha: 0.08),
                               borderRadius: BorderRadius.circular(16),
-                              border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+                              border: Border.all(
+                                color: authState.isGoogleLoading
+                                    ? AppColors.cyanWater.withValues(alpha: 0.4)
+                                    : Colors.white.withValues(alpha: 0.2),
+                              ),
                             ),
                             child: FittedBox(
                               fit: BoxFit.scaleDown,
@@ -382,25 +426,45 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  SvgPicture.network(
-                                    'https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg',
-                                    width: 20,
-                                    height: 20,
-                                    placeholderBuilder: (_) => const Icon(
-                                      Icons.g_mobiledata_rounded,
-                                      color: Colors.white,
-                                      size: 24,
+                                  if (authState.isGoogleLoading) ...[
+                                    const SizedBox(
+                                      width: 18,
+                                      height: 18,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2.2,
+                                        valueColor: AlwaysStoppedAnimation<Color>(AppColors.cyanWater),
+                                      ),
                                     ),
-                                  ),
-                                  const SizedBox(width: 10),
-                                  Text(
-                                    'Continuar con Google',
-                                    style: AppTypography.titleMedium.copyWith(
-                                      color: Colors.white,
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w700,
+                                    const SizedBox(width: 12),
+                                    Text(
+                                      'Conectando con Google...',
+                                      style: AppTypography.titleMedium.copyWith(
+                                        color: AppColors.cyanWater,
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w700,
+                                      ),
                                     ),
-                                  ),
+                                  ] else ...[
+                                    SvgPicture.network(
+                                      'https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg',
+                                      width: 20,
+                                      height: 20,
+                                      placeholderBuilder: (_) => const Icon(
+                                        Icons.g_mobiledata_rounded,
+                                        color: Colors.white,
+                                        size: 24,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Text(
+                                      'Continuar con Google',
+                                      style: AppTypography.titleMedium.copyWith(
+                                        color: Colors.white,
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ],
                                 ],
                               ),
                             ),
@@ -537,6 +601,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               ),
             ),
           ),
+        ),        // SlideTransition
+      ),          // FadeTransition
         ],
       ),
     );

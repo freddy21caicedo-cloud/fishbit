@@ -6,6 +6,8 @@ import 'package:fishbit_finance/core/design_system/app_typography.dart';
 import 'package:fishbit_finance/core/design_system/glass_container.dart';
 import 'package:fishbit_finance/core/design_system/glass_form_field.dart';
 import 'package:fishbit_finance/core/design_system/glass_button.dart';
+import 'package:fishbit_finance/core/design_system/widgets/glass_location_picker_sheet.dart';
+import 'package:fishbit_finance/core/services/geographic_service.dart';
 import 'package:fishbit_finance/modules/auth_tenant/presentation/providers/auth_provider.dart';
 
 class RegisterCompanyScreen extends ConsumerStatefulWidget {
@@ -34,11 +36,133 @@ class _RegisterCompanyScreenState extends ConsumerState<RegisterCompanyScreen> {
   // Paso 2: Empresa Controllers
   final _companyFormKey = GlobalKey<FormState>();
   final _companyNombreCtrl = TextEditingController();
-  final _companyUbicacionCtrl = TextEditingController();
   final _companyNitCtrl = TextEditingController();
   final _companyEmailCtrl = TextEditingController();
   final _companyIcaCtrl = TextEditingController();
   final _companyAunapCtrl = TextEditingController();
+
+  // Selector Geográfico en Cascada
+  String _selectedCountry = GeographicService.defaultCountry;
+  String _selectedState = 'Antioquia';
+  String _selectedCity = 'San Jerónimo';
+
+  String get _formattedUbicacion => '$_selectedCity, $_selectedState, $_selectedCountry';
+
+  Future<void> _pickCountry() async {
+    final picked = await GlassLocationPickerSheet.show(
+      context,
+      title: 'Selecciona el País',
+      subtitle: 'Elige el país de la empresa piscícola',
+      items: GeographicService.countries,
+      selectedItem: _selectedCountry,
+      prefixIcon: Icons.public_rounded,
+      searchHint: 'Buscar país...',
+    );
+
+    if (picked != null && picked != _selectedCountry) {
+      setState(() {
+        _selectedCountry = picked;
+        final states = GeographicService.getStatesForCountry(_selectedCountry);
+        _selectedState = states.isNotEmpty ? states.first : 'Principal';
+        final cities = GeographicService.getCitiesForState(_selectedCountry, _selectedState);
+        _selectedCity = cities.isNotEmpty ? cities.first : 'Principal';
+      });
+    }
+  }
+
+  Future<void> _pickState() async {
+    final states = GeographicService.getStatesForCountry(_selectedCountry);
+    final picked = await GlassLocationPickerSheet.show(
+      context,
+      title: 'Selecciona Departamento / Estado',
+      subtitle: 'Región de $_selectedCountry',
+      items: states,
+      selectedItem: _selectedState,
+      prefixIcon: Icons.map_rounded,
+      searchHint: 'Buscar departamento o estado...',
+    );
+
+    if (picked != null && picked != _selectedState) {
+      setState(() {
+        _selectedState = picked;
+        final cities = GeographicService.getCitiesForState(_selectedCountry, _selectedState);
+        _selectedCity = cities.isNotEmpty ? cities.first : 'Principal';
+      });
+    }
+  }
+
+  Future<void> _pickCity() async {
+    final cities = GeographicService.getCitiesForState(_selectedCountry, _selectedState);
+    final picked = await GlassLocationPickerSheet.show(
+      context,
+      title: 'Selecciona Ciudad o Municipio',
+      subtitle: 'En $_selectedState, $_selectedCountry',
+      items: cities,
+      selectedItem: _selectedCity,
+      prefixIcon: Icons.location_city_rounded,
+      searchHint: 'Buscar municipio o ciudad...',
+    );
+
+    if (picked != null && picked != _selectedCity) {
+      setState(() {
+        _selectedCity = picked;
+      });
+    }
+  }
+
+  Widget _buildLocationSelectTile({
+    required String label,
+    required String value,
+    required IconData icon,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        constraints: const BoxConstraints(minHeight: 52),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.06),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.16)),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: AppColors.greenBiomass, size: 20),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    label,
+                    style: const TextStyle(
+                      color: AppColors.greenBiomass,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.6,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    value,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.arrow_drop_down_rounded, color: AppColors.greenBiomass, size: 24),
+          ],
+        ),
+      ),
+    );
+  }
 
   @override
   void dispose() {
@@ -51,7 +175,6 @@ class _RegisterCompanyScreenState extends ConsumerState<RegisterCompanyScreen> {
     _passwordCtrl.dispose();
     _confirmPasswordCtrl.dispose();
     _companyNombreCtrl.dispose();
-    _companyUbicacionCtrl.dispose();
     _companyNitCtrl.dispose();
     _companyEmailCtrl.dispose();
     _companyIcaCtrl.dispose();
@@ -93,7 +216,7 @@ class _RegisterCompanyScreenState extends ConsumerState<RegisterCompanyScreen> {
           adminEmail: _emailCtrl.text,
           adminPassword: _passwordCtrl.text,
           companyNombre: _companyNombreCtrl.text,
-          companyUbicacion: _companyUbicacionCtrl.text,
+          companyUbicacion: _formattedUbicacion,
           companyNit: _companyNitCtrl.text,
           companyEmail: _companyEmailCtrl.text.isNotEmpty ? _companyEmailCtrl.text : _emailCtrl.text,
           companyRegistroIca: _companyIcaCtrl.text,
@@ -101,7 +224,7 @@ class _RegisterCompanyScreenState extends ConsumerState<RegisterCompanyScreen> {
         );
 
     if (success && mounted) {
-      context.go('/home');
+      context.go('/');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('¡Bienvenido a FishBit, ${_nombresCtrl.text}! Piscícola creada con éxito.'),
@@ -222,7 +345,7 @@ class _RegisterCompanyScreenState extends ConsumerState<RegisterCompanyScreen> {
 
                       // Contenido de los Pasos
                       SizedBox(
-                        height: 480,
+                        height: 560,
                         child: PageView(
                           controller: _pageController,
                           physics: const NeverScrollableScrollPhysics(),
@@ -258,19 +381,22 @@ class _RegisterCompanyScreenState extends ConsumerState<RegisterCompanyScreen> {
             title: 'Administrador',
             isActive: _currentStep == 0,
             isCompleted: _currentStep > 0,
+            activeColor: AppColors.cyanWater,
           ),
-          Expanded(
-            child: Container(
-              height: 2,
-              margin: const EdgeInsets.symmetric(horizontal: 10),
-              color: _currentStep > 0 ? AppColors.cyanWater : Colors.white.withValues(alpha: 0.12),
+          const Expanded(
+            child: Divider(
+              color: Colors.white24,
+              thickness: 1,
+              indent: 12,
+              endIndent: 12,
             ),
           ),
           _buildStepIndicator(
             stepNumber: 2,
-            title: 'Piscícola',
+            title: 'Empresa',
             isActive: _currentStep == 1,
             isCompleted: false,
+            activeColor: AppColors.greenBiomass,
           ),
         ],
       ),
@@ -282,41 +408,44 @@ class _RegisterCompanyScreenState extends ConsumerState<RegisterCompanyScreen> {
     required String title,
     required bool isActive,
     required bool isCompleted,
+    required Color activeColor,
   }) {
-    final color = isCompleted
-        ? AppColors.greenBiomass
-        : (isActive ? AppColors.cyanWater : AppColors.textSecondaryDark);
-
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         Container(
-          width: 24,
-          height: 24,
+          width: 28,
+          height: 28,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: color.withValues(alpha: 0.2),
-            border: Border.all(color: color, width: 1.5),
+            color: isCompleted
+                ? AppColors.greenBiomass
+                : (isActive ? activeColor : Colors.white.withValues(alpha: 0.08)),
+            border: Border.all(
+              color: isActive || isCompleted ? activeColor : Colors.white.withValues(alpha: 0.2),
+              width: 1.5,
+            ),
           ),
           child: Center(
             child: isCompleted
-                ? const Icon(Icons.check_rounded, size: 14, color: AppColors.greenBiomass)
+                ? const Icon(Icons.check_rounded, color: Colors.black, size: 16)
                 : Text(
                     '$stepNumber',
-                    style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w800),
+                    style: TextStyle(
+                      color: isActive ? Colors.black : Colors.white70,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 12,
+                    ),
                   ),
           ),
         ),
         const SizedBox(width: 8),
-        Flexible(
-          child: Text(
-            title,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              color: isActive || isCompleted ? Colors.white : AppColors.textSecondaryDark,
-              fontSize: 12,
-              fontWeight: isActive ? FontWeight.w800 : FontWeight.w500,
-            ),
+        Text(
+          title,
+          style: TextStyle(
+            color: isActive ? Colors.white : AppColors.textSecondaryDark,
+            fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
+            fontSize: 13,
           ),
         ),
       ],
@@ -330,7 +459,7 @@ class _RegisterCompanyScreenState extends ConsumerState<RegisterCompanyScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('👤 Paso 1: Perfil del Administrador', style: AppTypography.titleMedium.copyWith(color: AppColors.cyanWater)),
+            Text('👤 Paso 1: Datos del Administrador Maestro', style: AppTypography.titleMedium.copyWith(color: AppColors.cyanWater)),
             const SizedBox(height: 14),
 
             Row(
@@ -442,8 +571,8 @@ class _RegisterCompanyScreenState extends ConsumerState<RegisterCompanyScreen> {
                       onPressed: () => setState(() => _obscurePass = !_obscurePass),
                     ),
                     validator: (v) {
-                      if (v == null || v.isEmpty) return 'Requerida';
-                      if (v.length < 6) return 'Mínimo 6 caracteres';
+                      if (v == null || v.trim().isEmpty) return 'Contraseña requerida';
+                      if (v.trim().length < 6) return 'Mínimo 6 caracteres';
                       return null;
                     },
                   ),
@@ -510,21 +639,70 @@ class _RegisterCompanyScreenState extends ConsumerState<RegisterCompanyScreen> {
               accentColor: AppColors.greenBiomass,
               validator: (v) => v == null || v.trim().isEmpty ? 'Nombre de empresa requerido' : null,
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 14),
 
-            GlassFormField(
-              label: 'UBICACIÓN (DEPTO, MUNICIPIO, VEREDA)',
-              hint: 'Ej: Córdoba, Montería, Vereda Las Palomas',
-              controller: _companyUbicacionCtrl,
-              prefixIcon: Icons.location_on_outlined,
-              textCapitalization: TextCapitalization.words,
-              textInputAction: TextInputAction.next,
-              isRequired: true,
-              showClearButton: true,
-              accentColor: AppColors.greenBiomass,
-              validator: (v) => v == null || v.trim().isEmpty ? 'Ubicación de la finca requerida' : null,
+            // Ubicación en Cascada Estructurada
+            Row(
+              children: [
+                const Icon(Icons.share_location_rounded, color: AppColors.greenBiomass, size: 18),
+                const SizedBox(width: 8),
+                Text(
+                  'UBICACIÓN GEOGRÁFICA (EN CASCADA)',
+                  style: AppTypography.labelMicro.copyWith(color: AppColors.greenBiomass, letterSpacing: 1.1),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+
+            // Selector 1: País
+            _buildLocationSelectTile(
+              label: 'PAÍS',
+              value: _selectedCountry,
+              icon: Icons.public_rounded,
+              onTap: _pickCountry,
+            ),
+            const SizedBox(height: 10),
+
+            // Selector 2: Departamento / Estado
+            _buildLocationSelectTile(
+              label: 'DEPARTAMENTO / ESTADO',
+              value: _selectedState,
+              icon: Icons.map_rounded,
+              onTap: _pickState,
+            ),
+            const SizedBox(height: 10),
+
+            // Selector 3: Ciudad / Municipio
+            _buildLocationSelectTile(
+              label: 'CIUDAD / MUNICIPIO',
+              value: _selectedCity,
+              icon: Icons.location_city_rounded,
+              onTap: _pickCity,
             ),
             const SizedBox(height: 12),
+
+            // Chip resumen de ubicación
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.greenBiomass.withValues(alpha: 0.3)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.place_rounded, color: AppColors.greenBiomass, size: 16),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Ubicación registrada: $_formattedUbicacion',
+                      style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
 
             Row(
               children: [

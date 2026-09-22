@@ -122,7 +122,7 @@ class SupabaseAuthRepository implements AuthRepository {
         password: cleanPassword,
       );
     } on AuthException catch (authError) {
-      throw AuthFailure('Credenciales incorrectas: ${authError.message}');
+      throw AuthFailure(_translateAuthError(authError));
     } catch (authError) {
       if (authError is AppFailure) rethrow;
       throw AuthFailure('Error de autenticación: ${authError.toString()}');
@@ -317,7 +317,7 @@ class SupabaseAuthRepository implements AuthRepository {
       final unitId = rpcData['unit_id'] as String;
 
       await _storage.setSessionUserId(userId);
-      await _storage.setActiveSedeId(unitId);
+      await _storage.setActiveSedeIdForUser(userId, unitId);
 
       return UserMember(
         id: userId,
@@ -352,11 +352,37 @@ class SupabaseAuthRepository implements AuthRepository {
     String? companyRegistroIca,
     String? companyRegistroAunap,
   }) async {
-    final companyId = const Uuid().v4();
-    final unitId = const Uuid().v4();
-    final memberId = const Uuid().v4();
     final cleanEmail = adminEmail.trim().toLowerCase();
     final fullName = '$adminNombres $adminApellidos'.trim();
+
+    // ── Paso 1: Crear cuenta en Supabase Auth PRIMERO (bloqueante) ────────────
+    // Si falla (correo duplicado, error de red), propagamos el error con mensaje
+    // claro para que la UI lo muestre al usuario. Sin datos parciales en la DB.
+    final AuthResponse authRes;
+    try {
+      authRes = await _supabase.auth.signUp(
+        email: cleanEmail,
+        password: adminPassword.trim(),
+      );
+    } on AuthException catch (e) {
+      throw AuthFailure('No se pudo crear la cuenta: ${e.message}');
+    } catch (e) {
+      throw AuthFailure('Error al registrar: ${e.toString()}');
+    }
+
+    final authUser = authRes.user ?? _supabase.auth.currentUser;
+    if (authUser == null) {
+      throw const AuthFailure('No se pudo verificar la cuenta creada. Intenta de nuevo.');
+    }
+
+    // ── Paso 2: Usar el UUID de Supabase Auth como PK de todos los registros ─
+    final authUserId = authUser.id;
+    final companyId = const Uuid().v4();
+    final unitId = const Uuid().v4();
+
+    // ── Paso 3: Sede auto-generada con sigla única ────────────────────────────
+    final baseSigla = _buildSigla(companyNombre.trim());
+    final uniqueSigla = await _resolveUniqueSigla(companyId, baseSigla);
 
     final newCompany = Company(
       id: companyId,
@@ -378,15 +404,15 @@ class SupabaseAuthRepository implements AuthRepository {
     final newUnit = AquacultureUnit(
       id: unitId,
       empresaId: companyId,
-      nombre: 'Sede Principal',
-      sigla: 'PRIN',
+      nombre: companyNombre.trim(),   // Nombre = nombre de empresa (auto)
+      sigla: uniqueSigla,             // Sigla única auto-generada
       ubicacion: companyUbicacion.trim(),
       isDeleted: false,
       creadoEn: DateTime.now(),
     );
 
     final newAdmin = UserMember(
-      id: memberId,
+      id: authUserId,        // ← UUID de Supabase Auth, no uno generado aparte
       empresaId: companyId,
       unidadAcuicolaId: unitId,
       nombre: fullName,
@@ -398,22 +424,56 @@ class SupabaseAuthRepository implements AuthRepository {
       creadoEn: DateTime.now(),
     );
 
+    // ── Paso 4: Insertar registros en la DB ───────────────────────────────────
     try {
       await _supabase.from('empresas').insert(newCompany.toJson());
       await _supabase.from('unidades_acuicolas').insert(newUnit.toJson());
-      await _supabase.from('miembros_equipo').insert(newAdmin.toJson());
+
+      // Inserción espejo a tabla 'units' para retrocompatibilidad
       try {
-        await _supabase.auth.signUp(email: cleanEmail, password: adminPassword.trim());
+        await _supabase.from('units').insert({
+          'id': unitId,
+          'empresa_id': companyId,
+          'name': companyNombre.trim(),
+          'sigla': uniqueSigla,
+          'location': companyUbicacion.trim(),
+        });
       } catch (_) {}
-    } catch (_) {
-      // Si Supabase no está conectado o tabla no migrada, opera fluidamente con fallback
+
+      // Vinculación estricta en user_units (usuario -> sede)
+      try {
+        await _supabase.from('user_units').upsert({
+          'user_id': authUserId,
+          'unit_id': unitId,
+          'role': 'admin',
+        });
+      } catch (_) {}
+
+      await _supabase.from('miembros_equipo').insert(newAdmin.toJson());
+
+      // Actualizar profiles con full_name, phone, role y empresa_id (columna oficial de Supabase)
+      try {
+        await _supabase.from('profiles').upsert({
+          'id': authUserId,
+          'email': cleanEmail,
+          'full_name': fullName,
+          'phone': adminContacto.trim(),
+          'role': 'Admin',
+          'empresa_id': companyId,
+          'updated_at': DateTime.now().toUtc().toIso8601String(),
+        });
+      } catch (_) {}
+    } catch (e) {
+      throw ServerFailure('Error al guardar los datos: ${e.toString()}');
     }
 
-    await _storage.setSessionUserId(memberId);
-    await _storage.setActiveSedeId(unitId);
+    // ── Paso 5: Persistir sesión con clave por usuario ────────────────────────
+    await _storage.setSessionUserId(authUserId);
+    await _storage.setActiveSedeIdForUser(authUserId, unitId);
 
     return newAdmin;
   }
+
 
   @override
   Future<void> sendPasswordResetEmail(String email) async {
@@ -433,9 +493,93 @@ class SupabaseAuthRepository implements AuthRepository {
     } catch (_) {}
   }
 
+  /// Construye la sigla base a partir del nombre (máximo 4 caracteres, mayúsculas).
+  /// Ej: "Piscícola San Pedro" → "PSP", "Del Caribe" → "DC"
+  String _buildSigla(String nombre) {
+    final words = nombre
+        .toUpperCase()
+        .replaceAll(RegExp(r'[^A-Z0-9\s]'), '')
+        .split(RegExp(r'\s+'))
+        .where((w) => w.isNotEmpty)
+        .toList();
+    if (words.isEmpty) return 'SED';
+    if (words.length == 1) {
+      return words.first.substring(0, words.first.length.clamp(1, 4));
+    }
+    // Iniciales de cada palabra, máximo 4 letras
+    return words.map((w) => w[0]).take(4).join();
+  }
+
+  /// Asegura que la sigla sea única dentro de la empresa.
+  /// Si 'PSP' ya existe, retorna 'PSP2', luego 'PSP3', etc.
+  Future<String> _resolveUniqueSigla(String empresaId, String baseSigla) async {
+    try {
+      // Consultar siglas existentes en ambas tablas de unidades
+      final existingRows = await _supabase
+          .from('unidades_acuicolas')
+          .select('sigla')
+          .eq('empresa_id', empresaId);
+
+      final existing = (existingRows as List)
+          .map((r) => (r['sigla'] as String? ?? '').toUpperCase())
+          .toSet();
+
+      // También consultar tabla 'units' (segunda tabla de sedes)
+      try {
+        final existingUnits = await _supabase
+            .from('units')
+            .select('sigla')
+            .eq('empresa_id', empresaId);
+        for (final r in (existingUnits as List)) {
+          existing.add((r['sigla'] as String? ?? '').toUpperCase());
+        }
+      } catch (_) {}
+
+      if (!existing.contains(baseSigla)) return baseSigla;
+
+      // Agregar sufijo numérico hasta encontrar una sigla libre
+      int suffix = 2;
+      while (suffix < 100) {
+        final candidate = '$baseSigla$suffix';
+        if (!existing.contains(candidate)) return candidate;
+        suffix++;
+      }
+      return '$baseSigla${DateTime.now().millisecondsSinceEpoch % 1000}';
+    } catch (_) {
+      return baseSigla; // Si falla la consulta, usar la base sin sufijo
+    }
+  }
+
   bool _isValidUuid(String val) {
     return RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$').hasMatch(val);
   }
+
+  String _translateAuthError(AuthException error) {
+    final msg = error.message.toLowerCase();
+    final code = (error.code ?? '').toLowerCase();
+
+    if (code == 'invalid_credentials' ||
+        msg.contains('invalid login credentials') ||
+        msg.contains('invalid claim') ||
+        msg.contains('bad credentials')) {
+      return 'Correo o contraseña incorrectos. Por favor verifica tus datos.';
+    }
+    if (code == 'email_not_confirmed' || msg.contains('email not confirmed')) {
+      return 'Tu correo electrónico aún no ha sido confirmado. Revisa tu bandeja de entrada.';
+    }
+    if (code == 'over_request_rate_limit' || msg.contains('rate limit') || msg.contains('too many requests')) {
+      return 'Demasiados intentos fallidos. Por favor espera unos momentos antes de reintentar.';
+    }
+    if (code == 'user_not_found' || msg.contains('user not found')) {
+      return 'No existe ningún usuario registrado con este correo electrónico.';
+    }
+    if (msg.contains('network') || msg.contains('socket') || msg.contains('connection')) {
+      return 'No se pudo conectar al servidor de Supabase. Revisa tu conexión a internet.';
+    }
+
+    return 'Error de autenticación: ${error.message}';
+  }
+
 
   @override
   Future<Company?> fetchCompany(String empresaId) async {
@@ -528,25 +672,7 @@ class SupabaseAuthRepository implements AuthRepository {
     if (empresaId.isEmpty) return [];
 
     try {
-      // 1. Consultar tabla units con filtro estricto de empresa_id
-      final unitsRes = await _supabase
-          .from('units')
-          .select('*')
-          .eq('empresa_id', empresaId);
-
-      final unitsList = unitsRes as List;
-      if (unitsList.isNotEmpty) {
-        return unitsList.map((row) => AquacultureUnit(
-          id: row['id'] as String,
-          empresaId: row['empresa_id'] as String? ?? empresaId,
-          nombre: row['name'] as String? ?? 'Sede',
-          sigla: row['sigla'] as String? ?? '',
-          ubicacion: row['location'] as String?,
-          creadoEn: row['created_at'] != null ? DateTime.parse(row['created_at'] as String) : DateTime.now(),
-        )).toList();
-      }
-
-      // 2. Fallback: consultar unidades asociadas al usuario actual en user_units
+      // 1. Fuente oficial prioritaria: consultar unidades_acuicolas asociadas al usuario en user_units
       final currentUserId = _supabase.auth.currentUser?.id ?? _storage.getSessionUserId();
       if (currentUserId != null && currentUserId.isNotEmpty) {
         final userUnitsRes = await _supabase
@@ -578,6 +704,24 @@ class SupabaseAuthRepository implements AuthRepository {
           }
         }
       }
+
+      // 2. Soporte por tabla units (con filtro directo de empresa_id)
+      final unitsRes = await _supabase
+          .from('units')
+          .select('*')
+          .eq('empresa_id', empresaId);
+
+      final unitsList = unitsRes as List;
+      if (unitsList.isNotEmpty) {
+        return unitsList.map((row) => AquacultureUnit(
+          id: row['id'] as String,
+          empresaId: row['empresa_id'] as String? ?? empresaId,
+          nombre: row['name'] as String? ?? 'Sede',
+          sigla: row['sigla'] as String? ?? '',
+          ubicacion: row['location'] as String?,
+          creadoEn: row['created_at'] != null ? DateTime.parse(row['created_at'] as String) : DateTime.now(),
+        )).toList();
+      }
     } catch (_) {}
 
     return [];
@@ -585,12 +729,19 @@ class SupabaseAuthRepository implements AuthRepository {
 
   @override
   Future<AquacultureUnit> createUnit(String empresaId, String nombre, String sigla, String? ubicacion) async {
+    final unitId = const Uuid().v4();
+
+    // Si la sigla viene vacía (llamada desde auto-creación), generarla desde el nombre
+    final rawSigla = sigla.trim().isEmpty ? _buildSigla(nombre) : sigla.trim().toUpperCase();
+    final uniqueSigla = await _resolveUniqueSigla(empresaId, rawSigla);
+
     final newUnit = AquacultureUnit(
-      id: const Uuid().v4(),
+      id: unitId,
       empresaId: empresaId,
       nombre: nombre,
-      sigla: sigla.toUpperCase(),
+      sigla: uniqueSigla,
       ubicacion: ubicacion,
+      isDeleted: false,
       creadoEn: DateTime.now(),
     );
 
@@ -598,8 +749,10 @@ class SupabaseAuthRepository implements AuthRepository {
       final res = await _supabase
           .from('unidades_acuicolas')
           .insert({
+            'id': unitId,
+            'empresa_id': empresaId,
             'nombre': nombre,
-            'sigla': sigla.toUpperCase(),
+            'sigla': uniqueSigla,
             'ubicacion': ubicacion,
           })
           .select()
@@ -610,6 +763,7 @@ class SupabaseAuthRepository implements AuthRepository {
       return newUnit;
     }
   }
+
 
   @override
   Future<List<UserMember>> fetchTeamMembers(String empresaId) async {

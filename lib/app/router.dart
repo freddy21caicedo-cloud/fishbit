@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:fishbit_finance/app/main_navigation_shell.dart';
 import 'package:fishbit_finance/modules/auth_tenant/presentation/providers/auth_provider.dart';
+import 'package:fishbit_finance/modules/auth_tenant/presentation/screens/splash_screen.dart';
+import 'package:fishbit_finance/modules/auth_tenant/presentation/screens/sede_selection_screen.dart';
 import 'package:fishbit_finance/modules/auth_tenant/presentation/screens/login_screen.dart';
 import 'package:fishbit_finance/modules/auth_tenant/presentation/screens/register_company_screen.dart';
 import 'package:fishbit_finance/modules/auth_tenant/presentation/screens/onboarding_empresa_screen.dart';
@@ -35,47 +37,61 @@ final routerProvider = Provider<GoRouter>((ref) {
   final authState = ref.watch(authProvider);
 
   return GoRouter(
-    initialLocation: '/login',
+    initialLocation: '/splash',
     refreshListenable: authNotifier,
     redirect: (context, state) {
-      final isAuthRoute = state.matchedLocation == '/login' || state.matchedLocation == '/register';
-      final isOnboardingRoute = state.matchedLocation == '/onboarding-empresa';
+      final loc = state.matchedLocation;
+      final isAuthRoute = loc == '/login' || loc == '/register';
+      final isOnboardingRoute = loc == '/onboarding-empresa';
+      final isSplashRoute = loc == '/splash';
+      final isSedeRoute = loc == '/sede-selection';
 
-      if (authState.isLoading) return null;
+      // Mientras carga la sesión → mantener en /splash
+      if (authState.isLoading) {
+        return isSplashRoute ? null : '/splash';
+      }
 
+      // Sin sesión → login (salvo rutas de auth que ya son públicas)
       if (!authState.isAuthenticated) {
-        return isAuthRoute ? null : '/login';
+        if (isAuthRoute || isSplashRoute) return null;
+        return '/login';
       }
 
       final user = authState.currentUser;
       final isSuperAdmin = user?.email.toLowerCase() == 'especialistaacuicola@gmail.com';
-      final isSaasConsoleRoute = state.matchedLocation == '/saas-console' || state.matchedLocation == '/creator';
+      final isSaasConsoleRoute = loc == '/saas-console' || loc == '/creator';
 
-      // 1. Si es SuperAdmin de cobro/plataforma, redirigir directamente a la Consola SaaS
+      // 1. SuperAdmin → consola SaaS
       if (isSuperAdmin) {
         return isSaasConsoleRoute ? null : '/saas-console';
       }
 
-      // 2. Si no es SuperAdmin pero intenta acceder a la consola SaaS, redirigir al inicio
-      if (isSaasConsoleRoute) {
-        return '/';
-      }
+      // 2. Intento de acceso a consola sin permiso → inicio
+      if (isSaasConsoleRoute) return '/';
 
-      // 3. Si el usuario no tiene empresa configurada (nuevo ingreso Google o registro incompleto),
-      // forzar onboarding de empresa
+      // 3. Sin empresa configurada → onboarding
       final hasCompany = user?.empresaId != null && user!.empresaId!.isNotEmpty;
       if (!hasCompany) {
         return isOnboardingRoute ? null : '/onboarding-empresa';
       }
 
-      // 4. Si ya tiene empresa y está en login, register u onboarding, llevar al inicio
-      if (isAuthRoute || isOnboardingRoute) {
+      // 4. Múltiples sedes sin preferencia → selector de sede
+      if (authState.needsSedeSelection) {
+        return isSedeRoute ? null : '/sede-selection';
+      }
+
+      // 5. Ya autenticado con empresa y sede → redirigir fuera de rutas de setup
+      if (isAuthRoute || isOnboardingRoute || isSplashRoute || isSedeRoute) {
         return '/';
       }
 
       return null;
     },
     routes: [
+      GoRoute(
+        path: '/splash',
+        builder: (context, state) => const SplashScreen(),
+      ),
       GoRoute(
         path: '/login',
         builder: (context, state) => const LoginScreen(),
@@ -87,6 +103,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/onboarding-empresa',
         builder: (context, state) => const OnboardingEmpresaScreen(),
+      ),
+      GoRoute(
+        path: '/sede-selection',
+        builder: (context, state) => const SedeSelectionScreen(),
       ),
       GoRoute(
         path: '/saas-console',

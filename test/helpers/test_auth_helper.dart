@@ -67,6 +67,7 @@ class FakeAuthRepository implements AuthRepository {
 
 class FakeLocalStorageService implements LocalStorageService {
   String? activeSedeId;
+  final Map<String, String?> userSedes = {};
 
   @override
   String? getActiveSedeId() => activeSedeId;
@@ -78,8 +79,22 @@ class FakeLocalStorageService implements LocalStorageService {
   }
 
   @override
+  String? getActiveSedeIdForUser(String userId) => userSedes[userId];
+
+  @override
+  Future<bool> setActiveSedeIdForUser(String userId, String? sedeId) async {
+    if (sedeId == null) {
+      userSedes.remove(userId);
+    } else {
+      userSedes[userId] = sedeId;
+    }
+    return true;
+  }
+
+  @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
+
 
 class AuthNotifierMock extends AuthNotifier {
   AuthNotifierMock(AuthState initialState)
