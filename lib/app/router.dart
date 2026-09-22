@@ -53,7 +53,7 @@ final routerProvider = Provider<GoRouter>((ref) {
 
       // Sin sesión → login (salvo rutas de auth que ya son públicas)
       if (!authState.isAuthenticated) {
-        if (isAuthRoute || isSplashRoute) return null;
+        if (isAuthRoute) return null;
         return '/login';
       }
 
