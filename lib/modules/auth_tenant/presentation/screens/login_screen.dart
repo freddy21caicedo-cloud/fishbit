@@ -408,7 +408,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                           child: AnimatedContainer(
                             duration: const Duration(milliseconds: 200),
                             width: double.infinity,
-                            padding: const EdgeInsets.symmetric(vertical: 13, horizontal: 16),
+                            constraints: const BoxConstraints(minHeight: 48),
+                            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
                             decoration: BoxDecoration(
                               color: authState.isGoogleLoading
                                   ? AppColors.cyanWater.withValues(alpha: 0.12)
@@ -470,7 +471,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                         // Registro de Nueva Empresa
                         Center(
                           child: GestureDetector(
-                            onTap: () => context.go('/register'),
+                            onTap: () => context.go('/onboarding-empresa'),
                             child: RichText(
                               text: TextSpan(
                                 text: '¿No tienes cuenta? ',

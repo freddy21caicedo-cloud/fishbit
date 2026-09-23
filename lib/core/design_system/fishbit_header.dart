@@ -54,8 +54,8 @@ class FishBitHeader extends ConsumerWidget {
               ),
               border: Border(
                 bottom: BorderSide(
-                  color: Colors.white.withValues(alpha: 0.04),
-                  width: 0.5,
+                  color: isDark ? Colors.white.withValues(alpha: 0.08) : AppColors.glassBorderLight,
+                  width: isDark ? 0.5 : 1.0,
                 ),
               ),
             ),

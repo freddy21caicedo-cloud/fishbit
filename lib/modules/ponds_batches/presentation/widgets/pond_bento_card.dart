@@ -179,26 +179,29 @@ class _PondBentoCardState extends State<PondBentoCard> with SingleTickerProvider
           ),
           const SizedBox(width: 6),
           // Botón Rotar 3D hacia la Radiografía Biológica (WCAG 2.5.5 >= 48x48 dp)
-          SizedBox(
-            width: 48,
-            height: 48,
-            child: InkWell(
-              onTap: isRealActive ? _flipCard : null,
-              borderRadius: BorderRadius.circular(12),
-              child: Center(
-                child: Container(
-                  width: 36,
-                  height: 36,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: isDark ? Colors.white.withValues(alpha: 0.08) : Colors.white.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: isDark ? Colors.white.withValues(alpha: 0.16) : Colors.grey.withValues(alpha: 0.25)),
-                  ),
-                  child: Icon(
-                    Icons.flip_camera_android_rounded,
-                    size: 18,
-                    color: isRealActive ? (isDark ? Colors.white : AppColors.textPrimaryDark) : AppColors.textTertiaryDark,
+          Tooltip(
+            message: 'Ver radiografía y costos (Flip)',
+            child: SizedBox(
+              width: 48,
+              height: 48,
+              child: InkWell(
+                onTap: isRealActive ? _flipCard : null,
+                borderRadius: BorderRadius.circular(12),
+                child: Center(
+                  child: Container(
+                    width: 36,
+                    height: 36,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: isDark ? Colors.white.withValues(alpha: 0.08) : Colors.white.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: isDark ? Colors.white.withValues(alpha: 0.16) : Colors.grey.withValues(alpha: 0.25)),
+                    ),
+                    child: Icon(
+                      Icons.flip_camera_android_rounded,
+                      size: 18,
+                      color: isRealActive ? (isDark ? Colors.white : AppColors.textPrimaryDark) : AppColors.textTertiaryDark,
+                    ),
                   ),
                 ),
               ),
@@ -370,64 +373,25 @@ class _PondBentoCardState extends State<PondBentoCard> with SingleTickerProvider
             ),
           ],
 
-          const SizedBox(height: 12),
-
-          // Botón Disparador del 3D Flip (WCAG 2.5.5 >= 48dp de altura)
-          if (isActive && allBatches.isNotEmpty)
-            InkWell(
-              onTap: _flipCard,
-              borderRadius: BorderRadius.circular(12),
-              child: Container(
-                constraints: const BoxConstraints(minHeight: 48),
-                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
-                decoration: BoxDecoration(
-                  color: (isPolyculture ? Colors.purpleAccent : AppColors.cyanWater).withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: (isPolyculture ? Colors.purpleAccent : AppColors.cyanWater).withValues(alpha: 0.25)),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.flip_camera_android_rounded, size: 15, color: isPolyculture ? Colors.purpleAccent : AppColors.cyanWater),
-                    const SizedBox(width: 8),
-                    Flexible(
-                      child: Text(
-                        isPolyculture
-                            ? 'Radiografía Policultivo (Flip)'
-                            : 'Radiografía y Costos (Flip)',
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: isPolyculture ? Colors.purpleAccent : AppColors.cyanWater,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 0.2,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-
           if (isActive) ...[
             const SizedBox(height: 12),
-            // Botón de Acción Principal de Campo (WCAG 2.5.5 >= 48dp de altura táctil)
+            // Botón de Acción Principal de Campo (compacto y ergonómico)
             SizedBox(
               width: double.infinity,
-              height: 52,
+              height: 40,
               child: ElevatedButton(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.cyanWater.withValues(alpha: isDark ? 0.20 : 0.14),
+                  backgroundColor: AppColors.cyanWater.withValues(alpha: isDark ? 0.18 : 0.12),
                   foregroundColor: isDark ? AppColors.cyanWater : AppColors.blueOcean,
                   elevation: 0,
                   side: BorderSide(
-                    color: AppColors.cyanWater.withValues(alpha: isDark ? 0.6 : 0.8),
-                    width: 1.4,
+                    color: AppColors.cyanWater.withValues(alpha: isDark ? 0.55 : 0.75),
+                    width: 1.2,
                   ),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(10),
                   ),
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                 ),
                 onPressed: () {
                   if (widget.onOperationsPressed != null) {
@@ -439,21 +403,21 @@ class _PondBentoCardState extends State<PondBentoCard> with SingleTickerProvider
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Icon(Icons.flash_on_rounded, size: 20),
-                    const SizedBox(width: 8),
+                    const Icon(Icons.flash_on_rounded, size: 16),
+                    const SizedBox(width: 6),
                     Flexible(
                       child: Text(
                         'REGISTRAR ACCIÓN DE CAMPO',
                         overflow: TextOverflow.ellipsis,
                         style: AppTypography.titleSmall.copyWith(
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 0.6,
-                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.4,
+                          fontSize: 11.5,
                         ),
                       ),
                     ),
-                    const SizedBox(width: 6),
-                    const Icon(Icons.keyboard_arrow_up_rounded, size: 20),
+                    const SizedBox(width: 4),
+                    const Icon(Icons.keyboard_arrow_up_rounded, size: 16),
                   ],
                 ),
               ),
@@ -510,11 +474,13 @@ class _PondBentoCardState extends State<PondBentoCard> with SingleTickerProvider
           ),
         ),
       ),
-      child: SingleChildScrollView(
-        physics: const BouncingScrollPhysics(),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+      child: Scrollbar(
+        thumbVisibility: false,
+        child: SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
           // Selector de Especies para Policultivos
           if (isPolyculture) ...[
             SingleChildScrollView(
@@ -614,38 +580,12 @@ class _PondBentoCardState extends State<PondBentoCard> with SingleTickerProvider
                 ? _buildConsolidatedPolycultureView(allBatches)
                 : _buildSingleBatchView(activeBatch),
           ),
-
-          const SizedBox(height: 12),
-
-          // Botón para rotar al frente (WCAG 2.5.5 >= 48dp)
-          InkWell(
-            onTap: _flipCard,
-            borderRadius: BorderRadius.circular(12),
-            child: Container(
-              constraints: const BoxConstraints(minHeight: 48),
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.06),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
-              ),
-              child: const Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.arrow_back_rounded, size: 14, color: Colors.white),
-                  SizedBox(width: 6),
-                  Text('↩️ Volver a Vista de Estanque', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w700)),
-                ],
-              ),
-            ),
-          ),
         ],
       ),
     ),
-  );
-  }
+  ),
+);
+}
 
   // Radiografía de un Lote Individual
   Widget _buildSingleBatchView(FishBatch? activeBatch) {
@@ -671,9 +611,9 @@ class _PondBentoCardState extends State<PondBentoCard> with SingleTickerProvider
       children: [
         // 1. Desglose Biológico
         Text('🔬 DESGLOSE BIOLÓGICO', style: AppTypography.labelMicro.copyWith(color: AppColors.cyanWater, letterSpacing: 1.2, fontWeight: FontWeight.w800)),
-        const SizedBox(height: 6),
+        const SizedBox(height: 5),
         Container(
-          padding: const EdgeInsets.all(10),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
           decoration: BoxDecoration(
             color: Colors.white.withValues(alpha: 0.04),
             borderRadius: BorderRadius.circular(12),
@@ -688,7 +628,7 @@ class _PondBentoCardState extends State<PondBentoCard> with SingleTickerProvider
                 extra: '$mortalidadPeces bajas (${mortalidadPorcentaje.toStringAsFixed(1)}%)',
                 extraColor: mortalidadPorcentaje > 5.0 ? AppColors.coralAction : AppColors.greenBiomass,
               ),
-              const Divider(height: 10, color: Colors.white12),
+              const Divider(height: 6, color: Colors.white12),
               _buildDataRow(
                 context: context,
                 label: 'Peso Promedio:',
@@ -696,7 +636,7 @@ class _PondBentoCardState extends State<PondBentoCard> with SingleTickerProvider
                 extra: daysInCulture > 0 ? 'GDP: +${gdp.toStringAsFixed(2)} g/día' : 'Sembrado hoy',
                 extraColor: AppColors.cyanWater,
               ),
-              const Divider(height: 10, color: Colors.white12),
+              const Divider(height: 6, color: Colors.white12),
               _buildDataRow(
                 context: context,
                 label: 'Biomasa Viva:',
@@ -708,13 +648,13 @@ class _PondBentoCardState extends State<PondBentoCard> with SingleTickerProvider
           ),
         ),
 
-        const SizedBox(height: 10),
+        const SizedBox(height: 8),
 
         // 2. Desglose Financiero y Costo Invertido
         Text('💰 RADIOGRAFÍA FINANCIERA Y COSTOS', style: AppTypography.labelMicro.copyWith(color: AppColors.greenBiomass, letterSpacing: 1.2, fontWeight: FontWeight.w800)),
-        const SizedBox(height: 6),
+        const SizedBox(height: 5),
         Container(
-          padding: const EdgeInsets.all(10),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
           decoration: BoxDecoration(
             color: AppColors.greenBiomass.withValues(alpha: 0.05),
             borderRadius: BorderRadius.circular(12),
@@ -725,12 +665,12 @@ class _PondBentoCardState extends State<PondBentoCard> with SingleTickerProvider
               _buildFinancialRow(context, '• Costo Alevinos:', CurrencyFormatters.formatCOP(costoAlevines)),
               _buildFinancialRow(context, '• Alimento e Insumos:', CurrencyFormatters.formatCOP(costoInsumos)),
               _buildFinancialRow(context, '• Costos Fijos:', CurrencyFormatters.formatCOP(costoFijo)),
-              const Divider(height: 8, color: Colors.white24),
+              const Divider(height: 6, color: Colors.white24),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text('COSTO TOTAL INVERTIDO:', style: TextStyle(color: Theme.of(context).brightness == Brightness.dark ? Colors.white : AppColors.textPrimaryLight, fontWeight: FontWeight.w800, fontSize: 11)),
-                  Text(CurrencyFormatters.formatCOP(costoTotal), style: const TextStyle(color: AppColors.greenBiomass, fontWeight: FontWeight.w900, fontSize: 13)),
+                  Text(CurrencyFormatters.formatCOP(costoTotal), style: const TextStyle(color: AppColors.greenBiomass, fontWeight: FontWeight.w900, fontSize: 12.5)),
                 ],
               ),
               const SizedBox(height: 2),
@@ -767,9 +707,9 @@ class _PondBentoCardState extends State<PondBentoCard> with SingleTickerProvider
       children: [
         // 1. Distribución Porcentual de Biomasa
         Text('📊 DISTRIBUCIÓN DE BIOMASA POR ESPECIE', style: AppTypography.labelMicro.copyWith(color: Colors.purpleAccent, letterSpacing: 1.2, fontWeight: FontWeight.w800)),
-        const SizedBox(height: 6),
+        const SizedBox(height: 5),
         Container(
-          padding: const EdgeInsets.all(10),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
           decoration: BoxDecoration(
             color: Colors.purpleAccent.withValues(alpha: 0.05),
             borderRadius: BorderRadius.circular(12),
@@ -780,7 +720,7 @@ class _PondBentoCardState extends State<PondBentoCard> with SingleTickerProvider
               ...allBatches.map((b) {
                 final pct = totalBiomasa > 0 ? (b.biomasaActualKg / totalBiomasa) : 0.0;
                 return Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 2.5),
+                  padding: const EdgeInsets.symmetric(vertical: 2.0),
                   child: Column(
                     children: [
                       Row(
@@ -790,7 +730,7 @@ class _PondBentoCardState extends State<PondBentoCard> with SingleTickerProvider
                           Text('${(pct * 100).toStringAsFixed(1)}% (${CurrencyFormatters.formatKg(b.biomasaActualKg)})', style: const TextStyle(color: AppColors.cyanWater, fontSize: 10.5, fontWeight: FontWeight.w800)),
                         ],
                       ),
-                      const SizedBox(height: 3),
+                      const SizedBox(height: 2),
                       ClipRRect(
                         borderRadius: BorderRadius.circular(3),
                         child: LinearProgressIndicator(
@@ -808,13 +748,13 @@ class _PondBentoCardState extends State<PondBentoCard> with SingleTickerProvider
           ),
         ),
 
-        const SizedBox(height: 10),
+        const SizedBox(height: 8),
 
         // 2. Estructura Financiera Global del Policultivo
         Text('💰 INVERSIÓN TOTAL DEL POLICULTIVO', style: AppTypography.labelMicro.copyWith(color: AppColors.greenBiomass, letterSpacing: 1.2, fontWeight: FontWeight.w800)),
-        const SizedBox(height: 6),
+        const SizedBox(height: 5),
         Container(
-          padding: const EdgeInsets.all(10),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
           decoration: BoxDecoration(
             color: AppColors.greenBiomass.withValues(alpha: 0.05),
             borderRadius: BorderRadius.circular(12),
@@ -829,16 +769,16 @@ class _PondBentoCardState extends State<PondBentoCard> with SingleTickerProvider
                 extra: 'Supervivencia: ${supervGlobal.toStringAsFixed(1)}%',
                 extraColor: AppColors.greenBiomass,
               ),
-              const Divider(height: 8, color: Colors.white12),
+              const Divider(height: 6, color: Colors.white12),
               _buildFinancialRow(context, '• Total Semilla/Alevinaje:', CurrencyFormatters.formatCOP(totalAlevines)),
               _buildFinancialRow(context, '• Total Alimento e Insumos:', CurrencyFormatters.formatCOP(totalInsumos)),
               _buildFinancialRow(context, '• Total Costos Fijos Asignados:', CurrencyFormatters.formatCOP(totalFijos)),
-              const Divider(height: 8, color: Colors.white24),
+              const Divider(height: 6, color: Colors.white24),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text('INVERSIÓN TOTAL EN ESTANQUE:', style: TextStyle(color: Theme.of(context).brightness == Brightness.dark ? Colors.white : AppColors.textPrimaryLight, fontWeight: FontWeight.w800, fontSize: 11)),
-                  Text(CurrencyFormatters.formatCOP(granTotal), style: const TextStyle(color: AppColors.greenBiomass, fontWeight: FontWeight.w900, fontSize: 13)),
+                  Text(CurrencyFormatters.formatCOP(granTotal), style: const TextStyle(color: AppColors.greenBiomass, fontWeight: FontWeight.w900, fontSize: 12.5)),
                 ],
               ),
               const SizedBox(height: 2),

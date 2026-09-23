@@ -621,5 +621,51 @@ void main() {
       expect(user?.empresaId, isEmpty);
       expect(notifier.state.currentUser?.empresaId, isEmpty);
     });
+
+    testWidgets('14. Cumplimiento login-flow: Viewport movil estricto (375px) sin desbordamientos y touch targets >= 44px', (tester) async {
+      // iPhone SE / estándar mobile-first de 375px de ancho
+      tester.view.physicalSize = const Size(375 * 2, 667 * 2);
+      tester.view.devicePixelRatio = 2.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      await tester.pumpWidget(createLoginTestWidget());
+      await tester.pumpAndSettle();
+
+      // Verificar que los botones primarios cumplen touch target >= 44px
+      final submitBtnSize = tester.getSize(find.widgetWithText(GlassButton, 'Ingresar'));
+      expect(submitBtnSize.height, greaterThanOrEqualTo(44.0));
+
+      final googleBtnFinder = find.ancestor(
+        of: find.text('Continuar con Google'),
+        matching: find.byType(InkWell),
+      );
+      final googleBtnSize = tester.getSize(googleBtnFinder.first);
+      expect(googleBtnSize.height, greaterThanOrEqualTo(44.0));
+
+      // Verificar que los campos tienen labels superiores (no solo placeholder)
+      expect(find.byWidgetPredicate((w) => w is GlassFormField && w.label == 'CORREO ELECTRÓNICO'), findsOneWidget);
+      expect(find.byWidgetPredicate((w) => w is GlassFormField && w.label == 'CONTRASEÑA'), findsOneWidget);
+    });
+
+    testWidgets('15. Cumplimiento login-flow en Registro: Viewport movil (375px) con inputs accesibles', (tester) async {
+      tester.view.physicalSize = const Size(375 * 2, 667 * 2);
+      tester.view.devicePixelRatio = 2.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      await tester.pumpWidget(createRegisterTestWidget());
+      await tester.pumpAndSettle();
+
+      // Botón Continuar en 375px
+      final continueBtn = find.widgetWithText(GlassButton, 'Continuar a Datos de Empresa ➔');
+      expect(continueBtn, findsOneWidget);
+      final btnSize = tester.getSize(continueBtn);
+      expect(btnSize.height, greaterThanOrEqualTo(44.0));
+    });
   });
 }

@@ -21,6 +21,9 @@ abstract class AuthRepository {
     String? primerEstanqueNombre,
     double? primerEstanqueCapacidadM3,
     String? primerEstanqueTipo,
+    double? largoM,
+    double? anchoM,
+    double? profundidadM,
   });
   Future<UserMember> registerCompanyWithAdmin({
     required String adminNombres,

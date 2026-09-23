@@ -261,6 +261,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   Future<bool> setupCompanyForUser({
+    String? adminEmail,
+    String? adminPassword,
     String? adminNombre,
     String? adminCedula,
     String? adminTelefono,
@@ -273,12 +275,40 @@ class AuthNotifier extends StateNotifier<AuthState> {
     String? primerEstanqueNombre,
     double? primerEstanqueCapacidadM3,
     String? primerEstanqueTipo,
+    double? largoM,
+    double? anchoM,
+    double? profundidadM,
   }) async {
-    final user = state.currentUser;
-    if (user == null) return false;
-
     state = state.copyWith(isLoading: true, errorMessage: null);
     try {
+      var user = state.currentUser;
+
+      // Si no hay usuario en sesión, crearlo mediante signUp con adminEmail y adminPassword
+      if (user == null) {
+        if (adminEmail == null || adminPassword == null || adminEmail.trim().isEmpty || adminPassword.trim().isEmpty) {
+          throw Exception('Se requiere correo electrónico y contraseña para registrar la cuenta.');
+        }
+        final authRes = await Supabase.instance.client.auth.signUp(
+          email: adminEmail.trim().toLowerCase(),
+          password: adminPassword.trim(),
+        );
+        final createdUser = authRes.user ?? Supabase.instance.client.auth.currentUser;
+        if (createdUser == null) {
+          throw Exception('No se pudo verificar la creación de la cuenta.');
+        }
+        user = UserMember(
+          id: createdUser.id,
+          empresaId: '',
+          nombre: adminNombre?.trim().isNotEmpty == true ? adminNombre!.trim() : createdUser.email!.split('@')[0],
+          email: createdUser.email!.trim().toLowerCase(),
+          role: UserRole.admin,
+          permisoGlobalEmpresa: true,
+          estado: MemberStatus.active,
+          creadoEn: DateTime.now(),
+        );
+        state = state.copyWith(currentUser: user);
+      }
+
       final admin = await _repository.setupCompanyForUser(
         userId: user.id,
         userEmail: user.email,
@@ -294,6 +324,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
         primerEstanqueNombre: primerEstanqueNombre,
         primerEstanqueCapacidadM3: primerEstanqueCapacidadM3,
         primerEstanqueTipo: primerEstanqueTipo,
+        largoM: largoM,
+        anchoM: anchoM,
+        profundidadM: profundidadM,
       );
 
       // Sincronizar inmediatamente el currentUser para que el Router Guard detecte hasCompany = true

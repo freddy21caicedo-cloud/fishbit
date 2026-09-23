@@ -1,6 +1,12 @@
 {
   "version": 1,
   "skills": {
+    "color-mode-and-theme": {
+      "source": "dembrandt/dembrandt-skills",
+      "sourceType": "github",
+      "skillPath": "skills/color-mode-and-theme/SKILL.md",
+      "computedHash": "b87881b31a9c9c3cdcfd42d8aaa9216999f02ad9cacd70eb1b278e0c92de0bf5"
+    },
     "connector-googlemail": {
       "source": "caffeinelabs/skills",
       "sourceType": "github",

@@ -199,43 +199,47 @@ class _RegisterCompanyScreenState extends ConsumerState<RegisterCompanyScreen> {
                     children: [
                       // Encabezado con Logo y Botón Volver
                       Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           IconButton(
                             icon: const Icon(Icons.arrow_back_rounded, color: AppColors.textSecondaryDark),
                             tooltip: 'Volver al Login',
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
                             onPressed: () => context.go('/login'),
                           ),
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                'Fish',
-                                style: TextStyle(
-                                  fontSize: 26,
-                                  fontWeight: FontWeight.w900,
-                                  letterSpacing: -1.0,
-                                  color: AppColors.cyanWater,
-                                  shadows: [
-                                    Shadow(color: AppColors.cyanWater.withValues(alpha: 0.6), blurRadius: 16),
-                                  ],
+                          Expanded(
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  'Fish',
+                                  style: TextStyle(
+                                    fontSize: 24,
+                                    fontWeight: FontWeight.w900,
+                                    letterSpacing: -1.0,
+                                    color: AppColors.cyanWater,
+                                    shadows: [
+                                      Shadow(color: AppColors.cyanWater.withValues(alpha: 0.6), blurRadius: 16),
+                                    ],
+                                  ),
                                 ),
-                              ),
-                              Text(
-                                'Bit.',
-                                style: TextStyle(
-                                  fontSize: 26,
-                                  fontWeight: FontWeight.w900,
-                                  letterSpacing: -1.0,
-                                  color: AppColors.coralAction,
-                                  shadows: [
-                                    Shadow(color: AppColors.coralAction.withValues(alpha: 0.6), blurRadius: 16),
-                                  ],
+                                Text(
+                                  'Bit.',
+                                  style: TextStyle(
+                                    fontSize: 24,
+                                    fontWeight: FontWeight.w900,
+                                    letterSpacing: -1.0,
+                                    color: AppColors.coralAction,
+                                    shadows: [
+                                      Shadow(color: AppColors.coralAction.withValues(alpha: 0.6), blurRadius: 16),
+                                    ],
+                                  ),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
-                          const SizedBox(width: 48), // Balance visual con el IconButton
+                          const SizedBox(width: 40), // Balance visual con el IconButton
                         ],
                       ),
                       const SizedBox(height: 6),
@@ -278,7 +282,7 @@ class _RegisterCompanyScreenState extends ConsumerState<RegisterCompanyScreen> {
 
   Widget _buildWizardProgressBar() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.04),
         borderRadius: BorderRadius.circular(16),
@@ -286,27 +290,32 @@ class _RegisterCompanyScreenState extends ConsumerState<RegisterCompanyScreen> {
       ),
       child: Row(
         children: [
-          _buildStepIndicator(
-            stepNumber: 1,
-            title: 'Administrador',
-            isActive: _currentStep == 0,
-            isCompleted: _currentStep > 0,
-            activeColor: AppColors.cyanWater,
+          Expanded(
+            child: _buildStepIndicator(
+              stepNumber: 1,
+              title: 'Administrador',
+              isActive: _currentStep == 0,
+              isCompleted: _currentStep > 0,
+              activeColor: AppColors.cyanWater,
+            ),
           ),
-          const Expanded(
+          const SizedBox(
+            width: 14,
             child: Divider(
               color: Colors.white24,
               thickness: 1,
-              indent: 12,
-              endIndent: 12,
+              indent: 2,
+              endIndent: 2,
             ),
           ),
-          _buildStepIndicator(
-            stepNumber: 2,
-            title: 'Empresa',
-            isActive: _currentStep == 1,
-            isCompleted: false,
-            activeColor: AppColors.greenBiomass,
+          Expanded(
+            child: _buildStepIndicator(
+              stepNumber: 2,
+              title: 'Empresa',
+              isActive: _currentStep == 1,
+              isCompleted: false,
+              activeColor: AppColors.greenBiomass,
+            ),
           ),
         ],
       ),
@@ -324,8 +333,8 @@ class _RegisterCompanyScreenState extends ConsumerState<RegisterCompanyScreen> {
       mainAxisSize: MainAxisSize.min,
       children: [
         Container(
-          width: 28,
-          height: 28,
+          width: 24,
+          height: 24,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             color: isCompleted
@@ -338,18 +347,18 @@ class _RegisterCompanyScreenState extends ConsumerState<RegisterCompanyScreen> {
           ),
           child: Center(
             child: isCompleted
-                ? const Icon(Icons.check_rounded, color: Colors.black, size: 16)
+                ? const Icon(Icons.check_rounded, color: Colors.black, size: 14)
                 : Text(
                     '$stepNumber',
                     style: TextStyle(
                       color: isActive ? Colors.black : Colors.white70,
                       fontWeight: FontWeight.w800,
-                      fontSize: 12,
+                      fontSize: 11,
                     ),
                   ),
           ),
         ),
-        const SizedBox(width: 8),
+        const SizedBox(width: 6),
         Flexible(
           child: Text(
             title,
@@ -358,7 +367,7 @@ class _RegisterCompanyScreenState extends ConsumerState<RegisterCompanyScreen> {
             style: TextStyle(
               color: isActive ? Colors.white : AppColors.textSecondaryDark,
               fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
-              fontSize: 13,
+              fontSize: 12,
             ),
           ),
         ),

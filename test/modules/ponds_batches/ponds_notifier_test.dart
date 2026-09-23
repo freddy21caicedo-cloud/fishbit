@@ -216,6 +216,9 @@ class MockAuthRepository implements AuthRepository {
     String? primerEstanqueNombre,
     String? primerEstanqueTipo,
     double? primerEstanqueCapacidadM3,
+    double? largoM,
+    double? anchoM,
+    double? profundidadM,
   }) async => throw UnimplementedError();
   @override
   Future<UserMember> registerCompanyWithAdmin({required String adminNombres, required String adminApellidos, required String adminCedulaNit, required String adminContacto, required String adminEmail, required String adminPassword, required String companyNombre, required String companyUbicacion, required String companyNit, required String companyEmail, String? companyRegistroIca, String? companyRegistroAunap}) async => throw UnimplementedError();

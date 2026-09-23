@@ -99,13 +99,13 @@ class AppTypography {
     ),
     bodyMedium: TextStyle(
       fontSize: 13,
-      fontWeight: FontWeight.w400,
+      fontWeight: FontWeight.w500, // Compensación óptica para texto invertido sobre fondo oscuro
       color: AppColors.textSecondaryDark,
       height: 1.4,
     ),
     bodySmall: TextStyle(
       fontSize: 11,
-      fontWeight: FontWeight.w400,
+      fontWeight: FontWeight.w500, // Compensación óptica para texto invertido sobre fondo oscuro
       color: AppColors.textSecondaryDark,
     ),
     labelMicro: TextStyle(

@@ -50,6 +50,7 @@ class UserProfileSheet extends ConsumerWidget {
     final company = authState.currentCompany;
     final units = authState.units;
     final activeUnit = units.where((u) => u.id == authState.activeUnitId).firstOrNull;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     final roleColor = switch (user?.role) {
       UserRole.admin => AppColors.cyanWater,
@@ -79,8 +80,8 @@ class UserProfileSheet extends ConsumerWidget {
                     borderRadius: 26,
                     padding: const EdgeInsets.all(20),
                     blur: 28,
-                    opacity: 0.18,
-                    borderColor: roleColor.withValues(alpha: 0.35),
+                    opacity: isDark ? 0.18 : 0.94,
+                    borderColor: roleColor.withValues(alpha: isDark ? 0.35 : 0.45),
                     child: SingleChildScrollView(
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
@@ -123,14 +124,19 @@ class UserProfileSheet extends ConsumerWidget {
                                   children: [
                                     Text(
                                       user?.nombre ?? 'Usuario Acuícola',
-                                      style: AppTypography.titleMedium.copyWith(color: Colors.white, fontWeight: FontWeight.w800),
+                                      style: AppTypography.titleMedium.copyWith(
+                                        color: isDark ? Colors.white : AppColors.textPrimaryLight,
+                                        fontWeight: FontWeight.w800,
+                                      ),
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
                                     ),
                                     const SizedBox(height: 2),
                                     Text(
                                       user?.email ?? 'usuario@piscicola.com',
-                                      style: AppTypography.bodySmall.copyWith(color: AppColors.textSecondaryDark),
+                                      style: AppTypography.bodySmall.copyWith(
+                                        color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                                      ),
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
                                     ),
@@ -145,10 +151,16 @@ class UserProfileSheet extends ConsumerWidget {
                                   child: Container(
                                     padding: const EdgeInsets.all(4),
                                     decoration: BoxDecoration(
-                                      color: Colors.white.withValues(alpha: 0.08),
+                                      color: isDark
+                                          ? Colors.white.withValues(alpha: 0.08)
+                                          : Colors.black.withValues(alpha: 0.05),
                                       shape: BoxShape.circle,
                                     ),
-                                    child: const Icon(Icons.close_rounded, size: 16, color: AppColors.textSecondaryDark),
+                                    child: Icon(
+                                      Icons.close_rounded,
+                                      size: 16,
+                                      color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                                    ),
                                   ),
                                 ),
                               ),
@@ -177,51 +189,70 @@ class UserProfileSheet extends ConsumerWidget {
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                                   decoration: BoxDecoration(
-                                    color: Colors.white.withValues(alpha: 0.08),
+                                    color: isDark
+                                        ? Colors.white.withValues(alpha: 0.08)
+                                        : Colors.black.withValues(alpha: 0.05),
                                     borderRadius: BorderRadius.circular(8),
                                   ),
                                   child: Text(
                                     'Sede: ${activeUnit.sigla}',
-                                    style: const TextStyle(color: Colors.white70, fontSize: 10, fontWeight: FontWeight.w600),
+                                    style: TextStyle(
+                                      color: isDark ? Colors.white70 : AppColors.textSecondaryLight,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w600,
+                                    ),
                                   ),
                                 ),
                             ],
                           ),
                           const SizedBox(height: 16),
 
-                          // Barra Glassmorphic de Cambio de Tema (Modo Claro / Modo Oscuro)
+                          // Selector Segmentado de Modo Visual (Sistema / Claro / Oscuro)
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                             decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.06),
-                              borderRadius: BorderRadius.circular(18),
+                              color: isDark ? Colors.white.withValues(alpha: 0.06) : Colors.white,
+                              borderRadius: BorderRadius.circular(20),
                               border: Border.all(
-                                color: Colors.white.withValues(alpha: 0.12),
+                                color: isDark ? Colors.white.withValues(alpha: 0.12) : AppColors.glassBorderLight,
                               ),
+                              boxShadow: isDark
+                                  ? null
+                                  : [
+                                      BoxShadow(
+                                        color: Colors.black.withValues(alpha: 0.04),
+                                        blurRadius: 10,
+                                        offset: const Offset(0, 2),
+                                      ),
+                                    ],
                             ),
-                            child: const Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Row(
                                   children: [
-                                    Icon(Icons.palette_outlined, size: 20, color: AppColors.cyanWater),
-                                    SizedBox(width: 10),
-                                    Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          'Modo Visual',
-                                          style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w700),
-                                        ),
-                                        Text(
-                                          'Alternar Claro / Oscuro',
-                                          style: TextStyle(color: AppColors.textSecondaryDark, fontSize: 11),
-                                        ),
-                                      ],
+                                    const Icon(Icons.palette_outlined, size: 18, color: AppColors.cyanWater),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      'Tema Visual',
+                                      style: TextStyle(
+                                        color: isDark ? Colors.white : AppColors.textPrimaryLight,
+                                        fontSize: 12.5,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                    const Spacer(),
+                                    Text(
+                                      'Auto / Claro / Oscuro',
+                                      style: TextStyle(
+                                        color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                                        fontSize: 10.5,
+                                      ),
                                     ),
                                   ],
                                 ),
-                                ThemeAnimatedGlassToggle(),
+                                const SizedBox(height: 10),
+                                const ThemeSegmentedGlassSelector(),
                               ],
                             ),
                           ),
@@ -230,11 +261,16 @@ class UserProfileSheet extends ConsumerWidget {
                           // Accesos a Módulos Clave
                           Text(
                             'MÓDULOS DE GESTIÓN Y CONFIGURACIÓN',
-                            style: AppTypography.labelMicro.copyWith(color: AppColors.textSecondaryDark, letterSpacing: 1.2),
+                            style: AppTypography.labelMicro.copyWith(
+                              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                              letterSpacing: 1.2,
+                            ),
                           ),
                           const SizedBox(height: 10),
 
                           _buildModuleTile(
+                            context: context,
+                            isDark: isDark,
                             icon: Icons.groups_rounded,
                             color: Colors.purpleAccent,
                             title: 'Gestión de Equipos y Personal',
@@ -247,6 +283,8 @@ class UserProfileSheet extends ConsumerWidget {
                           const SizedBox(height: 8),
 
                           _buildModuleTile(
+                            context: context,
+                            isDark: isDark,
                             icon: Icons.point_of_sale_rounded,
                             color: AppColors.greenBiomass,
                             title: 'Módulo de Ventas y Cosechas',
@@ -259,6 +297,8 @@ class UserProfileSheet extends ConsumerWidget {
                           const SizedBox(height: 8),
 
                           _buildModuleTile(
+                            context: context,
+                            isDark: isDark,
                             icon: Icons.account_balance_wallet_rounded,
                             color: AppColors.coralAction,
                             title: 'Finanzas, Nómina y OPEX',
@@ -271,6 +311,8 @@ class UserProfileSheet extends ConsumerWidget {
                           const SizedBox(height: 8),
 
                           _buildModuleTile(
+                            context: context,
+                            isDark: isDark,
                             icon: Icons.tune_rounded,
                             color: AppColors.cyanWater,
                             title: 'Configuración de la App y Piscícola',
@@ -289,7 +331,9 @@ class UserProfileSheet extends ConsumerWidget {
                               Expanded(
                                 child: Text(
                                   'Empresa: ${company?.nombreComercial ?? 'Piscícola'}',
-                                  style: AppTypography.labelMicro.copyWith(color: AppColors.textSecondaryDark),
+                                  style: AppTypography.labelMicro.copyWith(
+                                    color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                                  ),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                 ),
@@ -322,6 +366,8 @@ class UserProfileSheet extends ConsumerWidget {
   }
 
   Widget _buildModuleTile({
+    required BuildContext context,
+    required bool isDark,
     required IconData icon,
     required Color color,
     required String title,
@@ -336,9 +382,20 @@ class UserProfileSheet extends ConsumerWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.05),
+            color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.white,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: color.withValues(alpha: 0.22)),
+            border: Border.all(
+              color: isDark ? color.withValues(alpha: 0.22) : AppColors.glassBorderLight,
+            ),
+            boxShadow: isDark
+                ? null
+                : [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.03),
+                      blurRadius: 6,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
           ),
           child: Row(
             children: [
@@ -357,16 +414,27 @@ class UserProfileSheet extends ConsumerWidget {
                   children: [
                     Text(
                       title,
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 12.5),
+                      style: TextStyle(
+                        color: isDark ? Colors.white : AppColors.textPrimaryLight,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 12.5,
+                      ),
                     ),
                     Text(
                       subtitle,
-                      style: const TextStyle(color: AppColors.textSecondaryDark, fontSize: 10),
+                      style: TextStyle(
+                        color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                        fontSize: 10,
+                      ),
                     ),
                   ],
                 ),
               ),
-              const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white24, size: 12),
+              Icon(
+                Icons.arrow_forward_ios_rounded,
+                color: isDark ? Colors.white24 : AppColors.textTertiaryLight,
+                size: 12,
+              ),
             ],
           ),
         ),

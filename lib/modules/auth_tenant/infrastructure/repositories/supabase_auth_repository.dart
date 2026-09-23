@@ -7,6 +7,7 @@ import 'package:fishbit_finance/modules/auth_tenant/domain/models/user_member.da
 import 'package:fishbit_finance/modules/auth_tenant/domain/models/company.dart';
 import 'package:fishbit_finance/modules/auth_tenant/domain/models/aquaculture_unit.dart';
 import 'package:fishbit_finance/modules/auth_tenant/domain/repositories/auth_repository.dart';
+import 'package:fishbit_finance/core/utils/sigla_generator.dart';
 
 class SupabaseAuthRepository implements AuthRepository {
   final SupabaseClient _supabase;
@@ -288,6 +289,9 @@ class SupabaseAuthRepository implements AuthRepository {
     String? primerEstanqueNombre,
     double? primerEstanqueCapacidadM3,
     String? primerEstanqueTipo,
+    double? largoM,
+    double? anchoM,
+    double? profundidadM,
   }) async {
     final especies = especiesHabilitadas ?? ['Tilapia Roja', 'Cachama Negra', 'Bocachico', 'Pangasius'];
 
@@ -307,6 +311,9 @@ class SupabaseAuthRepository implements AuthRepository {
         'p_estanque_nombre': primerEstanqueNombre?.trim(),
         'p_estanque_capacidad': primerEstanqueCapacidadM3 ?? 250.0,
         'p_estanque_tipo': primerEstanqueTipo?.trim() ?? 'Geomembrana',
+        if (largoM != null) 'p_largo_m': largoM,
+        if (anchoM != null) 'p_ancho_m': anchoM,
+        if (profundidadM != null) 'p_profundidad_m': profundidadM,
       });
 
       final Map<String, dynamic> rpcData = res is Map<String, dynamic>
@@ -381,7 +388,7 @@ class SupabaseAuthRepository implements AuthRepository {
     final unitId = const Uuid().v4();
 
     // ── Paso 3: Sede auto-generada con sigla única ────────────────────────────
-    final baseSigla = _buildSigla(companyNombre.trim());
+    final baseSigla = SiglaGenerator.generate(companyNombre.trim(), fallback: 'SED', maxLength: 4);
     final uniqueSigla = await _resolveUniqueSigla(companyId, baseSigla);
 
     final newCompany = Company(
@@ -488,23 +495,6 @@ class SupabaseAuthRepository implements AuthRepository {
     try {
       await _supabase.auth.signOut();
     } catch (_) {}
-  }
-
-  /// Construye la sigla base a partir del nombre (máximo 4 caracteres, mayúsculas).
-  /// Ej: "Piscícola San Pedro" → "PSP", "Del Caribe" → "DC"
-  String _buildSigla(String nombre) {
-    final words = nombre
-        .toUpperCase()
-        .replaceAll(RegExp(r'[^A-Z0-9\s]'), '')
-        .split(RegExp(r'\s+'))
-        .where((w) => w.isNotEmpty)
-        .toList();
-    if (words.isEmpty) return 'SED';
-    if (words.length == 1) {
-      return words.first.substring(0, words.first.length.clamp(1, 4));
-    }
-    // Iniciales de cada palabra, máximo 4 letras
-    return words.map((w) => w[0]).take(4).join();
   }
 
   /// Asegura que la sigla sea única dentro de la empresa.
@@ -750,7 +740,7 @@ class SupabaseAuthRepository implements AuthRepository {
     final unitId = const Uuid().v4();
 
     // Si la sigla viene vacía (llamada desde auto-creación), generarla desde el nombre
-    final rawSigla = sigla.trim().isEmpty ? _buildSigla(nombre) : sigla.trim().toUpperCase();
+    final rawSigla = sigla.trim().isEmpty ? SiglaGenerator.generate(nombre, fallback: 'SED', maxLength: 4) : sigla.trim().toUpperCase();
     final uniqueSigla = await _resolveUniqueSigla(empresaId, rawSigla);
 
     final newUnit = AquacultureUnit(

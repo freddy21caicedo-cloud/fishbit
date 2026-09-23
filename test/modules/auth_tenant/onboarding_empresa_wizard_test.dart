@@ -25,7 +25,6 @@ class MockAuthNotifier extends StateNotifier<AuthState> implements AuthNotifier 
           ),
         );
 
-  @override
   bool signOutCalled = false;
 
   @override
@@ -64,7 +63,7 @@ void main() {
     expect(find.text('1. Administrador'), findsOneWidget);
     expect(find.text('2. Empresa'), findsOneWidget);
     expect(find.text('3. Infraestructura'), findsOneWidget);
-    expect(find.text('DATOS PERSONALES DEL ADMINISTRADOR'), findsOneWidget);
+    expect(find.text('DATOS DEL ADMINISTRADOR'), findsOneWidget);
 
     // Verify presence of Form Fields
     expect(find.byType(TextFormField), findsWidgets);

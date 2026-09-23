@@ -105,6 +105,7 @@ class _ParametroModalState extends ConsumerState<ParametroModal> {
     final isAmmoniaCritical = amonio != null && amonio > 0.5;
     final isNitriteCritical = nitritos != null && nitritos > 0.2;
     final isChlorineAlert = cloro != null && cloro > 0.05;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Dialog(
       backgroundColor: Colors.transparent,
@@ -115,8 +116,8 @@ class _ParametroModalState extends ConsumerState<ParametroModal> {
           borderRadius: 24,
           padding: const EdgeInsets.all(22),
           blur: 24,
-          opacity: 0.16,
-          borderColor: AppColors.cyanWater.withValues(alpha: 0.35),
+          opacity: isDark ? 0.16 : 0.94,
+          borderColor: AppColors.cyanWater.withValues(alpha: isDark ? 0.35 : 0.25),
           child: Form(
             key: _formKey,
             child: SingleChildScrollView(
@@ -141,43 +142,50 @@ class _ParametroModalState extends ConsumerState<ParametroModal> {
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text('💧 Calidad de Agua', style: AppTypography.titleMedium.copyWith(color: Colors.white, fontWeight: FontWeight.w800)),
-                              const Text('Registro fisicoquímico integral', style: TextStyle(color: AppColors.textSecondaryDark, fontSize: 11)),
+                              Text('💧 Calidad de Agua', style: AppTypography.titleMedium.copyWith(color: isDark ? Colors.white : AppColors.textPrimaryLight, fontWeight: FontWeight.w800)),
+                              Text('Registro fisicoquímico integral', style: TextStyle(color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight, fontSize: 11)),
                             ],
                           ),
                         ],
                       ),
                       IconButton(
-                        icon: const Icon(Icons.close_rounded, color: AppColors.textSecondaryDark),
+                        icon: Icon(Icons.close_rounded, color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
                         onPressed: () => Navigator.of(context).pop(),
                       ),
                     ],
                   ),
                   const SizedBox(height: 16),
 
-                  Text('ESTANQUE DE MEDICIÓN', style: AppTypography.labelMicro.copyWith(color: AppColors.textSecondaryDark)),
+                  Text('ESTANQUE DE MEDICIÓN', style: AppTypography.labelMicro.copyWith(color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight)),
                   const SizedBox(height: 6),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12),
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.06),
+                      color: isDark ? Colors.white.withValues(alpha: 0.06) : Colors.black.withValues(alpha: 0.04),
                       borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+                      border: Border.all(color: isDark ? Colors.white.withValues(alpha: 0.12) : AppColors.glassBorderLight),
                     ),
                     child: DropdownButtonHideUnderline(
                       child: DropdownButton<String>(
                         value: ponds.any((p) => p.id == _selectedPondId) ? _selectedPondId : null,
-                        dropdownColor: AppColors.surfaceDark,
+                        dropdownColor: isDark ? AppColors.surfaceDarkRaised : AppColors.surfaceLight,
                         isExpanded: true,
-                        hint: const Text(
+                        hint: Text(
                           'Selecciona un estanque *',
-                          style: TextStyle(color: AppColors.textSecondaryDark, fontSize: 13, fontWeight: FontWeight.w500),
+                          style: TextStyle(color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight, fontSize: 13, fontWeight: FontWeight.w500),
                         ),
                         icon: const Icon(Icons.keyboard_arrow_down_rounded, color: AppColors.cyanWater),
                         items: ponds.map((p) {
                           return DropdownMenuItem<String>(
                             value: p.id,
-                            child: Text('${p.nombre} (${p.sigla})', style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
+                            child: Text(
+                              '${p.nombre} (${p.sigla})',
+                              style: TextStyle(
+                                color: isDark ? Colors.white : AppColors.textPrimaryLight,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                           );
                         }).toList(),
                         onChanged: (val) => setState(() => _selectedPondId = val),

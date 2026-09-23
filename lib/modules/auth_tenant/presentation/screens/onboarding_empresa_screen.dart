@@ -31,8 +31,13 @@ class _OnboardingEmpresaScreenState extends ConsumerState<OnboardingEmpresaScree
 
   // ─── Paso 1: Datos Administrador ──────────────────────────────────────────
   late final TextEditingController _adminNameCtrl;
+  final _emailCtrl = TextEditingController();
+  final _passwordCtrl = TextEditingController();
+  final _confirmPasswordCtrl = TextEditingController();
   final _cedulaCtrl = TextEditingController();
   final _telefonoCtrl = TextEditingController();
+  bool _obscurePassword = true;
+  bool _obscureConfirmPassword = true;
 
   // ─── Paso 2: Datos Empresa & Ubicación en Cascada ──────────────────────────
   final _companyNameCtrl = TextEditingController();
@@ -65,18 +70,52 @@ class _OnboardingEmpresaScreenState extends ConsumerState<OnboardingEmpresaScree
   bool _isUnitNameManuallyEdited = false;
 
   final _pondNameCtrl = TextEditingController(text: 'Estanque 01');
-  final _pondCapacidadCtrl = TextEditingController(text: '300');
-  String _pondTipo = 'Geomembrana';
+  String _pondTipo = 'Geomembrana'; // Geomembrana, Tierra / Excavado, Concreto, Fibra de Vidrio, Raceways
+  String _pondForma = 'Rectangular'; // 'Rectangular' o 'Circular'
+
+  // Dimensiones del estanque
+  final _largoCtrl = TextEditingController(text: '20');
+  final _anchoCtrl = TextEditingController(text: '10');
+  final _profundidadCtrl = TextEditingController(text: '1.5');
+  final _diametroCtrl = TextEditingController(text: '12');
+
+  double _calculatedM3 = 300.0;
 
   @override
   void initState() {
     super.initState();
     final user = ref.read(authProvider).currentUser;
     _adminNameCtrl = TextEditingController(text: user?.nombre ?? '');
+    _emailCtrl.text = user?.email ?? '';
 
     // Sincronizar automáticamente Nombre de Sede y Sigla a partir de la Empresa
     _companyNameCtrl.addListener(_onCompanyNameChanged);
     _unitNameCtrl.addListener(_onUnitNameChanged);
+
+    // Escuchar cambios de dimensiones para calcular volumen en tiempo real
+    _largoCtrl.addListener(_recalculateVolume);
+    _anchoCtrl.addListener(_recalculateVolume);
+    _profundidadCtrl.addListener(_recalculateVolume);
+    _diametroCtrl.addListener(_recalculateVolume);
+    _recalculateVolume();
+  }
+
+  void _recalculateVolume() {
+    final prof = double.tryParse(_profundidadCtrl.text.trim()) ?? 0.0;
+    if (_pondForma == 'Rectangular') {
+      final largo = double.tryParse(_largoCtrl.text.trim()) ?? 0.0;
+      final ancho = double.tryParse(_anchoCtrl.text.trim()) ?? 0.0;
+      setState(() {
+        _calculatedM3 = (largo * ancho * prof);
+      });
+    } else {
+      // Circular: pi * (d / 2)^2 * prof
+      final diametro = double.tryParse(_diametroCtrl.text.trim()) ?? 0.0;
+      final radio = diametro / 2.0;
+      setState(() {
+        _calculatedM3 = (3.141592653589793 * radio * radio * prof);
+      });
+    }
   }
 
   void _onCompanyNameChanged() {
@@ -99,6 +138,9 @@ class _OnboardingEmpresaScreenState extends ConsumerState<OnboardingEmpresaScree
   @override
   void dispose() {
     _adminNameCtrl.dispose();
+    _emailCtrl.dispose();
+    _passwordCtrl.dispose();
+    _confirmPasswordCtrl.dispose();
     _cedulaCtrl.dispose();
     _telefonoCtrl.dispose();
     _companyNameCtrl.dispose();
@@ -106,7 +148,10 @@ class _OnboardingEmpresaScreenState extends ConsumerState<OnboardingEmpresaScree
     _unitNameCtrl.dispose();
     _unitSiglaCtrl.dispose();
     _pondNameCtrl.dispose();
-    _pondCapacidadCtrl.dispose();
+    _largoCtrl.dispose();
+    _anchoCtrl.dispose();
+    _profundidadCtrl.dispose();
+    _diametroCtrl.dispose();
     super.dispose();
   }
 
@@ -141,9 +186,16 @@ class _OnboardingEmpresaScreenState extends ConsumerState<OnboardingEmpresaScree
   Future<void> _handleSetup() async {
     if (!_step3FormKey.currentState!.validate()) return;
 
-    final capacidadParsed = double.tryParse(_pondCapacidadCtrl.text.trim()) ?? 250.0;
+    final user = ref.read(authProvider).currentUser;
+    final isGoogleUser = user != null && user.email.isNotEmpty;
+
+    final largo = _pondForma == 'Rectangular' ? double.tryParse(_largoCtrl.text.trim()) : null;
+    final ancho = _pondForma == 'Rectangular' ? double.tryParse(_anchoCtrl.text.trim()) : null;
+    final profundidad = double.tryParse(_profundidadCtrl.text.trim());
 
     final success = await ref.read(authProvider.notifier).setupCompanyForUser(
+          adminEmail: isGoogleUser ? user.email : _emailCtrl.text.trim(),
+          adminPassword: isGoogleUser ? null : _passwordCtrl.text.trim(),
           adminNombre: _adminNameCtrl.text.trim(),
           adminCedula: _cedulaCtrl.text.trim(),
           adminTelefono: _telefonoCtrl.text.trim(),
@@ -154,8 +206,11 @@ class _OnboardingEmpresaScreenState extends ConsumerState<OnboardingEmpresaScree
           unitSigla: _unitSiglaCtrl.text.trim(),
           especiesHabilitadas: _selectedSpecies,
           primerEstanqueNombre: _pondNameCtrl.text.trim(),
-          primerEstanqueCapacidadM3: capacidadParsed,
+          primerEstanqueCapacidadM3: _calculatedM3 > 0 ? _calculatedM3 : 250.0,
           primerEstanqueTipo: _pondTipo,
+          largoM: largo,
+          anchoM: ancho,
+          profundidadM: profundidad,
         );
 
     if (success && mounted) {
@@ -366,7 +421,7 @@ class _OnboardingEmpresaScreenState extends ConsumerState<OnboardingEmpresaScree
           icon: const Icon(Icons.logout_rounded, color: Colors.white70),
           onPressed: () async {
             await ref.read(authProvider.notifier).signOut();
-            if (context.mounted) {
+            if (mounted) {
               context.go('/login');
             }
           },
@@ -478,6 +533,8 @@ class _OnboardingEmpresaScreenState extends ConsumerState<OnboardingEmpresaScree
 
   // ─── PASO 1: DATOS DEL ADMINISTRADOR ─────────────────────────────────────
   Widget _buildStep1Admin(UserMember? user, double screenWidth) {
+    final isGoogleUser = user != null && user.email.isNotEmpty;
+
     return Form(
       key: _step1FormKey,
       child: Column(
@@ -486,17 +543,25 @@ class _OnboardingEmpresaScreenState extends ConsumerState<OnboardingEmpresaScree
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: AppColors.cyanWater.withValues(alpha: 0.08),
+              color: isGoogleUser ? AppColors.cyanWater.withValues(alpha: 0.08) : Colors.white.withValues(alpha: 0.05),
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: AppColors.cyanWater.withValues(alpha: 0.2)),
+              border: Border.all(
+                color: isGoogleUser ? AppColors.cyanWater.withValues(alpha: 0.25) : Colors.white.withValues(alpha: 0.12),
+              ),
             ),
             child: Row(
               children: [
-                const Icon(Icons.verified_user_rounded, color: AppColors.cyanWater, size: 20),
+                Icon(
+                  isGoogleUser ? Icons.verified_user_rounded : Icons.person_add_alt_1_rounded,
+                  color: isGoogleUser ? AppColors.cyanWater : AppColors.greenBiomass,
+                  size: 20,
+                ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    'Cuenta autenticada: ${user?.email ?? 'Google'}. Asignada automáticamente como Administrador General de la Empresa.',
+                    isGoogleUser
+                        ? 'Cuenta autenticada: ${user.email}. Asignada automáticamente como Administrador General.'
+                        : 'Crea tu cuenta de Administrador General para tu empresa piscícola.',
                     style: AppTypography.bodySmall.copyWith(color: Colors.white70, fontSize: 12),
                   ),
                 ),
@@ -506,24 +571,135 @@ class _OnboardingEmpresaScreenState extends ConsumerState<OnboardingEmpresaScree
           const SizedBox(height: 18),
 
           Text(
-            'DATOS PERSONALES DEL ADMINISTRADOR',
+            'DATOS DEL ADMINISTRADOR',
             style: AppTypography.labelMicro.copyWith(color: AppColors.cyanWater, letterSpacing: 1.1),
           ),
           const SizedBox(height: 10),
 
-          // Correo (Bloqueado)
+          // Correo Electrónico
           GlassFormField(
             label: 'CORREO ELECTRÓNICO',
-            hint: user?.email ?? 'admin@gmail.com',
-            controller: TextEditingController(text: user?.email ?? ''),
-            prefixIcon: Icons.mark_email_read_rounded,
-            suffixWidget: const Padding(
-              padding: EdgeInsets.only(right: 12),
-              child: Icon(Icons.lock_outline_rounded, color: AppColors.cyanWater, size: 18),
-            ),
-            isReadOnly: true,
+            hint: isGoogleUser ? user.email : 'ej. admin@piscicola.com',
+            controller: _emailCtrl,
+            prefixIcon: isGoogleUser ? Icons.mark_email_read_rounded : Icons.alternate_email_rounded,
+            keyboardType: TextInputType.emailAddress,
+            isReadOnly: isGoogleUser,
+            isRequired: true,
+            suffixWidget: isGoogleUser
+                ? const Padding(
+                    padding: EdgeInsets.only(right: 12),
+                    child: Icon(Icons.lock_outline_rounded, color: AppColors.cyanWater, size: 18),
+                  )
+                : null,
+            validator: (val) {
+              if (val == null || val.trim().isEmpty) return 'Ingresa el correo electrónico';
+              if (!val.contains('@') || !val.contains('.')) return 'Correo inválido';
+              return null;
+            },
           ),
           const SizedBox(height: 14),
+
+          // Campos de Contraseña (Solo si no viene autenticado con Google)
+          if (!isGoogleUser) ...[
+            if (screenWidth < 420) ...[
+              GlassFormField(
+                label: 'CONTRASEÑA',
+                hint: 'Mínimo 6 caracteres',
+                controller: _passwordCtrl,
+                prefixIcon: Icons.lock_outline_rounded,
+                obscureText: _obscurePassword,
+                suffixWidget: IconButton(
+                  icon: Icon(
+                    _obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                    color: Colors.white54,
+                    size: 20,
+                  ),
+                  onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                ),
+                isRequired: true,
+                validator: (val) {
+                  if (val == null || val.trim().isEmpty) return 'Ingresa una contraseña';
+                  if (val.trim().length < 6) return 'Mínimo 6 caracteres';
+                  return null;
+                },
+              ),
+              const SizedBox(height: 14),
+              GlassFormField(
+                label: 'CONFIRMAR CONTRASEÑA',
+                hint: 'Repite la contraseña',
+                controller: _confirmPasswordCtrl,
+                prefixIcon: Icons.lock_reset_rounded,
+                obscureText: _obscureConfirmPassword,
+                suffixWidget: IconButton(
+                  icon: Icon(
+                    _obscureConfirmPassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                    color: Colors.white54,
+                    size: 20,
+                  ),
+                  onPressed: () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword),
+                ),
+                isRequired: true,
+                validator: (val) {
+                  if (val == null || val.trim().isEmpty) return 'Confirma tu contraseña';
+                  if (val.trim() != _passwordCtrl.text.trim()) return 'Las contraseñas no coinciden';
+                  return null;
+                },
+              ),
+            ] else ...[
+              Row(
+                children: [
+                  Expanded(
+                    child: GlassFormField(
+                      label: 'CONTRASEÑA',
+                      hint: 'Mínimo 6 caracteres',
+                      controller: _passwordCtrl,
+                      prefixIcon: Icons.lock_outline_rounded,
+                      obscureText: _obscurePassword,
+                      suffixWidget: IconButton(
+                        icon: Icon(
+                          _obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                          color: Colors.white54,
+                          size: 20,
+                        ),
+                        onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                      ),
+                      isRequired: true,
+                      validator: (val) {
+                        if (val == null || val.trim().isEmpty) return 'Ingresa una contraseña';
+                        if (val.trim().length < 6) return 'Mínimo 6 caracteres';
+                        return null;
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: GlassFormField(
+                      label: 'CONFIRMAR CONTRASEÑA',
+                      hint: 'Repite la contraseña',
+                      controller: _confirmPasswordCtrl,
+                      prefixIcon: Icons.lock_reset_rounded,
+                      obscureText: _obscureConfirmPassword,
+                      suffixWidget: IconButton(
+                        icon: Icon(
+                          _obscureConfirmPassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                          color: Colors.white54,
+                          size: 20,
+                        ),
+                        onPressed: () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword),
+                      ),
+                      isRequired: true,
+                      validator: (val) {
+                        if (val == null || val.trim().isEmpty) return 'Confirma tu contraseña';
+                        if (val.trim() != _passwordCtrl.text.trim()) return 'Las contraseñas no coinciden';
+                        return null;
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ],
+            const SizedBox(height: 14),
+          ],
 
           // Nombre Completo
           GlassFormField(
@@ -840,42 +1016,96 @@ class _OnboardingEmpresaScreenState extends ConsumerState<OnboardingEmpresaScree
 
           GlassFormField(
             label: 'NOMBRE / IDENTIFICADOR DEL ESTANQUE',
-            hint: 'ej. Estanque 01 (Geomembrana)',
+            hint: 'ej. Estanque 01',
             controller: _pondNameCtrl,
             prefixIcon: Icons.water_rounded,
             isRequired: true,
             validator: (val) => val == null || val.trim().isEmpty ? 'Ingresa el identificador del estanque' : null,
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
 
-          // Capacidad y Tipo de Estanque (Responsive)
-          if (screenWidth < 420) ...[
-            GlassFormField(
-              label: 'VOLUMEN / CAPACIDAD (m³)',
-              hint: 'ej. 300',
-              controller: _pondCapacidadCtrl,
-              prefixIcon: Icons.straighten_rounded,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              isRequired: true,
-              validator: (val) {
-                if (val == null || val.trim().isEmpty) return 'Requerido';
-                final parsed = double.tryParse(val.trim());
-                if (parsed == null || parsed <= 0) return 'Mayor a 0';
-                return null;
-              },
+          // Selector de Tipo de Estanque y Selector de Forma Geométrica
+          Row(
+            children: [
+              Expanded(
+                flex: 3,
+                child: _buildPondTypeDropdown(),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                flex: 3,
+                child: _buildPondShapeDropdown(),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+
+          // Dimensiones según Forma Geométrica
+          if (_pondForma == 'Rectangular') ...[
+            Row(
+              children: [
+                Expanded(
+                  child: GlassFormField(
+                    label: 'LARGO (m)',
+                    hint: 'ej. 20',
+                    controller: _largoCtrl,
+                    prefixIcon: Icons.straighten_rounded,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    isRequired: true,
+                    validator: (val) {
+                      if (val == null || val.trim().isEmpty) return 'Requerido';
+                      final parsed = double.tryParse(val.trim());
+                      if (parsed == null || parsed <= 0) return 'Mayor a 0';
+                      return null;
+                    },
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: GlassFormField(
+                    label: 'ANCHO (m)',
+                    hint: 'ej. 10',
+                    controller: _anchoCtrl,
+                    prefixIcon: Icons.straighten_rounded,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    isRequired: true,
+                    validator: (val) {
+                      if (val == null || val.trim().isEmpty) return 'Requerido';
+                      final parsed = double.tryParse(val.trim());
+                      if (parsed == null || parsed <= 0) return 'Mayor a 0';
+                      return null;
+                    },
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: GlassFormField(
+                    label: 'PROFUNDIDAD (m)',
+                    hint: 'ej. 1.5',
+                    controller: _profundidadCtrl,
+                    prefixIcon: Icons.vertical_align_bottom_rounded,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    isRequired: true,
+                    validator: (val) {
+                      if (val == null || val.trim().isEmpty) return 'Requerido';
+                      final parsed = double.tryParse(val.trim());
+                      if (parsed == null || parsed <= 0) return 'Mayor a 0';
+                      return null;
+                    },
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 12),
-            _buildPondTypeDropdown(),
           ] else ...[
             Row(
               children: [
                 Expanded(
                   flex: 3,
                   child: GlassFormField(
-                    label: 'VOLUMEN / CAPACIDAD (m³)',
-                    hint: 'ej. 300',
-                    controller: _pondCapacidadCtrl,
-                    prefixIcon: Icons.straighten_rounded,
+                    label: 'DIÁMETRO (m)',
+                    hint: 'ej. 12',
+                    controller: _diametroCtrl,
+                    prefixIcon: Icons.panorama_fish_eye_rounded,
                     keyboardType: const TextInputType.numberWithOptions(decimal: true),
                     isRequired: true,
                     validator: (val) {
@@ -889,11 +1119,77 @@ class _OnboardingEmpresaScreenState extends ConsumerState<OnboardingEmpresaScree
                 const SizedBox(width: 12),
                 Expanded(
                   flex: 3,
-                  child: _buildPondTypeDropdown(),
+                  child: GlassFormField(
+                    label: 'PROFUNDIDAD (m)',
+                    hint: 'ej. 1.5',
+                    controller: _profundidadCtrl,
+                    prefixIcon: Icons.vertical_align_bottom_rounded,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    isRequired: true,
+                    validator: (val) {
+                      if (val == null || val.trim().isEmpty) return 'Requerido';
+                      final parsed = double.tryParse(val.trim());
+                      if (parsed == null || parsed <= 0) return 'Mayor a 0';
+                      return null;
+                    },
+                  ),
                 ),
               ],
             ),
           ],
+          const SizedBox(height: 14),
+
+          // Tarjeta de Cálculo de Volumen en Tiempo Real
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  AppColors.cyanWater.withValues(alpha: 0.15),
+                  AppColors.greenBiomass.withValues(alpha: 0.12),
+                ],
+              ),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppColors.cyanWater.withValues(alpha: 0.35)),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppColors.cyanWater.withValues(alpha: 0.2),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.calculate_rounded, color: AppColors.cyanWater, size: 22),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'VOLUMEN CALCULADO AUTOMÁTICAMENTE',
+                        style: AppTypography.labelMicro.copyWith(
+                          color: AppColors.cyanWater,
+                          letterSpacing: 0.8,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '${_calculatedM3.toStringAsFixed(1)} m³ de agua (${(_calculatedM3 * 1000).toStringAsFixed(0)} Litros aprox.)',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 14.5,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
           const SizedBox(height: 20),
 
           // Credencial / Resumen Corporativo Previo a la Activación
@@ -903,12 +1199,59 @@ class _OnboardingEmpresaScreenState extends ConsumerState<OnboardingEmpresaScree
     );
   }
 
+  Widget _buildPondShapeDropdown() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'FORMA GEOMÉTRICA',
+          style: AppTypography.labelMicro.copyWith(
+            color: AppColors.cyanWater,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.8,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Container(
+          height: 52,
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: _pondForma,
+              dropdownColor: const Color(0xFF131F2E),
+              icon: const Icon(Icons.arrow_drop_down_rounded, color: AppColors.cyanWater),
+              style: const TextStyle(color: Colors.white, fontSize: 13.5, fontWeight: FontWeight.w600),
+              isExpanded: true,
+              items: const [
+                DropdownMenuItem(value: 'Rectangular', child: Text('Rectangular (L × A × P)')),
+                DropdownMenuItem(value: 'Circular', child: Text('Circular (Diámetro)')),
+              ],
+              onChanged: (val) {
+                if (val != null) {
+                  setState(() {
+                    _pondForma = val;
+                    _recalculateVolume();
+                  });
+                }
+              },
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildPondTypeDropdown() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'TIPO DE ESTANQUE',
+          'TIPO DE ESTRUCTURA',
           style: AppTypography.labelMicro.copyWith(
             color: AppColors.cyanWater,
             fontWeight: FontWeight.w700,
@@ -933,9 +1276,10 @@ class _OnboardingEmpresaScreenState extends ConsumerState<OnboardingEmpresaScree
               isExpanded: true,
               items: const [
                 DropdownMenuItem(value: 'Geomembrana', child: Text('Geomembrana')),
-                DropdownMenuItem(value: 'Tierra', child: Text('Tierra')),
+                DropdownMenuItem(value: 'Tierra / Excavado', child: Text('Tierra / Excavado')),
                 DropdownMenuItem(value: 'Concreto', child: Text('Concreto')),
-                DropdownMenuItem(value: 'Raceway', child: Text('Raceway')),
+                DropdownMenuItem(value: 'Fibra de Vidrio', child: Text('Fibra de Vidrio')),
+                DropdownMenuItem(value: 'Raceways', child: Text('Raceways')),
               ],
               onChanged: (val) {
                 if (val != null) {
@@ -976,7 +1320,7 @@ class _OnboardingEmpresaScreenState extends ConsumerState<OnboardingEmpresaScree
           _buildSummaryRow('Ubicación:', _formattedUbicacion),
           _buildSummaryRow('Administrador:', _adminNameCtrl.text.trim().isNotEmpty ? _adminNameCtrl.text.trim() : 'Sin definir'),
           _buildSummaryRow('Sede Inicial:', '${_unitNameCtrl.text.trim()} [${_unitSiglaCtrl.text.trim()}]'),
-          _buildSummaryRow('Primer Estanque:', '${_pondNameCtrl.text.trim()} • ${_pondCapacidadCtrl.text.trim()} m³ ($_pondTipo)'),
+          _buildSummaryRow('Primer Estanque:', '${_pondNameCtrl.text.trim()} • ${_calculatedM3.toStringAsFixed(1)} m³ ($_pondTipo)'),
           _buildSummaryRow('Especies:', _selectedSpecies.join(', ')),
         ],
       ),

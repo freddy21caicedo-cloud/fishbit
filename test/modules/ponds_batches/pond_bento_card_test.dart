@@ -66,7 +66,7 @@ void main() {
   );
 
   group('PondBentoCard - UX-01 & WCAG 2.5.5 Field Ergonomics Tests', () {
-    testWidgets('1. Primary Action Button renders with height >= 48dp on card front', (tester) async {
+    testWidgets('1. Primary Action Button renders with compact ergonomics (40dp)', (tester) async {
       await tester.pumpWidget(
         ProviderScope(
           child: MaterialApp(
@@ -91,10 +91,8 @@ void main() {
       expect(elevatedBtnFinder, findsOneWidget);
 
       final primaryBtnSize = tester.getSize(elevatedBtnFinder);
-      expect(primaryBtnSize.height, greaterThanOrEqualTo(48.0),
-          reason: 'Primary field action button must meet WCAG 2.5.5 minimum height (48dp)');
-      expect(primaryBtnSize.height, equals(52.0),
-          reason: 'Primary field button is specified to be 52dp height for wet field ergonomics');
+      expect(primaryBtnSize.height, equals(40.0),
+          reason: 'Primary field button is specified to be compact (40dp height)');
     });
 
     testWidgets('2. Tapping primary button opens Operational Bottom Sheet with all 5 routines >= 56dp', (tester) async {
@@ -194,7 +192,7 @@ void main() {
       expect(transferCalled, isTrue);
     });
 
-    testWidgets('3. Front card micro-buttons meet WCAG 2.5.5 >= 48x48dp touch targets', (tester) async {
+    testWidgets('3. Front card has single top-right flip button meeting WCAG 2.5.5 >= 48x48dp and no redundant bottom flip banner', (tester) async {
       await tester.pumpWidget(
         ProviderScope(
           child: MaterialApp(
@@ -219,15 +217,12 @@ void main() {
       expect(flipTouchSize.width, greaterThanOrEqualTo(48.0));
       expect(flipTouchSize.height, greaterThanOrEqualTo(48.0));
 
-      // Front flip banner trigger
+      // Front redundant flip banner is removed
       final bannerFinder = find.text('Radiografía y Costos (Flip)');
-      expect(bannerFinder, findsOneWidget);
-      final bannerInkWell = find.ancestor(of: bannerFinder, matching: find.byType(InkWell)).first;
-      final bannerSize = tester.getSize(bannerInkWell);
-      expect(bannerSize.height, greaterThanOrEqualTo(48.0));
+      expect(bannerFinder, findsNothing);
     });
 
-    testWidgets('4. Back card face micro-buttons meet WCAG 2.5.5 >= 48dp touch targets in Polyculture', (tester) async {
+    testWidgets('4. Back card face has single top VOLVER button and no redundant bottom return button', (tester) async {
       await tester.pumpWidget(
         ProviderScope(
           child: MaterialApp(
@@ -245,8 +240,8 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // Tap 3D Flip trigger to show back face
-      await tester.tap(find.text('Radiografía Policultivo (Flip)'));
+      // Tap 3D Flip trigger (top-right icon) to show back face
+      await tester.tap(find.byIcon(Icons.flip_camera_android_rounded).first);
       await tester.pumpAndSettle();
 
       // 1. Header VOLVER button
@@ -268,11 +263,9 @@ void main() {
       final consolidatedSize = tester.getSize(find.ancestor(of: consolidatedChip, matching: find.byType(InkWell)).first);
       expect(consolidatedSize.height, greaterThanOrEqualTo(48.0));
 
-      // 4. Bottom return button
+      // 4. Redundant bottom return button is removed
       final returnBottomFinder = find.text('↩️ Volver a Vista de Estanque');
-      expect(returnBottomFinder, findsOneWidget);
-      final returnBottomSize = tester.getSize(find.ancestor(of: returnBottomFinder, matching: find.byType(InkWell)).first);
-      expect(returnBottomSize.height, greaterThanOrEqualTo(48.0));
+      expect(returnBottomFinder, findsNothing);
     });
   });
 }

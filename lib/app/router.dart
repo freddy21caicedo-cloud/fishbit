@@ -41,7 +41,7 @@ final routerProvider = Provider<GoRouter>((ref) {
     refreshListenable: authNotifier,
     redirect: (context, state) {
       final loc = state.matchedLocation;
-      final isAuthRoute = loc == '/login' || loc == '/register';
+      final isAuthRoute = loc == '/login' || loc == '/register' || loc == '/onboarding-empresa';
       final isOnboardingRoute = loc == '/onboarding-empresa';
       final isSplashRoute = loc == '/splash';
       final isSedeRoute = loc == '/sede-selection';
@@ -51,7 +51,12 @@ final routerProvider = Provider<GoRouter>((ref) {
         return isSplashRoute ? null : '/splash';
       }
 
-      // Sin sesión → login (salvo rutas de auth que ya son públicas)
+      // Redirigir la ruta obsoleta /register hacia /onboarding-empresa
+      if (loc == '/register') {
+        return '/onboarding-empresa';
+      }
+
+      // Sin sesión → login (salvo rutas de auth y onboarding que son públicas)
       if (!authState.isAuthenticated) {
         if (isAuthRoute) return null;
         return '/login';
