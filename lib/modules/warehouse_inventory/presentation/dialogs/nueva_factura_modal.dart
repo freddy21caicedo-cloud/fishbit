@@ -677,11 +677,11 @@ class _NuevaFacturaModalState extends ConsumerState<NuevaFacturaModal> {
           physics: const BouncingScrollPhysics(),
           child: Row(
             children: [
-              _buildCategoryChip('concentrados', '🍽️ Concentrados', isDark, allSuppliers),
-              _buildCategoryChip('insumos', '🧪 Insumos', isDark, allSuppliers),
-              _buildCategoryChip('alevinos', '🐟 Alevinos / Semilla', isDark, allSuppliers),
-              _buildCategoryChip('farmacia', '💊 Farmacia', isDark, allSuppliers),
-              _buildCategoryChip('oxigenadores', '⚙️ Equipos / Motores', isDark, allSuppliers),
+              _buildCategoryChip('concentrados', 'Concentrados', isDark, allSuppliers),
+              _buildCategoryChip('insumos', 'Insumos', isDark, allSuppliers),
+              _buildCategoryChip('alevinos', 'Alevinos / Semilla', isDark, allSuppliers),
+              _buildCategoryChip('farmacia', 'Farmacia', isDark, allSuppliers),
+              _buildCategoryChip('oxigenadores', 'Equipos / Motores', isDark, allSuppliers),
             ],
           ),
         ),
@@ -1027,37 +1027,6 @@ class _NuevaFacturaModalState extends ConsumerState<NuevaFacturaModal> {
                   ),
                 ],
               ),
-              const SizedBox(height: 16),
-
-              // Botón de Confirmación Principal dentro del Ticket
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: _isSubmitting ? null : _guardarFactura,
-                  icon: _isSubmitting
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black),
-                        )
-                      : const Icon(Icons.check_circle_rounded, color: Colors.black, size: 20),
-                  label: Text(
-                    _isSubmitting
-                        ? 'Registrando Factura...'
-                        : (_categoriaSeleccionada == 'concentrados' || _categoriaSeleccionada == 'insumos'
-                            ? 'Confirmar Factura e Ingresar ${CurrencyFormatters.formatKg(_totalCantidadFisica)}'
-                            : 'Confirmar Factura e Ingresar ${_totalItemsCantidad.toInt()} Unidades'),
-                    style: const TextStyle(color: Colors.black, fontSize: 13.5, fontWeight: FontWeight.w900),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.greenBiomass,
-                    elevation: 4,
-                    shadowColor: AppColors.greenBiomass.withValues(alpha: 0.4),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                    padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
-                  ),
-                ),
-              ),
             ],
           ),
         ),
@@ -1095,9 +1064,15 @@ class _NuevaFacturaModalState extends ConsumerState<NuevaFacturaModal> {
         else
           ElevatedButton.icon(
             onPressed: _isSubmitting ? null : _guardarFactura,
-            icon: const Icon(Icons.check_circle_rounded, color: Colors.black, size: 18),
+            icon: _isSubmitting
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black),
+                  )
+                : const Icon(Icons.check_circle_rounded, color: Colors.black, size: 18),
             label: Text(
-              _isSubmitting ? 'Guardando...' : 'Confirmar Factura',
+              _isSubmitting ? 'Guardando Factura...' : 'Confirmar Factura',
               style: const TextStyle(color: Colors.black, fontSize: 13, fontWeight: FontWeight.w800),
             ),
             style: ElevatedButton.styleFrom(
