@@ -425,9 +425,10 @@ class SupabaseAuthRepository implements AuthRepository {
     try {
       await _supabase.from('empresas').insert(newCompany.toJson());
 
-      // Inserción en tabla canónica unidades_acuicolas (columnas reales: id, nombre, sigla, ubicacion)
+      // Inserción en tabla canónica unidades_acuicolas (incluyendo empresa_id para multi-tenancy)
       await _supabase.from('unidades_acuicolas').insert({
         'id': unitId,
+        'empresa_id': companyId,
         'nombre': companyNombre.trim(),
         'sigla': uniqueSigla,
         if (companyUbicacion.trim().isNotEmpty) 'ubicacion': companyUbicacion.trim(),
@@ -515,11 +516,12 @@ class SupabaseAuthRepository implements AuthRepository {
         }
       } catch (_) {}
 
-      // Consultar tabla canónica 'unidades_acuicolas' (sin filtrar por empresa_id porque no existe esa columna)
+      // Consultar tabla canónica 'unidades_acuicolas' filtrando por la misma empresa
       try {
         final existingRows = await _supabase
             .from('unidades_acuicolas')
-            .select('sigla');
+            .select('sigla')
+            .eq('empresa_id', empresaId);
         for (final r in (existingRows as List)) {
           final s = (r['sigla'] as String? ?? '').toUpperCase();
           if (s.isNotEmpty) existing.add(s);
@@ -758,6 +760,7 @@ class SupabaseAuthRepository implements AuthRepository {
           .from('unidades_acuicolas')
           .insert({
             'id': unitId,
+            'empresa_id': empresaId,
             'nombre': nombre,
             'sigla': uniqueSigla,
             if (ubicacion != null && ubicacion.isNotEmpty) 'ubicacion': ubicacion,
@@ -985,17 +988,45 @@ class SupabaseAuthRepository implements AuthRepository {
       }
 
       final member = UserMember.fromJson(res);
-
+      String activeUserId = member.id;
       try {
-        await _supabase.auth.signUp(
+        final authRes = await _supabase.auth.signUp(
           email: member.email,
           password: password,
         );
+        if (authRes.user != null) {
+          activeUserId = authRes.user!.id;
+        }
       } catch (_) {}
+
+      // Sincronizar en profiles para que la sesión sea válida
+      try {
+        await _supabase.from('profiles').upsert({
+          'id': activeUserId,
+          'email': member.email,
+          'full_name': member.nombre,
+          'role': UserMember.roleToString(member.role),
+          'empresa_id': member.empresaId,
+          'phone': member.cedula,
+          'updated_at': DateTime.now().toIso8601String(),
+        });
+      } catch (_) {}
+
+      // Sincronizar en user_units si tiene sede asignada
+      if (member.unidadAcuicolaId != null && member.unidadAcuicolaId!.isNotEmpty) {
+        try {
+          await _supabase.from('user_units').upsert({
+            'user_id': activeUserId,
+            'unit_id': member.unidadAcuicolaId!,
+            'role': UserMember.roleToString(member.role).toLowerCase(),
+          });
+        } catch (_) {}
+      }
 
       final updated = await _supabase
           .from('miembros_equipo')
           .update({
+            'auth_user_id': activeUserId,
             'estado': 'Activo',
             'token_invitacion': null,
           })
@@ -1005,6 +1036,9 @@ class SupabaseAuthRepository implements AuthRepository {
 
       final activeMember = UserMember.fromJson(updated);
       await _storage.setSessionUserId(activeMember.id);
+      if (activeMember.unidadAcuicolaId != null) {
+        await _storage.setActiveSedeIdForUser(activeMember.id, activeMember.unidadAcuicolaId!);
+      }
       return activeMember;
     } catch (e) {
       if (e is AppFailure) rethrow;
