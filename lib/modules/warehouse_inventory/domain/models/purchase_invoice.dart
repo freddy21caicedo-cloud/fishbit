@@ -188,12 +188,22 @@ class PurchaseInvoice {
     );
   }
 
+  // BUG-W7: ampliado para preservar todas las categorías (constraint actualizada en DB)
   static String _normalizeTipoFactura(String val) {
     final lower = val.toLowerCase().trim();
-    if (lower == 'concentrados' || lower == 'alimento' || lower == 'concentrado') {
-      return 'Alimento';
+    // Tipos permitidos por la constraint facturas_tipo_factura_check
+    const allowed = {
+      'Alimento', 'Insumo', 'concentrados', 'insumos',
+      'farmacia', 'oxigenadores', 'alevinos', 'herramienta',
+    };
+    // Mapeo de alias → valor canónico
+    if (lower == 'concentrado' || lower == 'alimento') return 'Alimento';
+    if (lower == 'insumo') return 'Insumo';
+    // Buscar coincidencia directa (case-insensitive)
+    for (final a in allowed) {
+      if (a.toLowerCase() == lower) return a;
     }
-    return 'Insumo';
+    return 'Insumo'; // fallback seguro
   }
 
   Map<String, dynamic> toJson() => {

@@ -66,10 +66,12 @@ class BiologicalPurchase {
     );
   }
 
+  // BUG-W3: incluye unidad_acuicola_sigla (NOT NULL en compras_mat_biologico)
   Map<String, dynamic> toJson() => {
         'id': id,
         'empresa_id': empresaId,
         'unidad_acuicola_id': unidadAcuicolaId,
+        'unidad_acuicola_sigla': 'SEDE', // requerido NOT NULL — se actualiza post-migración B4
         'tipo': tipo,
         'especie': especie,
         'proveedor_nombre': proveedorNombre,

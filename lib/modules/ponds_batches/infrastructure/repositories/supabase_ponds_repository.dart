@@ -281,9 +281,9 @@ class SupabasePondsRepository implements PondsRepository {
         }
       } catch (_) {}
 
-      return [];
+      return []; // BUG-13: no devolver demo data para empresas reales
     } catch (_) {
-      return [];
+      return []; // BUG-13: no devolver demo data para empresas reales
     }
   }
 
@@ -519,9 +519,9 @@ class SupabasePondsRepository implements PondsRepository {
       if (rawList.isNotEmpty) {
         return rawList.map((row) => TransferRecord.fromJson(row as Map<String, dynamic>)).toList();
       }
-      return _demoTransfers;
+      return []; // BUG-13: no mezclar con datos demo para empresas reales
     } catch (_) {
-      return _demoTransfers;
+      return []; // BUG-13: no mezclar con datos demo para empresas reales
     }
   }
 
@@ -552,7 +552,7 @@ class SupabasePondsRepository implements PondsRepository {
         query = query.or('batch_id.eq.$batchId,lote_id.eq.$batchId');
       }
 
-      final res = await query.order('date', ascending: false).limit(100);
+      final res = await query.order('fecha', ascending: false).limit(100); // BUG-15: 'date'→'fecha'
       final rawList = res as List;
       return rawList.map((row) => BiometriaRecord.fromJson(row as Map<String, dynamic>)).toList();
     } catch (_) {
@@ -703,7 +703,7 @@ class SupabasePondsRepository implements PondsRepository {
         'biomasa_perdida_kg': biomasaPerdida,
         if (observaciones != null) 'observaciones': observaciones,
         if (registradoPor != null) 'registrado_por': registradoPor,
-        'fecha': now.toIso8601String().split('T')[0],
+        'fecha': now.toIso8601String(),        // BUG-8: timestamp completo, no solo date
         'date': now.toIso8601String().split('T')[0],
         'hora': hourStr,
         'creado_en': DateTime.now().toIso8601String(),
@@ -726,9 +726,9 @@ class SupabasePondsRepository implements PondsRepository {
       _demoMortalities.insert(0, record);
       return record;
     } catch (e) {
+      // BUG-9: propagar el error — no silenciar ni guardar solo en memoria
       debugPrint('[PondsRepository] Error al registrar mortalidad en Supabase: $e');
-      _demoMortalities.insert(0, record);
-      return record;
+      rethrow;
     }
   }
 
@@ -830,7 +830,7 @@ class SupabasePondsRepository implements PondsRepository {
         'estanque_id': estanqueId,
         'lote_id': loteId,
         'batch_id': loteId,
-        'fecha': now.toIso8601String().split('T')[0],
+        'fecha': now.toIso8601String(),          // BUG-8: timestamp completo, no solo date
         'date': now.toIso8601String().split('T')[0],
         'hora': hourStr,
         'peces_capturados': sampleCount,
@@ -864,9 +864,9 @@ class SupabasePondsRepository implements PondsRepository {
       _demoBiometries.insert(0, record);
       return record;
     } catch (e) {
+      // BUG-10: propagar el error — no silenciar ni guardar solo en memoria
       debugPrint('[PondsRepository] Error al registrar biometría en Supabase: $e');
-      _demoBiometries.insert(0, record);
-      return record;
+      rethrow;
     }
   }
 }

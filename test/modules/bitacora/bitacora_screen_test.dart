@@ -599,7 +599,7 @@ void main() {
       expect(find.text('Limpiar'), findsOneWidget);
 
       // Tab 1 (Calidad de Agua): should show empty state because Pond 2 has no water parameter records
-      expect(find.textContaining('Sin mediciones en Estanque 02'), findsOneWidget);
+      expect(find.text('Sin mediciones en Estanque 02'), findsOneWidget);
 
       // Tab 2 (Alimentación): should show empty state because Pond 2 has no feeding records
       await tester.tap(find.byKey(const Key('tab_alimentacion')));

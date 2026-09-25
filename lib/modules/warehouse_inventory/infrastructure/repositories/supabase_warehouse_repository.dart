@@ -125,12 +125,10 @@ class SupabaseWarehouseRepository implements WarehouseRepository {
   @override
   Future<List<PurchaseInvoice>> fetchInvoices(String empresaId, String unidadAcuicolaId) async {
     try {
+      // BUG-W5: eliminar filtro por sigla (recibía UUID, nunca matcheaba)
       var query = _supabase.from('facturas').select('*');
       if (empresaId.isNotEmpty && !empresaId.startsWith('c1000000-')) {
         query = query.eq('empresa_id', empresaId);
-      }
-      if (unidadAcuicolaId.isNotEmpty) {
-        query = query.eq('unidad_acuicola_sigla', unidadAcuicolaId);
       }
       final res = await query.order('creado_en', ascending: false).limit(100);
 
@@ -165,9 +163,10 @@ class SupabaseWarehouseRepository implements WarehouseRepository {
   @override
   Future<List<BiologicalPurchase>> fetchBiologicalPurchases(String empresaId, String unidadAcuicolaId) async {
     try {
+      // BUG-W4: filtrar solo por empresa_id (sigla no es válida como filtro de UUID)
       var query = _supabase.from('compras_mat_biologico').select('*');
-      if (unidadAcuicolaId.isNotEmpty) {
-        query = query.eq('unidad_acuicola_sigla', unidadAcuicolaId);
+      if (empresaId.isNotEmpty && !empresaId.startsWith('c1000000-')) {
+        query = query.eq('empresa_id', empresaId);
       }
       final res = await query.order('creado_en', ascending: false).limit(100);
 
@@ -227,6 +226,10 @@ class SupabaseWarehouseRepository implements WarehouseRepository {
     if (supplier.empresaId == null || supplier.empresaId!.startsWith('c1000000-')) {
       _demoCustomSuppliers.add(supplier);
       return supplier;
+    }
+    // BUG-W1: empresaId es NOT NULL en proveedores — validar antes de insertar
+    if (supplier.empresaId == null || supplier.empresaId!.isEmpty) {
+      throw Exception('No se puede guardar un proveedor sin empresa asignada. Por favor reinicia sesión.');
     }
     try {
       final res = await _supabase

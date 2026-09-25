@@ -223,9 +223,10 @@ class FishBatch {
       'cantidad_inicial_peces': cantidadInicialPeces,
       'cantidad_actual_peces': cantidadActualPeces,
       'peso_inicial_gramos': pesoInicialGramos,
+      'peso_actual_gramos': pesoActualGramos,       // BUG-2: campo faltante
       'biomasa_inicial_kg': biomasaInicialKg,
       'biomasa_actual_kg': biomasaActualKg,
-      'costo_inicial_alevines': costoInicialAlevinos,
+      'costo_inicial_alevinos': costoInicialAlevinos, // BUG-1: typo alevines→alevinos corregido
       'costo_acumulado_insumos': costoAcumuladoInsumos,
       'costo_acumulado_fijo': costoAcumuladoFijo,
       'estado': statusToString(estado),
@@ -239,6 +240,12 @@ class FishBatch {
     }
     if (unidadAcuicolaId.isNotEmpty) {
       map['unit_id'] = unidadAcuicolaId;
+    }
+    if (rolPolicultivo.isNotEmpty && rolPolicultivo != 'principal') {
+      map['rol_policultivo'] = rolPolicultivo;       // BUG-2: campo faltante
+    }
+    if (fechaCosechaEstimada != null) {
+      map['fecha_cosecha_estimada'] = fechaCosechaEstimada!.toIso8601String(); // BUG-2
     }
 
     return map;

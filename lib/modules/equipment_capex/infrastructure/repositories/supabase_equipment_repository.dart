@@ -45,16 +45,14 @@ class SupabaseEquipmentRepository implements EquipmentRepository {
       return _demoEquipment;
     }
     try {
-      var query = _supabase.from('equipos').select('*');
-      if (unidadAcuicolaId.isNotEmpty) {
-        query = query.eq('unidad_acuicola_sigla', unidadAcuicolaId);
-      }
+      // BUG-5: filtrar por empresa_id (no por sigla con UUID)
+      var query = _supabase.from('equipos').select('*').eq('empresa_id', empresaId);
       final res = await query.order('creado_en', ascending: true).limit(100);
 
       final list = (res as List).map((row) => EquipmentAsset.fromJson(row as Map<String, dynamic>)).toList();
-      return list.isNotEmpty ? list : _demoEquipment;
+      return list;
     } catch (_) {
-      return _demoEquipment;
+      return [];
     }
   }
 
@@ -72,9 +70,9 @@ class SupabaseEquipmentRepository implements EquipmentRepository {
           .single();
 
       return EquipmentAsset.fromJson(res);
-    } catch (_) {
-      _demoEquipment.add(equipment);
-      return equipment;
+    } catch (e) {
+      // BUG-5b: propagamos el error para que el usuario sepa que no se guardó
+      rethrow;
     }
   }
 

@@ -23,9 +23,6 @@ class SupabaseFinanceRepository implements FinanceRepository {
       if (empresaId.isNotEmpty && !empresaId.startsWith('c1000000-')) {
         query = query.eq('empresa_id', empresaId);
       }
-      if (unidadAcuicolaId.isNotEmpty) {
-        query = query.eq('unidad_acuicola_sigla', unidadAcuicolaId);
-      }
       final res = await query.order('fecha_pago', ascending: false).limit(100);
 
       final list = (res as List).map((row) => PayrollRecord.fromJson(row as Map<String, dynamic>)).toList();
@@ -73,17 +70,15 @@ class SupabaseFinanceRepository implements FinanceRepository {
       return _demoEnergy;
     }
     try {
+      // BUG-6: filtrar por empresa_id — no por sigla con UUID
       var query = _supabase.from('recibos_energia').select('*');
       if (empresaId.isNotEmpty) {
         query = query.eq('empresa_id', empresaId);
       }
-      if (unidadAcuicolaId.isNotEmpty) {
-        query = query.eq('unidad_acuicola_sigla', unidadAcuicolaId);
-      }
       final res = await query.order('fecha_emision', ascending: false).limit(100);
 
       final list = (res as List).map((row) => EnergyBill.fromJson(row as Map<String, dynamic>)).toList();
-      return list.isNotEmpty ? list : _demoEnergy;
+      return list;
     } catch (e) {
       debugPrint('Error obteniendo recibos_energia: $e');
       return _demoEnergy;
@@ -117,14 +112,15 @@ class SupabaseFinanceRepository implements FinanceRepository {
       return _demoMaintenances;
     }
     try {
+      // BUG-6: filtrar por empresa_id — no por sigla con UUID
       var query = _supabase.from('mantenimientos').select('*');
-      if (unidadAcuicolaId.isNotEmpty) {
-        query = query.eq('unidad_acuicola_sigla', unidadAcuicolaId);
+      if (empresaId.isNotEmpty && !empresaId.startsWith('c1000000-')) {
+        query = query.eq('empresa_id', empresaId);
       }
       final res = await query.order('fecha', ascending: false).limit(100);
 
       final list = (res as List).map((row) => MaintenanceRecord.fromJson(row as Map<String, dynamic>)).toList();
-      return list.isNotEmpty ? list : _demoMaintenances;
+      return list;
     } catch (e) {
       debugPrint('Error obteniendo mantenimientos: $e');
       return _demoMaintenances;
