@@ -83,16 +83,6 @@ class _RegistrarProveedorModalState extends ConsumerState<RegistrarProveedorModa
       'label': 'Alevinos y Genética',
       'icon': Icons.bubble_chart_rounded,
     },
-    {
-      'key': 'empaque',
-      'label': 'Empaque y Logística',
-      'icon': Icons.inventory_2_rounded,
-    },
-    {
-      'key': 'servicios',
-      'label': 'Servicios y Mantenimiento',
-      'icon': Icons.build_rounded,
-    },
   ];
 
   bool _isSaving = false;

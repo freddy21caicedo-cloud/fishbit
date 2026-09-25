@@ -133,7 +133,9 @@ class _NuevaFacturaModalState extends ConsumerState<NuevaFacturaModal> {
   void _onCategoryChanged(String newCat, List<Supplier> allSuppliers) {
     setState(() {
       _categoriaSeleccionada = newCat;
-      final matching = allSuppliers.where((s) => s.categoriaPrincipal == newCat).toList();
+      final matching = allSuppliers.where((s) =>
+        s.categorias.contains(newCat) || s.categoriaPrincipal == newCat
+      ).toList();
       _selectedSupplier = matching.isNotEmpty ? matching.first : null;
       for (final item in _items) {
         item.dispose();
@@ -475,7 +477,9 @@ class _NuevaFacturaModalState extends ConsumerState<NuevaFacturaModal> {
     final companySpecies = company?.especiesHabilitadas ?? ['Trucha Arcoíris'];
     final allSuppliers = warehouseState.suppliers;
 
-    final filteredSuppliers = allSuppliers.where((s) => s.categoriaPrincipal == _categoriaSeleccionada).toList();
+    final filteredSuppliers = allSuppliers.where((s) =>
+      s.categorias.contains(_categoriaSeleccionada) || s.categoriaPrincipal == _categoriaSeleccionada
+    ).toList();
 
     if (_selectedSupplier == null && filteredSuppliers.isNotEmpty) {
       _selectedSupplier = filteredSuppliers.first;

@@ -474,7 +474,11 @@ class _NuevoItemModalState extends ConsumerState<NuevoItemModal> {
     final company = authState.currentCompany;
     final companySpecies = company?.especiesHabilitadas ?? ['Trucha Arcoíris'];
 
-    final suppliers = state.suppliers.where((s) => s.categoriaPrincipal == _categoryKey).toList();
+    // Buscar en la lista completa de categorías (no solo en categoriaPrincipal)
+    // para que un proveedor multi-categoría aparezca en todos los formularios relevantes
+    final suppliers = state.suppliers.where((s) =>
+      s.categorias.contains(_categoryKey) || s.categoriaPrincipal == _categoryKey
+    ).toList();
 
     // Inicializar proveedor por defecto
     if (_selectedSupplier == null && suppliers.isNotEmpty) {

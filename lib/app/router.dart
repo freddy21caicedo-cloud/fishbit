@@ -79,7 +79,6 @@ final routerProvider = Provider<GoRouter>((ref) {
           authState.currentCompany != null ||
           authState.availableCompanies.isNotEmpty;
       if (!hasCompany) {
-        if (isAuthRoute) return null;
         return isOnboardingRoute ? null : '/onboarding-empresa';
       }
 
