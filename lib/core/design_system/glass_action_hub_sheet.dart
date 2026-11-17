@@ -7,7 +7,6 @@ import 'package:fishbit_finance/core/design_system/glass_container.dart';
 import 'package:fishbit_finance/core/design_system/floating_dock_layout.dart';
 import 'package:fishbit_finance/modules/auth_tenant/domain/models/user_member.dart';
 import 'package:fishbit_finance/modules/auth_tenant/presentation/providers/auth_provider.dart';
-import 'package:fishbit_finance/modules/auth_tenant/presentation/dialogs/sede_selector_modal.dart';
 
 class GlassActionHubSheet extends ConsumerWidget {
   const GlassActionHubSheet({super.key});
@@ -140,24 +139,23 @@ class GlassActionHubSheet extends ConsumerWidget {
                                 context.go('/sales');
                               },
                             ),
-                            if (isAdmin)
-                              _buildHubTile(
-                                context: context,
-                                icon: Icons.account_balance_wallet_rounded,
-                                color: AppColors.purpleAnalytics,
-                                title: 'Finanzas y OPEX',
-                                subtitle: 'Nómina, energía y CAPEX',
-                                onTap: () {
-                                  Navigator.of(context).pop();
-                                  context.go('/finance');
-                                },
-                              ),
+                            _buildHubTile(
+                              context: context,
+                              icon: Icons.account_balance_wallet_rounded,
+                              color: AppColors.purpleAnalytics,
+                              title: 'FishBit Finanzas',
+                              subtitle: 'Nómina, energía y CAPEX',
+                              onTap: () {
+                                Navigator.of(context).pop();
+                                context.go('/finance');
+                              },
+                            ),
                             if (isAdmin)
                               _buildHubTile(
                                 context: context,
                                 icon: Icons.groups_rounded,
                                 color: Colors.purpleAccent,
-                                title: 'Equipo Acuícola',
+                                title: 'Equipo FishBit',
                                 subtitle: 'Personal y roles',
                                 onTap: () {
                                   Navigator.of(context).pop();
@@ -166,21 +164,10 @@ class GlassActionHubSheet extends ConsumerWidget {
                               ),
                             _buildHubTile(
                               context: context,
-                              icon: Icons.storefront_rounded,
-                              color: AppColors.amberWarning,
-                              title: 'Sedes y Piscícola',
-                              subtitle: 'Cambiar o crear sede',
-                              onTap: () {
-                                Navigator.of(context).pop();
-                                SedeSelectorModal.show(context);
-                              },
-                            ),
-                            _buildHubTile(
-                              context: context,
                               icon: Icons.verified_user_rounded,
                               color: AppColors.cyanWater,
-                              title: 'Trazabilidad ICA / AUNAP',
-                              subtitle: '12 formatos y reportes Excel',
+                              title: 'FishBit Certificación',
+                              subtitle: 'Trazabilidad ICA / AUNAP y reportes',
                               onTap: () {
                                 Navigator.of(context).pop();
                                 context.go('/ica');

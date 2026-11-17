@@ -47,9 +47,11 @@ class _TrasladoModalState extends ConsumerState<TrasladoModal> {
     super.initState();
     _selectedPondOrigenId = widget.pond?.id;
     _selectedBatchId = widget.batch?.id;
-    _pesoCtrl.text = (widget.batch?.pesoActualGramos ?? 100.0).toStringAsFixed(1);
-    _pecesCtrl.text = (widget.batch?.cantidadActualPeces ?? 1000).toString();
-    _nuevoCodigoCtrl.text = '${widget.batch?.codigoLote ?? "LOTE"}-B';
+    if (widget.batch != null) {
+      _pesoCtrl.text = widget.batch!.pesoActualGramos.toStringAsFixed(1);
+      _pecesCtrl.text = widget.batch!.cantidadActualPeces.toString();
+      _nuevoCodigoCtrl.text = '${widget.batch!.codigoLote}-B';
+    }
   }
 
   @override
@@ -97,7 +99,7 @@ class _TrasladoModalState extends ConsumerState<TrasladoModal> {
 
     final maxPeces = batchOrigen?.cantidadActualPeces ?? 0;
     final pecesTrasladados = (int.tryParse(_pecesCtrl.text.replaceAll(RegExp(r'[^\d]'), '')) ?? 0).clamp(0, maxPeces > 0 ? maxPeces : 1000000);
-    final pesoPromedioG = double.tryParse(_pesoCtrl.text.replaceAll(RegExp(r'[^\d.]'), '')) ?? (batchOrigen?.pesoActualGramos ?? 1.0);
+    final pesoPromedioG = double.tryParse(_pesoCtrl.text.replaceAll(RegExp(r'[^\d.]'), '')) ?? (batchOrigen?.pesoActualGramos ?? 0.0);
     final biomasaTrasladadaKg = (pecesTrasladados * pesoPromedioG) / 1000.0;
 
     final proporcion = maxPeces > 0 ? (pecesTrasladados / maxPeces) : 0.0;
@@ -386,10 +388,11 @@ class _TrasladoModalState extends ConsumerState<TrasladoModal> {
                         flex: 3,
                         child: TextFormField(
                           controller: _pecesCtrl,
+                          readOnly: !_esDesdoble,
                           keyboardType: TextInputType.number,
                           style: TextStyle(color: isDark ? Colors.white : AppColors.textPrimaryLight, fontWeight: FontWeight.w800, fontSize: 13),
                           decoration: InputDecoration(
-                            labelText: _esDesdoble ? 'Peces a Desdoblar' : 'Peces Trasladados',
+                            labelText: _esDesdoble ? 'Peces a Desdoblar' : 'Peces Trasladados (100%)',
                             floatingLabelBehavior: FloatingLabelBehavior.auto,
                             labelStyle: const TextStyle(fontSize: 11, color: AppColors.cyanWater),
                             hintText: '5000',
@@ -402,6 +405,9 @@ class _TrasladoModalState extends ConsumerState<TrasladoModal> {
                             final val = int.tryParse(v ?? '') ?? 0;
                             if (val <= 0) return 'Ingrese cantidad > 0';
                             if (val > maxPeces) return 'Máximo $maxPeces peces';
+                            if (_esDesdoble && maxPeces > 1 && val >= maxPeces) {
+                              return 'Debe ser menor a $maxPeces (use Traslado Total)';
+                            }
                             return null;
                           },
                         ),
@@ -417,11 +423,16 @@ class _TrasladoModalState extends ConsumerState<TrasladoModal> {
                             labelText: 'Peso Prom (g)',
                             floatingLabelBehavior: FloatingLabelBehavior.auto,
                             labelStyle: const TextStyle(fontSize: 11, color: AppColors.amberWarning),
-                            hintText: '350.0',
+                            hintText: 'Ej: 350.0',
                             isDense: true,
                             contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                             border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
                           ),
+                          validator: (val) {
+                            final p = double.tryParse(val?.replaceAll(RegExp(r'[^\d.]'), '') ?? '');
+                            if (p == null || p <= 0) return 'Ingresa peso (> 0)';
+                            return null;
+                          },
                           onChanged: (_) => setState(() {}),
                         ),
                       ),
@@ -547,6 +558,17 @@ class _TrasladoModalState extends ConsumerState<TrasladoModal> {
                         return;
                       }
 
+                      if (batchOrigen == null || pondOrigen == null) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('⚠️ Debe seleccionar un lote y estanque de origen válidos'),
+                            backgroundColor: AppColors.coralAction,
+                            behavior: SnackBarBehavior.floating,
+                          ),
+                        );
+                        return;
+                      }
+
                       setState(() => _isLoading = true);
 
                       try {
@@ -556,6 +578,7 @@ class _TrasladoModalState extends ConsumerState<TrasladoModal> {
                               estanqueDestinoId: _selectedPondDestinoId!,
                               pecesTrasladados: pecesTrasladados,
                               biomasaTrasladadaKg: biomasaTrasladadaKg,
+                              pesoPromedioGramos: pesoPromedioG,
                               esDesdoble: _esDesdoble,
                               nuevoCodigoLote: _nuevoCodigoCtrl.text.trim().isNotEmpty
                                   ? _nuevoCodigoCtrl.text.trim()

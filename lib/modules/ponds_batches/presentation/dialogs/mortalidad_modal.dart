@@ -31,7 +31,7 @@ class MortalidadModal extends ConsumerStatefulWidget {
 
 class _MortalidadModalState extends ConsumerState<MortalidadModal> {
   final _formKey = GlobalKey<FormState>();
-  final _muertosCtrl = TextEditingController(text: '5');
+  final _muertosCtrl = TextEditingController();
   late final TextEditingController _pesoCtrl;
   final _obsCtrl = TextEditingController();
 
@@ -55,8 +55,9 @@ class _MortalidadModalState extends ConsumerState<MortalidadModal> {
     super.initState();
     _selectedPondId = widget.pond?.id;
     _selectedBatchId = widget.batch?.id;
+    final batchWeight = widget.batch?.pesoActualGramos;
     _pesoCtrl = TextEditingController(
-      text: (widget.batch?.pesoActualGramos ?? 250.0).toStringAsFixed(1),
+      text: (batchWeight != null && batchWeight > 0) ? batchWeight.toStringAsFixed(1) : '',
     );
   }
 
@@ -84,10 +85,10 @@ class _MortalidadModalState extends ConsumerState<MortalidadModal> {
     final activeBatch = widget.batch ??
         (activeBatches.where((b) => b.id == _selectedBatchId).firstOrNull ?? activeBatches.firstOrNull);
 
-    final muertos = int.tryParse(_muertosCtrl.text) ?? 0;
-    final pesoG = double.tryParse(_pesoCtrl.text) ?? (activeBatch?.pesoActualGramos ?? 250.0);
+    final muertos = int.tryParse(_muertosCtrl.text.trim()) ?? 0;
+    final pesoG = double.tryParse(_pesoCtrl.text.replaceAll(',', '.').trim()) ?? (activeBatch?.pesoActualGramos ?? 0.0);
     final biomasaPerdidaKg = (muertos * pesoG) / 1000.0;
-    final poblacionPrevia = activeBatch?.cantidadActualPeces ?? 1000;
+    final poblacionPrevia = activeBatch?.cantidadActualPeces ?? 0;
     final superacionPoblacion = muertos > poblacionPrevia;
     final nuevaPoblacion = (poblacionPrevia - muertos).clamp(0, 9999999);
     final tasaMortalidadPct = poblacionPrevia > 0 ? (muertos / poblacionPrevia) * 100.0 : 0.0;
@@ -281,9 +282,17 @@ class _MortalidadModalState extends ConsumerState<MortalidadModal> {
                       Expanded(
                         child: GlassFormField(
                           label: 'PECES MUERTOS RETIRADOS',
-                          hint: '0',
+                          hint: 'Ej: 5',
                           controller: _muertosCtrl,
                           keyboardType: TextInputType.number,
+                          validator: (val) {
+                            final n = int.tryParse(val?.trim() ?? '');
+                            if (n == null || n <= 0) return 'Ingresa bajas (> 0)';
+                            if (poblacionPrevia > 0 && n > poblacionPrevia) {
+                              return 'Supera población ($poblacionPrevia)';
+                            }
+                            return null;
+                          },
                           onChanged: (_) => setState(() {}),
                         ),
                       ),
@@ -291,9 +300,14 @@ class _MortalidadModalState extends ConsumerState<MortalidadModal> {
                       Expanded(
                         child: GlassFormField(
                           label: 'PESO PROM. (g)',
-                          hint: '250',
+                          hint: 'Ej: 250',
                           controller: _pesoCtrl,
                           keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          validator: (val) {
+                            final p = double.tryParse(val?.replaceAll(',', '.').trim() ?? '');
+                            if (p == null || p <= 0) return 'Ingresa peso (> 0)';
+                            return null;
+                          },
                           onChanged: (_) => setState(() {}),
                         ),
                       ),
@@ -408,6 +422,7 @@ class _MortalidadModalState extends ConsumerState<MortalidadModal> {
                     onPressed: (activePond == null || activeBatch == null || muertos <= 0 || superacionPoblacion)
                         ? null
                         : () async {
+                            if (!_formKey.currentState!.validate()) return;
                             final nav = Navigator.of(context);
                             final messenger = ScaffoldMessenger.of(context);
                             setState(() => _isLoading = true);

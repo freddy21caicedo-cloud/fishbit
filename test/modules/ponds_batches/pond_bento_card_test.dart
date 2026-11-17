@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fishbit_finance/modules/ponds_batches/domain/models/pond.dart';
 import 'package:fishbit_finance/modules/ponds_batches/domain/models/fish_batch.dart';
+import 'package:fishbit_finance/modules/water_quality/domain/models/water_parameter.dart';
 import 'package:fishbit_finance/modules/ponds_batches/presentation/widgets/pond_bento_card.dart';
 
 void main() {
@@ -266,6 +267,186 @@ void main() {
       // 4. Redundant bottom return button is removed
       final returnBottomFinder = find.text('↩️ Volver a Vista de Estanque');
       expect(returnBottomFinder, findsNothing);
+    });
+
+    testWidgets('5. Front card renders Water Quality mini-strip with live O2, Temp, and pH', (tester) async {
+      final testParam = WaterParameter(
+        id: 'wq-1',
+        empresaId: 'emp-1',
+        unidadAcuicolaId: 'u-1',
+        estanqueId: 'pond-test-1',
+        fecha: now,
+        oxigenoMgL: 5.8,
+        temperaturaC: 28.5,
+        ph: 7.4,
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp(
+            home: Scaffold(
+              body: SingleChildScrollView(
+                child: PondBentoCard(
+                  pond: testPond,
+                  batch: testBatch1,
+                  batches: [testBatch1],
+                  latestWaterParameter: testParam,
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('O₂: 5.8 mg/L'), findsOneWidget);
+      expect(find.textContaining('T: 28.5°C'), findsOneWidget);
+      expect(find.textContaining('pH: 7.4'), findsOneWidget);
+    });
+
+    testWidgets('6. Reverse face includes Structural and Aeration card with dimensions and harvest projection', (tester) async {
+      final pondWithDims = testPond.copyWith(
+        largoM: 30.0,
+        anchoM: 20.0,
+        profundidadM: 1.0,
+        tipoEstructura: 'Geomembrana Circular',
+      );
+
+      final batchWithHarvest = testBatch1.copyWith(
+        fechaCosechaEstimada: now.add(const Duration(days: 30)),
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp(
+            home: Scaffold(
+              body: SingleChildScrollView(
+                child: PondBentoCard(
+                  pond: pondWithDims,
+                  batch: batchWithHarvest,
+                  batches: [batchWithHarvest],
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Tap 3D Flip trigger to show back face
+      await tester.tap(find.byIcon(Icons.flip_camera_android_rounded).first);
+      await tester.pumpAndSettle();
+
+      expect(find.text('🏗️ FICHA ESTRUCTURAL Y AIREACIÓN'), findsOneWidget);
+      expect(find.textContaining('30.0m × 20.0m × 1.0m'), findsOneWidget);
+      expect(find.textContaining('600 m³ de agua'), findsOneWidget);
+      expect(find.textContaining('Aireación sug.:'), findsOneWidget);
+    });
+
+    testWidgets('7. Operational Bottom Sheet includes Edit Pond action >= 56dp and fires onEditPondPressed', (tester) async {
+      bool editCalled = false;
+
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp(
+            home: Scaffold(
+              body: SingleChildScrollView(
+                child: PondBentoCard(
+                  pond: testPond,
+                  batch: testBatch1,
+                  batches: [testBatch1],
+                  onEditPondPressed: () => editCalled = true,
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Open bottom sheet
+      await tester.tap(find.text('REGISTRAR ACCIÓN DE CAMPO'));
+      await tester.pumpAndSettle();
+
+      final editFinder = find.text('Editar Parámetros del Estanque');
+      expect(editFinder, findsOneWidget);
+
+      final inkWellFinder = find.ancestor(of: editFinder, matching: find.byType(InkWell)).first;
+      final size = tester.getSize(inkWellFinder);
+      expect(size.height, greaterThanOrEqualTo(56.0));
+
+      await tester.tap(editFinder);
+      await tester.pumpAndSettle();
+      expect(editCalled, isTrue);
+    });
+
+    testWidgets('8. Reverse face does not overflow inside constrained grid cell (e.g. 340x420 & 360x450)', (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp(
+            home: Scaffold(
+              body: Center(
+                child: SizedBox(
+                  width: 340,
+                  height: 420,
+                  child: PondBentoCard(
+                    pond: testPond,
+                    batch: testBatch1,
+                    batches: [testBatch1, testBatch2],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+
+      // Flip card to reverse face
+      await tester.tap(find.byIcon(Icons.flip_camera_android_rounded).first);
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+
+      // Switch to consolidated polyculture view on reverse face
+      final consolidatedFinder = find.text('📊 Consolidado');
+      await tester.ensureVisible(consolidatedFinder);
+      await tester.pumpAndSettle();
+      await tester.tap(consolidatedFinder);
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('9. Target harvest weight reflects custom targetWeightsBySpecies on front and back faces', (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp(
+            home: Scaffold(
+              body: SingleChildScrollView(
+                child: PondBentoCard(
+                  pond: testPond,
+                  batch: testBatch1,
+                  batches: [testBatch1],
+                  targetWeightsBySpecies: const {
+                    'Tilapia Roja': 800.0,
+                  },
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Front card should display custom harvest target
+      expect(find.textContaining('800g cosecha'), findsOneWidget);
+
+      // Flip to reverse face
+      await tester.tap(find.byIcon(Icons.flip_camera_android_rounded).first);
+      await tester.pumpAndSettle();
+
+      // Reverse face should display custom target
+      expect(find.textContaining('800g meta'), findsOneWidget);
     });
   });
 }

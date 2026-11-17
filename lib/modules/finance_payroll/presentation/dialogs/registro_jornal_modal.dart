@@ -53,7 +53,7 @@ class _RegistroJornalModalState extends ConsumerState<RegistroJornalModal> {
     super.initState();
     _laborSeleccionada = _laboresComunes.first;
     final config = ref.read(financeProvider).payrollConfig;
-    _valorJornalCtrl = TextEditingController(text: config.tarifaJornalCampoDefecto.toInt().toString());
+    _valorJornalCtrl = TextEditingController(text: CurrencyFormatters.formatCOP(config.tarifaJornalCampoDefecto));
   }
 
   @override
@@ -64,8 +64,10 @@ class _RegistroJornalModalState extends ConsumerState<RegistroJornalModal> {
     super.dispose();
   }
 
-  int get _cantidad => int.tryParse(_cantidadCtrl.text) ?? 1;
-  double get _valorJornal => double.tryParse(_valorJornalCtrl.text) ?? 65000.0;
+  int get _cantidad => CurrencyFormatters.parseCOP(_cantidadCtrl.text).toInt().clamp(1, 999999);
+  double get _valorJornal => CurrencyFormatters.parseCOP(_valorJornalCtrl.text) > 0
+      ? CurrencyFormatters.parseCOP(_valorJornalCtrl.text)
+      : 65000.0;
   double get _totalPagar => _cantidad * _valorJornal;
 
   @override
@@ -201,6 +203,7 @@ class _RegistroJornalModalState extends ConsumerState<RegistroJornalModal> {
                           label: 'VALOR POR JORNAL (\$ COP)',
                           controller: _valorJornalCtrl,
                           keyboardType: TextInputType.number,
+                          inputFormatters: [CurrencyInputFormatter()],
                           prefixIcon: Icons.payments_outlined,
                           onChanged: (_) => setState(() {}),
                         ),

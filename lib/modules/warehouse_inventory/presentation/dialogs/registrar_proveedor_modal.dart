@@ -17,17 +17,26 @@ import 'package:fishbit_finance/modules/auth_tenant/presentation/providers/auth_
 /// (País -> Departamento -> Ciudad), datos de contacto y multi-selección de categorías.
 class RegistrarProveedorModal extends ConsumerStatefulWidget {
   final String? initialCategory;
+  final Supplier? supplierToEdit;
 
   const RegistrarProveedorModal({
     super.key,
     this.initialCategory,
+    this.supplierToEdit,
   });
 
-  static Future<Supplier?> show(BuildContext context, {String? initialCategory}) {
+  static Future<Supplier?> show(
+    BuildContext context, {
+    String? initialCategory,
+    Supplier? supplierToEdit,
+  }) {
     return showDialog<Supplier?>(
       context: context,
       barrierDismissible: true,
-      builder: (context) => RegistrarProveedorModal(initialCategory: initialCategory),
+      builder: (context) => RegistrarProveedorModal(
+        initialCategory: initialCategory,
+        supplierToEdit: supplierToEdit,
+      ),
     );
   }
 
@@ -90,14 +99,35 @@ class _RegistrarProveedorModalState extends ConsumerState<RegistrarProveedorModa
   @override
   void initState() {
     super.initState();
-    // Inicializar categorías
-    if (widget.initialCategory != null && widget.initialCategory!.isNotEmpty) {
-      _categoriasSeleccionadas.add(widget.initialCategory!);
+    final edit = widget.supplierToEdit;
+    if (edit != null) {
+      _nombreCtrl.text = edit.nombre;
+      _documentoCtrl.text = edit.nit;
+      _tipoIdentificacion = edit.tipoIdentificacion ?? 'NIT';
+      _contactoNombreCtrl.text = edit.contactoNombre ?? '';
+      _telefonoCtrl.text = edit.telefono ?? '';
+      _emailCtrl.text = edit.email ?? '';
+      _direccionCtrl.text = edit.direccion ?? '';
+      if (edit.categorias.isNotEmpty) {
+        _categoriasSeleccionadas.addAll(edit.categorias);
+      } else {
+        _categoriasSeleccionadas.add(edit.categoriaPrincipal);
+      }
+      _actualizarCascadaGeografica(
+        edit.pais ?? GeographicService.defaultCountry,
+        departamentoInicial: edit.departamento ?? 'Antioquia',
+        ciudadInicial: edit.ciudad ?? 'Medellín',
+      );
     } else {
-      _categoriasSeleccionadas.add('concentrados');
-    }
+      // Inicializar categorías
+      if (widget.initialCategory != null && widget.initialCategory!.isNotEmpty) {
+        _categoriasSeleccionadas.add(widget.initialCategory!);
+      } else {
+        _categoriasSeleccionadas.add('concentrados');
+      }
 
-    _actualizarCascadaGeografica(_selectedCountry, departamentoInicial: 'Antioquia', ciudadInicial: 'Medellín');
+      _actualizarCascadaGeografica(_selectedCountry, departamentoInicial: 'Antioquia', ciudadInicial: 'Medellín');
+    }
   }
 
   @override
@@ -209,8 +239,9 @@ class _RegistrarProveedorModalState extends ConsumerState<RegistrarProveedorModa
       final categoriasList = _categoriasSeleccionadas.toList();
       final catPrincipal = categoriasList.first;
 
+      final isEditing = widget.supplierToEdit != null;
       final newSupplier = Supplier(
-        id: const Uuid().v4(),
+        id: isEditing ? widget.supplierToEdit!.id : const Uuid().v4(),
         nit: _documentoCtrl.text.trim(),
         nombre: _nombreCtrl.text.trim(),
         tipoIdentificacion: _tipoIdentificacion,
@@ -223,18 +254,27 @@ class _RegistrarProveedorModalState extends ConsumerState<RegistrarProveedorModa
         direccion: _direccionCtrl.text.trim().isNotEmpty ? _direccionCtrl.text.trim() : null,
         categoriaPrincipal: catPrincipal,
         categorias: categoriasList,
-        empresaId: empresaId,
-        unidadAcuicolaSigla: sigla,
-        isCustom: true,
+        productosOfrecidos: isEditing ? widget.supplierToEdit!.productosOfrecidos : const [],
+        empresaId: isEditing ? (widget.supplierToEdit!.empresaId ?? empresaId) : empresaId,
+        unidadAcuicolaSigla: isEditing ? (widget.supplierToEdit!.unidadAcuicolaSigla ?? sigla) : sigla,
+        isCustom: isEditing ? widget.supplierToEdit!.isCustom : true,
       );
 
-      await ref.read(warehouseProvider.notifier).addSupplier(newSupplier);
+      if (isEditing) {
+        await ref.read(warehouseProvider.notifier).updateSupplier(newSupplier);
+      } else {
+        await ref.read(warehouseProvider.notifier).addSupplier(newSupplier);
+      }
 
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Proveedor "${newSupplier.nombre}" registrado exitosamente.'),
+          content: Text(
+            isEditing
+                ? 'Proveedor "${newSupplier.nombre}" actualizado.'
+                : 'Proveedor "${newSupplier.nombre}" registrado exitosamente.',
+          ),
           backgroundColor: AppColors.greenBiomass,
         ),
       );

@@ -44,6 +44,7 @@ class CrearClienteModal extends ConsumerStatefulWidget {
 class _CrearClienteModalState extends ConsumerState<CrearClienteModal> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _nombreCtrl;
+  final _cedulaNitCtrl = TextEditingController();
   final _telefonoCtrl = TextEditingController();
   final _emailCtrl = TextEditingController();
   bool _isSaving = false;
@@ -57,6 +58,7 @@ class _CrearClienteModalState extends ConsumerState<CrearClienteModal> {
   @override
   void dispose() {
     _nombreCtrl.dispose();
+    _cedulaNitCtrl.dispose();
     _telefonoCtrl.dispose();
     _emailCtrl.dispose();
     super.dispose();
@@ -77,10 +79,12 @@ class _CrearClienteModalState extends ConsumerState<CrearClienteModal> {
         id: const Uuid().v4(),
         empresaId: empresaId,
         nombre: _nombreCtrl.text.trim(),
+        cedulaNit: _cedulaNitCtrl.text.trim().isNotEmpty ? _cedulaNitCtrl.text.trim() : null,
         telefono: _telefonoCtrl.text.trim().isNotEmpty ? _telefonoCtrl.text.trim() : null,
         email: _emailCtrl.text.trim().isNotEmpty ? _emailCtrl.text.trim().toLowerCase() : null,
         creadoEn: DateTime.now(),
       );
+
 
       await ref.read(salesProvider.notifier).addClient(newClient);
       widget.onClientCreated?.call(newClient);
@@ -198,6 +202,19 @@ class _CrearClienteModalState extends ConsumerState<CrearClienteModal> {
                       },
                     ),
                     const SizedBox(height: 14),
+
+                    // Campo Cédula / NIT
+                    GlassFormField(
+                      label: 'CÉDULA / NIT (OPCIONAL)',
+                      hint: 'Ej: 900.123.456-7 / 1075...',
+                      controller: _cedulaNitCtrl,
+                      prefixIcon: Icons.badge_outlined,
+                      textInputAction: TextInputAction.next,
+                      showClearButton: true,
+                      accentColor: AppColors.greenBiomass,
+                    ),
+                    const SizedBox(height: 14),
+
 
                     // Campo Teléfono / WhatsApp
                     GlassFormField(

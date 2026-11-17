@@ -52,7 +52,7 @@ class IcaOfficialReportsEngine {
 
   void _downloadExcel(Excel excel, String filename) {
     final bytes = excel.save();
-    if (bytes != null && kIsWeb) {
+    if (bytes != null) {
       downloadFileWeb(bytes, filename);
     }
   }
@@ -138,7 +138,14 @@ class IcaOfficialReportsEngine {
     _setCellValue(sheet, 6, currentRow, ExcelStylerHelper.formatCurrency(totalCosto), ExcelStylerHelper.totalValueStyle);
     _setCellValue(sheet, 7, currentRow, '', ExcelStylerHelper.totalValueStyle);
 
-    // 8. Auto-ancho de Columnas
+    // 8. Pie de Firmas Oficial
+    ExcelStylerHelper.writeOfficialSignatureFooter(
+      sheet: sheet,
+      startRow: currentRow,
+      maxCols: 8,
+    );
+
+    // 9. Auto-ancho de Columnas
     sheet.setColumnWidth(0, 14.0);
     sheet.setColumnWidth(1, 16.0);
     sheet.setColumnWidth(2, 36.0);
@@ -392,6 +399,10 @@ class IcaOfficialReportsEngine {
       final styleC = isZebra ? ExcelStylerHelper.cellZebraCenter : ExcelStylerHelper.cellCenter;
       final styleR = isZebra ? ExcelStylerHelper.cellZebraRight : ExcelStylerHelper.cellRight;
 
+      final styleStatus = ox < 4.0
+          ? ExcelStylerHelper.statusCriticalStyle
+          : (ox < 5.0 ? ExcelStylerHelper.statusWarningStyle : ExcelStylerHelper.statusOptimalStyle);
+
       _setCellValue(sheet, 0, currentRow, w.fecha.toIso8601String().split('T')[0], styleC);
       _setCellValue(sheet, 1, currentRow, '${w.fecha.hour.toString().padLeft(2, '0')}:${w.fecha.minute.toString().padLeft(2, '0')}', styleC);
       _setCellValue(sheet, 2, currentRow, pondLabel, styleL);
@@ -400,10 +411,16 @@ class IcaOfficialReportsEngine {
       _setCellValue(sheet, 5, currentRow, w.ph?.toStringAsFixed(1) ?? '-', styleR);
       _setCellValue(sheet, 6, currentRow, w.amonioMgL?.toStringAsFixed(2) ?? '-', styleR);
       _setCellValue(sheet, 7, currentRow, w.nitritosMgL?.toStringAsFixed(2) ?? '-', styleR);
-      _setCellValue(sheet, 8, currentRow, estado, styleC);
+      _setCellValue(sheet, 8, currentRow, estado, styleStatus);
 
       currentRow++;
     }
+
+    ExcelStylerHelper.writeOfficialSignatureFooter(
+      sheet: sheet,
+      startRow: currentRow,
+      maxCols: 9,
+    );
 
     sheet.setColumnWidth(0, 14.0);
     sheet.setColumnWidth(1, 10.0);

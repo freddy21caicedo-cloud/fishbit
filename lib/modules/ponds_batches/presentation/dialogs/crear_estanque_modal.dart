@@ -15,14 +15,16 @@ import 'package:fishbit_finance/modules/ponds_batches/presentation/providers/pon
 /// Sigue el estándar de los formularios de registro de FishBit (scroll fluido, sin PageView restringido,
 /// sigla técnica auto-asignada sin réplicas y soporte completo para modo claro/oscuro).
 class CrearEstanqueModal extends ConsumerStatefulWidget {
-  const CrearEstanqueModal({super.key});
+  final Pond? pondToEdit;
 
-  static Future<Pond?> show(BuildContext context) {
+  const CrearEstanqueModal({super.key, this.pondToEdit});
+
+  static Future<Pond?> show(BuildContext context, {Pond? pondToEdit}) {
     return showDialog<Pond>(
       context: context,
       barrierDismissible: true,
       barrierColor: Colors.black.withValues(alpha: 0.65),
-      builder: (_) => const CrearEstanqueModal(),
+      builder: (_) => CrearEstanqueModal(pondToEdit: pondToEdit),
     );
   }
 
@@ -34,9 +36,9 @@ class _CrearEstanqueModalState extends ConsumerState<CrearEstanqueModal> {
   final _formKey = GlobalKey<FormState>();
 
   // Identificación
-  final _nombreCtrl = TextEditingController();
+  late final TextEditingController _nombreCtrl;
   String _siglaGenerada = '';
-  String _tipoEstructura = 'Geomembrana Circular';
+  late String _tipoEstructura;
 
   final List<Map<String, dynamic>> _tiposEstructura = [
     {'label': 'Geomembrana Circular', 'icon': Icons.circle_outlined, 'desc': 'Tanque australiano / Zamorano'},
@@ -46,25 +48,52 @@ class _CrearEstanqueModalState extends ConsumerState<CrearEstanqueModal> {
   ];
 
   // Geometría y Volumen
-  bool _esCircular = true;
-  final _diametroCtrl = TextEditingController(text: '12.0');
-  final _profundidadCtrl = TextEditingController(text: '1.2');
-  final _largoCtrl = TextEditingController(text: '20.0');
-  final _anchoCtrl = TextEditingController(text: '10.0');
-  final _capacidadFinalCtrl = TextEditingController();
+  late bool _esCircular;
+  late final TextEditingController _diametroCtrl;
+  late final TextEditingController _profundidadCtrl;
+  late final TextEditingController _largoCtrl;
+  late final TextEditingController _anchoCtrl;
+  late final TextEditingController _capacidadFinalCtrl;
 
   bool _isSaving = false;
   bool _hasManuallyEditedCapacidad = false;
 
+  bool get isEditing => widget.pondToEdit != null;
+
   @override
   void initState() {
     super.initState();
+    final p = widget.pondToEdit;
+    final isRect = p != null && (p.largoM != null && p.largoM! > 0);
+
+    _nombreCtrl = TextEditingController(text: p?.nombre ?? '');
+    _siglaGenerada = p?.sigla ?? '';
+    _tipoEstructura = p?.tipoEstructura ?? 'Geomembrana Circular';
+
+    _esCircular = !isRect;
+    final prof = p?.profundidadM ?? 1.2;
+    _profundidadCtrl = TextEditingController(text: prof.toStringAsFixed(1));
+    _largoCtrl = TextEditingController(text: (p?.largoM ?? 20.0).toStringAsFixed(1));
+    _anchoCtrl = TextEditingController(text: (p?.anchoM ?? 10.0).toStringAsFixed(1));
+
+    // Estimar diámetro si era circular con capacidad dada
+    double initialDiam = 12.0;
+    if (_esCircular && p != null && p.capacidadM3 > 0 && prof > 0) {
+      final area = p.capacidadM3 / prof;
+      initialDiam = math.sqrt((4 * area) / math.pi);
+    }
+    _diametroCtrl = TextEditingController(text: initialDiam.toStringAsFixed(1));
+    _capacidadFinalCtrl = TextEditingController(text: p != null ? p.capacidadM3.toStringAsFixed(1) : '');
+    if (p != null) _hasManuallyEditedCapacidad = true;
+
     _nombreCtrl.addListener(_onNombreChanged);
     _diametroCtrl.addListener(_recalcularVolumen);
     _profundidadCtrl.addListener(_recalcularVolumen);
     _largoCtrl.addListener(_recalcularVolumen);
     _anchoCtrl.addListener(_recalcularVolumen);
-    _recalcularVolumen();
+    if (p == null) {
+      _recalcularVolumen();
+    }
   }
 
   @override
@@ -90,6 +119,9 @@ class _CrearEstanqueModalState extends ConsumerState<CrearEstanqueModal> {
 
   /// Calcula una sigla técnica única, secuencial y libre de réplicas en la unidad activa
   void _actualizarSigla() {
+    if (widget.pondToEdit != null) {
+      return;
+    }
     final auth = ref.read(authProvider);
     final user = auth.currentUser;
     final unidadId = auth.activeUnitId ?? user?.unidadAcuicolaId ?? '';
@@ -203,29 +235,46 @@ class _CrearEstanqueModalState extends ConsumerState<CrearEstanqueModal> {
     final double? ancho = _esCircular ? null : _parseDecimal(_anchoCtrl.text);
     final prof = _parseDecimal(_profundidadCtrl.text);
 
-    final newPond = Pond(
-      id: const Uuid().v4(),
-      empresaId: empresaId,
-      unidadAcuicolaId: unidadId,
-      unidadAcuicolaSigla: unidadSigla,
-      tipoEstructura: _tipoEstructura,
-      nombre: _nombreCtrl.text.trim(),
-      sigla: _siglaGenerada,
-      capacidadM3: capacidadM3,
-      largoM: largo,
-      anchoM: ancho,
-      profundidadM: prof,
-      estado: PondStatus.available,
-      creadoEn: DateTime.now(),
-    );
+    final isEditing = widget.pondToEdit != null;
+    final pondToSave = isEditing
+        ? widget.pondToEdit!.copyWith(
+            nombre: _nombreCtrl.text.trim(),
+            sigla: _siglaGenerada.isNotEmpty ? _siglaGenerada : widget.pondToEdit!.sigla,
+            tipoEstructura: _tipoEstructura,
+            capacidadM3: capacidadM3,
+            largoM: largo,
+            anchoM: ancho,
+            profundidadM: prof,
+          )
+        : Pond(
+            id: const Uuid().v4(),
+            empresaId: empresaId,
+            unidadAcuicolaId: unidadId,
+            unidadAcuicolaSigla: unidadSigla,
+            tipoEstructura: _tipoEstructura,
+            nombre: _nombreCtrl.text.trim(),
+            sigla: _siglaGenerada,
+            capacidadM3: capacidadM3,
+            largoM: largo,
+            anchoM: ancho,
+            profundidadM: prof,
+            estado: PondStatus.available,
+            creadoEn: DateTime.now(),
+          );
 
     try {
-      await ref.read(pondsProvider.notifier).addPond(newPond);
+      if (isEditing) {
+        await ref.read(pondsProvider.notifier).updatePond(pondToSave);
+      } else {
+        await ref.read(pondsProvider.notifier).addPond(pondToSave);
+      }
       if (mounted) {
-        Navigator.of(context).pop(newPond);
+        Navigator.of(context).pop(pondToSave);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('✅ Estanque "${newPond.nombre}" (${newPond.sigla} - ${newPond.capacidadM3.toInt()} m³) creado con éxito.'),
+            content: Text(isEditing
+                ? '✅ Estanque "${pondToSave.nombre}" (${pondToSave.sigla}) actualizado con éxito.'
+                : '✅ Estanque "${pondToSave.nombre}" (${pondToSave.sigla} - ${pondToSave.capacidadM3.toInt()} m³) creado con éxito.'),
             backgroundColor: AppColors.greenBiomass,
           ),
         );
@@ -235,7 +284,7 @@ class _CrearEstanqueModalState extends ConsumerState<CrearEstanqueModal> {
         setState(() => _isSaving = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error al crear estanque: $e'),
+            content: Text('Error al guardar estanque: $e'),
             backgroundColor: AppColors.coralAction,
           ),
         );
@@ -286,8 +335,8 @@ class _CrearEstanqueModalState extends ConsumerState<CrearEstanqueModal> {
                                   color: AppColors.cyanWater.withValues(alpha: 0.15),
                                   borderRadius: BorderRadius.circular(12),
                                 ),
-                                child: const Icon(
-                                  Icons.waves_rounded,
+                                child: Icon(
+                                  isEditing ? Icons.tune_rounded : Icons.waves_rounded,
                                   color: AppColors.cyanWater,
                                   size: 22,
                                 ),
@@ -298,7 +347,7 @@ class _CrearEstanqueModalState extends ConsumerState<CrearEstanqueModal> {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      'Nuevo Estanque de Cultivo',
+                                      isEditing ? 'Editar Estanque de Cultivo' : 'Nuevo Estanque de Cultivo',
                                       style: AppTypography.titleMedium.copyWith(
                                         color: isDark ? Colors.white : AppColors.textPrimaryLight,
                                         fontWeight: FontWeight.w800,
@@ -306,7 +355,9 @@ class _CrearEstanqueModalState extends ConsumerState<CrearEstanqueModal> {
                                       overflow: TextOverflow.ellipsis,
                                     ),
                                     Text(
-                                      'Infraestructura física y cubicaje hidráulico',
+                                      isEditing
+                                          ? 'Ajustar cubicaje y parámetros de infraestructura'
+                                          : 'Infraestructura física y cubicaje hidráulico',
                                       style: TextStyle(
                                         color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
                                         fontSize: 11,
@@ -817,7 +868,7 @@ class _CrearEstanqueModalState extends ConsumerState<CrearEstanqueModal> {
                         Expanded(
                           flex: 2,
                           child: GlassButton(
-                            label: 'Guardar Estanque',
+                            label: isEditing ? 'Actualizar Estanque' : 'Guardar Estanque',
                             backgroundColor: AppColors.cyanWater,
                             isLoading: _isSaving,
                             onPressed: _handleSave,

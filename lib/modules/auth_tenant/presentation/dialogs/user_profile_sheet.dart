@@ -301,7 +301,7 @@ class UserProfileSheet extends ConsumerWidget {
                             isDark: isDark,
                             icon: Icons.account_balance_wallet_rounded,
                             color: AppColors.coralAction,
-                            title: 'Finanzas, Nómina y OPEX',
+                            title: 'FishBit Finanzas',
                             subtitle: 'Costos de producción, nómina y balance',
                             onTap: () {
                               Navigator.of(context).pop();

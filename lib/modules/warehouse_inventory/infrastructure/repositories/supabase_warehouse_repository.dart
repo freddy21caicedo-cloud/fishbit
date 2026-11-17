@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:uuid/uuid.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:fishbit_finance/modules/warehouse_inventory/domain/models/inventory_item.dart';
 import 'package:fishbit_finance/modules/warehouse_inventory/domain/models/purchase_invoice.dart';
@@ -241,6 +242,62 @@ class SupabaseWarehouseRepository implements WarehouseRepository {
       return Supplier.fromJson(res);
     } catch (e) {
       debugPrint('[SupabaseWarehouseRepository] Error in createSupplier: $e');
+      rethrow;
+    }
+  }
+
+  static final RegExp _uuidRegex = RegExp(
+    r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
+  );
+
+  @override
+  Future<void> ensureDefaultSuppliersSeeded(String empresaId) async {
+    if (empresaId.isEmpty || empresaId.startsWith('c1000000-')) return;
+    try {
+      await _supabase.rpc('seed_default_suppliers_for_empresa', params: {
+        'p_empresa_id': empresaId,
+      });
+    } catch (e) {
+      debugPrint('[SupabaseWarehouseRepository] Error in ensureDefaultSuppliersSeeded: $e');
+    }
+  }
+
+  @override
+  Future<Supplier> updateSupplier(Supplier supplier) async {
+    final idx = _demoCustomSuppliers.indexWhere((s) => s.id == supplier.id);
+    if (idx != -1) {
+      _demoCustomSuppliers[idx] = supplier;
+    }
+    if (supplier.empresaId == null || supplier.empresaId!.startsWith('c1000000-')) {
+      return supplier;
+    }
+    // Si por alguna razón el ID no es UUID (plantilla en memoria), crearlo con UUID nuevo
+    if (!_uuidRegex.hasMatch(supplier.id)) {
+      final migrated = supplier.copyWith(id: const Uuid().v4(), isCustom: true);
+      return createSupplier(migrated);
+    }
+    try {
+      final res = await _supabase
+          .from('proveedores')
+          .update(supplier.toSupabaseJson())
+          .eq('id', supplier.id)
+          .select()
+          .single();
+      return Supplier.fromJson(res);
+    } catch (e) {
+      debugPrint('[SupabaseWarehouseRepository] Error in updateSupplier: $e');
+      rethrow;
+    }
+  }
+
+  @override
+  Future<void> deleteSupplier(String supplierId) async {
+    _demoCustomSuppliers.removeWhere((s) => s.id == supplierId);
+    if (!_uuidRegex.hasMatch(supplierId)) return;
+    try {
+      await _supabase.from('proveedores').delete().eq('id', supplierId);
+    } catch (e) {
+      debugPrint('[SupabaseWarehouseRepository] Error in deleteSupplier: $e');
       rethrow;
     }
   }

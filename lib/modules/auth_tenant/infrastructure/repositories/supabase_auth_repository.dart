@@ -68,9 +68,13 @@ class SupabaseAuthRepository implements AuthRepository {
           } catch (_) {}
         }
 
+        final needsPwChange = (profileRow['requiere_cambio_clave'] as bool? ?? false) ||
+            (supabaseUser?.userMetadata?['must_change_password'] == true);
+
         final member = UserMember.fromJson({
           ...profileRow,
           'empresa_id': resolvedEmpresaId,
+          'requiere_cambio_clave': needsPwChange,
           if (assignedUnitId != null) 'unit_id': assignedUnitId,
         });
 
@@ -167,9 +171,13 @@ class SupabaseAuthRepository implements AuthRepository {
         // Si empresa_id es nulo, se mantiene nulo sin asignar empresas al azar
         final String? resolvedEmpresaId = profileRow['empresa_id'] as String?;
 
+        final needsPwChange = (profileRow['requiere_cambio_clave'] as bool? ?? false) ||
+            (authUser?.userMetadata?['must_change_password'] == true);
+
         final member = UserMember.fromJson({
           ...profileRow,
           'empresa_id': resolvedEmpresaId,
+          'requiere_cambio_clave': needsPwChange,
           if (assignedUnitId != null) 'unit_id': assignedUnitId,
         });
 
@@ -703,14 +711,11 @@ class SupabaseAuthRepository implements AuthRepository {
 
           final rawList = res as List;
           if (rawList.isNotEmpty) {
-            return rawList.map((row) => AquacultureUnit(
-              id: row['id'] as String,
-              empresaId: empresaId,
-              nombre: row['nombre'] as String? ?? 'Sede',
-              sigla: row['sigla'] as String? ?? '',
-              ubicacion: row['ubicacion'] as String?,
-              creadoEn: row['creado_en'] != null ? DateTime.parse(row['creado_en'] as String) : DateTime.now(),
-            )).toList();
+            return rawList.map((row) {
+              final map = Map<String, dynamic>.from(row as Map);
+              map['empresa_id'] = empresaId;
+              return AquacultureUnit.fromJson(map);
+            }).toList();
           }
         }
       }
@@ -723,14 +728,11 @@ class SupabaseAuthRepository implements AuthRepository {
 
       final unitsList = unitsRes as List;
       if (unitsList.isNotEmpty) {
-        return unitsList.map((row) => AquacultureUnit(
-          id: row['id'] as String,
-          empresaId: row['empresa_id'] as String? ?? empresaId,
-          nombre: row['name'] as String? ?? 'Sede',
-          sigla: row['sigla'] as String? ?? '',
-          ubicacion: row['location'] as String?,
-          creadoEn: row['created_at'] != null ? DateTime.parse(row['created_at'] as String) : DateTime.now(),
-        )).toList();
+        return unitsList.map((row) {
+          final map = Map<String, dynamic>.from(row as Map);
+          map['empresa_id'] = map['empresa_id'] ?? empresaId;
+          return AquacultureUnit.fromJson(map);
+        }).toList();
       }
     } catch (_) {}
 
@@ -738,19 +740,46 @@ class SupabaseAuthRepository implements AuthRepository {
   }
 
   @override
-  Future<AquacultureUnit> createUnit(String empresaId, String nombre, String sigla, String? ubicacion) async {
+  Future<AquacultureUnit> createUnit(
+    String empresaId,
+    String nombre,
+    String sigla,
+    String? ubicacion, {
+    String? pais,
+    String? departamento,
+    String? ciudad,
+    String? direccion,
+    String? telefono,
+  }) async {
     final unitId = const Uuid().v4();
 
     // Si la sigla viene vacía (llamada desde auto-creación), generarla desde el nombre
     final rawSigla = sigla.trim().isEmpty ? SiglaGenerator.generate(nombre, fallback: 'SED', maxLength: 4) : sigla.trim().toUpperCase();
     final uniqueSigla = await _resolveUniqueSigla(empresaId, rawSigla);
 
+    // Formatear ubicacion compuesta si no viene preformateada
+    String? finalUbicacion = ubicacion;
+    if ((finalUbicacion == null || finalUbicacion.trim().isEmpty) && (ciudad != null || departamento != null)) {
+      final parts = [
+        if (direccion != null && direccion.trim().isNotEmpty) direccion.trim(),
+        if (ciudad != null && ciudad.trim().isNotEmpty) ciudad.trim(),
+        if (departamento != null && departamento.trim().isNotEmpty) departamento.trim(),
+        if (pais != null && pais.trim().isNotEmpty) pais.trim(),
+      ];
+      if (parts.isNotEmpty) finalUbicacion = parts.join(', ');
+    }
+
     final newUnit = AquacultureUnit(
       id: unitId,
       empresaId: empresaId,
       nombre: nombre,
       sigla: uniqueSigla,
-      ubicacion: ubicacion,
+      ubicacion: finalUbicacion,
+      pais: pais,
+      departamento: departamento,
+      ciudad: ciudad,
+      direccion: direccion,
+      telefono: telefono,
       isDeleted: false,
       creadoEn: DateTime.now(),
     );
@@ -763,7 +792,12 @@ class SupabaseAuthRepository implements AuthRepository {
             'empresa_id': empresaId,
             'nombre': nombre,
             'sigla': uniqueSigla,
-            if (ubicacion != null && ubicacion.isNotEmpty) 'ubicacion': ubicacion,
+            if (finalUbicacion != null && finalUbicacion.isNotEmpty) 'ubicacion': finalUbicacion,
+            if (pais != null && pais.isNotEmpty) 'pais': pais,
+            if (departamento != null && departamento.isNotEmpty) 'departamento': departamento,
+            if (ciudad != null && ciudad.isNotEmpty) 'ciudad': ciudad,
+            if (direccion != null && direccion.isNotEmpty) 'direccion': direccion,
+            if (telefono != null && telefono.isNotEmpty) 'telefono': telefono,
           })
           .select()
           .single();
@@ -774,11 +808,30 @@ class SupabaseAuthRepository implements AuthRepository {
           'empresa_id': empresaId,
           'name': nombre,
           'sigla': uniqueSigla,
-          if (ubicacion != null && ubicacion.isNotEmpty) 'location': ubicacion,
+          if (finalUbicacion != null && finalUbicacion.isNotEmpty) 'location': finalUbicacion,
+          if (pais != null && pais.isNotEmpty) 'pais': pais,
+          if (departamento != null && departamento.isNotEmpty) 'departamento': departamento,
+          if (ciudad != null && ciudad.isNotEmpty) 'ciudad': ciudad,
+          if (direccion != null && direccion.isNotEmpty) 'address': direccion,
+          if (telefono != null && telefono.isNotEmpty) 'phone': telefono,
         });
       } catch (_) {}
 
-      return AquacultureUnit.fromJson(res);
+      // Vinculación en user_units para el usuario autenticado creador
+      final currentUserId = _supabase.auth.currentUser?.id ?? _storage.getSessionUserId();
+      if (currentUserId != null && currentUserId.isNotEmpty) {
+        try {
+          await _supabase.from('user_units').upsert({
+            'user_id': currentUserId,
+            'unit_id': unitId,
+            'role': 'admin',
+          });
+        } catch (_) {}
+      }
+
+      final map = Map<String, dynamic>.from(res);
+      map['empresa_id'] = empresaId;
+      return AquacultureUnit.fromJson(map);
     } catch (_) {
       return newUnit;
     }
@@ -842,63 +895,53 @@ class SupabaseAuthRepository implements AuthRepository {
     }
 
     final cleanEmail = email.trim().toLowerCase();
-    final memberId = const Uuid().v4();
-    final newMember = UserMember(
-      id: memberId,
-      empresaId: empresaId,
-      unidadAcuicolaId: unidadAcuicolaId,
-      nombre: nombre.trim(),
-      email: cleanEmail,
-      role: role,
-      cedula: cedula.trim(),
-      salarioBase: salarioBase,
-      periodoPago: periodoPago,
-      permisoGlobalEmpresa: permisoGlobalEmpresa,
-      estado: MemberStatus.active,
-      creadoEn: DateTime.now(),
-    );
+    final cleanPassword = password.trim();
+
+    if (cleanPassword.length < 8) {
+      throw const AuthFailure('La contraseña inicial debe tener al menos 8 caracteres.');
+    }
 
     try {
-      // 2. Guardar en miembros_equipo
-      await _supabase.from('miembros_equipo').insert(newMember.toJson());
+      // 2. Crear usuario en Auth, Profiles, Miembros y UserUnits mediante RPC transaccional
+      // sin reemplazar la sesión activa del Administrador.
+      final res = await _supabase.rpc<dynamic>(
+        'upsert_team_member_with_password',
+        params: {
+          'p_empresa_id': empresaId,
+          'p_unidad_acuicola_id': unidadAcuicolaId ?? empresaId,
+          'p_nombre': nombre.trim(),
+          'p_email': cleanEmail,
+          'p_cedula': cedula.trim(),
+          'p_telefono': telefono.trim(),
+          'p_role': UserMember.roleToString(role),
+          'p_permiso_global': permisoGlobalEmpresa,
+          'p_salario_base': salarioBase,
+          'p_periodo_pago': periodoPago,
+          'p_password': cleanPassword,
+        },
+      );
 
-      // 3. Intentar registrar en Supabase Auth y Profiles
-      try {
-        final authRes = await _supabase.auth.signUp(
-          email: cleanEmail, 
-          password: password.trim(),
-          data: {
-            'full_name': nombre.trim(),
-            'role': UserMember.roleToString(role),
-            'empresa_id': empresaId,
-          },
-        );
-        final createdAuthId = authRes.user?.id ?? memberId;
-        await _supabase.from('profiles').upsert({
-          'id': createdAuthId,
-          'email': cleanEmail,
-          'full_name': nombre.trim(),
-          'role': UserMember.roleToString(role),
-          'empresa_id': empresaId,
-          'phone': telefono.trim(),
-          'updated_at': DateTime.now().toIso8601String(),
-        });
-      } catch (_) {
-        // Si signUp requiere confirmación de email o falla, guardar en profiles con el memberId
-        try {
-          await _supabase.from('profiles').upsert({
-            'id': memberId,
-            'email': cleanEmail,
-            'full_name': nombre.trim(),
-            'role': UserMember.roleToString(role),
-            'empresa_id': empresaId,
-            'phone': telefono.trim(),
-            'updated_at': DateTime.now().toIso8601String(),
-          });
-        } catch (_) {}
+      if (res is Map) {
+        return UserMember.fromJson(Map<String, dynamic>.from(res));
       }
 
-      return newMember;
+      return UserMember(
+        id: const Uuid().v4(),
+        empresaId: empresaId,
+        unidadAcuicolaId: unidadAcuicolaId,
+        nombre: nombre.trim(),
+        email: cleanEmail,
+        role: role,
+        cedula: cedula.trim(),
+        salarioBase: salarioBase,
+        periodoPago: periodoPago,
+        permisoGlobalEmpresa: permisoGlobalEmpresa,
+        estado: MemberStatus.active,
+        requiereCambioClave: true,
+        creadoEn: DateTime.now(),
+      );
+    } on PostgrestException catch (e) {
+      throw ServerFailure(e.message);
     } catch (e) {
       if (e is AppFailure) rethrow;
       throw ServerFailure('Error creando miembro del equipo: ${e.toString()}');
@@ -1047,7 +1090,7 @@ class SupabaseAuthRepository implements AuthRepository {
   }
 
   @override
-  Future<UserMember> updateTeamMember(UserMember member) async {
+  Future<UserMember> updateTeamMember(UserMember member, {String? newPassword}) async {
     // Validar privilegios administrativos del llamador
     final caller = await getCurrentSession();
     if (caller == null) {
@@ -1073,7 +1116,35 @@ class SupabaseAuthRepository implements AuthRepository {
       );
     }
 
+    final cleanNewPassword = newPassword?.trim();
+    if (cleanNewPassword != null && cleanNewPassword.isNotEmpty && cleanNewPassword.length < 8) {
+      throw const AuthFailure('La nueva contraseña temporal debe tener al menos 8 caracteres.');
+    }
+
     try {
+      if (cleanNewPassword != null && cleanNewPassword.isNotEmpty) {
+        final res = await _supabase.rpc<dynamic>(
+          'upsert_team_member_with_password',
+          params: {
+            'p_member_id': member.id,
+            'p_empresa_id': member.empresaId,
+            'p_unidad_acuicola_id': member.unidadAcuicolaId ?? member.empresaId,
+            'p_nombre': member.nombre,
+            'p_email': member.email.trim().toLowerCase(),
+            'p_cedula': member.cedula ?? '',
+            'p_role': UserMember.roleToString(member.role),
+            'p_permiso_global': member.permisoGlobalEmpresa,
+            'p_salario_base': member.salarioBase,
+            'p_periodo_pago': member.periodoPago,
+            'p_password': cleanNewPassword,
+          },
+        );
+        if (res is Map) {
+          return UserMember.fromJson(Map<String, dynamic>.from(res));
+        }
+        return member.copyWith(requiereCambioClave: true);
+      }
+
       // 1. Actualizar en miembros_equipo
       await _supabase
           .from('miembros_equipo')
@@ -1091,6 +1162,8 @@ class SupabaseAuthRepository implements AuthRepository {
       } catch (_) {}
 
       return member;
+    } on PostgrestException catch (e) {
+      throw ServerFailure(e.message);
     } catch (e) {
       if (e is AppFailure) rethrow;
       throw ServerFailure('Error actualizando miembro: $e');
@@ -1133,6 +1206,10 @@ class SupabaseAuthRepository implements AuthRepository {
     if (caller == null) {
       throw const AuthFailure('No hay una sesión activa para realizar esta operación.');
     }
+    if (caller.id == memberId) {
+      throw const AuthFailure('No puedes eliminar tu propia cuenta de administrador.');
+    }
+
     final callerRoleStr = UserMember.roleToString(caller.role).toLowerCase();
     final isAuthorized = caller.isAdmin ||
         caller.isCreator ||
@@ -1147,13 +1224,66 @@ class SupabaseAuthRepository implements AuthRepository {
     }
 
     try {
+      final memberRow = await _supabase
+          .from('miembros_equipo')
+          .select('id, email, empresa_id')
+          .eq('id', memberId)
+          .maybeSingle();
+
+      if (memberRow == null) {
+        throw const AuthFailure('El colaborador no fue encontrado.');
+      }
+
+      final memberEmail = (memberRow['email'] as String? ?? '').trim().toLowerCase();
+      if (memberEmail.isNotEmpty && memberEmail == caller.email.trim().toLowerCase()) {
+        throw const AuthFailure('No puedes eliminar tu propia cuenta de administrador.');
+      }
+
+      if (!caller.isCreator &&
+          (caller.empresaId == null || caller.empresaId != memberRow['empresa_id'])) {
+        throw const AuthFailure(
+          'Violación de seguridad multi-tenant: no tienes permisos para eliminar colaboradores de otra empresa.',
+        );
+      }
+
+      // Eliminar en miembros_equipo (el trigger elimina auth.users y en cascada profiles/user_units)
       await _supabase
           .from('miembros_equipo')
           .delete()
           .eq('id', memberId);
+
+      // Limpieza adicional en profiles por email si existía con UUID previo distinto
+      if (memberEmail.isNotEmpty) {
+        try {
+          await _supabase.from('profiles').delete().eq('email', memberEmail);
+        } catch (_) {}
+      }
     } catch (e) {
       if (e is AppFailure) rethrow;
       throw ServerFailure('Error eliminando miembro: $e');
+    }
+  }
+
+  @override
+  Future<void> updateInitialPassword(String newPassword) async {
+    final cleanPassword = newPassword.trim();
+    if (cleanPassword.length < 8) {
+      throw const AuthFailure('La nueva contraseña debe tener al menos 8 caracteres.');
+    }
+
+    try {
+      await _supabase.auth.updateUser(
+        UserAttributes(
+          password: cleanPassword,
+          data: {'must_change_password': false},
+        ),
+      );
+      await _supabase.rpc<dynamic>('complete_first_login_password_change');
+    } on AuthException catch (e) {
+      throw AuthFailure(_translateAuthError(e));
+    } catch (e) {
+      if (e is AppFailure) rethrow;
+      throw ServerFailure('No se pudo actualizar la contraseña en Supabase: $e');
     }
   }
 }

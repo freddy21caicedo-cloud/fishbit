@@ -90,3 +90,15 @@ final waterQualityProvider = StateNotifierProvider<WaterQualityNotifier, WaterQu
   final repo = ref.watch(waterQualityRepositoryProvider);
   return WaterQualityNotifier(repo, ref);
 });
+
+/// Selector memoizado en O(1) que entrega el registro más reciente de calidad de agua por ID de estanque
+final latestWaterQualityByPondProvider = Provider.autoDispose<Map<String, WaterParameter>>((ref) {
+  final params = ref.watch(waterQualityProvider.select((s) => s.recentParameters));
+  final map = <String, WaterParameter>{};
+  for (final p in params) {
+    if (p.estanqueId.isNotEmpty && !map.containsKey(p.estanqueId)) {
+      map[p.estanqueId] = p;
+    }
+  }
+  return map;
+});

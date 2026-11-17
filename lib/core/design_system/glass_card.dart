@@ -33,63 +33,81 @@ class GlassCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final hasHeader = title != null || titleWidget != null || leadingIcon != null || trailingWidget != null;
 
-    Widget content = Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        if (title != null || titleWidget != null || leadingIcon != null || trailingWidget != null) ...[
-          Row(
-            children: [
-              if (leadingIcon != null) ...[
-                leadingIcon!,
-                const SizedBox(width: 8),
-              ],
-              Expanded(
-                child: titleWidget ??
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (title != null)
-                          Text(
-                            title!.toUpperCase(),
-                            style: AppTypography.labelMicro.copyWith(
-                              color: glowColor ?? (isDark ? AppColors.cyanWater : AppColors.blueOcean),
-                            ),
-                          ),
-                        if (subtitle != null) ...[
-                          const SizedBox(height: 2),
-                          Text(
-                            subtitle!,
-                            style: AppTypography.bodySmall.copyWith(
-                              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-              ),
-              if (trailingWidget != null) ...[
-                const SizedBox(width: 8),
-                Flexible(
-                  flex: 0,
-                  child: trailingWidget!,
+    Widget buildHeader() {
+      return Row(
+        children: [
+          if (leadingIcon != null) ...[
+            leadingIcon!,
+            const SizedBox(width: 8),
+          ],
+          Expanded(
+            child: titleWidget ??
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (title != null)
+                      Text(
+                        title!.toUpperCase(),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTypography.labelMicro.copyWith(
+                          color: glowColor ?? (isDark ? AppColors.cyanWater : AppColors.blueOcean),
+                        ),
+                      ),
+                    if (subtitle != null) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle!,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTypography.bodySmall.copyWith(
+                          color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
-              ],
-            ],
           ),
-          const SizedBox(height: 12),
+          if (trailingWidget != null) ...[
+            const SizedBox(width: 8),
+            Flexible(
+              flex: 0,
+              child: trailingWidget!,
+            ),
+          ],
         ],
-        child,
-      ],
-    );
+      );
+    }
 
     final card = GlassContainer(
       borderRadius: borderRadius,
       padding: padding ?? const EdgeInsets.all(16),
       borderColor: glowColor?.withValues(alpha: 0.3) ??
           (isDark ? Colors.white.withValues(alpha: 0.08) : AppColors.glassBorderLight),
-      child: content,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final isBounded = constraints.hasBoundedHeight;
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (hasHeader) ...[
+                buildHeader(),
+                const SizedBox(height: 12),
+              ],
+              if (isBounded)
+                Flexible(
+                  fit: FlexFit.loose,
+                  child: child,
+                )
+              else
+                child,
+            ],
+          );
+        },
+      ),
     );
 
     if (onTap != null) {

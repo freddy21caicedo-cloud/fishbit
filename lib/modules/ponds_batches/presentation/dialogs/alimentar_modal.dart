@@ -112,11 +112,11 @@ class _AlimentarModalState extends ConsumerState<AlimentarModal> {
     final selectedItem = feedItems.where((i) => i.id == _selectedInsumoId).firstOrNull;
     final stockDisponibleKg = selectedItem?.cantidadActualKg ?? 0.0;
     final costoUnitario = selectedItem?.costoUnitarioHistorico ?? 4800.0;
-    final kgSuministrados = double.tryParse(_kgCtrl.text) ?? racionSugeridaDiaKg;
+    final kgSuministrados = double.tryParse(_kgCtrl.text.replaceAll(',', '.').trim()) ?? racionSugeridaDiaKg;
     final sinStock = selectedItem == null || stockDisponibleKg <= 0;
     final stockInsuficiente = sinStock || (kgSuministrados > stockDisponibleKg);
     final costoTotal = kgSuministrados * costoUnitario;
-    final racionesNum = int.tryParse(_racionesCtrl.text) ?? 3;
+    final racionesNum = int.tryParse(_racionesCtrl.text.trim()) ?? 3;
     final kgPorRacion = racionesNum > 0 ? (kgSuministrados / racionesNum) : kgSuministrados;
 
     return Dialog(

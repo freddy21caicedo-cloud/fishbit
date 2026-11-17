@@ -59,6 +59,35 @@ class FakeAuthRepository implements AuthRepository {
   Future<List<UserMember>> fetchTeamMembers(String companyId) async => mockTeam;
 
   @override
+  Future<AquacultureUnit> createUnit(
+    String empresaId,
+    String nombre,
+    String sigla,
+    String? ubicacion, {
+    String? pais,
+    String? departamento,
+    String? ciudad,
+    String? direccion,
+    String? telefono,
+  }) async {
+    final unit = AquacultureUnit(
+      id: 'unit-${DateTime.now().millisecondsSinceEpoch}',
+      empresaId: empresaId,
+      nombre: nombre,
+      sigla: sigla,
+      ubicacion: ubicacion,
+      pais: pais,
+      departamento: departamento,
+      ciudad: ciudad,
+      direccion: direccion,
+      telefono: telefono,
+      creadoEn: DateTime.now(),
+    );
+    mockUnits.add(unit);
+    return unit;
+  }
+
+  @override
   Future<void> signOut() async {}
 
   @override

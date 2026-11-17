@@ -8,38 +8,46 @@ import 'package:fishbit_finance/core/design_system/glass_container.dart';
 import 'package:fishbit_finance/core/utils/currency_formatters.dart';
 import 'package:fishbit_finance/modules/ponds_batches/domain/models/pond.dart';
 import 'package:fishbit_finance/modules/ponds_batches/domain/models/fish_batch.dart';
+import 'package:fishbit_finance/modules/water_quality/domain/models/water_parameter.dart';
 import 'package:fishbit_finance/modules/water_quality/presentation/dialogs/parametro_modal.dart';
 import 'package:fishbit_finance/modules/ponds_batches/presentation/dialogs/alimentar_modal.dart';
 import 'package:fishbit_finance/modules/ponds_batches/presentation/dialogs/biometria_modal.dart';
 import 'package:fishbit_finance/modules/ponds_batches/presentation/dialogs/mortalidad_modal.dart';
 import 'package:fishbit_finance/modules/ponds_batches/presentation/dialogs/traslado_modal.dart';
 import 'package:fishbit_finance/modules/ponds_batches/presentation/dialogs/siembra_modal.dart';
+import 'package:fishbit_finance/modules/ponds_batches/presentation/dialogs/crear_estanque_modal.dart';
 
 /// Tarjeta Bento de Estanque Interactiva Optimizada a 60/120 FPS con efecto 3D Flip de 180°
 /// - Cara Frontal: Resumen Operativo, Calidad de Agua, Densidad y Acciones Rápidas.
-/// - Cara Trasera (Reverso 180°): Trazabilidad, Radiografía por Especie y Vista Consolidada en Policultivos.
+/// - Cara Trasera (Reverso 180°): Trazabilidad, Ficha Estructural/Aireación, Radiografía por Especie y Costos.
 class PondBentoCard extends StatefulWidget {
   final Pond pond;
   final FishBatch? batch;
   final List<FishBatch> batches;
+  final WaterParameter? latestWaterParameter;
   final VoidCallback? onFeedPressed;
   final VoidCallback? onTransferPressed;
   final VoidCallback? onSamplePressed;
   final VoidCallback? onMortalityPressed;
   final VoidCallback? onWaterQualityPressed;
   final VoidCallback? onOperationsPressed;
+  final VoidCallback? onEditPondPressed;
+  final Map<String, dynamic>? targetWeightsBySpecies;
 
   const PondBentoCard({
     super.key,
     required this.pond,
     this.batch,
     this.batches = const [],
+    this.latestWaterParameter,
     this.onFeedPressed,
     this.onTransferPressed,
     this.onSamplePressed,
     this.onMortalityPressed,
     this.onWaterQualityPressed,
     this.onOperationsPressed,
+    this.onEditPondPressed,
+    this.targetWeightsBySpecies,
   });
 
   @override
@@ -131,15 +139,21 @@ class _PondBentoCardState extends State<PondBentoCard> with SingleTickerProvider
     final totalPeces = allBatches.fold(0, (sum, b) => sum + b.cantidadActualPeces);
     final totalBiomasa = allBatches.fold(0.0, (sum, b) => sum + b.biomasaActualKg);
     final displayBiomasa = totalBiomasa > 0 ? totalBiomasa : widget.pond.biomasaKg;
-    final displayDensidad = widget.pond.capacidadM3 > 0 ? (displayBiomasa / widget.pond.capacidadM3) : widget.pond.densidadKgM3;
+    final capacidadM3 = widget.pond.capacidadM3 > 0
+        ? widget.pond.capacidadM3
+        : (((widget.pond.largoM ?? 0) * (widget.pond.anchoM ?? 0) * (widget.pond.profundidadM ?? 0)) > 0
+            ? ((widget.pond.largoM ?? 0) * (widget.pond.anchoM ?? 0) * (widget.pond.profundidadM ?? 0))
+            : 1.0);
+    final displayDensidad = capacidadM3 > 0 ? (displayBiomasa / capacidadM3) : widget.pond.densidadKgM3;
     final activeBatch = allBatches.isNotEmpty ? allBatches.first : widget.batch;
 
-    final isRealActive = (widget.pond.estado == PondStatus.active || allBatches.isNotEmpty) && totalPeces > 0;
+    final isRealActive = (widget.pond.estado == PondStatus.active || allBatches.isNotEmpty || displayBiomasa > 0) && (totalPeces > 0 || displayBiomasa > 0);
+    final densidadPecesM3 = capacidadM3 > 0 && totalPeces > 0 ? (totalPeces / capacidadM3) : 0.0;
     final avgWeightGrams = totalPeces > 0
         ? (displayBiomasa * 1000 / totalPeces)
         : (isRealActive ? (activeBatch?.pesoActualGramos ?? 0.0) : 0.0);
 
-    const targetWeight = 500.0;
+    final targetWeight = _getTargetHarvestWeightGrams(activeBatch?.especie ?? '');
     final harvestProgress = isRealActive && avgWeightGrams > 0
         ? (avgWeightGrams / targetWeight).clamp(0.01, 1.0)
         : 0.0;
@@ -209,221 +223,248 @@ class _PondBentoCardState extends State<PondBentoCard> with SingleTickerProvider
           ),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Especie o resumen de policultivo
-          if (isPolyculture) ...[
-            Text(
-              'Policultivo (${allBatches.length} especies activas)',
-              style: AppTypography.titleSmall.copyWith(color: Colors.purpleAccent, fontWeight: FontWeight.w800),
-            ),
-            const SizedBox(height: 4),
-            ...allBatches.map((b) => Padding(
-                  padding: const EdgeInsets.only(bottom: 2),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: Text(
-                          '• ${b.especie} (${b.codigoLote})',
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        '${CurrencyFormatters.formatInt(b.cantidadActualPeces)} pcs • ${b.biomasaActualKg.toInt()} kg',
-                        style: const TextStyle(color: AppColors.textSecondaryDark, fontSize: 11),
-                      ),
-                    ],
-                  ),
-                )),
-          ] else ...[
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Text(
-                    isRealActive && allBatches.isNotEmpty ? allBatches.first.especie : 'Estanque Vacío / Disponible',
-                    overflow: TextOverflow.ellipsis,
-                    style: AppTypography.titleMedium.copyWith(
-                      color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-                if (isRealActive && allBatches.isNotEmpty) ...[
-                  const SizedBox(width: 8),
-                  Text(
-                    '${CurrencyFormatters.formatInt(totalPeces)} peces',
-                    style: AppTypography.bodySmall.copyWith(
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.cyanWater,
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ],
-
-          const SizedBox(height: 12),
-
-          // Grid de 3 Métricas Operativas
-          Row(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final frontContent = Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Expanded(
-                child: _buildMetricTile(
-                  label: 'BIOMASA TOTAL',
-                  value: CurrencyFormatters.formatKg(isRealActive ? displayBiomasa : 0.0),
-                  caption: totalPeces > 0 ? '${avgWeightGrams.toStringAsFixed(1)} g/pez' : (isRealActive ? null : 'Sin biomasa'),
-                  color: AppColors.cyanWater,
+              // Especie o resumen de policultivo
+              if (isPolyculture) ...[
+                Text(
+                  'Policultivo (${allBatches.length} especies activas)',
+                  style: AppTypography.titleSmall.copyWith(color: Colors.purpleAccent, fontWeight: FontWeight.w800),
                 ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _buildMetricTile(
-                  label: 'DENSIDAD',
-                  value: isRealActive ? '${displayDensidad.toStringAsFixed(1)} kg/m³' : '0.0 kg/m³',
-                  caption: isRealActive
-                      ? (displayDensidad < 8.0
-                          ? '🟢 Óptima'
-                          : (displayDensidad <= 16.0 ? '🟡 Alerta' : '🔴 Crítica'))
-                      : '⚪ Disponible',
-                  color: isRealActive
-                      ? (displayDensidad < 8.0
-                          ? AppColors.purpleAnalytics
-                          : (displayDensidad <= 16.0 ? AppColors.amberWarning : AppColors.coralAction))
-                      : AppColors.textTertiaryDark,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _buildMetricTile(
-                  label: 'FCR CONVERSIÓN',
-                  value: isRealActive && activeBatch != null
-                      ? (activeBatch.fcrOrNull != null ? activeBatch.fcrOrNull!.toStringAsFixed(2) : '—')
-                      : '—',
-                  caption: isRealActive && activeBatch != null
-                      ? (activeBatch.diasDeCultivo <= 0
-                          ? 'Sembrado hoy'
-                          : 'GPD: ${activeBatch.gpd.toStringAsFixed(2)} g/d')
-                      : 'Sin lote activo',
-                  color: isRealActive ? AppColors.greenBiomass : AppColors.textTertiaryDark,
-                ),
-              ),
-            ],
-          ),
-
-          // Alerta de Periodo de Retiro ICA si está activo
-          if (activeBatch != null && activeBatch.enPeriodoRetiro) ...[
-            const SizedBox(height: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                color: AppColors.coralAction.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: AppColors.coralAction.withValues(alpha: 0.5)),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.sanitizer_rounded, color: AppColors.coralAction, size: 16),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      'PERIODO DE RETIRO SANITARIO (ICA): Quedan ${activeBatch.diasRetiroSanitarioRestantes} días. Cosecha y venta bloqueadas temporalmente por inocuidad.',
-                      style: const TextStyle(color: AppColors.coralAction, fontSize: 10, fontWeight: FontWeight.w700),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-
-          // Barra de Progreso de Talla hacia Cosecha
-          if (isActive && activeBatch != null) ...[
-            const SizedBox(height: 12),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
+                const SizedBox(height: 4),
+                ...allBatches.map((b) => Padding(
+                      padding: const EdgeInsets.only(bottom: 2),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              '• ${b.especie} (${b.codigoLote})',
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            '${CurrencyFormatters.formatInt(b.cantidadActualPeces)} pcs • ${b.biomasaActualKg.toInt()} kg',
+                            style: const TextStyle(color: AppColors.textSecondaryDark, fontSize: 11),
+                          ),
+                        ],
+                      ),
+                    )),
+              ] else ...[
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      'Talla Promedio: ${avgWeightGrams.toStringAsFixed(0)}g / ${targetWeight.toInt()}g cosecha',
-                      style: AppTypography.labelMicro.copyWith(color: AppColors.textSecondaryDark),
-                    ),
-                    Text(
-                      '${(harvestProgress * 100).toInt()}%',
-                      style: AppTypography.labelMicro.copyWith(color: AppColors.cyanWater, fontWeight: FontWeight.w800),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(6),
-                  child: LinearProgressIndicator(
-                    value: harvestProgress,
-                    backgroundColor: Colors.white.withValues(alpha: 0.08),
-                    valueColor: const AlwaysStoppedAnimation<Color>(AppColors.cyanWater),
-                    minHeight: 6,
-                  ),
-                ),
-              ],
-            ),
-          ],
-
-          if (isActive) ...[
-            const SizedBox(height: 12),
-            // Botón de Acción Principal de Campo (compacto y ergonómico)
-            SizedBox(
-              width: double.infinity,
-              height: 40,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.cyanWater.withValues(alpha: isDark ? 0.18 : 0.12),
-                  foregroundColor: isDark ? AppColors.cyanWater : AppColors.blueOcean,
-                  elevation: 0,
-                  side: BorderSide(
-                    color: AppColors.cyanWater.withValues(alpha: isDark ? 0.55 : 0.75),
-                    width: 1.2,
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                ),
-                onPressed: () {
-                  if (widget.onOperationsPressed != null) {
-                    widget.onOperationsPressed!();
-                  } else {
-                    _showOperationsBottomSheet(context, activeBatch);
-                  }
-                },
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(Icons.flash_on_rounded, size: 16),
-                    const SizedBox(width: 6),
-                    Flexible(
+                    Expanded(
                       child: Text(
-                        'REGISTRAR ACCIÓN DE CAMPO',
+                        isRealActive && allBatches.isNotEmpty ? allBatches.first.especie : 'Estanque Vacío / Disponible',
                         overflow: TextOverflow.ellipsis,
-                        style: AppTypography.titleSmall.copyWith(
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 0.4,
-                          fontSize: 11.5,
+                        style: AppTypography.titleMedium.copyWith(
+                          color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
                     ),
-                    const SizedBox(width: 4),
-                    const Icon(Icons.keyboard_arrow_up_rounded, size: 16),
+                    if (isRealActive && allBatches.isNotEmpty) ...[
+                      const SizedBox(width: 8),
+                      Text(
+                        '${CurrencyFormatters.formatInt(totalPeces)} peces',
+                        style: AppTypography.bodySmall.copyWith(
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.cyanWater,
+                        ),
+                      ),
+                    ],
                   ],
                 ),
+              ],
+
+              const SizedBox(height: 8),
+
+              // Mini-Strip de Calidad de Agua (Semáforo Operativo)
+              _buildWaterQualityMiniStrip(context, widget.latestWaterParameter),
+
+              const SizedBox(height: 10),
+
+              // Grid de 3 Métricas Operativas
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildMetricTile(
+                      label: 'BIOMASA TOTAL',
+                      value: CurrencyFormatters.formatKg(isRealActive ? displayBiomasa : 0.0),
+                      caption: totalPeces > 0 ? '${avgWeightGrams.toStringAsFixed(1)} g/pez' : (isRealActive ? null : 'Sin biomasa'),
+                      color: AppColors.cyanWater,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _buildMetricTile(
+                      label: 'DENSIDAD',
+                      value: isRealActive ? '${displayDensidad.toStringAsFixed(2)} kg/m³' : '0.0 kg/m³',
+                      caption: isRealActive
+                          ? (densidadPecesM3 > 0
+                              ? '${densidadPecesM3.toStringAsFixed(1)} pcs/m³ • ${(displayDensidad < 8.0 ? 'Óptima' : (displayDensidad <= 16.0 ? 'Alerta' : 'Crítica'))}'
+                              : (displayDensidad < 8.0 ? '🟢 Óptima' : (displayDensidad <= 16.0 ? '🟡 Alerta' : '🔴 Crítica')))
+                          : '⚪ Disponible',
+                      color: isRealActive
+                          ? (displayDensidad < 8.0
+                              ? AppColors.purpleAnalytics
+                              : (displayDensidad <= 16.0 ? AppColors.amberWarning : AppColors.coralAction))
+                          : AppColors.textTertiaryDark,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _buildMetricTile(
+                      label: 'FCA (CONVERSIÓN)',
+                      value: isRealActive && activeBatch != null
+                          ? (activeBatch.fcrOrNull != null
+                              ? '${activeBatch.fcrOrNull!.toStringAsFixed(2)}:1'
+                              : (activeBatch.alimentoAcumuladoKg <= 0 ? '—' : 'Calc.'))
+                          : '—',
+                      caption: isRealActive && activeBatch != null
+                          ? (activeBatch.fcrOrNull != null
+                              ? 'GPD: ${activeBatch.gpd.toStringAsFixed(2)} g/d'
+                              : (activeBatch.alimentoAcumuladoKg <= 0
+                                  ? 'Sin alimento reg.'
+                                  : 'GPD: ${activeBatch.gpd.toStringAsFixed(2)} g/d'))
+                          : 'Sin lote activo',
+                      color: isRealActive ? AppColors.greenBiomass : AppColors.textTertiaryDark,
+                    ),
+                  ),
+                ],
               ),
-            ),
-          ],
-        ],
+
+              // Alerta de Periodo de Retiro ICA si está activo
+              if (activeBatch != null && activeBatch.enPeriodoRetiro) ...[
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: AppColors.coralAction.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AppColors.coralAction.withValues(alpha: 0.5)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.sanitizer_rounded, color: AppColors.coralAction, size: 16),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          'PERIODO DE RETIRO SANITARIO (ICA): Quedan ${activeBatch.diasRetiroSanitarioRestantes} días. Cosecha y venta bloqueadas temporalmente por inocuidad.',
+                          style: const TextStyle(color: AppColors.coralAction, fontSize: 10, fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+
+              // Barra de Progreso de Talla hacia Cosecha
+              if (isActive && activeBatch != null) ...[
+                const SizedBox(height: 12),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            'Talla Promedio: ${avgWeightGrams.toStringAsFixed(0)}g / ${targetWeight.toInt()}g cosecha',
+                            style: AppTypography.labelMicro.copyWith(color: AppColors.textSecondaryDark),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          '${(harvestProgress * 100).toInt()}%',
+                          style: AppTypography.labelMicro.copyWith(color: AppColors.cyanWater, fontWeight: FontWeight.w800),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(6),
+                      child: LinearProgressIndicator(
+                        value: harvestProgress,
+                        backgroundColor: Colors.white.withValues(alpha: 0.08),
+                        valueColor: const AlwaysStoppedAnimation<Color>(AppColors.cyanWater),
+                        minHeight: 6,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+
+              if (isActive) ...[
+                const SizedBox(height: 12),
+                // Botón de Acción Principal de Campo (compacto y ergonómico)
+                SizedBox(
+                  width: double.infinity,
+                  height: 40,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.cyanWater.withValues(alpha: isDark ? 0.18 : 0.12),
+                      foregroundColor: isDark ? AppColors.cyanWater : AppColors.blueOcean,
+                      elevation: 0,
+                      side: BorderSide(
+                        color: AppColors.cyanWater.withValues(alpha: isDark ? 0.55 : 0.75),
+                        width: 1.2,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                    ),
+                    onPressed: () {
+                      if (widget.onOperationsPressed != null) {
+                        widget.onOperationsPressed!();
+                      } else {
+                        _showOperationsBottomSheet(context, activeBatch);
+                      }
+                    },
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.flash_on_rounded, size: 16),
+                        const SizedBox(width: 6),
+                        Flexible(
+                          child: Text(
+                            'REGISTRAR ACCIÓN DE CAMPO',
+                            overflow: TextOverflow.ellipsis,
+                            style: AppTypography.titleSmall.copyWith(
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.4,
+                              fontSize: 11.5,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        const Icon(Icons.keyboard_arrow_up_rounded, size: 16),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          );
+
+          if (constraints.hasBoundedHeight) {
+            return SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              child: frontContent,
+            );
+          }
+
+          return frontContent;
+        },
       ),
     );
   }
@@ -474,121 +515,142 @@ class _PondBentoCardState extends State<PondBentoCard> with SingleTickerProvider
           ),
         ),
       ),
-      child: Scrollbar(
-        thumbVisibility: false,
-        child: SingleChildScrollView(
-          physics: const BouncingScrollPhysics(),
-          child: Column(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final scrollContent = Column(
             crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
             children: [
-          // Selector de Especies para Policultivos
-          if (isPolyculture) ...[
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [
-                  ...allBatches.asMap().entries.map((entry) {
-                    final idx = entry.key;
-                    final b = entry.value;
-                    final isSelected = !_showConsolidated && validIndex == idx;
+              // Selector de Especies para Policultivos
+              if (isPolyculture) ...[
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      ...allBatches.asMap().entries.map((entry) {
+                        final idx = entry.key;
+                        final b = entry.value;
+                        final isSelected = !_showConsolidated && validIndex == idx;
 
-                    return Padding(
-                      padding: const EdgeInsets.only(right: 6),
-                      child: InkWell(
-                        onTap: () => setState(() {
-                          _selectedBatchIndex = idx;
-                          _showConsolidated = false;
-                        }),
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 6),
+                          child: InkWell(
+                            onTap: () => setState(() {
+                              _selectedBatchIndex = idx;
+                              _showConsolidated = false;
+                            }),
+                            borderRadius: BorderRadius.circular(8),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 180),
+                              constraints: const BoxConstraints(minHeight: 48),
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                              decoration: BoxDecoration(
+                                color: isSelected
+                                    ? Colors.purpleAccent.withValues(alpha: isDark ? 0.45 : 0.25)
+                                    : (isDark ? Colors.white.withValues(alpha: 0.04) : Colors.white.withValues(alpha: 0.08)),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: isSelected
+                                      ? Colors.purpleAccent
+                                      : (isDark ? Colors.white.withValues(alpha: 0.12) : Colors.grey.withValues(alpha: 0.12)),
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    '🐟 ${b.especie}',
+                                    style: TextStyle(
+                                      color: isSelected
+                                          ? Colors.purpleAccent
+                                          : (isDark ? Colors.white70 : AppColors.textPrimaryDark),
+                                      fontSize: 10.5,
+                                      fontWeight: isSelected ? FontWeight.w800 : FontWeight.w500,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        );
+                      }),
+                      // Chip de Resumen Consolidado
+                      InkWell(
+                        onTap: () => setState(() => _showConsolidated = true),
                         borderRadius: BorderRadius.circular(8),
                         child: AnimatedContainer(
                           duration: const Duration(milliseconds: 180),
                           constraints: const BoxConstraints(minHeight: 48),
                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                           decoration: BoxDecoration(
-                            color: isSelected
-                                ? Colors.purpleAccent.withValues(alpha: isDark ? 0.45 : 0.25)
-                                : (isDark ? Colors.white.withValues(alpha: 0.04) : Colors.white.withValues(alpha: 0.08)),
+                            color: _showConsolidated ? AppColors.cyanWater.withValues(alpha: 0.25) : Colors.white.withValues(alpha: 0.04),
                             borderRadius: BorderRadius.circular(8),
                             border: Border.all(
-                              color: isSelected
-                                  ? Colors.purpleAccent
-                                  : (isDark ? Colors.white.withValues(alpha: 0.12) : Colors.grey.withValues(alpha: 0.12)),
+                              color: _showConsolidated ? AppColors.cyanWater : Colors.white.withValues(alpha: 0.12),
                             ),
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
+                              Icon(Icons.pie_chart_rounded, size: 12, color: _showConsolidated ? AppColors.cyanWater : Colors.white70),
+                              const SizedBox(width: 4),
                               Text(
-                                '🐟 ${b.especie}',
+                                '📊 Consolidado',
                                 style: TextStyle(
-                                  color: isSelected
-                                      ? Colors.purpleAccent
-                                      : (isDark ? Colors.white70 : AppColors.textPrimaryDark),
+                                  color: _showConsolidated ? AppColors.cyanWater : Colors.white70,
                                   fontSize: 10.5,
-                                  fontWeight: isSelected ? FontWeight.w800 : FontWeight.w500,
+                                  fontWeight: _showConsolidated ? FontWeight.w800 : FontWeight.w500,
                                 ),
                               ),
                             ],
                           ),
                         ),
                       ),
-                    );
-                  }),
-                  // Chip de Resumen Consolidado
-                  InkWell(
-                    onTap: () => setState(() => _showConsolidated = true),
-                    borderRadius: BorderRadius.circular(8),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 180),
-                      constraints: const BoxConstraints(minHeight: 48),
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                      decoration: BoxDecoration(
-                        color: _showConsolidated ? AppColors.cyanWater.withValues(alpha: 0.25) : Colors.white.withValues(alpha: 0.04),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color: _showConsolidated ? AppColors.cyanWater : Colors.white.withValues(alpha: 0.12),
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.pie_chart_rounded, size: 12, color: _showConsolidated ? AppColors.cyanWater : Colors.white70),
-                          const SizedBox(width: 4),
-                          Text(
-                            '📊 Consolidado',
-                            style: TextStyle(
-                              color: _showConsolidated ? AppColors.cyanWater : Colors.white70,
-                              fontSize: 10.5,
-                              fontWeight: _showConsolidated ? FontWeight.w800 : FontWeight.w500,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+                    ],
                   ),
-                ],
+                ),
+                const SizedBox(height: 8),
+              ],
+
+              // Contenido con Transición Fluida entre Especie y Consolidado
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 200),
+                transitionBuilder: (child, animation) => FadeTransition(opacity: animation, child: child),
+                child: _showConsolidated && isPolyculture
+                    ? _buildConsolidatedPolycultureView(allBatches)
+                    : _buildSingleBatchView(activeBatch),
+              ),
+            ],
+          );
+
+          if (constraints.hasBoundedHeight) {
+            return Scrollbar(
+              thumbVisibility: false,
+              child: SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                child: scrollContent,
+              ),
+            );
+          }
+
+          return ConstrainedBox(
+            constraints: const BoxConstraints(maxHeight: 380),
+            child: Scrollbar(
+              thumbVisibility: false,
+              child: SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                child: scrollContent,
               ),
             ),
-            const SizedBox(height: 10),
-          ],
-
-          // Contenido con Transición Fluida entre Especie y Consolidado
-          AnimatedSwitcher(
-            duration: const Duration(milliseconds: 200),
-            transitionBuilder: (child, animation) => FadeTransition(opacity: animation, child: child),
-            child: _showConsolidated && isPolyculture
-                ? _buildConsolidatedPolycultureView(allBatches)
-                : _buildSingleBatchView(activeBatch),
-          ),
-        ],
+          );
+        },
       ),
-    ),
-  ),
-);
-}
+    );
+  }
 
   // Radiografía de un Lote Individual
   Widget _buildSingleBatchView(FishBatch? activeBatch) {
+    final bool isDark = Theme.of(context).brightness == Brightness.dark;
     final initialPeces = activeBatch?.cantidadInicialPeces ?? 0;
     final currentPeces = activeBatch?.cantidadActualPeces ?? 0;
     final mortalidadPeces = (initialPeces - currentPeces).clamp(0, initialPeces);
@@ -604,6 +666,20 @@ class _PondBentoCardState extends State<PondBentoCard> with SingleTickerProvider
     final costoFijo = activeBatch?.costoAcumuladoFijo ?? 0.0;
     final costoTotal = costoAlevines + costoInsumos + costoFijo;
     final cpk = (activeBatch?.biomasaActualKg ?? 0.0) > 0 ? (costoTotal / activeBatch!.biomasaActualKg) : 0.0;
+
+    final capacidadM3 = widget.pond.capacidadM3 > 0
+        ? widget.pond.capacidadM3
+        : (((widget.pond.largoM ?? 0) * (widget.pond.anchoM ?? 0) * (widget.pond.profundidadM ?? 0)) > 0
+            ? ((widget.pond.largoM ?? 0) * (widget.pond.anchoM ?? 0) * (widget.pond.profundidadM ?? 0))
+            : 1.0);
+    final batchBiomasa = activeBatch?.biomasaActualKg ?? 0.0;
+    final singleDensidad = capacidadM3 > 0 ? (batchBiomasa / capacidadM3) : 0.0;
+    final singleDensidadPeces = capacidadM3 > 0 && currentPeces > 0 ? (currentPeces / capacidadM3) : 0.0;
+
+    final targetWeightSingle = _getTargetHarvestWeightGrams(activeBatch?.especie ?? '');
+    final harvestProgressSingle = currentWeight > 0
+        ? (currentWeight / targetWeightSingle).clamp(0.01, 1.0)
+        : 0.0;
 
     return Column(
       key: ValueKey('batch_${activeBatch?.id ?? "single"}'),
@@ -644,6 +720,61 @@ class _PondBentoCardState extends State<PondBentoCard> with SingleTickerProvider
                 extra: 'Inicial: ${CurrencyFormatters.formatKg(activeBatch?.biomasaInicialKg ?? 0.0)}',
                 extraColor: AppColors.greenBiomass,
               ),
+              const Divider(height: 6, color: Colors.white12),
+              _buildDataRow(
+                context: context,
+                label: 'FCA (Conversión):',
+                value: activeBatch?.fcrOrNull != null
+                    ? '${activeBatch!.fcrOrNull!.toStringAsFixed(2)}:1'
+                    : ((activeBatch?.alimentoAcumuladoKg ?? 0) <= 0 ? 'Sin alimento' : 'Calculando...'),
+                extra: 'Alimento: ${CurrencyFormatters.formatKg(activeBatch?.alimentoAcumuladoKg ?? 0.0)}',
+                extraColor: (activeBatch?.fcrOrNull != null && activeBatch!.fcrOrNull! <= 1.6)
+                    ? AppColors.greenBiomass
+                    : AppColors.amberWarning,
+              ),
+              const Divider(height: 6, color: Colors.white12),
+              _buildDataRow(
+                context: context,
+                label: 'Densidad por m³:',
+                value: '${singleDensidad.toStringAsFixed(2)} kg/m³ (${capacidadM3.toStringAsFixed(0)} m³ agua)',
+                extra: singleDensidadPeces > 0 ? '${singleDensidadPeces.toStringAsFixed(1)} pcs/m³' : '—',
+                extraColor: singleDensidad < 8.0
+                    ? AppColors.greenBiomass
+                    : (singleDensidad <= 16.0 ? AppColors.amberWarning : AppColors.coralAction),
+              ),
+              const Divider(height: 6, color: Colors.white12),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'Talla Hacia Cosecha: ${currentWeight.toStringAsFixed(0)}g / ${targetWeightSingle.toInt()}g meta',
+                          style: TextStyle(color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight, fontSize: 10),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        '${(harvestProgressSingle * 100).toInt()}%',
+                        style: const TextStyle(color: AppColors.cyanWater, fontWeight: FontWeight.w800, fontSize: 11),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 3),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: LinearProgressIndicator(
+                      value: harvestProgressSingle,
+                      backgroundColor: Colors.white10,
+                      valueColor: const AlwaysStoppedAnimation<Color>(AppColors.cyanWater),
+                      minHeight: 4,
+                    ),
+                  ),
+                ],
+              ),
             ],
           ),
         ),
@@ -669,7 +800,14 @@ class _PondBentoCardState extends State<PondBentoCard> with SingleTickerProvider
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('COSTO TOTAL INVERTIDO:', style: TextStyle(color: Theme.of(context).brightness == Brightness.dark ? Colors.white : AppColors.textPrimaryLight, fontWeight: FontWeight.w800, fontSize: 11)),
+                  Expanded(
+                    child: Text(
+                      'COSTO TOTAL INVERTIDO:',
+                      style: TextStyle(color: Theme.of(context).brightness == Brightness.dark ? Colors.white : AppColors.textPrimaryLight, fontWeight: FontWeight.w800, fontSize: 11),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
                   Text(CurrencyFormatters.formatCOP(costoTotal), style: const TextStyle(color: AppColors.greenBiomass, fontWeight: FontWeight.w900, fontSize: 12.5)),
                 ],
               ),
@@ -677,13 +815,23 @@ class _PondBentoCardState extends State<PondBentoCard> with SingleTickerProvider
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('Costo Unitario por Kilo (CPK):', style: TextStyle(color: Theme.of(context).brightness == Brightness.dark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight, fontSize: 10)),
+                  Expanded(
+                    child: Text(
+                      'Costo Unitario por Kilo (CPK):',
+                      style: TextStyle(color: Theme.of(context).brightness == Brightness.dark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight, fontSize: 10),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
                   Text('${CurrencyFormatters.formatCOP(cpk)} / kg', style: const TextStyle(color: AppColors.cyanWater, fontWeight: FontWeight.w800, fontSize: 11)),
                 ],
               ),
             ],
           ),
         ),
+
+        // 3. Ficha Estructural y Aireación
+        _buildStructuralCard(context, widget.pond, activeBatch),
       ],
     );
   }
@@ -693,6 +841,10 @@ class _PondBentoCardState extends State<PondBentoCard> with SingleTickerProvider
     final totalPeces = allBatches.fold(0, (sum, b) => sum + b.cantidadActualPeces);
     final totalPecesIniciales = allBatches.fold(0, (sum, b) => sum + b.cantidadInicialPeces);
     final totalBiomasa = allBatches.fold(0.0, (sum, b) => sum + b.biomasaActualKg);
+    final totalBiomasaInicial = allBatches.fold(0.0, (sum, b) => sum + b.biomasaInicialKg);
+    final totalAlimento = allBatches.fold(0.0, (sum, b) => sum + b.alimentoAcumuladoKg);
+    final gananciaTotal = totalBiomasa - totalBiomasaInicial;
+    final fcaGlobal = (totalAlimento > 0 && gananciaTotal > 0) ? (totalAlimento / gananciaTotal) : null;
     final totalAlevines = allBatches.fold(0.0, (sum, b) => sum + b.costoInicialAlevinos);
     final totalInsumos = allBatches.fold(0.0, (sum, b) => sum + b.costoAcumuladoInsumos);
     final totalFijos = allBatches.fold(0.0, (sum, b) => sum + b.costoAcumuladoFijo);
@@ -726,7 +878,14 @@ class _PondBentoCardState extends State<PondBentoCard> with SingleTickerProvider
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text('• ${b.especie}', style: TextStyle(color: Theme.of(context).brightness == Brightness.dark ? Colors.white : AppColors.textPrimaryLight, fontSize: 11, fontWeight: FontWeight.w700)),
+                          Expanded(
+                            child: Text(
+                              '• ${b.especie}',
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(color: Theme.of(context).brightness == Brightness.dark ? Colors.white : AppColors.textPrimaryLight, fontSize: 11, fontWeight: FontWeight.w700),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
                           Text('${(pct * 100).toStringAsFixed(1)}% (${CurrencyFormatters.formatKg(b.biomasaActualKg)})', style: const TextStyle(color: AppColors.cyanWater, fontSize: 10.5, fontWeight: FontWeight.w800)),
                         ],
                       ),
@@ -770,6 +929,24 @@ class _PondBentoCardState extends State<PondBentoCard> with SingleTickerProvider
                 extraColor: AppColors.greenBiomass,
               ),
               const Divider(height: 6, color: Colors.white12),
+              _buildDataRow(
+                context: context,
+                label: 'FCA Consolidado:',
+                value: fcaGlobal != null ? '${fcaGlobal.toStringAsFixed(2)}:1' : '—',
+                extra: 'Alimento: ${CurrencyFormatters.formatKg(totalAlimento)}',
+                extraColor: (fcaGlobal != null && fcaGlobal <= 1.6) ? AppColors.greenBiomass : AppColors.amberWarning,
+              ),
+              const Divider(height: 6, color: Colors.white12),
+              _buildDataRow(
+                context: context,
+                label: 'Densidad Consolidada:',
+                value: '${(totalBiomasa / (widget.pond.capacidadM3 > 0 ? widget.pond.capacidadM3 : 1.0)).toStringAsFixed(2)} kg/m³',
+                extra: '${(totalPeces / (widget.pond.capacidadM3 > 0 ? widget.pond.capacidadM3 : 1.0)).toStringAsFixed(1)} pcs/m³',
+                extraColor: (totalBiomasa / (widget.pond.capacidadM3 > 0 ? widget.pond.capacidadM3 : 1.0)) < 8.0
+                    ? AppColors.greenBiomass
+                    : ((totalBiomasa / (widget.pond.capacidadM3 > 0 ? widget.pond.capacidadM3 : 1.0)) <= 16.0 ? AppColors.amberWarning : AppColors.coralAction),
+              ),
+              const Divider(height: 6, color: Colors.white12),
               _buildFinancialRow(context, '• Total Semilla/Alevinaje:', CurrencyFormatters.formatCOP(totalAlevines)),
               _buildFinancialRow(context, '• Total Alimento e Insumos:', CurrencyFormatters.formatCOP(totalInsumos)),
               _buildFinancialRow(context, '• Total Costos Fijos Asignados:', CurrencyFormatters.formatCOP(totalFijos)),
@@ -777,7 +954,14 @@ class _PondBentoCardState extends State<PondBentoCard> with SingleTickerProvider
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('INVERSIÓN TOTAL EN ESTANQUE:', style: TextStyle(color: Theme.of(context).brightness == Brightness.dark ? Colors.white : AppColors.textPrimaryLight, fontWeight: FontWeight.w800, fontSize: 11)),
+                  Expanded(
+                    child: Text(
+                      'INVERSIÓN TOTAL EN ESTANQUE:',
+                      style: TextStyle(color: Theme.of(context).brightness == Brightness.dark ? Colors.white : AppColors.textPrimaryLight, fontWeight: FontWeight.w800, fontSize: 11),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
                   Text(CurrencyFormatters.formatCOP(granTotal), style: const TextStyle(color: AppColors.greenBiomass, fontWeight: FontWeight.w900, fontSize: 12.5)),
                 ],
               ),
@@ -785,14 +969,195 @@ class _PondBentoCardState extends State<PondBentoCard> with SingleTickerProvider
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('CPK Promedio Ponderado:', style: TextStyle(color: Theme.of(context).brightness == Brightness.dark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight, fontSize: 10)),
+                  Expanded(
+                    child: Text(
+                      'CPK Promedio Ponderado:',
+                      style: TextStyle(color: Theme.of(context).brightness == Brightness.dark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight, fontSize: 10),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
                   Text('${CurrencyFormatters.formatCOP(cpkGlobal)} / kg', style: const TextStyle(color: AppColors.cyanWater, fontWeight: FontWeight.w800, fontSize: 11)),
                 ],
               ),
             ],
           ),
         ),
+
+        // 3. Ficha Estructural y Aireación
+        _buildStructuralCard(context, widget.pond, allBatches.firstOrNull),
       ],
+    );
+  }
+
+  double _getTargetHarvestWeightGrams(String especie) {
+    if (widget.targetWeightsBySpecies != null && widget.targetWeightsBySpecies!.containsKey(especie)) {
+      final val = widget.targetWeightsBySpecies![especie];
+      if (val is num) return val.toDouble();
+      final parsed = double.tryParse(val.toString());
+      if (parsed != null && parsed > 0) return parsed;
+    }
+    final lower = especie.toLowerCase();
+    if (lower.contains('cachama')) return 1000.0;
+    if (lower.contains('tilapia')) return 650.0;
+    if (lower.contains('trucha')) return 400.0;
+    if (lower.contains('bocachico')) return 400.0;
+    if (lower.contains('pangasius')) return 800.0;
+    if (lower.contains('camar') || lower.contains('langostino')) return 25.0;
+    return 500.0;
+  }
+
+  Widget _buildWaterQualityMiniStrip(BuildContext context, WaterParameter? param) {
+    if (param == null) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.04),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+        ),
+        child: const Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.water_drop_outlined, size: 12, color: AppColors.textTertiaryDark),
+            SizedBox(width: 4),
+            Flexible(
+              child: Text(
+                'Agua: Sin registro reciente',
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(color: AppColors.textTertiaryDark, fontSize: 10, fontWeight: FontWeight.w600),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final o2 = param.oxigenoMgL;
+    final temp = param.temperaturaC;
+    final ph = param.ph;
+
+    Color o2Color = AppColors.greenBiomass;
+    if (o2 != null) {
+      if (o2 < 3.5) {
+        o2Color = AppColors.coralAction;
+      } else if (o2 < 5.0) {
+        o2Color = AppColors.amberWarning;
+      }
+    }
+
+    Color phColor = AppColors.greenBiomass;
+    if (ph != null) {
+      if (ph < 6.0 || ph > 9.0) {
+        phColor = AppColors.coralAction;
+      } else if (ph < 6.5 || ph > 8.5) {
+        phColor = AppColors.amberWarning;
+      }
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: AppColors.cyanWater.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.cyanWater.withValues(alpha: 0.2)),
+      ),
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        alignment: Alignment.centerLeft,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.water_drop_rounded, size: 13, color: AppColors.cyanWater),
+            const SizedBox(width: 4),
+            Text(
+              'O₂: ${o2 != null ? "${o2.toStringAsFixed(1)} mg/L" : "—"}',
+              style: TextStyle(color: o2Color, fontSize: 10, fontWeight: FontWeight.w800),
+            ),
+            const Text(' • ', style: TextStyle(color: Colors.white30, fontSize: 10)),
+            Text(
+              'T: ${temp != null ? "${temp.toStringAsFixed(1)}°C" : "—"}',
+              style: const TextStyle(color: AppColors.cyanWater, fontSize: 10, fontWeight: FontWeight.w700),
+            ),
+            const Text(' • ', style: TextStyle(color: Colors.white30, fontSize: 10)),
+            Text(
+              'pH: ${ph != null ? ph.toStringAsFixed(1) : "—"}',
+              style: TextStyle(color: phColor, fontSize: 10, fontWeight: FontWeight.w800),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStructuralCard(BuildContext context, Pond pond, FishBatch? batch) {
+    final dims = (pond.largoM != null && pond.anchoM != null && pond.profundidadM != null && pond.largoM! > 0)
+        ? '${pond.largoM!.toStringAsFixed(1)}m × ${pond.anchoM!.toStringAsFixed(1)}m × ${pond.profundidadM!.toStringAsFixed(1)}m'
+        : 'Geometría no definida';
+    final tipo = pond.tipoEstructura?.isNotEmpty == true ? pond.tipoEstructura! : 'Tierra / Geomembrana';
+    final hpSugerido = (pond.capacidadM3 / 100.0).clamp(1.0, 15.0);
+
+    final fechaSiembraStr = batch != null
+        ? '${batch.fechaSiembra.day}/${batch.fechaSiembra.month}/${batch.fechaSiembra.year}'
+        : 'Sin siembra';
+    final fechaCosechaStr = batch?.fechaCosechaEstimada != null
+        ? '${batch!.fechaCosechaEstimada!.day}/${batch.fechaCosechaEstimada!.month}/${batch.fechaCosechaEstimada!.year}'
+        : 'Por proyectar';
+
+    return Container(
+      margin: const EdgeInsets.only(top: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.03),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.architecture_rounded, size: 13, color: AppColors.cyanWater),
+              const SizedBox(width: 5),
+              Expanded(
+                child: Text(
+                  '🏗️ FICHA ESTRUCTURAL Y AIREACIÓN',
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTypography.labelMicro.copyWith(
+                    color: AppColors.cyanWater,
+                    letterSpacing: 1.0,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 5),
+          _buildDataRow(
+            context: context,
+            label: 'Dimensiones:',
+            value: dims,
+            extra: 'Tipo: $tipo',
+            extraColor: AppColors.textSecondaryDark,
+          ),
+          const Divider(height: 6, color: Colors.white12),
+          _buildDataRow(
+            context: context,
+            label: 'Capacidad Hidráulica:',
+            value: '${pond.capacidadM3.toInt()} m³ de agua',
+            extra: 'Aireación sug.: ~${hpSugerido.toStringAsFixed(1)} HP',
+            extraColor: pond.aireacionActiva ? AppColors.cyanWater : AppColors.amberWarning,
+          ),
+          const Divider(height: 6, color: Colors.white12),
+          _buildDataRow(
+            context: context,
+            label: 'Fecha de Siembra:',
+            value: fechaSiembraStr,
+            extra: 'Cosecha est.: $fechaCosechaStr',
+            extraColor: AppColors.greenBiomass,
+          ),
+        ],
+      ),
     );
   }
 
@@ -812,15 +1177,30 @@ class _PondBentoCardState extends State<PondBentoCard> with SingleTickerProvider
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(label, style: TextStyle(color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight, fontSize: 10)),
-            Text(value, style: TextStyle(color: isDark ? Colors.white : AppColors.textPrimaryLight, fontWeight: FontWeight.w700, fontSize: 11)),
-          ],
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label, style: TextStyle(color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight, fontSize: 10)),
+              Text(
+                value,
+                style: TextStyle(color: isDark ? Colors.white : AppColors.textPrimaryLight, fontWeight: FontWeight.w700, fontSize: 11),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
         ),
-        Text(extra, style: TextStyle(color: extraColor, fontWeight: FontWeight.w800, fontSize: 11)),
+        const SizedBox(width: 8),
+        Flexible(
+          child: Text(
+            extra,
+            style: TextStyle(color: extraColor, fontWeight: FontWeight.w800, fontSize: 11),
+            textAlign: TextAlign.right,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
       ],
     );
   }
@@ -832,8 +1212,18 @@ class _PondBentoCardState extends State<PondBentoCard> with SingleTickerProvider
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(title, style: TextStyle(color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight, fontSize: 10)),
-          Text(amount, style: TextStyle(color: isDark ? Colors.white : AppColors.textPrimaryLight, fontWeight: FontWeight.w600, fontSize: 11)),
+          Expanded(
+            child: Text(
+              title,
+              style: TextStyle(color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight, fontSize: 10),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            amount,
+            style: TextStyle(color: isDark ? Colors.white : AppColors.textPrimaryLight, fontWeight: FontWeight.w600, fontSize: 11),
+          ),
         ],
       ),
     );
@@ -855,10 +1245,15 @@ class _PondBentoCardState extends State<PondBentoCard> with SingleTickerProvider
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: AppTypography.labelMicro.copyWith(color: color, fontSize: 8)),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(label, style: AppTypography.labelMicro.copyWith(color: color, fontSize: 8)),
+          ),
           const SizedBox(height: 2),
           FittedBox(
             fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
             child: Text(
               value,
               style: AppTypography.titleMedium.copyWith(
@@ -869,7 +1264,14 @@ class _PondBentoCardState extends State<PondBentoCard> with SingleTickerProvider
           ),
           if (caption != null) ...[
             const SizedBox(height: 1),
-            Text(caption, style: TextStyle(color: color.withValues(alpha: 0.8), fontSize: 9, fontWeight: FontWeight.w600)),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                caption,
+                style: TextStyle(color: color.withValues(alpha: 0.8), fontSize: 9, fontWeight: FontWeight.w600),
+              ),
+            ),
           ],
         ],
       ),
@@ -930,6 +1332,14 @@ class _PondBentoCardState extends State<PondBentoCard> with SingleTickerProvider
             TrasladoModal.show(context, pond: widget.pond, batch: activeBatch);
           }
         },
+        onEditPond: () {
+          Navigator.of(modalCtx).pop();
+          if (widget.onEditPondPressed != null) {
+            widget.onEditPondPressed!();
+          } else {
+            CrearEstanqueModal.show(context, pondToEdit: widget.pond);
+          }
+        },
       ),
     );
   }
@@ -944,6 +1354,7 @@ class _PondOperationsSheetContent extends StatelessWidget {
   final VoidCallback onSample;
   final VoidCallback onMortality;
   final VoidCallback onTransfer;
+  final VoidCallback onEditPond;
 
   const _PondOperationsSheetContent({
     required this.pond,
@@ -953,6 +1364,7 @@ class _PondOperationsSheetContent extends StatelessWidget {
     required this.onSample,
     required this.onMortality,
     required this.onTransfer,
+    required this.onEditPond,
   });
 
   @override
@@ -973,156 +1385,196 @@ class _PondOperationsSheetContent extends StatelessWidget {
               blur: 24,
               opacity: isDark ? 0.22 : 0.16,
               borderColor: AppColors.cyanWater.withValues(alpha: 0.35),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Indicador de arrastre táctil
-                  Center(
-                    child: Container(
-                      width: 44,
-                      height: 4,
-                      margin: const EdgeInsets.only(bottom: 12),
-                      decoration: BoxDecoration(
-                        color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.25),
-                        borderRadius: BorderRadius.circular(2),
+              child: SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Indicador de arrastre táctil
+                    Center(
+                      child: Container(
+                        width: 44,
+                        height: 4,
+                        margin: const EdgeInsets.only(bottom: 12),
+                        decoration: BoxDecoration(
+                          color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.25),
+                          borderRadius: BorderRadius.circular(2),
+                        ),
                       ),
                     ),
-                  ),
-                  // Cabecera Operativa con Tag del Estanque y Botón Cerrar (48x48)
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: AppColors.cyanWater.withValues(alpha: 0.2),
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(color: AppColors.cyanWater.withValues(alpha: 0.5)),
-                              ),
-                              child: Text(
-                                pond.sigla,
-                                style: const TextStyle(
-                                  color: AppColors.cyanWater,
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w900,
+                    // Cabecera Operativa con Tag del Estanque y Botón Cerrar (48x48)
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: AppColors.cyanWater.withValues(alpha: 0.2),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: AppColors.cyanWater.withValues(alpha: 0.5)),
+                                ),
+                                child: Text(
+                                  pond.sigla,
+                                  style: const TextStyle(
+                                    color: AppColors.cyanWater,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w900,
+                                  ),
                                 ),
                               ),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(
-                                    'ACCIONES DE CAMPO',
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: AppTypography.titleSmall.copyWith(
-                                      color: isDark ? Colors.white : AppColors.textPrimaryLight,
-                                      fontWeight: FontWeight.w900,
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      'ACCIONES DE CAMPO',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: AppTypography.titleSmall.copyWith(
+                                        color: isDark ? Colors.white : AppColors.textPrimaryLight,
+                                        fontWeight: FontWeight.w900,
+                                      ),
                                     ),
-                                  ),
-                                  Text(
-                                    '${pond.nombre} • ${hasBatch ? (batch!.especie) : "Sin lote activo"}',
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: AppTypography.labelMicro.copyWith(
-                                      color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                                    Text(
+                                      '${pond.nombre} • ${hasBatch ? (batch!.especie) : "Sin lote activo"}',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: AppTypography.labelMicro.copyWith(
+                                        color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                                      ),
                                     ),
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
-                      ),
-                      SizedBox(
-                        width: 48,
-                        height: 48,
-                        child: IconButton(
-                          icon: const Icon(Icons.close_rounded),
-                          color: isDark ? Colors.white70 : AppColors.textPrimaryLight,
-                          onPressed: () => Navigator.of(context).pop(),
+                        SizedBox(
+                          width: 48,
+                          height: 48,
+                          child: IconButton(
+                            icon: const Icon(Icons.close_rounded),
+                            color: isDark ? Colors.white70 : AppColors.textPrimaryLight,
+                            onPressed: () => Navigator.of(context).pop(),
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
 
-                  // 1. Alimentación (Feeding)
-                  _buildLargeOperationTile(
-                    context: context,
-                    icon: Icons.restaurant_rounded,
-                    color: AppColors.greenBiomass,
-                    title: 'Registrar Alimentación',
-                    subtitle: hasBatch
-                        ? 'Ración diaria de concentrado y costo'
-                        : 'Sembrar lote previo para habilitar',
-                    onTap: onFeed,
-                  ),
-                  const SizedBox(height: 10),
+                    // 1. Alimentación (Feeding)
+                    _buildLargeOperationTile(
+                      context: context,
+                      icon: Icons.restaurant_rounded,
+                      color: AppColors.greenBiomass,
+                      title: 'Registrar Alimentación',
+                      subtitle: hasBatch
+                          ? 'Ración diaria de concentrado y costo'
+                          : 'Sembrar lote previo para habilitar',
+                      onTap: onFeed,
+                    ),
+                    const SizedBox(height: 10),
 
-                  // 2. Calidad de Agua (Water Quality) - Rutina Reglamentaria ICA
-                  _buildLargeOperationTile(
-                    context: context,
-                    icon: Icons.water_drop_rounded,
-                    color: AppColors.cyanWater,
-                    title: 'Calidad de Agua (O₂, pH, Temp)',
-                    subtitle: 'Medición físico-química reglamentaria ICA',
-                    onTap: onWaterQuality,
-                  ),
-                  const SizedBox(height: 10),
+                    // 2. Calidad de Agua (Water Quality) - Rutina Reglamentaria ICA
+                    _buildLargeOperationTile(
+                      context: context,
+                      icon: Icons.water_drop_rounded,
+                      color: AppColors.cyanWater,
+                      title: 'Calidad de Agua (O₂, pH, Temp)',
+                      subtitle: 'Medición físico-química reglamentaria ICA',
+                      onTap: onWaterQuality,
+                    ),
+                    const SizedBox(height: 10),
 
-                  // 3. Muestreo Biométrico (Biometry)
-                  _buildLargeOperationTile(
-                    context: context,
-                    icon: Icons.scale_rounded,
-                    color: AppColors.purpleAnalytics,
-                    title: 'Muestreo y Biometría',
-                    subtitle: hasBatch
-                        ? 'Pesaje de control, talla promedio y FCR'
-                        : 'Requiere lote activo en estanque',
-                    onTap: hasBatch ? onSample : () {},
-                    enabled: hasBatch,
-                  ),
-                  const SizedBox(height: 10),
+                    // 3. Muestreo Biométrico (Biometry)
+                    _buildLargeOperationTile(
+                      context: context,
+                      icon: Icons.scale_rounded,
+                      color: AppColors.purpleAnalytics,
+                      title: 'Muestreo y Biometría',
+                      subtitle: hasBatch
+                          ? 'Pesaje de control, talla promedio y FCR'
+                          : 'Requiere lote activo en estanque',
+                      onTap: hasBatch
+                          ? onSample
+                          : () => _showEmptyPondNotice(context, 'el muestreo biométrico'),
+                      enabled: hasBatch,
+                    ),
+                    const SizedBox(height: 10),
 
-                  // 4. Mortalidad / Bajas
-                  _buildLargeOperationTile(
-                    context: context,
-                    icon: Icons.warning_amber_rounded,
-                    color: AppColors.coralAction,
-                    title: 'Registrar Bajas / Mortalidad',
-                    subtitle: hasBatch
-                        ? 'Ajuste de biomasa viva y causas sanitarias'
-                        : 'Requiere lote activo en estanque',
-                    onTap: hasBatch ? onMortality : () {},
-                    enabled: hasBatch,
-                  ),
-                  const SizedBox(height: 10),
+                    // 4. Mortalidad / Bajas
+                    _buildLargeOperationTile(
+                      context: context,
+                      icon: Icons.warning_amber_rounded,
+                      color: AppColors.coralAction,
+                      title: 'Registrar Bajas / Mortalidad',
+                      subtitle: hasBatch
+                          ? 'Ajuste de biomasa viva y causas sanitarias'
+                          : 'Requiere lote activo en estanque',
+                      onTap: hasBatch
+                          ? onMortality
+                          : () => _showEmptyPondNotice(context, 'el registro de mortalidad'),
+                      enabled: hasBatch,
+                    ),
+                    const SizedBox(height: 10),
 
-                  // 5. Traslado o Cosecha
-                  _buildLargeOperationTile(
-                    context: context,
-                    icon: Icons.swap_horiz_rounded,
-                    color: AppColors.amberWarning,
-                    title: 'Traslado o Cosecha',
-                    subtitle: hasBatch
-                        ? 'Transferir a otro estanque o iniciar cosecha'
-                        : 'Requiere lote activo en estanque',
-                    onTap: hasBatch ? onTransfer : () {},
-                    enabled: hasBatch,
-                  ),
-                  const SizedBox(height: 8),
-                ],
+                    // 5. Traslado o Cosecha
+                    _buildLargeOperationTile(
+                      context: context,
+                      icon: Icons.swap_horiz_rounded,
+                      color: AppColors.amberWarning,
+                      title: 'Traslado o Cosecha',
+                      subtitle: hasBatch
+                          ? 'Transferir a otro estanque o iniciar cosecha'
+                          : 'Requiere lote activo en estanque',
+                      onTap: hasBatch
+                          ? onTransfer
+                          : () => _showEmptyPondNotice(context, 'el traslado o cosecha'),
+                      enabled: hasBatch,
+                    ),
+                    const SizedBox(height: 10),
+
+                    // 6. Configurar y Editar Estanque Físico
+                    _buildLargeOperationTile(
+                      context: context,
+                      icon: Icons.tune_rounded,
+                      color: AppColors.cyanWater,
+                      title: 'Editar Parámetros del Estanque',
+                      subtitle: 'Dimensiones, cubicaje, aireación y tipo',
+                      onTap: onEditPond,
+                      enabled: true,
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                ),
               ),
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  void _showEmptyPondNotice(BuildContext context, String actionName) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Este estanque no tiene un lote sembrado para realizar $actionName.'),
+        backgroundColor: AppColors.surfaceDark,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        action: SnackBarAction(
+          label: 'Sembrar Lote',
+          textColor: AppColors.cyanWater,
+          onPressed: () {
+            Navigator.of(context).maybePop();
+            SiembraModal.show(context, pond: pond);
+          },
         ),
       ),
     );
@@ -1142,7 +1594,7 @@ class _PondOperationsSheetContent extends StatelessWidget {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: enabled ? onTap : null,
+        onTap: onTap,
         borderRadius: BorderRadius.circular(16),
         child: Container(
           constraints: const BoxConstraints(minHeight: 60),

@@ -474,14 +474,23 @@ class _NuevoItemModalState extends ConsumerState<NuevoItemModal> {
     final company = authState.currentCompany;
     final companySpecies = company?.especiesHabilitadas ?? ['Trucha Arcoíris'];
 
-    // Buscar en la lista completa de categorías (no solo en categoriaPrincipal)
-    // para que un proveedor multi-categoría aparezca en todos los formularios relevantes
-    final suppliers = state.suppliers.where((s) =>
+    // Buscar primero los proveedores de la categoría seleccionada y agregar
+    // los proveedores personalizados creados por el usuario (para sincronización total)
+    final matchingCategory = state.suppliers.where((s) =>
       s.categorias.contains(_categoryKey) || s.categoriaPrincipal == _categoryKey
     ).toList();
+    final customSuppliers = state.suppliers.where((s) => s.isCustom && !matchingCategory.contains(s)).toList();
+    final suppliers = [
+      ...matchingCategory,
+      ...customSuppliers,
+    ];
+    if (suppliers.isEmpty && state.suppliers.isNotEmpty) {
+      suppliers.addAll(state.suppliers);
+    }
 
-    // Inicializar proveedor por defecto
-    if (_selectedSupplier == null && suppliers.isNotEmpty) {
+    // Inicializar o sincronizar proveedor por defecto si cambió la categoría
+    if (suppliers.isNotEmpty &&
+        (_selectedSupplier == null || !suppliers.any((s) => s.nombre == _selectedSupplier))) {
       _selectedSupplier = suppliers.first.nombre;
     }
 
@@ -855,44 +864,72 @@ class _NuevoItemModalState extends ConsumerState<NuevoItemModal> {
         ),
         const SizedBox(height: 12),
 
-        // Referencia Oficial del Producto
-        Text('REFERENCIA / ARTÍCULO OFICIAL', style: AppTypography.labelMicro.copyWith(color: accentColor, fontWeight: FontWeight.w800)),
+        // Referencia Oficial del Producto o Ingreso Manual
+        Text(
+          availableProducts.isNotEmpty ? 'REFERENCIA / ARTÍCULO OFICIAL' : 'NOMBRE DEL ARTÍCULO / PRODUCTO',
+          style: AppTypography.labelMicro.copyWith(color: accentColor, fontWeight: FontWeight.w800),
+        ),
         const SizedBox(height: 6),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
-          decoration: BoxDecoration(
-            color: isDark ? Colors.white.withValues(alpha: 0.06) : Colors.white,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: accentColor.withValues(alpha: 0.35)),
-          ),
-          child: DropdownButtonHideUnderline(
-            child: DropdownButton<String>(
-              value: availableProducts.contains(_selectedProduct)
-                  ? _selectedProduct
-                  : (availableProducts.isNotEmpty ? availableProducts.first : null),
-              dropdownColor: isDark ? AppColors.surfaceDark : Colors.white,
-              isExpanded: true,
-              icon: const Icon(Icons.check_circle_outline_rounded, color: AppColors.greenBiomass, size: 18),
-              items: availableProducts.map((p) {
-                return DropdownMenuItem(
-                  value: p,
-                  child: Text(
-                    p,
-                    style: TextStyle(
-                      color: isDark ? Colors.white : AppColors.textPrimaryLight,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
+        if (availableProducts.isEmpty)
+          TextFormField(
+            initialValue: _selectedProduct ?? '',
+            style: TextStyle(
+              color: isDark ? Colors.white : AppColors.textPrimaryLight,
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+            ),
+            decoration: InputDecoration(
+              hintText: 'Ej. Cal Agrícola / Oxigenador 2HP / Florfenicol',
+              filled: true,
+              fillColor: isDark ? Colors.white.withValues(alpha: 0.06) : Colors.white,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: BorderSide(color: accentColor.withValues(alpha: 0.35)),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: BorderSide(color: accentColor.withValues(alpha: 0.35)),
+              ),
+            ),
+            onChanged: (val) => _selectedProduct = val.trim(),
+          )
+        else
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+            decoration: BoxDecoration(
+              color: isDark ? Colors.white.withValues(alpha: 0.06) : Colors.white,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: accentColor.withValues(alpha: 0.35)),
+            ),
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<String>(
+                value: availableProducts.contains(_selectedProduct)
+                    ? _selectedProduct
+                    : (availableProducts.isNotEmpty ? availableProducts.first : null),
+                dropdownColor: isDark ? AppColors.surfaceDark : Colors.white,
+                isExpanded: true,
+                icon: const Icon(Icons.check_circle_outline_rounded, color: AppColors.greenBiomass, size: 18),
+                items: availableProducts.map((p) {
+                  return DropdownMenuItem(
+                    value: p,
+                    child: Text(
+                      p,
+                      style: TextStyle(
+                        color: isDark ? Colors.white : AppColors.textPrimaryLight,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                      ),
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                );
-              }).toList(),
-              onChanged: (val) {
-                if (val != null) _onProductSelected(val);
-              },
+                  );
+                }).toList(),
+                onChanged: (val) {
+                  if (val != null) _onProductSelected(val);
+                },
+              ),
             ),
           ),
-        ),
         const SizedBox(height: 14),
 
         // Ficha Técnica contextual

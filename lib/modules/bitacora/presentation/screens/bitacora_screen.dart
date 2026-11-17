@@ -1186,9 +1186,6 @@ class _BitacoraScreenState extends ConsumerState<BitacoraScreen> with SingleTick
             final loteStr = batch != null ? 'Lote ${batch.codigoLote}' : (bio.loteId.isNotEmpty ? 'Lote ${bio.loteId}' : 'Lote Principal');
             final especieStr = batch?.especie ?? pond?.especieActual ?? 'Tilapia';
             final fechaStr = '${bio.fecha.day}/${bio.fecha.month}/${bio.fecha.year}';
-            final horaStr = bio.hora != null && bio.hora!.isNotEmpty
-                ? (bio.hora!.length >= 5 ? bio.hora!.substring(0, 5) : bio.hora!)
-                : '${bio.fecha.hour.toString().padLeft(2, '0')}:${bio.fecha.minute.toString().padLeft(2, '0')}';
             final periodGdp = periodGdpMap[bio.id] ?? bio.gdpGDia ?? 0.0;
 
             return Padding(
@@ -1214,7 +1211,7 @@ class _BitacoraScreenState extends ConsumerState<BitacoraScreen> with SingleTick
                             children: [
                               Text(pondTitulo, style: AppTypography.titleSmall.copyWith(color: AppColors.cyanWater, fontWeight: FontWeight.w800)),
                               GlassBadge(text: '$loteStr • $especieStr', color: Colors.white),
-                              GlassBadge(text: '$fechaStr • ⏰ $horaStr', color: Colors.white70),
+                              GlassBadge(text: fechaStr, color: Colors.white70),
                             ],
                           ),
                         ),
@@ -1785,7 +1782,11 @@ class _BiometryAnalysis {
       biometriesByBatch.putIfAbsent(key, () => []).add(bio);
     }
     for (final list in biometriesByBatch.values) {
-      list.sort((a, b) => a.fecha.compareTo(b.fecha));
+      list.sort((a, b) {
+        final cmp = a.fecha.compareTo(b.fecha);
+        if (cmp != 0) return cmp;
+        return a.creadoEn.compareTo(b.creadoEn);
+      });
     }
 
     final Map<String, double> periodGdpMap = {};
@@ -1821,7 +1822,12 @@ class _BiometryAnalysis {
       }
     }
 
-    final sortedBiometries = List<BiometriaRecord>.from(biometries)..sort((a, b) => b.fecha.compareTo(a.fecha));
+    final sortedBiometries = List<BiometriaRecord>.from(biometries)
+      ..sort((a, b) {
+        final cmp = b.fecha.compareTo(a.fecha);
+        if (cmp != 0) return cmp;
+        return b.creadoEn.compareTo(a.creadoEn);
+      });
 
     final double latestAvgWeight;
     if (sortedBiometries.isNotEmpty) {

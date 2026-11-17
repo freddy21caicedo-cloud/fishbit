@@ -154,6 +154,29 @@ class Company {
       estadoSuscripcion: estadoSuscripcion ?? this.estadoSuscripcion,
     );
   }
+
+  /// Retorna el peso objetivo de cosecha estándar por especie
+  static double defaultHarvestWeightForSpecies(String especie) {
+    final lower = especie.toLowerCase();
+    if (lower.contains('cachama')) return 1000.0;
+    if (lower.contains('tilapia')) return 650.0;
+    if (lower.contains('trucha')) return 400.0;
+    if (lower.contains('bocachico')) return 400.0;
+    if (lower.contains('pangasius')) return 800.0;
+    if (lower.contains('camar') || lower.contains('langostino')) return 25.0;
+    return 500.0;
+  }
+
+  /// Obtiene la meta de peso de cosecha en gramos configurada para la especie, o el valor por defecto
+  double getTargetHarvestWeightGrams(String especie) {
+    final configured = pesosFinalesEspeciesG[especie];
+    if (configured != null) {
+      if (configured is num) return configured.toDouble();
+      final parsed = double.tryParse(configured.toString());
+      if (parsed != null && parsed > 0) return parsed;
+    }
+    return defaultHarvestWeightForSpecies(especie);
+  }
 }
 
 

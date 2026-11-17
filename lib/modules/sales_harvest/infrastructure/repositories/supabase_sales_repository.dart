@@ -16,6 +16,7 @@ class SupabaseSalesRepository implements SalesRepository {
       id: 'cl100000-0000-0000-0000-000000000001',
       empresaId: 'c1000000-0000-0000-0000-000000000001',
       nombre: 'Distribuidora del Mar S.A.S.',
+      cedulaNit: '900.123.456-7',
       telefono: '+57 312 456 7890',
       email: 'compras@distrimar.com',
       creadoEn: DateTime.now(),
@@ -24,6 +25,7 @@ class SupabaseSalesRepository implements SalesRepository {
       id: 'cl100000-0000-0000-0000-000000000002',
       empresaId: 'c1000000-0000-0000-0000-000000000001',
       nombre: 'Restaurante Pescadería Central',
+      cedulaNit: '800.987.654-1',
       telefono: '+57 301 987 6543',
       email: 'pedidos@pescaderia.com',
       creadoEn: DateTime.now(),
@@ -40,16 +42,28 @@ class SupabaseSalesRepository implements SalesRepository {
       estanqueNombre: 'Estanque 01 (Geomembrana)',
       clienteId: 'cl100000-0000-0000-0000-000000000001',
       clienteNombre: 'Distribuidora del Mar S.A.S.',
+      clienteCedulaNit: '900.123.456-7',
       especie: 'Tilapia Roja',
+      tipoVenta: SalePresentation.evisceradoCompleto,
+      cantidadPeces: 1700,
+      pesoVivoKg: 850.0,
+      pesoArregladoKg: 710.0,
+      mermaKg: 140.0,
+      mermaPct: 16.47,
+      mermaGPpe: 82.35,
+      baseCobro: 'peso_vivo',
       biomasaVendidaKg: 850.0,
       precioUnitarioKg: 9200.0,
       ingresoBruto: 7820000.0,
       cogs: 3713684.0,
       utilidadNeta: 4106316.0,
       estadoPago: 'Pagado',
+      pesoPromedioG: 500.0,
+      porcentajeViscerasPct: 16.47,
       creadoEn: DateTime.now().subtract(const Duration(days: 2)),
     ),
   ];
+
 
   @override
   Future<List<BatchSale>> fetchSales(String empresaId, String unidadAcuicolaId) async {
@@ -105,6 +119,7 @@ class SupabaseSalesRepository implements SalesRepository {
         biomasaVendidaKg: sale.biomasaVendidaKg,
         ingresoBruto: sale.ingresoBruto,
         cogs: sale.cogs,
+        pecesVendidos: sale.cantidadPeces,
       ));
 
       return sale;
@@ -116,6 +131,7 @@ class SupabaseSalesRepository implements SalesRepository {
         biomasaVendidaKg: sale.biomasaVendidaKg,
         ingresoBruto: sale.ingresoBruto,
         cogs: sale.cogs,
+        pecesVendidos: sale.cantidadPeces,
       ));
       return sale;
     }
@@ -135,9 +151,10 @@ class SupabaseSalesRepository implements SalesRepository {
           .limit(100);
 
       final list = (res as List).map((row) => Client.fromJson(row as Map<String, dynamic>)).toList();
-      return list.isNotEmpty ? list : _demoClients;
-    } catch (_) {
-      return _demoClients;
+      return list;
+    } catch (e) {
+      debugPrint('[SalesRepository] Error al obtener clientes: $e');
+      return [];
     }
   }
 
@@ -155,9 +172,10 @@ class SupabaseSalesRepository implements SalesRepository {
           .single();
 
       return Client.fromJson(res);
-    } catch (_) {
-      _demoClients.add(client);
-      return client;
+    } catch (e) {
+      debugPrint('[SalesRepository] Error al crear cliente en base de datos: $e');
+      rethrow;
     }
   }
 }
+

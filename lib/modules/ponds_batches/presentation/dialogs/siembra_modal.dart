@@ -15,6 +15,7 @@ import 'package:fishbit_finance/modules/warehouse_inventory/domain/models/invent
 import 'package:fishbit_finance/modules/warehouse_inventory/presentation/dialogs/nuevo_item_modal.dart';
 import 'package:fishbit_finance/modules/warehouse_inventory/presentation/dialogs/nueva_factura_modal.dart';
 import 'package:fishbit_finance/modules/warehouse_inventory/presentation/providers/warehouse_provider.dart';
+import 'package:fishbit_finance/core/utils/currency_formatters.dart';
 
 class SiembraModal extends ConsumerStatefulWidget {
   final Pond? initialPond;
@@ -36,9 +37,10 @@ class SiembraModal extends ConsumerStatefulWidget {
 class _SiembraModalState extends ConsumerState<SiembraModal> {
   final _formKey = GlobalKey<FormState>();
   final _codigoCtrl = TextEditingController();
-  final _pecesCtrl = TextEditingController(text: '5000');
-  final _pesoCtrl = TextEditingController(text: '1.5');
-  final _costoAlevinosCtrl = TextEditingController(text: '0');
+  final _pecesCtrl = TextEditingController();
+  final _pesoCtrl = TextEditingController();
+  final _metaCosechaCtrl = TextEditingController();
+  final _costoAlevinosCtrl = TextEditingController();
 
   String _selectedEspecie = 'Tilapia Roja';
   String? _selectedPondId;
@@ -61,6 +63,7 @@ class _SiembraModalState extends ConsumerState<SiembraModal> {
     final company = ref.read(authProvider).currentCompany;
     if (company != null && company.especiesHabilitadas.isNotEmpty) {
       _selectedEspecie = company.especiesHabilitadas.first;
+      _metaCosechaCtrl.text = company.getTargetHarvestWeightGrams(_selectedEspecie).toInt().toString();
     }
   }
 
@@ -72,6 +75,7 @@ class _SiembraModalState extends ConsumerState<SiembraModal> {
       if (!company.especiesHabilitadas.contains(_selectedEspecie)) {
         _selectedEspecie = company.especiesHabilitadas.first;
       }
+      _metaCosechaCtrl.text = company.getTargetHarvestWeightGrams(_selectedEspecie).toInt().toString();
     }
     _actualizarCodigoLote();
     _recalcularCostoAutomatico();
@@ -82,6 +86,7 @@ class _SiembraModalState extends ConsumerState<SiembraModal> {
     _codigoCtrl.dispose();
     _pecesCtrl.dispose();
     _pesoCtrl.dispose();
+    _metaCosechaCtrl.dispose();
     _costoAlevinosCtrl.dispose();
     super.dispose();
   }
@@ -123,19 +128,19 @@ class _SiembraModalState extends ConsumerState<SiembraModal> {
       costoUnitario = warehouseState.getCostoUnitarioAlevino(_selectedEspecie);
     }
 
-    final peces = int.tryParse(_pecesCtrl.text) ?? 0;
+    final peces = CurrencyFormatters.parseCOP(_pecesCtrl.text).toInt();
 
     if (costoUnitario > 0) {
       final total = peces * costoUnitario;
-      _costoAlevinosCtrl.text = total.toStringAsFixed(0);
+      _costoAlevinosCtrl.text = CurrencyFormatters.formatCOP(total);
     } else {
-      _costoAlevinosCtrl.text = '0';
+      _costoAlevinosCtrl.text = CurrencyFormatters.formatCOP(0);
     }
   }
 
   double get _biomasaCalculadaKg {
-    final peces = int.tryParse(_pecesCtrl.text) ?? 0;
-    final pesoG = double.tryParse(_pesoCtrl.text) ?? 0.0;
+    final peces = CurrencyFormatters.parseCOP(_pecesCtrl.text).toInt();
+    final pesoG = double.tryParse(_pesoCtrl.text.replaceAll(',', '.').trim()) ?? 0.0;
     return (peces * pesoG) / 1000.0;
   }
 
@@ -151,7 +156,7 @@ class _SiembraModalState extends ConsumerState<SiembraModal> {
     final warehouseState = ref.read(warehouseProvider);
     final alevinosDisponibles = warehouseState.getAlevinosForSpecies(_selectedEspecie);
     final stockDisponible = warehouseState.getTotalAlevinosDisponibles(_selectedEspecie);
-    final peces = int.tryParse(_pecesCtrl.text) ?? 0;
+    final peces = CurrencyFormatters.parseCOP(_pecesCtrl.text).toInt();
 
     if (stockDisponible <= 0 || alevinosDisponibles.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -195,11 +200,21 @@ class _SiembraModalState extends ConsumerState<SiembraModal> {
     }
 
     final authState = ref.read(authProvider);
-    final empresaId = authState.currentUser?.empresaId ?? 'c1000000-0000-0000-0000-000000000001';
-    final unidadId = authState.activeUnitId ?? 'u1000000-0000-0000-0000-000000000001';
+    final empresaId = authState.currentCompany?.id ?? authState.currentUser?.empresaId;
+    final unidadId = authState.activeUnitId ?? authState.currentUser?.unidadAcuicolaId ?? '';
 
-    final pesoG = double.tryParse(_pesoCtrl.text) ?? 1.5;
-    final costoAlevinos = double.tryParse(_costoAlevinosCtrl.text) ?? 0.0;
+    if (empresaId == null || empresaId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Error: No se encontró una empresa activa en la sesión.'),
+          backgroundColor: AppColors.waterCritical,
+        ),
+      );
+      return;
+    }
+
+    final pesoG = double.tryParse(_pesoCtrl.text.replaceAll(',', '.').trim()) ?? 0.0;
+    final costoAlevinos = CurrencyFormatters.parseCOP(_costoAlevinosCtrl.text);
     final biomasaKg = _biomasaCalculadaKg;
 
     final pondsState = ref.read(pondsProvider);
@@ -212,6 +227,9 @@ class _SiembraModalState extends ConsumerState<SiembraModal> {
 
     final existingBatches = pondsState.batches.where((b) => b.estanqueId == _selectedPondId && b.estado == BatchStatus.active).toList();
     final isPolyculture = existingBatches.isNotEmpty;
+
+    final nav = Navigator.of(context);
+    final messenger = ScaffoldMessenger.of(context);
 
     final batch = FishBatch(
       id: const Uuid().v4(),
@@ -236,9 +254,6 @@ class _SiembraModalState extends ConsumerState<SiembraModal> {
       creadoEn: DateTime.now(),
     );
 
-    final nav = Navigator.of(context);
-    final messenger = ScaffoldMessenger.of(context);
-
     try {
       // 1. Plantar el lote
       final success = await ref.read(pondsProvider.notifier).plantBatch(batch);
@@ -249,6 +264,18 @@ class _SiembraModalState extends ConsumerState<SiembraModal> {
           cantidadPeces: peces.toDouble(),
           specificItemId: _selectedInventoryItemId,
         );
+
+        final metaCosechaG = double.tryParse(_metaCosechaCtrl.text.replaceAll(',', '.').trim());
+        if (metaCosechaG != null && metaCosechaG > 0) {
+          final currentCompany = authState.currentCompany;
+          if (currentCompany != null) {
+            final Map<String, dynamic> nuevosPesos = Map<String, dynamic>.from(currentCompany.pesosFinalesEspeciesG);
+            nuevosPesos[_selectedEspecie] = metaCosechaG;
+            await ref.read(authProvider.notifier).updateCompany(
+              currentCompany.copyWith(pesosFinalesEspeciesG: nuevosPesos),
+            );
+          }
+        }
 
         if (mounted) {
           nav.pop();
@@ -436,6 +463,10 @@ class _SiembraModalState extends ConsumerState<SiembraModal> {
                               if (val != null) {
                                 setState(() {
                                   _selectedEspecie = val;
+                                  final comp = ref.read(authProvider).currentCompany;
+                                  if (comp != null) {
+                                    _metaCosechaCtrl.text = comp.getTargetHarvestWeightGrams(val).toInt().toString();
+                                  }
                                   _actualizarCodigoLote();
                                   _costoModificadoManualmente = false;
                                   _recalcularCostoAutomatico();
@@ -620,12 +651,14 @@ class _SiembraModalState extends ConsumerState<SiembraModal> {
                       Expanded(
                         child: GlassFormField(
                           label: 'CANTIDAD PECES',
+                          hint: 'Ej: 5.000',
                           controller: _pecesCtrl,
                           keyboardType: TextInputType.number,
                           prefixIcon: Icons.pets_rounded,
+                          inputFormatters: [IntegerThousandsFormatter()],
                           validator: (val) {
-                            final n = int.tryParse(val ?? '');
-                            if (n == null || n <= 0) return 'Ingresa cantidad';
+                            final n = CurrencyFormatters.parseCOP(val).toInt();
+                            if (n <= 0) return 'Ingresa cantidad';
                             if (n > stockDisponible && stockDisponible > 0) {
                               return 'Excede stock (${stockDisponible.toInt()})';
                             }
@@ -642,15 +675,31 @@ class _SiembraModalState extends ConsumerState<SiembraModal> {
                       Expanded(
                         child: GlassFormField(
                           label: 'PESO PROM. (g)',
+                          hint: 'Ej: 1.5',
                           controller: _pesoCtrl,
                           keyboardType: const TextInputType.numberWithOptions(decimal: true),
                           prefixIcon: Icons.scale_rounded,
                           validator: (val) {
-                            final n = double.tryParse(val ?? '');
+                            final n = double.tryParse(val?.replaceAll(',', '.') ?? '');
                             if (n == null || n <= 0) return 'Ingresa peso';
                             return null;
                           },
                           onChanged: (_) => setState(() {}),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: GlassFormField(
+                          label: 'META COSECHA (g)',
+                          hint: 'Ej: 650',
+                          controller: _metaCosechaCtrl,
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          prefixIcon: Icons.flag_rounded,
+                          validator: (val) {
+                            final n = double.tryParse(val?.replaceAll(',', '.') ?? '');
+                            if (n == null || n <= 0) return 'Ingresa meta';
+                            return null;
+                          },
                         ),
                       ),
                     ],
@@ -660,9 +709,11 @@ class _SiembraModalState extends ConsumerState<SiembraModal> {
                   // Costo Total Trasladado de Alevinos
                   GlassFormField(
                     label: 'COSTO TOTAL ALEVINOS (\$ COP) [Trasladado de Almacén]',
+                    hint: 'Ej: \$ 0',
                     controller: _costoAlevinosCtrl,
                     keyboardType: TextInputType.number,
                     prefixIcon: Icons.monetization_on_outlined,
+                    inputFormatters: [CurrencyInputFormatter()],
                     onChanged: (_) {
                       _costoModificadoManualmente = true;
                     },
@@ -707,7 +758,7 @@ class _SiembraModalState extends ConsumerState<SiembraModal> {
                           children: [
                             Text('Costo Inicial del Lote:', style: AppTypography.bodySmall.copyWith(color: Colors.white70)),
                             Text(
-                              '\$${(double.tryParse(_costoAlevinosCtrl.text) ?? 0.0).toStringAsFixed(0)} COP',
+                              '\$${CurrencyFormatters.parseCOP(_costoAlevinosCtrl.text).toStringAsFixed(0)} COP',
                               style: AppTypography.titleMedium.copyWith(color: AppColors.greenBiomass, fontWeight: FontWeight.w900),
                             ),
                           ],

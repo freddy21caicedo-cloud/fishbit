@@ -30,7 +30,7 @@ class BiometriaModal extends ConsumerStatefulWidget {
 
 class _BiometriaModalState extends ConsumerState<BiometriaModal> {
   final _formKey = GlobalKey<FormState>();
-  final _pecesCapturadosCtrl = TextEditingController(text: '35');
+  final _pecesCapturadosCtrl = TextEditingController();
   late final TextEditingController _pesoTotalCapturaKgCtrl;
   final _longitudCtrl = TextEditingController();
   final _obsCtrl = TextEditingController();
@@ -45,12 +45,7 @@ class _BiometriaModalState extends ConsumerState<BiometriaModal> {
     super.initState();
     _selectedPondId = widget.pond?.id;
     _selectedBatchId = widget.batch?.id;
-    final defaultPesoG = widget.batch?.pesoActualGramos ?? 250.0;
-    const defaultPeces = 35;
-    final defaultCapturaKg = (defaultPeces * defaultPesoG) / 1000.0;
-    _pesoTotalCapturaKgCtrl = TextEditingController(
-      text: defaultCapturaKg.toStringAsFixed(2),
-    );
+    _pesoTotalCapturaKgCtrl = TextEditingController();
   }
 
   @override
@@ -82,22 +77,27 @@ class _BiometriaModalState extends ConsumerState<BiometriaModal> {
     final activeBatch = widget.batch ??
         (activeBatches.where((b) => b.id == _selectedBatchId).firstOrNull ?? activeBatches.firstOrNull);
 
-    final pesoCapturaKg = double.tryParse(_pesoTotalCapturaKgCtrl.text) ?? 0.0;
-    final pecesCapturados = int.tryParse(_pecesCapturadosCtrl.text) ?? 0;
+    final pesoCapturaKg = double.tryParse(_pesoTotalCapturaKgCtrl.text.replaceAll(',', '.').trim()) ?? 0.0;
+    final pecesCapturados = int.tryParse(_pecesCapturadosCtrl.text.trim()) ?? 0;
+    final bool hasValidSample = pecesCapturados > 0 && pesoCapturaKg > 0;
     final pesoCapturaGramos = pesoCapturaKg * 1000.0;
-    final pesoPromedioGramos = pecesCapturados > 0 ? (pesoCapturaGramos / pecesCapturados) : (activeBatch?.pesoActualGramos ?? 250.0);
+    final pesoPromedioGramos = hasValidSample ? (pesoCapturaGramos / pecesCapturados) : 0.0;
 
-    final pesoAnteriorG = activeBatch?.pesoActualGramos ?? 200.0;
-    final pecesVivos = activeBatch?.cantidadActualPeces ?? 1000;
+    final pesoAnteriorG = activeBatch?.pesoActualGramos ?? 0.0;
+    final pecesVivos = activeBatch?.cantidadActualPeces ?? 0;
     final biomasaParcialKg = (pecesVivos * pesoPromedioGramos) / 1000.0;
-    final gananciaPesoG = pesoPromedioGramos - pesoAnteriorG;
+    final gananciaPesoG = hasValidSample ? (pesoPromedioGramos - pesoAnteriorG) : 0.0;
+
+    final capacidadM3 = activePond?.capacidadM3 ?? 0.0;
+    final nuevaDensidadKgM3 = capacidadM3 > 0 ? (biomasaParcialKg / capacidadM3) : 0.0;
+    final densidadPecesM3 = capacidadM3 > 0 ? (pecesVivos / capacidadM3) : 0.0;
 
     // Cálculo GDP (Ganancia Diaria de Peso)
     final dias = (activeBatch?.diasDeCultivo ?? 30) > 0 ? (activeBatch?.diasDeCultivo ?? 30) : 1;
     final gdp = dias > 0 ? ((pesoPromedioGramos - (activeBatch?.pesoInicialGramos ?? 10.0)) / dias) : 0.0;
 
     // Factor K de Fulton (si se ingresa longitud en cm)
-    final longitudCm = double.tryParse(_longitudCtrl.text);
+    final longitudCm = double.tryParse(_longitudCtrl.text.replaceAll(',', '.').trim());
     final factorK = (longitudCm != null && longitudCm > 0) ? (100.0 * pesoPromedioGramos / (longitudCm * longitudCm * longitudCm)) : null;
 
     final recomendacionNutricional = _getRecommendedPelletAndProtein(pesoPromedioGramos);
@@ -177,11 +177,6 @@ class _BiometriaModalState extends ConsumerState<BiometriaModal> {
                           onChanged: (val) {
                             setState(() {
                               _selectedPondId = val;
-                              final b = pondsState.batches.where((b) => b.estanqueId == val).firstOrNull;
-                              if (b != null) {
-                                const pCount = 35;
-                                _pesoTotalCapturaKgCtrl.text = ((pCount * b.pesoActualGramos) / 1000.0).toStringAsFixed(2);
-                              }
                             });
                           },
                         ),
@@ -242,11 +237,6 @@ class _BiometriaModalState extends ConsumerState<BiometriaModal> {
                           onChanged: (val) {
                             setState(() {
                               _selectedBatchId = val;
-                              final b = activeBatches.where((batch) => batch.id == val).firstOrNull;
-                              if (b != null) {
-                                const pCount = 35;
-                                _pesoTotalCapturaKgCtrl.text = ((pCount * b.pesoActualGramos) / 1000.0).toStringAsFixed(2);
-                              }
                             });
                           },
                         ),
@@ -261,9 +251,14 @@ class _BiometriaModalState extends ConsumerState<BiometriaModal> {
                       Expanded(
                         child: GlassFormField(
                           label: 'PECES CAPTURADOS (RED)',
-                          hint: '35',
+                          hint: 'Ej: 35',
                           controller: _pecesCapturadosCtrl,
                           keyboardType: TextInputType.number,
+                          validator: (val) {
+                            final n = int.tryParse(val?.trim() ?? '');
+                            if (n == null || n <= 0) return 'Ingresa peces (> 0)';
+                            return null;
+                          },
                           onChanged: (_) => setState(() {}),
                         ),
                       ),
@@ -271,9 +266,14 @@ class _BiometriaModalState extends ConsumerState<BiometriaModal> {
                       Expanded(
                         child: GlassFormField(
                           label: 'PESO TOTAL CAPTURA (kg)',
-                          hint: '8.75',
+                          hint: 'Ej: 8.75',
                           controller: _pesoTotalCapturaKgCtrl,
                           keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          validator: (val) {
+                            final p = double.tryParse(val?.replaceAll(',', '.').trim() ?? '');
+                            if (p == null || p <= 0) return 'Ingresa peso (> 0)';
+                            return null;
+                          },
                           onChanged: (_) => setState(() {}),
                         ),
                       ),
@@ -300,9 +300,15 @@ class _BiometriaModalState extends ConsumerState<BiometriaModal> {
                               FittedBox(
                                 fit: BoxFit.scaleDown,
                                 alignment: Alignment.centerLeft,
-                                child: Text('${pesoPromedioGramos.toStringAsFixed(1)} g', style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900)),
+                                child: Text(
+                                  hasValidSample ? '${pesoPromedioGramos.toStringAsFixed(1)} g' : '-- g',
+                                  style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900),
+                                ),
                               ),
-                              Text('${pesoCapturaKg.toStringAsFixed(2)} kg ÷ $pecesCapturados peces', style: const TextStyle(color: Colors.white60, fontSize: 10)),
+                              Text(
+                                hasValidSample ? '${pesoCapturaKg.toStringAsFixed(2)} kg ÷ $pecesCapturados peces' : '-- kg ÷ -- peces',
+                                style: const TextStyle(color: Colors.white60, fontSize: 10),
+                              ),
                             ],
                           ),
                         ),
@@ -324,9 +330,15 @@ class _BiometriaModalState extends ConsumerState<BiometriaModal> {
                               FittedBox(
                                 fit: BoxFit.scaleDown,
                                 alignment: Alignment.centerLeft,
-                                child: Text('${biomasaParcialKg.toStringAsFixed(1)} kg', style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900)),
+                                child: Text(
+                                  hasValidSample ? '${biomasaParcialKg.toStringAsFixed(1)} kg' : '-- kg',
+                                  style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900),
+                                ),
                               ),
-                              Text('En $pecesVivos peces vivos', style: const TextStyle(color: Colors.white60, fontSize: 10)),
+                              Text(
+                                hasValidSample ? 'En $pecesVivos peces vivos' : 'Requiere pesaje de muestra',
+                                style: const TextStyle(color: Colors.white60, fontSize: 10),
+                              ),
                             ],
                           ),
                         ),
@@ -373,6 +385,23 @@ class _BiometriaModalState extends ConsumerState<BiometriaModal> {
                           children: [
                             const Text('GDP Acumulado (g/día):', style: TextStyle(color: AppColors.textSecondaryDark, fontSize: 12)),
                             Text('${gdp.toStringAsFixed(2)} g/día', style: const TextStyle(color: AppColors.cyanWater, fontWeight: FontWeight.w800, fontSize: 13)),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text('Densidad Resultante por m³:', style: TextStyle(color: AppColors.textSecondaryDark, fontSize: 12)),
+                            Text(
+                              '${nuevaDensidadKgM3.toStringAsFixed(2)} kg/m³ (${densidadPecesM3.toStringAsFixed(1)} pcs/m³)',
+                              style: TextStyle(
+                                color: nuevaDensidadKgM3 < 8.0
+                                    ? AppColors.purpleAnalytics
+                                    : (nuevaDensidadKgM3 <= 16.0 ? AppColors.amberWarning : AppColors.coralAction),
+                                fontWeight: FontWeight.w800,
+                                fontSize: 13,
+                              ),
+                            ),
                           ],
                         ),
                         if (factorK != null) ...[
@@ -435,9 +464,10 @@ class _BiometriaModalState extends ConsumerState<BiometriaModal> {
                     height: 46,
                     backgroundColor: AppColors.cyanWater,
                     isLoading: _isLoading,
-                    onPressed: (activePond == null || activeBatch == null || pesoPromedioGramos <= 0)
+                    onPressed: (activePond == null || activeBatch == null || !hasValidSample)
                         ? null
                         : () async {
+                            if (!_formKey.currentState!.validate()) return;
                             final nav = Navigator.of(context);
                             final messenger = ScaffoldMessenger.of(context);
                             setState(() => _isLoading = true);
@@ -445,6 +475,7 @@ class _BiometriaModalState extends ConsumerState<BiometriaModal> {
                                   estanqueId: activePond.id,
                                   loteId: activeBatch.id,
                                   nuevoPesoPromedioGramos: pesoPromedioGramos,
+                                  biomasaCalculadaKg: biomasaParcialKg,
                                   cantidadPecesMuestreados: int.tryParse(_pecesCapturadosCtrl.text),
                                   pesoTotalCapturaKg: pesoCapturaKg,
                                   longitudPromedioCm: longitudCm,
@@ -459,7 +490,7 @@ class _BiometriaModalState extends ConsumerState<BiometriaModal> {
                                 nav.pop();
                                 messenger.showSnackBar(
                                   SnackBar(
-                                    content: Text('Biometría guardada en ${activePond.sigla} (${pesoPromedioGramos.toStringAsFixed(1)}g). Biomasa ajustada a ${biomasaParcialKg.toStringAsFixed(1)} kg.'),
+                                    content: Text('Biometría guardada en ${activePond.sigla} (${pesoPromedioGramos.toStringAsFixed(1)}g). Biomasa ajustada a ${biomasaParcialKg.toStringAsFixed(1)} kg • Densidad: ${nuevaDensidadKgM3.toStringAsFixed(2)} kg/m³.'),
                                     backgroundColor: AppColors.cyanWater,
                                   ),
                                 );

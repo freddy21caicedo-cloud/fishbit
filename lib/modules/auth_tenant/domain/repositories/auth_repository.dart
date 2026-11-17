@@ -47,7 +47,17 @@ abstract class AuthRepository {
   Future<void> updateCompany(Company company);
 
   Future<List<AquacultureUnit>> fetchUnits(String empresaId);
-  Future<AquacultureUnit> createUnit(String empresaId, String nombre, String sigla, String? ubicacion);
+  Future<AquacultureUnit> createUnit(
+    String empresaId,
+    String nombre,
+    String sigla,
+    String? ubicacion, {
+    String? pais,
+    String? departamento,
+    String? ciudad,
+    String? direccion,
+    String? telefono,
+  });
 
   Future<List<UserMember>> fetchTeamMembers(String empresaId);
   Future<UserMember> createTeamMember({
@@ -72,7 +82,8 @@ abstract class AuthRepository {
     String? cedula,
   });
   Future<UserMember> registerWithInvitationToken(String token, String password);
-  Future<UserMember> updateTeamMember(UserMember member);
+  Future<UserMember> updateTeamMember(UserMember member, {String? newPassword});
   Future<void> updateMemberStatus(String memberId, MemberStatus newStatus);
   Future<void> deleteMember(String memberId);
+  Future<void> updateInitialPassword(String newPassword);
 }

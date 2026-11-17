@@ -3,9 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fishbit_finance/core/design_system/app_colors.dart';
 import 'package:fishbit_finance/core/design_system/app_typography.dart';
 import 'package:fishbit_finance/core/design_system/fishbit_header.dart';
-import 'package:fishbit_finance/core/design_system/glass_card.dart';
 import 'package:fishbit_finance/core/design_system/floating_dock_layout.dart';
-import 'package:fishbit_finance/core/utils/currency_formatters.dart';
+import 'package:fishbit_finance/modules/auth_tenant/presentation/providers/auth_provider.dart';
 import 'package:fishbit_finance/modules/ponds_batches/domain/models/pond.dart';
 import 'package:fishbit_finance/modules/ponds_batches/domain/models/fish_batch.dart';
 import 'package:fishbit_finance/modules/ponds_batches/presentation/dialogs/alimentar_modal.dart';
@@ -16,6 +15,7 @@ import 'package:fishbit_finance/modules/ponds_batches/presentation/dialogs/siemb
 import 'package:fishbit_finance/modules/ponds_batches/presentation/dialogs/traslado_modal.dart';
 import 'package:fishbit_finance/modules/ponds_batches/presentation/providers/ponds_provider.dart';
 import 'package:fishbit_finance/modules/ponds_batches/presentation/widgets/pond_bento_card.dart';
+import 'package:fishbit_finance/modules/water_quality/presentation/providers/water_quality_provider.dart';
 
 class PondsDashboardScreen extends ConsumerStatefulWidget {
   const PondsDashboardScreen({super.key});
@@ -30,11 +30,10 @@ class _PondsDashboardScreenState extends ConsumerState<PondsDashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final biomasaTotalKg = ref.watch(pondsProvider.select((s) => s.biomasaTotalKg));
-    final costoTotalEnAgua = ref.watch(pondsProvider.select((s) => s.costoTotalEnAgua));
     final isLoading = ref.watch(pondsProvider.select((s) => s.isLoading));
     final ponds = ref.watch(pondsProvider.select((s) => s.ponds));
     final batchesByPond = ref.watch(activeBatchesByPondProvider);
+    final waterQualityByPond = ref.watch(latestWaterQualityByPondProvider);
 
     final filteredPonds = switch (_selectedFilterIndex) {
       1 => ponds.where((p) => p.estado == PondStatus.active).toList(),
@@ -162,48 +161,13 @@ class _PondsDashboardScreenState extends ConsumerState<PondsDashboardScreen> {
                   onRefresh: () => ref.read(pondsProvider.notifier).loadPondsAndBatches(),
                 ),
 
-                // KPIs Principales en Bento Grid
+                // Barra de Filtros Segmentados
                 SliverToBoxAdapter(
                   child: Padding(
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: GlassCard(
-                                title: 'Biomasa en Agua',
-                                glowColor: AppColors.cyanWater,
-                                child: FittedBox(
-                                  fit: BoxFit.scaleDown,
-                                  alignment: Alignment.centerLeft,
-                                  child: Text(
-                                    CurrencyFormatters.formatKg(biomasaTotalKg),
-                                    style: AppTypography.numberKpi.copyWith(color: AppColors.cyanWater),
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: GlassCard(
-                                title: 'Inversión Biológica',
-                                glowColor: AppColors.greenBiomass,
-                                child: FittedBox(
-                                  fit: BoxFit.scaleDown,
-                                  alignment: Alignment.centerLeft,
-                                  child: Text(
-                                    CurrencyFormatters.formatCOP(costoTotalEnAgua),
-                                    style: AppTypography.numberKpi.copyWith(color: AppColors.greenBiomass, fontSize: 18),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 18),
-
                         // Barra de Filtros Segmentados
                         Wrap(
                           alignment: WrapAlignment.spaceBetween,
@@ -293,7 +257,7 @@ class _PondsDashboardScreenState extends ConsumerState<PondsDashboardScreen> {
                     sliver: SliverGrid(
                       gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
                         maxCrossAxisExtent: 440,
-                        mainAxisExtent: 420,
+                        mainAxisExtent: 450,
                         crossAxisSpacing: 16,
                         mainAxisSpacing: 16,
                       ),
@@ -307,6 +271,8 @@ class _PondsDashboardScreenState extends ConsumerState<PondsDashboardScreen> {
                             pond: pond,
                             batch: primaryBatch,
                             batches: activeBatches,
+                            latestWaterParameter: waterQualityByPond[pond.id],
+                            targetWeightsBySpecies: ref.watch(authProvider).currentCompany?.pesosFinalesEspeciesG,
                             onFeedPressed: () {
                               if (primaryBatch != null) {
                                 AlimentarModal.show(context, pond: pond, batch: primaryBatch);
@@ -317,6 +283,7 @@ class _PondsDashboardScreenState extends ConsumerState<PondsDashboardScreen> {
                             onSamplePressed: primaryBatch != null ? () => BiometriaModal.show(context, pond: pond, batch: primaryBatch) : null,
                             onMortalityPressed: primaryBatch != null ? () => MortalidadModal.show(context, pond: pond, batch: primaryBatch) : null,
                             onTransferPressed: primaryBatch != null ? () => TrasladoModal.show(context, pond: pond, batch: primaryBatch) : null,
+                            onEditPondPressed: () => CrearEstanqueModal.show(context, pondToEdit: pond),
                           );
                         },
                         childCount: filteredPonds.length,
@@ -341,6 +308,8 @@ class _PondsDashboardScreenState extends ConsumerState<PondsDashboardScreen> {
                               pond: pond,
                               batch: primaryBatch,
                               batches: activeBatches,
+                              latestWaterParameter: waterQualityByPond[pond.id],
+                              targetWeightsBySpecies: ref.watch(authProvider).currentCompany?.pesosFinalesEspeciesG,
                               onFeedPressed: () {
                                 if (primaryBatch != null) {
                                   AlimentarModal.show(context, pond: pond, batch: primaryBatch);
@@ -351,6 +320,7 @@ class _PondsDashboardScreenState extends ConsumerState<PondsDashboardScreen> {
                               onSamplePressed: primaryBatch != null ? () => BiometriaModal.show(context, pond: pond, batch: primaryBatch) : null,
                               onMortalityPressed: primaryBatch != null ? () => MortalidadModal.show(context, pond: pond, batch: primaryBatch) : null,
                               onTransferPressed: primaryBatch != null ? () => TrasladoModal.show(context, pond: pond, batch: primaryBatch) : null,
+                              onEditPondPressed: () => CrearEstanqueModal.show(context, pondToEdit: pond),
                             ),
                           );
                         },

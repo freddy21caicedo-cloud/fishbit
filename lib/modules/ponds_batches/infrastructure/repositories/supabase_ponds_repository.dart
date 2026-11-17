@@ -197,7 +197,31 @@ class SupabasePondsRepository implements PondsRepository {
 
       final rawList = res as List;
       if (rawList.isNotEmpty) {
-        return rawList.map((row) => Pond.fromJson(row as Map<String, dynamic>)).toList();
+        final ponds = rawList.map((row) => Pond.fromJson(row as Map<String, dynamic>)).toList();
+        try {
+          final lotesRes = await _supabase
+              .from('lotes')
+              .select('estanque_id, biomasa_actual_kg')
+              .eq('empresa_id', empresaId)
+              .eq('estado', 'Activo');
+          final lotesList = lotesRes as List;
+          if (lotesList.isNotEmpty) {
+            final Map<String, double> bioPorEstanque = {};
+            for (final l in lotesList) {
+              final pid = l['estanque_id']?.toString() ?? '';
+              final bio = (l['biomasa_actual_kg'] as num?)?.toDouble() ?? 0.0;
+              bioPorEstanque[pid] = (bioPorEstanque[pid] ?? 0.0) + bio;
+            }
+            return ponds.map((p) {
+              final realBio = bioPorEstanque[p.id];
+              if (realBio != null && realBio > 0) {
+                return p.copyWith(biomasaKg: realBio);
+              }
+              return p;
+            }).toList();
+          }
+        } catch (_) {}
+        return ponds;
       }
       return [];
     } catch (_) {
@@ -265,7 +289,80 @@ class SupabasePondsRepository implements PondsRepository {
 
       final rawList = res as List;
       if (rawList.isNotEmpty) {
-        return rawList.map((row) => FishBatch.fromJson(row as Map<String, dynamic>)).toList();
+        final batches = rawList.map((row) => FishBatch.fromJson(row as Map<String, dynamic>)).toList();
+        
+        // Sumar dinámicamente el alimento acumulado registrado en alimentacion_diaria para cálculo exacto de FCA
+        try {
+          final feedRes = await _supabase
+              .from('alimentacion_diaria')
+              .select('lote_id, cantidad_consumida_kg, costo_calculado')
+              .eq('empresa_id', empresaId);
+          final feedList = feedRes as List;
+          if (feedList.isNotEmpty) {
+            final Map<String, double> alimentoPorLote = {};
+            final Map<String, double> costoInsumosPorLote = {};
+            for (final f in feedList) {
+              final lid = f['lote_id']?.toString() ?? '';
+              final cant = (f['cantidad_consumida_kg'] as num?)?.toDouble() ?? 0.0;
+              final costo = (f['costo_calculado'] as num?)?.toDouble() ?? 0.0;
+              alimentoPorLote[lid] = (alimentoPorLote[lid] ?? 0.0) + cant;
+              costoInsumosPorLote[lid] = (costoInsumosPorLote[lid] ?? 0.0) + costo;
+            }
+            final parentIdsWithChildren = batches
+                .where((b) => b.lotePadreId != null && b.lotePadreId!.isNotEmpty)
+                .map((b) => b.lotePadreId!)
+                .toSet();
+            final enriched = batches.map((b) {
+              // Si el lote fue desdoblado (tiene lotes hijos), respetar el prorrateo almacenado en lotes
+              if (parentIdsWithChildren.contains(b.id) || (b.lotePadreId != null && b.lotePadreId!.isNotEmpty)) {
+                return b;
+              }
+              final kgAlimento = alimentoPorLote[b.id] ?? b.alimentoAcumuladoKg;
+              final costoInsumos = costoInsumosPorLote[b.id] ?? b.costoAcumuladoInsumos;
+              return b.copyWith(
+                alimentoAcumuladoKg: kgAlimento > 0 ? kgAlimento : b.alimentoAcumuladoKg,
+                costoAcumuladoInsumos: costoInsumos > 0 ? costoInsumos : b.costoAcumuladoInsumos,
+              );
+            }).toList();
+            batches
+              ..clear()
+              ..addAll(enriched);
+          }
+        } catch (_) {}
+        // Sincronizar dinámicamente el peso actual y biomasa con la última biometría registrada para consistencia infalible
+        try {
+          final bioRes = await _supabase
+              .from('biometrias')
+              .select('lote_id, peso_promedio_g, fecha, creado_en')
+              .eq('empresa_id', empresaId)
+              .order('fecha', ascending: false)
+              .order('creado_en', ascending: false);
+          final bioList = bioRes as List;
+          if (bioList.isNotEmpty) {
+            final Map<String, double> latestWeightByBatch = {};
+            for (final bio in bioList) {
+              final lid = bio['lote_id']?.toString() ?? '';
+              final w = (bio['peso_promedio_g'] as num?)?.toDouble();
+              if (lid.isNotEmpty && w != null && w > 0 && !latestWeightByBatch.containsKey(lid)) {
+                latestWeightByBatch[lid] = w;
+              }
+            }
+
+            for (int i = 0; i < batches.length; i++) {
+              final b = batches[i];
+              final latestW = latestWeightByBatch[b.id];
+              if (latestW != null && latestW > 0 && latestW != b.pesoActualGramos) {
+                final correctedBiomass = (b.cantidadActualPeces * latestW) / 1000.0;
+                batches[i] = b.copyWith(
+                  pesoActualGramos: latestW,
+                  biomasaActualKg: correctedBiomass > 0 ? correctedBiomass : b.biomasaActualKg,
+                );
+              }
+            }
+          }
+        } catch (_) {}
+
+        return batches;
       }
 
       // Fallback a siembras si lotes no retorna datos
@@ -293,11 +390,17 @@ class SupabasePondsRepository implements PondsRepository {
       _demoBatches.add(batch);
       final pondIdx = _demoPonds.indexWhere((p) => p.id == batch.estanqueId);
       if (pondIdx != -1) {
+        final totalBiomasa = _demoBatches
+            .where((b) => b.estanqueId == batch.estanqueId && b.estado == BatchStatus.active)
+            .fold<double>(0.0, (acc, b) => acc + b.biomasaActualKg);
+        final totalCosto = _demoBatches
+            .where((b) => b.estanqueId == batch.estanqueId && b.estado == BatchStatus.active)
+            .fold<double>(0.0, (acc, b) => acc + b.costoTotal);
         _demoPonds[pondIdx] = _demoPonds[pondIdx].copyWith(
           estado: PondStatus.active,
           especieActual: batch.especie,
-          biomasaKg: batch.biomasaActualKg,
-          costoAcumuladoBiologico: batch.costoTotal,
+          biomasaKg: totalBiomasa,
+          costoAcumuladoBiologico: totalCosto,
         );
       }
       return batch;
@@ -329,9 +432,10 @@ class SupabasePondsRepository implements PondsRepository {
       await _supabase.from('estanques').update({
         'estado': 'Activo',
         'especie': batch.especie,
-        'biomasa_kg': batch.biomasaActualKg,
         'costo_acumulado_biologico': batch.costoTotal,
       }).eq('id', batch.estanqueId);
+
+      await _syncPondBiomassAndCount(batch.estanqueId);
 
       return FishBatch.fromJson(res);
     } catch (e) {
@@ -362,14 +466,20 @@ class SupabasePondsRepository implements PondsRepository {
     required String estanqueDestinoId,
     required int pecesTrasladados,
     required double biomasaTrasladadaKg,
+    double? pesoPromedioGramos,
     required bool esDesdoble,
     required String nuevoCodigoLote,
     String? registradoPor,
   }) async {
     final now = DateTime.now();
     final origenIdx = _demoBatches.indexWhere((b) => b.id == batchOrigenId);
-    if (origenIdx != -1) {
+    final isDemo = origenIdx != -1 && _demoBatches[origenIdx].empresaId.startsWith('c1000000-');
+
+    if (isDemo) {
       final origen = _demoBatches[origenIdx];
+      final pesoEfectivo = (pesoPromedioGramos != null && pesoPromedioGramos > 0)
+          ? pesoPromedioGramos
+          : origen.pesoActualGramos;
       final proporcion = origen.cantidadActualPeces > 0
           ? (pecesTrasladados / origen.cantidadActualPeces)
           : 0.0;
@@ -418,18 +528,24 @@ class SupabasePondsRepository implements PondsRepository {
 
         final origPondIdx = _demoPonds.indexWhere((p) => p.id == estanqueOrigenId);
         if (origPondIdx != -1) {
+          final totalBiomasaOrig = _demoBatches
+              .where((b) => b.estanqueId == estanqueOrigenId && b.estado == BatchStatus.active)
+              .fold<double>(0.0, (acc, b) => acc + b.biomasaActualKg);
           _demoPonds[origPondIdx] = _demoPonds[origPondIdx].copyWith(
-            biomasaKg: remanenteBiomasa,
+            biomasaKg: totalBiomasaOrig,
             costoAcumuladoBiologico: _demoBatches[origenIdx].costoTotal,
           );
         }
 
         final destPondIdx = _demoPonds.indexWhere((p) => p.id == estanqueDestinoId);
         if (destPondIdx != -1) {
+          final totalBiomasaDest = _demoBatches
+              .where((b) => b.estanqueId == estanqueDestinoId && b.estado == BatchStatus.active)
+              .fold<double>(0.0, (acc, b) => acc + b.biomasaActualKg);
           _demoPonds[destPondIdx] = _demoPonds[destPondIdx].copyWith(
             estado: PondStatus.active,
             especieActual: origen.especie,
-            biomasaKg: biomasaTrasladadaKg,
+            biomasaKg: totalBiomasaDest,
             costoAcumuladoBiologico: newBatch.costoTotal,
           );
         }
@@ -437,25 +553,31 @@ class SupabasePondsRepository implements PondsRepository {
         _demoBatches[origenIdx] = origen.copyWith(estanqueId: estanqueDestinoId);
         final origPondIdx = _demoPonds.indexWhere((p) => p.id == estanqueOrigenId);
         if (origPondIdx != -1) {
+          final activeBatchesOrig = _demoBatches
+              .where((b) => b.estanqueId == estanqueOrigenId && b.estado == BatchStatus.active)
+              .toList();
+          final totalBiomasaOrig = activeBatchesOrig.fold<double>(0.0, (acc, b) => acc + b.biomasaActualKg);
           _demoPonds[origPondIdx] = _demoPonds[origPondIdx].copyWith(
-            estado: PondStatus.available,
-            especieActual: '',
-            biomasaKg: 0.0,
-            costoAcumuladoBiologico: 0.0,
+            estado: activeBatchesOrig.isNotEmpty ? PondStatus.active : PondStatus.available,
+            especieActual: activeBatchesOrig.isNotEmpty ? _demoPonds[origPondIdx].especieActual : '',
+            biomasaKg: totalBiomasaOrig,
+            costoAcumuladoBiologico: activeBatchesOrig.fold<double>(0.0, (acc, b) => acc + b.costoTotal),
           );
         }
         final destPondIdx = _demoPonds.indexWhere((p) => p.id == estanqueDestinoId);
         if (destPondIdx != -1) {
+          final activeBatchesDest = _demoBatches
+              .where((b) => b.estanqueId == estanqueDestinoId && b.estado == BatchStatus.active)
+              .toList();
           _demoPonds[destPondIdx] = _demoPonds[destPondIdx].copyWith(
             estado: PondStatus.active,
             especieActual: origen.especie,
-            biomasaKg: origen.biomasaActualKg,
-            costoAcumuladoBiologico: origen.costoTotal,
+            biomasaKg: activeBatchesDest.fold<double>(0.0, (acc, b) => acc + b.biomasaActualKg),
+            costoAcumuladoBiologico: activeBatchesDest.fold<double>(0.0, (acc, b) => acc + b.costoTotal),
           );
         }
       }
 
-      // Registro de Auditoría en memoria
       final transferAudit = TransferRecord(
         id: const Uuid().v4(),
         empresaId: origen.empresaId,
@@ -479,13 +601,120 @@ class SupabasePondsRepository implements PondsRepository {
         creadoEn: now,
       );
       _demoTransfers.insert(0, transferAudit);
+      return;
+    }
 
-      // Persistencia en Supabase Postgres
-      if (!origen.empresaId.startsWith('c1000000-')) {
-        try {
-          await _supabase.from('traslados_lotes').insert(transferAudit.toJson());
-        } catch (_) {}
+    // Flujo para Empresas Reales en Supabase mediante RPC Atómica
+    try {
+      final loteOrigenRes = await _supabase
+          .from('lotes')
+          .select('*')
+          .eq('id', batchOrigenId)
+          .single();
+
+      final pesoPromedio = (pesoPromedioGramos != null && pesoPromedioGramos > 0)
+          ? pesoPromedioGramos
+          : ((loteOrigenRes['peso_actual_gramos'] as num?)?.toDouble() ??
+              (pecesTrasladados > 0 ? (biomasaTrasladadaKg * 1000.0 / pecesTrasladados) : 100.0));
+
+      try {
+        await _supabase.rpc('split_or_transfer_batch', params: {
+          'p_lote_origen_id': batchOrigenId,
+          'p_estanque_destino_id': estanqueDestinoId,
+          'p_tipo_operacion': esDesdoble ? 'DESDOBLE_PARCIAL' : 'TRASLADO_TOTAL',
+          'p_peces_trasladar': pecesTrasladados,
+          'p_peso_promedio': pesoPromedio,
+          'p_nuevo_codigo_lote': nuevoCodigoLote,
+          'p_motivo': 'Operación de ${esDesdoble ? 'desdoble parcial' : 'traslado total'}',
+          'p_registrado_por': registradoPor ?? 'Admin Acuícola',
+        });
+      } catch (rpcErr) {
+        debugPrint('[PondsRepository] RPC fallback en transferOrSplitBatch: $rpcErr');
+        // Fallback seguro si el RPC falla por restricción unidad_acuicola_sigla o firma
+        final origen = FishBatch.fromJson(loteOrigenRes);
+        final proporcion = origen.cantidadActualPeces > 0
+            ? (pecesTrasladados / origen.cantidadActualPeces).clamp(0.0, 1.0)
+            : 0.0;
+        final costoAlevinos = origen.costoInicialAlevinos * proporcion;
+        final costoInsumos = origen.costoAcumuladoInsumos * proporcion;
+        final costoFijo = origen.costoAcumuladoFijo * proporcion;
+        final costoTotal = costoAlevinos + costoInsumos + costoFijo;
+        final biomasaReal = (pecesTrasladados * pesoPromedio) / 1000.0;
+        String nuevoLoteId = origen.id;
+
+        if (esDesdoble) {
+          final remanentePeces = (origen.cantidadActualPeces - pecesTrasladados).clamp(0, origen.cantidadActualPeces);
+          final remanenteBiomasa = (remanentePeces * pesoPromedio) / 1000.0;
+          await _supabase.from('lotes').update({
+            'cantidad_actual_peces': remanentePeces,
+            'biomasa_actual_kg': remanenteBiomasa,
+            'costo_inicial_alevinos': (origen.costoInicialAlevinos - costoAlevinos).clamp(0.0, double.infinity),
+            'costo_acumulado_insumos': (origen.costoAcumuladoInsumos - costoInsumos).clamp(0.0, double.infinity),
+            'costo_acumulado_fijo': (origen.costoAcumuladoFijo - costoFijo).clamp(0.0, double.infinity),
+          }).eq('id', origen.id);
+
+          nuevoLoteId = const Uuid().v4();
+          final hijo = FishBatch(
+            id: nuevoLoteId,
+            empresaId: origen.empresaId,
+            unidadAcuicolaId: origen.unidadAcuicolaId,
+            unidadAcuicolaSigla: origen.unidadAcuicolaSigla ?? 'PRIN',
+            estanqueId: estanqueDestinoId,
+            lotePadreId: origen.id,
+            codigoLote: nuevoCodigoLote,
+            especie: origen.especie,
+            rolPolicultivo: origen.rolPolicultivo,
+            cantidadInicialPeces: pecesTrasladados,
+            cantidadActualPeces: pecesTrasladados,
+            pesoInicialGramos: pesoPromedio,
+            pesoActualGramos: pesoPromedio,
+            biomasaInicialKg: biomasaReal,
+            biomasaActualKg: biomasaReal,
+            alimentoAcumuladoKg: origen.alimentoAcumuladoKg * proporcion,
+            costoInicialAlevinos: costoAlevinos,
+            costoAcumuladoInsumos: costoInsumos,
+            costoAcumuladoFijo: costoFijo,
+            estado: BatchStatus.active,
+            fechaSiembra: now,
+            creadoEn: now,
+          );
+          await _supabase.from('lotes').insert(hijo.toJson());
+        } else {
+          await _supabase.from('lotes').update({
+            'estanque_id': estanqueDestinoId,
+            'peso_actual_gramos': pesoPromedio,
+            'biomasa_actual_kg': biomasaReal,
+          }).eq('id', origen.id);
+        }
+
+        await _supabase.from('traslados_lotes').insert({
+          'id': const Uuid().v4(),
+          'empresa_id': origen.empresaId,
+          'unidad_acuicola_id': origen.unidadAcuicolaId,
+          'lote_origen_id': origen.id,
+          'lote_destino_id': nuevoLoteId,
+          'estanque_origen_id': estanqueOrigenId,
+          'estanque_destino_id': estanqueDestinoId,
+          'tipo_operacion': esDesdoble ? 'DESDOBLE_PARCIAL' : 'TRASLADO_TOTAL',
+          'peces_trasladados': pecesTrasladados,
+          'peso_promedio_gramos': pesoPromedio,
+          'biomasa_trasladada_kg': biomasaReal,
+          'proporcion_costos': proporcion,
+          'costo_alevinos_transferido': costoAlevinos,
+          'costo_insumos_transferido': costoInsumos,
+          'costo_fijo_transferido': costoFijo,
+          'costo_total_transferido': costoTotal,
+          'nuevo_codigo_lote': nuevoCodigoLote,
+          'registrado_por': registradoPor ?? 'Admin Acuícola',
+          'fecha_operacion': now.toIso8601String(),
+        });
       }
+
+      await _syncPondBiomassAndCount(estanqueOrigenId);
+      await _syncPondBiomassAndCount(estanqueDestinoId);
+    } catch (e) {
+      debugPrint('[PondsRepository] Error en transferOrSplitBatch: $e');
+      rethrow;
     }
   }
 
@@ -552,7 +781,10 @@ class SupabasePondsRepository implements PondsRepository {
         query = query.or('batch_id.eq.$batchId,lote_id.eq.$batchId');
       }
 
-      final res = await query.order('fecha', ascending: false).limit(100); // BUG-15: 'date'→'fecha'
+      final res = await query
+          .order('fecha', ascending: false)
+          .order('creado_en', ascending: false)
+          .limit(100);
       final rawList = res as List;
       return rawList.map((row) => BiometriaRecord.fromJson(row as Map<String, dynamic>)).toList();
     } catch (_) {
@@ -614,77 +846,92 @@ class SupabasePondsRepository implements PondsRepository {
     final hourStr = hora ?? '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}:00';
     final biomasaPerdida = biomasaPerdidaKg ?? ((cantidadPecesMuertos * pesoPromedioGramos) / 1000.0);
 
-    final batchIdx = _demoBatches.indexWhere((b) => b.id == loteId || b.estanqueId == estanqueId);
+    String finalEmpresaId = empresaId ?? '';
+    String finalUnitId = unidadAcuicolaId ?? '';
+    final isDemo = finalEmpresaId.startsWith('c1000000-');
+
     double newBiomass = 0.0;
     int newCount = 0;
 
-    String finalEmpresaId = empresaId ?? '';
-    String finalUnitId = unidadAcuicolaId ?? '';
+    if (isDemo) {
+      final batchIdx = _demoBatches.indexWhere((b) => b.id == loteId || b.estanqueId == estanqueId);
+      if (batchIdx != -1) {
+        final batch = _demoBatches[batchIdx];
+        if (finalEmpresaId.isEmpty) finalEmpresaId = batch.empresaId;
+        if (finalUnitId.isEmpty) finalUnitId = batch.unidadAcuicolaId;
+        newCount = (batch.cantidadActualPeces - cantidadPecesMuertos).clamp(0, 9999999);
+        newBiomass = (newCount * (pesoPromedioGramos > 0 ? pesoPromedioGramos : batch.pesoActualGramos)) / 1000.0;
+        
+        _demoBatches[batchIdx] = batch.copyWith(
+          cantidadActualPeces: newCount,
+          biomasaActualKg: newBiomass,
+        );
 
-    if (batchIdx != -1) {
-      final batch = _demoBatches[batchIdx];
-      if (finalEmpresaId.isEmpty) finalEmpresaId = batch.empresaId;
-      if (finalUnitId.isEmpty) finalUnitId = batch.unidadAcuicolaId;
-      newCount = (batch.cantidadActualPeces - cantidadPecesMuertos).clamp(0, 9999999);
-      newBiomass = (newCount * (pesoPromedioGramos > 0 ? pesoPromedioGramos : batch.pesoActualGramos)) / 1000.0;
-      
-      _demoBatches[batchIdx] = batch.copyWith(
-        cantidadActualPeces: newCount,
-        biomasaActualKg: newBiomass,
-      );
-
-      final pondIdx = _demoPonds.indexWhere((p) => p.id == estanqueId);
-      if (pondIdx != -1) {
-        _demoPonds[pondIdx] = _demoPonds[pondIdx].copyWith(biomasaKg: newBiomass);
-      }
-    } else if (!finalEmpresaId.startsWith('c1000000-')) {
-      // Para empresas reales en producción: obtener el lote real de la base de datos
-      try {
-        final lotesRes = await _supabase
-            .from('lotes')
-            .select('cantidad_actual_peces, peso_actual_gramos, empresa_id, unidad_acuicola_id')
-            .eq('id', loteId)
-            .maybeSingle();
-
-        if (lotesRes != null) {
-          final currentPeces = (lotesRes['cantidad_actual_peces'] as num?)?.toInt() ?? 0;
-          final currentPeso = (lotesRes['peso_actual_gramos'] as num?)?.toDouble() ?? pesoPromedioGramos;
-          if (finalEmpresaId.isEmpty) finalEmpresaId = lotesRes['empresa_id']?.toString() ?? '';
-          if (finalUnitId.isEmpty) finalUnitId = lotesRes['unidad_acuicola_id']?.toString() ?? '';
-
-          newCount = (currentPeces - cantidadPecesMuertos).clamp(0, 9999999);
-          final effectivePeso = pesoPromedioGramos > 0 ? pesoPromedioGramos : currentPeso;
-          newBiomass = (newCount * effectivePeso) / 1000.0;
+        final pondIdx = _demoPonds.indexWhere((p) => p.id == estanqueId);
+        if (pondIdx != -1) {
+          final totalBiomasa = _demoBatches
+              .where((b) => b.estanqueId == estanqueId && b.estado == BatchStatus.active)
+              .fold<double>(0.0, (acc, b) => acc + b.biomasaActualKg);
+          _demoPonds[pondIdx] = _demoPonds[pondIdx].copyWith(biomasaKg: totalBiomasa);
         }
-      } catch (e) {
-        debugPrint('[PondsRepository] Error al consultar lote para mortalidad: $e');
       }
-    }
 
-    final record = MortalityRecord(
-      id: const Uuid().v4(),
-      empresaId: finalEmpresaId,
-      unidadAcuicolaId: finalUnitId,
-      estanqueId: estanqueId,
-      loteId: loteId,
-      cantidadPecesMuertos: cantidadPecesMuertos,
-      pesoPromedioGramos: pesoPromedioGramos,
-      biomasaPerdidaKg: biomasaPerdida,
-      causaProbable: causaProbable,
-      observaciones: observaciones,
-      registradoPor: registradoPor,
-      fecha: now,
-      hora: hourStr,
-      creadoEn: DateTime.now(),
-    );
-
-    if (finalEmpresaId.startsWith('c1000000-')) {
+      final record = MortalityRecord(
+        id: const Uuid().v4(),
+        empresaId: finalEmpresaId,
+        unidadAcuicolaId: finalUnitId,
+        estanqueId: estanqueId,
+        loteId: loteId,
+        cantidadPecesMuertos: cantidadPecesMuertos,
+        pesoPromedioGramos: pesoPromedioGramos,
+        biomasaPerdidaKg: biomasaPerdida,
+        causaProbable: causaProbable,
+        observaciones: observaciones,
+        registradoPor: registradoPor,
+        fecha: now,
+        hora: hourStr,
+        creadoEn: DateTime.now(),
+      );
       _demoMortalities.insert(0, record);
       return record;
     }
 
+    // Para empresas reales en Supabase
     try {
-      // 1. Insertar en tabla oficial mortalidad con schema completo
+      final lotesRes = await _supabase
+          .from('lotes')
+          .select('cantidad_actual_peces, peso_actual_gramos, empresa_id, unit_id')
+          .eq('id', loteId)
+          .maybeSingle();
+
+      if (lotesRes != null) {
+        final currentPeces = (lotesRes['cantidad_actual_peces'] as num?)?.toInt() ?? 0;
+        final currentPeso = (lotesRes['peso_actual_gramos'] as num?)?.toDouble() ?? pesoPromedioGramos;
+        if (finalEmpresaId.isEmpty) finalEmpresaId = lotesRes['empresa_id']?.toString() ?? '';
+        if (finalUnitId.isEmpty) finalUnitId = lotesRes['unit_id']?.toString() ?? '';
+
+        newCount = (currentPeces - cantidadPecesMuertos).clamp(0, 9999999);
+        final effectivePeso = pesoPromedioGramos > 0 ? pesoPromedioGramos : currentPeso;
+        newBiomass = (newCount * effectivePeso) / 1000.0;
+      }
+
+      final record = MortalityRecord(
+        id: const Uuid().v4(),
+        empresaId: finalEmpresaId,
+        unidadAcuicolaId: finalUnitId,
+        estanqueId: estanqueId,
+        loteId: loteId,
+        cantidadPecesMuertos: cantidadPecesMuertos,
+        pesoPromedioGramos: pesoPromedioGramos,
+        biomasaPerdidaKg: biomasaPerdida,
+        causaProbable: causaProbable,
+        observaciones: observaciones,
+        registradoPor: registradoPor,
+        fecha: now,
+        hora: hourStr,
+        creadoEn: DateTime.now(),
+      );
+
       final insertData = {
         'id': record.id,
         'empresa_id': finalEmpresaId,
@@ -703,30 +950,27 @@ class SupabasePondsRepository implements PondsRepository {
         'biomasa_perdida_kg': biomasaPerdida,
         if (observaciones != null) 'observaciones': observaciones,
         if (registradoPor != null) 'registrado_por': registradoPor,
-        'fecha': now.toIso8601String(),        // BUG-8: timestamp completo, no solo date
+        'fecha': now.toIso8601String(),
         'date': now.toIso8601String().split('T')[0],
         'hora': hourStr,
+        'created_at': DateTime.now().toIso8601String(),
         'creado_en': DateTime.now().toIso8601String(),
       };
 
       await _supabase.from('mortalidad').insert(insertData);
 
-      // 2. Actualizar conteo y biomasa en lotes si aplica
+      // Actualizar conteo y biomasa en lotes y sincronizar estanque considerando policultivo
       if (newCount >= 0) {
         await _supabase.from('lotes').update({
           'cantidad_actual_peces': newCount,
           'biomasa_actual_kg': newBiomass,
         }).eq('id', loteId);
 
-        await _supabase.from('estanques').update({
-          'biomasa_kg': newBiomass,
-        }).eq('id', estanqueId);
+        await _syncPondBiomassAndCount(estanqueId);
       }
 
-      _demoMortalities.insert(0, record);
       return record;
     } catch (e) {
-      // BUG-9: propagar el error — no silenciar ni guardar solo en memoria
       debugPrint('[PondsRepository] Error al registrar mortalidad en Supabase: $e');
       rethrow;
     }
@@ -739,6 +983,7 @@ class SupabasePondsRepository implements PondsRepository {
     required String estanqueId,
     required String loteId,
     required double nuevoPesoPromedioGramos,
+    double? biomasaCalculadaKg,
     int? cantidadPecesMuestreados,
     double? pesoTotalCapturaKg,
     double? longitudPromedioCm,
@@ -754,74 +999,99 @@ class SupabasePondsRepository implements PondsRepository {
     final sampleCount = cantidadPecesMuestreados ?? 35;
     final totalCaptureKg = pesoTotalCapturaKg ?? ((sampleCount * nuevoPesoPromedioGramos) / 1000.0);
 
-    final batchIdx = _demoBatches.indexWhere((b) => b.id == loteId || b.estanqueId == estanqueId);
-    double newBiomass = 0.0;
-
     String finalEmpresaId = empresaId ?? '';
     String finalUnitId = unidadAcuicolaId ?? '';
+    final isDemo = finalEmpresaId.startsWith('c1000000-');
 
-    if (batchIdx != -1) {
-      final batch = _demoBatches[batchIdx];
-      if (finalEmpresaId.isEmpty) finalEmpresaId = batch.empresaId;
-      if (finalUnitId.isEmpty) finalUnitId = batch.unidadAcuicolaId;
-      newBiomass = (batch.cantidadActualPeces * nuevoPesoPromedioGramos) / 1000.0;
+    double newBiomass = biomasaCalculadaKg ?? 0.0;
 
-      _demoBatches[batchIdx] = batch.copyWith(
-        pesoActualGramos: nuevoPesoPromedioGramos,
-        biomasaActualKg: newBiomass,
-      );
-
-      final pondIdx = _demoPonds.indexWhere((p) => p.id == estanqueId);
-      if (pondIdx != -1) {
-        _demoPonds[pondIdx] = _demoPonds[pondIdx].copyWith(biomasaKg: newBiomass);
-      }
-    } else if (!finalEmpresaId.startsWith('c1000000-')) {
-      // Para empresas reales en producción: obtener el lote de la base de datos
-      try {
-        final lotesRes = await _supabase
-            .from('lotes')
-            .select('cantidad_actual_peces, empresa_id, unidad_acuicola_id')
-            .eq('id', loteId)
-            .maybeSingle();
-
-        if (lotesRes != null) {
-          final currentPeces = (lotesRes['cantidad_actual_peces'] as num?)?.toInt() ?? 0;
-          if (finalEmpresaId.isEmpty) finalEmpresaId = lotesRes['empresa_id']?.toString() ?? '';
-          if (finalUnitId.isEmpty) finalUnitId = lotesRes['unidad_acuicola_id']?.toString() ?? '';
-          newBiomass = (currentPeces * nuevoPesoPromedioGramos) / 1000.0;
+    if (isDemo) {
+      final batchIdx = _demoBatches.indexWhere((b) => b.id == loteId || b.estanqueId == estanqueId);
+      if (batchIdx != -1) {
+        final batch = _demoBatches[batchIdx];
+        if (finalEmpresaId.isEmpty) finalEmpresaId = batch.empresaId;
+        if (finalUnitId.isEmpty) finalUnitId = batch.unidadAcuicolaId;
+        if (newBiomass <= 0.0) {
+          newBiomass = (batch.cantidadActualPeces * nuevoPesoPromedioGramos) / 1000.0;
         }
-      } catch (e) {
-        debugPrint('[PondsRepository] Error al consultar lote para biometría: $e');
+
+        _demoBatches[batchIdx] = batch.copyWith(
+          pesoActualGramos: nuevoPesoPromedioGramos,
+          biomasaActualKg: newBiomass,
+        );
+
+        final pondIdx = _demoPonds.indexWhere((p) => p.id == estanqueId);
+        if (pondIdx != -1) {
+          final totalBiomasa = _demoBatches
+              .where((b) => b.estanqueId == estanqueId && b.estado == BatchStatus.active)
+              .fold<double>(0.0, (acc, b) => acc + b.biomasaActualKg);
+          _demoPonds[pondIdx] = _demoPonds[pondIdx].copyWith(biomasaKg: totalBiomasa);
+        }
       }
-    }
 
-    final record = BiometriaRecord(
-      id: const Uuid().v4(),
-      empresaId: finalEmpresaId,
-      unitId: finalUnitId,
-      estanqueId: estanqueId,
-      loteId: loteId,
-      fecha: now,
-      hora: hourStr,
-      pecesCapturados: sampleCount,
-      pesoTotalCapturaKg: totalCaptureKg,
-      pesoPromedioG: nuevoPesoPromedioGramos,
-      biomasaParcialKg: newBiomass,
-      longitudCm: longitudPromedioCm,
-      factorK: factorK,
-      gdpGDia: gdpGDia,
-      observaciones: observaciones,
-      registradoPor: registradoPor,
-      creadoEn: DateTime.now(),
-    );
-
-    if (finalEmpresaId.startsWith('c1000000-')) {
+      final record = BiometriaRecord(
+        id: const Uuid().v4(),
+        empresaId: finalEmpresaId,
+        unitId: finalUnitId,
+        estanqueId: estanqueId,
+        loteId: loteId,
+        fecha: now,
+        hora: hourStr,
+        pecesCapturados: sampleCount,
+        pesoTotalCapturaKg: totalCaptureKg,
+        pesoPromedioG: nuevoPesoPromedioGramos,
+        biomasaParcialKg: newBiomass,
+        longitudCm: longitudPromedioCm,
+        factorK: factorK,
+        gdpGDia: gdpGDia,
+        observaciones: observaciones,
+        registradoPor: registradoPor,
+        creadoEn: DateTime.now(),
+      );
       _demoBiometries.insert(0, record);
       return record;
     }
 
+    // Para empresas reales en Supabase
     try {
-      // 1. Insertar en tabla oficial biometrias con schema completo
+      final lotesRes = await _supabase
+          .from('lotes')
+          .select('cantidad_actual_peces, empresa_id, unit_id')
+          .eq('id', loteId)
+          .maybeSingle();
+
+      int currentPeces = 0;
+      if (lotesRes != null) {
+        currentPeces = (lotesRes['cantidad_actual_peces'] as num?)?.toInt() ?? 0;
+        if (finalEmpresaId.isEmpty) finalEmpresaId = lotesRes['empresa_id']?.toString() ?? '';
+        if (finalUnitId.isEmpty) finalUnitId = lotesRes['unit_id']?.toString() ?? '';
+      }
+
+      if (newBiomass <= 0.0 && currentPeces > 0) {
+        newBiomass = (currentPeces * nuevoPesoPromedioGramos) / 1000.0;
+      }
+
+      final record = BiometriaRecord(
+        id: const Uuid().v4(),
+        empresaId: finalEmpresaId,
+        unitId: finalUnitId,
+        estanqueId: estanqueId,
+        loteId: loteId,
+        fecha: now,
+        hora: hourStr,
+        pecesCapturados: sampleCount,
+        pesoTotalCapturaKg: totalCaptureKg,
+        pesoPromedioG: nuevoPesoPromedioGramos,
+        biomasaParcialKg: newBiomass,
+        longitudCm: longitudPromedioCm,
+        factorK: factorK,
+        gdpGDia: gdpGDia,
+        observaciones: observaciones,
+        registradoPor: registradoPor,
+        creadoEn: DateTime.now(),
+      );
+
+      // 1. Insertar en tabla oficial biometrias
       final insertData = {
         'id': record.id,
         'empresa_id': finalEmpresaId,
@@ -830,7 +1100,7 @@ class SupabasePondsRepository implements PondsRepository {
         'estanque_id': estanqueId,
         'lote_id': loteId,
         'batch_id': loteId,
-        'fecha': now.toIso8601String(),          // BUG-8: timestamp completo, no solo date
+        'fecha': now.toIso8601String(),
         'date': now.toIso8601String().split('T')[0],
         'hora': hourStr,
         'peces_capturados': sampleCount,
@@ -844,29 +1114,59 @@ class SupabasePondsRepository implements PondsRepository {
         if (gdpGDia != null) 'gdp_g_dia': gdpGDia,
         if (observaciones != null) 'observaciones': observaciones,
         if (registradoPor != null) 'registrado_por': registradoPor,
+        'created_at': DateTime.now().toIso8601String(),
         'creado_en': DateTime.now().toIso8601String(),
       };
 
       await _supabase.from('biometrias').insert(insertData);
 
       // 2. Actualizar biomasa y peso actual en lotes y estanques
-      if (newBiomass > 0) {
-        await _supabase.from('lotes').update({
-          'biomasa_actual_kg': newBiomass,
-          'peso_actual_gramos': nuevoPesoPromedioGramos,
-        }).eq('id', loteId);
+      final updateBatchData = <String, dynamic>{
+        'peso_actual_gramos': nuevoPesoPromedioGramos,
+      };
+      if (newBiomass > 0.0) {
+        updateBatchData['biomasa_actual_kg'] = newBiomass;
+      }
+      await _supabase.from('lotes').update(updateBatchData).eq('id', loteId);
 
-        await _supabase.from('estanques').update({
-          'biomasa_kg': newBiomass,
-        }).eq('id', estanqueId);
+      if (newBiomass > 0.0) {
+        await _syncPondBiomassAndCount(estanqueId);
       }
 
-      _demoBiometries.insert(0, record);
       return record;
     } catch (e) {
-      // BUG-10: propagar el error — no silenciar ni guardar solo en memoria
       debugPrint('[PondsRepository] Error al registrar biometría en Supabase: $e');
       rethrow;
+    }
+  }
+
+  /// Recalcula y sincroniza la biomasa total y conteo de peces de un estanque
+  /// mediante agregación (SUM) sobre todos los lotes activos (soporte policultivo).
+  Future<void> _syncPondBiomassAndCount(String estanqueId) async {
+    try {
+      final activeLotsRes = await _supabase
+          .from('lotes')
+          .select('biomasa_actual_kg, cantidad_actual_peces')
+          .eq('estanque_id', estanqueId)
+          .inFilter('estado', ['Activo', 'activo', 'ACTIVO']);
+
+      double totalBiomasa = 0.0;
+      int totalPeces = 0;
+      if (activeLotsRes is List) {
+        for (final row in activeLotsRes) {
+          totalBiomasa += (row['biomasa_actual_kg'] as num?)?.toDouble() ?? 0.0;
+          totalPeces += (row['cantidad_actual_peces'] as num?)?.toInt() ?? 0;
+        }
+      }
+
+      await _supabase.from('estanques').update({
+        'biomasa_kg': totalBiomasa,
+        'cantidad_peces': totalPeces,
+        'estado': totalBiomasa > 0.0 ? 'Activo' : 'Disponible',
+        'updated_at': DateTime.now().toIso8601String(),
+      }).eq('id', estanqueId);
+    } catch (e) {
+      debugPrint('[PondsRepository] Error sincronizando biomasa del estanque $estanqueId: $e');
     }
   }
 }

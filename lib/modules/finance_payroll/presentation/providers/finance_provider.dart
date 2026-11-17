@@ -178,6 +178,34 @@ class FinanceNotifier extends StateNotifier<FinanceState> {
       state = state.copyWith(errorMessage: e.toString());
     }
   }
+
+  /// Registro rápido de nómina mensual consolidada de la granja (sin necesidad de desglosar empleado por empleado)
+  Future<void> registrarNominaMensualGeneral({
+    required double valorTotalMensual,
+    required DateTime mesPeriodo,
+    String concepto = 'Nómina Operativa General Consolidada',
+  }) async {
+    final auth = _ref.read(authProvider);
+    final user = auth.currentUser;
+    final unitId = auth.activeUnitId;
+    if (user == null || user.empresaId == null || unitId == null) return;
+
+    final record = PayrollRecord(
+      id: 'nom-gen-${DateTime.now().millisecondsSinceEpoch}',
+      empresaId: user.empresaId!,
+      unidadAcuicolaId: unitId,
+      empleadoId: 'emp-general',
+      empleadoNombre: concepto,
+      periodo: 'Mensual',
+      salarioBase: valorTotalMensual,
+      costoTotalEmpresa: valorTotalMensual,
+      fechaPago: mesPeriodo,
+      estado: 'Pagado',
+      creadoEn: DateTime.now(),
+    );
+
+    await addPayroll(record);
+  }
 }
 
 final financeProvider = StateNotifierProvider<FinanceNotifier, FinanceState>((ref) {

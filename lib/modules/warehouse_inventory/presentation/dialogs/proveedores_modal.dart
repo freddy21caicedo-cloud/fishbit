@@ -134,6 +134,46 @@ class _ProveedoresModalState extends ConsumerState<ProveedoresModal> {
     );
   }
 
+  Future<void> _confirmDeleteSupplier(BuildContext context, Supplier s) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Eliminar Proveedor'),
+        content: Text('¿Deseas eliminar a "${s.nombre}" del directorio de proveedores?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.coralAction, foregroundColor: Colors.white),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Eliminar'),
+          ),
+        ],
+      ),
+    );
+    if (confirm == true && mounted) {
+      try {
+        await ref.read(warehouseProvider.notifier).deleteSupplier(s.id);
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Proveedor "${s.nombre}" eliminado.'),
+              backgroundColor: AppColors.coralAction,
+            ),
+          );
+        }
+      } catch (e) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error al eliminar: $e'), backgroundColor: AppColors.coralAction),
+          );
+        }
+      }
+    }
+  }
+
   Widget _buildList(List<Supplier> suppliers, bool isDark) {
     if (suppliers.isEmpty) {
       return Center(
@@ -235,6 +275,23 @@ class _ProveedoresModalState extends ConsumerState<ProveedoresModal> {
                               fontWeight: FontWeight.w800,
                             ),
                           ),
+                        ),
+                        const SizedBox(width: 4),
+                        IconButton(
+                          tooltip: 'Editar proveedor',
+                          visualDensity: VisualDensity.compact,
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                          icon: const Icon(Icons.edit_outlined, size: 16, color: AppColors.cyanWater),
+                          onPressed: () => RegistrarProveedorModal.show(context, supplierToEdit: s),
+                        ),
+                        IconButton(
+                          tooltip: 'Eliminar proveedor',
+                          visualDensity: VisualDensity.compact,
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                          icon: const Icon(Icons.delete_outline_rounded, size: 16, color: AppColors.coralAction),
+                          onPressed: () => _confirmDeleteSupplier(context, s),
                         ),
                       ],
                     ),

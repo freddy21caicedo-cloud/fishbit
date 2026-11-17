@@ -34,6 +34,7 @@ class UserMember {
   final String? cedula;
   final double salarioBase;
   final String periodoPago; // 'Quincenal' | 'Mensual'
+  final bool requiereCambioClave;
   final DateTime creadoEn;
 
   const UserMember({
@@ -50,6 +51,7 @@ class UserMember {
     this.cedula,
     this.salarioBase = 0.0,
     this.periodoPago = 'Quincenal',
+    this.requiereCambioClave = false,
     required this.creadoEn,
   });
 
@@ -168,6 +170,7 @@ class UserMember {
     String? cedula,
     double? salarioBase,
     String? periodoPago,
+    bool? requiereCambioClave,
     DateTime? creadoEn,
   }) {
     return UserMember(
@@ -184,6 +187,7 @@ class UserMember {
       cedula: cedula ?? this.cedula,
       salarioBase: salarioBase ?? this.salarioBase,
       periodoPago: periodoPago ?? this.periodoPago,
+      requiereCambioClave: requiereCambioClave ?? this.requiereCambioClave,
       creadoEn: creadoEn ?? this.creadoEn,
     );
   }
@@ -200,6 +204,7 @@ class UserMember {
         'cedula': cedula,
         'salario_base': salarioBase,
         'periodo_pago': periodoPago,
+        'requiere_cambio_clave': requiereCambioClave,
       };
 
   factory UserMember.fromJson(Map<String, dynamic> json) {
@@ -209,6 +214,9 @@ class UserMember {
     final rawEmail = (json['email'] as String? ?? '').trim().toLowerCase();
     final rawUnitId = json['unit_id'] as String? ?? json['unidad_acuicola_id'] as String?;
     final rawEmpresaId = json['empresa_id'] as String?;
+    final requiresPasswordChange =
+        (json['requiere_cambio_clave'] as bool? ?? false) ||
+        (json['must_change_password'] as bool? ?? false);
 
     return UserMember(
       id: json['id'] as String,
@@ -224,6 +232,7 @@ class UserMember {
       cedula: json['cedula'] as String?,
       salarioBase: (json['salario_base'] as num?)?.toDouble() ?? 0.0,
       periodoPago: json['periodo_pago'] as String? ?? 'Quincenal',
+      requiereCambioClave: requiresPasswordChange,
       creadoEn: json['created_at'] != null
           ? DateTime.parse(json['created_at'] as String)
           : json['creado_en'] != null

@@ -49,15 +49,17 @@ class BiometriaRecord {
   factory BiometriaRecord.fromJson(Map<String, dynamic> json) {
     DateTime parsedFecha = DateTime.now();
     if (json['fecha'] != null) {
-      parsedFecha = DateTime.tryParse(json['fecha'].toString()) ?? DateTime.now();
+      final fStr = json['fecha'].toString().split('T').first.split(' ').first;
+      parsedFecha = DateTime.tryParse(fStr) ?? DateTime.now();
     } else if (json['date'] != null) {
-      final dStr = json['date'].toString();
-      final hStr = json['hora']?.toString() ?? json['hour']?.toString() ?? '00:00:00';
-      parsedFecha = DateTime.tryParse('${dStr}T$hStr') ?? DateTime.tryParse(dStr) ?? DateTime.now();
+      final dStr = json['date'].toString().split('T').first.split(' ').first;
+      parsedFecha = DateTime.tryParse(dStr) ?? DateTime.now();
     } else if (json['created_at'] != null) {
-      parsedFecha = DateTime.tryParse(json['created_at'].toString()) ?? DateTime.now();
+      final cStr = json['created_at'].toString().split('T').first.split(' ').first;
+      parsedFecha = DateTime.tryParse(cStr) ?? DateTime.now();
     } else if (json['creado_en'] != null) {
-      parsedFecha = DateTime.tryParse(json['creado_en'].toString()) ?? DateTime.now();
+      final cStr = json['creado_en'].toString().split('T').first.split(' ').first;
+      parsedFecha = DateTime.tryParse(cStr) ?? DateTime.now();
     }
 
     final rawPeces = json['peces_capturados'] ?? json['peces_muestreados'] ?? json['sample_count'] ?? json['pecesCapturados'] ?? json['cantidad_peces'];

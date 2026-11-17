@@ -67,6 +67,7 @@ class MockPondsRepository implements PondsRepository {
     required String estanqueId,
     required String loteId,
     required double nuevoPesoPromedioGramos,
+    double? biomasaCalculadaKg,
     int? cantidadPecesMuestreados,
     double? pesoTotalCapturaKg,
     double? longitudPromedioCm,
@@ -235,7 +236,7 @@ class MockAuthRepository implements AuthRepository {
   @override
   Future<List<AquacultureUnit>> fetchUnits(String empresaId) async => [];
   @override
-  Future<AquacultureUnit> createUnit(String empresaId, String nombre, String sigla, String? ubicacion) async => throw UnimplementedError();
+  Future<AquacultureUnit> createUnit(String empresaId, String nombre, String sigla, String? ubicacion, {String? pais, String? departamento, String? ciudad, String? direccion, String? telefono}) async => throw UnimplementedError();
   @override
   Future<List<UserMember>> fetchTeamMembers(String empresaId) async => [];
   @override

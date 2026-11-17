@@ -48,7 +48,7 @@ class _RegistroNominaModalState extends ConsumerState<RegistroNominaModal> {
     super.initState();
     final config = ref.read(financeProvider).payrollConfig;
     _arlEmpleado = config.arlDefault;
-    _auxilioCtrl = TextEditingController(text: (config.auxilioTransporteMensual / 2).toInt().toString());
+    _auxilioCtrl = TextEditingController(text: CurrencyFormatters.formatCOP(config.auxilioTransporteMensual / 2));
   }
 
   @override
@@ -60,9 +60,9 @@ class _RegistroNominaModalState extends ConsumerState<RegistroNominaModal> {
     super.dispose();
   }
 
-  double get _salario => double.tryParse(_salarioCtrl.text) ?? 0.0;
-  double get _auxilio => double.tryParse(_auxilioCtrl.text) ?? 0.0;
-  double get _recargos => double.tryParse(_recargosCtrl.text) ?? 0.0;
+  double get _salario => CurrencyFormatters.parseCOP(_salarioCtrl.text);
+  double get _auxilio => CurrencyFormatters.parseCOP(_auxilioCtrl.text);
+  double get _recargos => CurrencyFormatters.parseCOP(_recargosCtrl.text);
 
   PayrollCalculationResult _getCalculation(PayrollConfig config) {
     return PayrollEngine.calculate(
@@ -161,7 +161,8 @@ class _RegistroNominaModalState extends ConsumerState<RegistroNominaModal> {
                               if (val != null) {
                                 _nombreManualCtrl.text = '${val.nombre} (${val.roleDisplayName})';
                                 if (val.salarioBase > 0) {
-                                  _salarioCtrl.text = val.periodoPago == 'Quincenal' ? (val.salarioBase / 2).toInt().toString() : val.salarioBase.toInt().toString();
+                                  final base = val.periodoPago == 'Quincenal' ? (val.salarioBase / 2) : val.salarioBase;
+                                  _salarioCtrl.text = CurrencyFormatters.formatCOP(base);
                                 }
                                 _periodo = val.periodoPago;
                                 if (val.isTechnician || val.isOperator) {
@@ -214,11 +215,10 @@ class _RegistroNominaModalState extends ConsumerState<RegistroNominaModal> {
                                 if (val != null) {
                                   setState(() {
                                     _periodo = val;
-                                    _auxilioCtrl.text = (val == 'Quincenal'
-                                            ? financeConfig.auxilioTransporteMensual / 2
-                                            : financeConfig.auxilioTransporteMensual)
-                                        .toInt()
-                                        .toString();
+                                    final aux = val == 'Quincenal'
+                                        ? financeConfig.auxilioTransporteMensual / 2
+                                        : financeConfig.auxilioTransporteMensual;
+                                    _auxilioCtrl.text = CurrencyFormatters.formatCOP(aux);
                                   });
                                 }
                               },
@@ -244,9 +244,10 @@ class _RegistroNominaModalState extends ConsumerState<RegistroNominaModal> {
                     children: [
                       Expanded(
                         child: GlassFormField(
-                          label: 'SUELDO DEVENGADO',
+                          label: 'SUELDO DEVENGADO (\$ COP)',
                           controller: _salarioCtrl,
                           keyboardType: TextInputType.number,
+                          inputFormatters: [CurrencyInputFormatter()],
                           prefixIcon: Icons.payments_outlined,
                           validator: (v) => (v == null || v.trim().isEmpty) ? 'Ingresa el sueldo' : null,
                           onChanged: (_) => setState(() {}),
@@ -255,9 +256,10 @@ class _RegistroNominaModalState extends ConsumerState<RegistroNominaModal> {
                       const SizedBox(width: 10),
                       Expanded(
                         child: GlassFormField(
-                          label: 'AUXILIO TRANSPORTE',
+                          label: 'AUXILIO TRANSPORTE (\$ COP)',
                           controller: _auxilioCtrl,
                           keyboardType: TextInputType.number,
+                          inputFormatters: [CurrencyInputFormatter()],
                           prefixIcon: Icons.directions_bus_outlined,
                           onChanged: (_) => setState(() {}),
                         ),

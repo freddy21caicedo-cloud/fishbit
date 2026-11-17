@@ -99,60 +99,96 @@ void main() {
       expect(zeroSale.margenNetoPct, 0.0);
     });
 
-    test('Serializes to JSON and deserializes correctly', () {
+    test('Calculates yield loss (merma), viscera percent and clean weight accurately for eviscerated fish', () {
+      final sale = BatchSale(
+        id: 'sale-evisc-01',
+        empresaId: 'emp-10',
+        unidadAcuicolaId: 'unit-10',
+        clienteNombre: 'Pescadería San Pedro',
+        clienteCedulaNit: '900.543.210-9',
+        loteId: 'lote-10',
+        codigoLote: 'LOT-TIL-01',
+        estanqueNombre: 'Estanque 2',
+        especie: 'Tilapia Roja',
+        tipoVenta: SalePresentation.evisceradoCompleto,
+        cantidadPeces: 1000,
+        pesoVivoKg: 500.0,
+        pesoArregladoKg: 420.0,
+        mermaKg: 80.0,
+        mermaPct: 16.0,
+        mermaGPpe: 80.0,
+        baseCobro: 'peso_arreglado',
+        biomasaVendidaKg: 500.0,
+        precioUnitarioKg: 12000.0, // Facturado sobre peso arreglado
+        ingresoBruto: 420.0 * 12000.0, // 5,040,000 COP
+        cogs: 2500000.0,
+        utilidadNeta: (420.0 * 12000.0) - 2500000.0, // 2,540,000 COP
+        creadoEn: DateTime(2026, 9, 1),
+      );
+
+      expect(sale.tipoVenta, SalePresentation.evisceradoCompleto);
+      expect(sale.clienteCedulaNit, '900.543.210-9');
+      expect(sale.cantidadPeces, 1000);
+      expect(sale.pesoVivoKg, 500.0);
+      expect(sale.pesoArregladoKg, 420.0);
+      expect(sale.mermaKg, 80.0);
+      expect(sale.mermaPct, 16.0);
+      expect(sale.mermaGPpe, 80.0);
+      expect(sale.baseCobro, 'peso_arreglado');
+      expect(sale.ingresoBruto, 5040000.0);
+      expect(sale.utilidadNeta, 2540000.0);
+    });
+
+    test('Serializes to JSON and deserializes correctly with precision fields', () {
       final sale = BatchSale(
         id: 'sale-json-1',
         empresaId: 'emp-1',
         unidadAcuicolaId: 'unit-1',
         clienteId: 'cli-99',
         clienteNombre: 'Restaurante El Pescador',
+        clienteCedulaNit: '1075283921',
         loteId: 'lot-55',
         codigoLote: 'L-TIL-55',
         estanqueNombre: 'Estanque 5',
         especie: 'Tilapia',
-        biomasaVendidaKg: 500.0,
+        tipoVenta: SalePresentation.medioEviscerado,
+        cantidadPeces: 200,
+        pesoVivoKg: 100.0,
+        pesoArregladoKg: 90.0,
+        mermaKg: 10.0,
+        mermaPct: 10.0,
+        mermaGPpe: 50.0,
+        baseCobro: 'peso_vivo',
+        biomasaVendidaKg: 100.0,
         precioUnitarioKg: 10000.0,
-        ingresoBruto: 5000000.0,
-        cogs: 3200000.0,
-        utilidadNeta: 1800000.0,
-        estadoPago: 'Pendiente',
-        pesoPromedioG: 480.0,
-        porcentajeViscerasPct: 11.8,
+        ingresoBruto: 1000000.0,
+        cogs: 600000.0,
+        utilidadNeta: 400000.0,
+        estadoPago: 'Pagado',
+        pesoPromedioG: 500.0,
+        porcentajeViscerasPct: 10.0,
         creadoEn: DateTime(2026, 8, 25, 14, 0),
       );
 
       final json = sale.toJson();
       expect(json['id'], 'sale-json-1');
       expect(json['cliente_nombre'], 'Restaurante El Pescador');
-      expect(json['biomasa_vendida_kg'], 500.0);
-      expect(json['estado_pago'], 'Pendiente');
+      expect(json['cliente_cedula_nit'], '1075283921');
+      expect(json['tipo_venta'], 'medio_eviscerado');
+      expect(json['peso_vivo_kg'], 100.0);
+      expect(json['peso_arreglado_kg'], 90.0);
+      expect(json['merma_kg'], 10.0);
+      expect(json['merma_pct'], 10.0);
 
-      final parsed = BatchSale.fromJson({
-        'id': 'sale-json-1',
-        'empresa_id': 'emp-1',
-        'unidad_acuicola_id': 'unit-1',
-        'cliente_id': 'cli-99',
-        'cliente_nombre': 'Restaurante El Pescador',
-        'lote_id': 'lot-55',
-        'codigo_lote': 'L-TIL-55',
-        'estanque_nombre': 'Estanque 5',
-        'especie': 'Tilapia',
-        'biomasa_vendida_kg': 500.0,
-        'precio_unitario_kg': 10000.0,
-        'ingreso_bruto': 5000000.0,
-        'cogs': 3200000.0,
-        'utilidad_neta': 1800000.0,
-        'estado_pago': 'Pendiente',
-        'peso_promedio_g': 480.0,
-        'porcentaje_visceras_pct': 11.8,
-        'creado_en': '2026-08-25T14:00:00.000',
-      });
-
+      final parsed = BatchSale.fromJson(json);
       expect(parsed.id, 'sale-json-1');
-      expect(parsed.ingresoBruto, 5000000.0);
-      expect(parsed.estadoPago, 'Pendiente');
+      expect(parsed.clienteCedulaNit, '1075283921');
+      expect(parsed.tipoVenta, SalePresentation.medioEviscerado);
+      expect(parsed.pesoArregladoKg, 90.0);
+      expect(parsed.mermaKg, 10.0);
     });
   });
+
 
   group('Client Domain Model Tests', () {
     test('Client parses from JSON and produces correct Map', () {

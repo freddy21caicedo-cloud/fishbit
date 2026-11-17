@@ -7,6 +7,7 @@ import 'package:fishbit_finance/core/design_system/glass_form_field.dart';
 import 'package:fishbit_finance/core/design_system/glass_button.dart';
 import 'package:fishbit_finance/modules/finance_payroll/domain/models/payroll_config.dart';
 import 'package:fishbit_finance/modules/finance_payroll/presentation/providers/finance_provider.dart';
+import 'package:fishbit_finance/core/utils/currency_formatters.dart';
 
 class ConfiguracionNominaModal extends ConsumerStatefulWidget {
   const ConfiguracionNominaModal({super.key});
@@ -37,9 +38,9 @@ class _ConfiguracionNominaModalState extends ConsumerState<ConfiguracionNominaMo
     final config = ref.read(financeProvider).payrollConfig;
     _exoneracion = config.aplicaExoneracionLey1607;
     _arlSelected = config.arlDefault;
-    _auxilioCtrl = TextEditingController(text: config.auxilioTransporteMensual.toInt().toString());
-    _dotacionCtrl = TextEditingController(text: config.dotacionProvisionMensual.toInt().toString());
-    _jornalCtrl = TextEditingController(text: config.tarifaJornalCampoDefecto.toInt().toString());
+    _auxilioCtrl = TextEditingController(text: CurrencyFormatters.formatCOP(config.auxilioTransporteMensual));
+    _dotacionCtrl = TextEditingController(text: CurrencyFormatters.formatCOP(config.dotacionProvisionMensual));
+    _jornalCtrl = TextEditingController(text: CurrencyFormatters.formatCOP(config.tarifaJornalCampoDefecto));
   }
 
   @override
@@ -176,18 +177,20 @@ class _ConfiguracionNominaModalState extends ConsumerState<ConfiguracionNominaMo
                   children: [
                     Expanded(
                       child: GlassFormField(
-                        label: 'AUXILIO TRANSPORTE MES',
+                        label: 'AUXILIO TRANSPORTE MES (\$)',
                         controller: _auxilioCtrl,
                         keyboardType: TextInputType.number,
+                        inputFormatters: [CurrencyInputFormatter()],
                         prefixIcon: Icons.directions_bus_outlined,
                       ),
                     ),
                     const SizedBox(width: 10),
                     Expanded(
                       child: GlassFormField(
-                        label: 'PROVISIÓN DOTACIÓN/EPP',
+                        label: 'PROVISIÓN DOTACIÓN/EPP (\$)',
                         controller: _dotacionCtrl,
                         keyboardType: TextInputType.number,
+                        inputFormatters: [CurrencyInputFormatter()],
                         prefixIcon: Icons.checkroom_outlined,
                       ),
                     ),
@@ -197,9 +200,10 @@ class _ConfiguracionNominaModalState extends ConsumerState<ConfiguracionNominaMo
 
                 GlassFormField(
                   label: 'TARIFA SUGERIDA JORNAL DE CAMPO (\$ COP/DÍA)',
-                  hint: '65000',
+                  hint: '\$ 65.000',
                   controller: _jornalCtrl,
                   keyboardType: TextInputType.number,
+                  inputFormatters: [CurrencyInputFormatter()],
                   prefixIcon: Icons.agriculture_outlined,
                 ),
                 const SizedBox(height: 16),
@@ -260,12 +264,15 @@ class _ConfiguracionNominaModalState extends ConsumerState<ConfiguracionNominaMo
                     final nav = Navigator.of(context);
                     final messenger = ScaffoldMessenger.of(context);
                     setState(() => _isLoading = true);
+                    final aux = CurrencyFormatters.parseCOP(_auxilioCtrl.text);
+                    final dot = CurrencyFormatters.parseCOP(_dotacionCtrl.text);
+                    final jor = CurrencyFormatters.parseCOP(_jornalCtrl.text);
                     final newConfig = PayrollConfig(
                       aplicaExoneracionLey1607: _exoneracion,
                       arlDefault: _arlSelected,
-                      auxilioTransporteMensual: double.tryParse(_auxilioCtrl.text) ?? 162000.0,
-                      dotacionProvisionMensual: double.tryParse(_dotacionCtrl.text) ?? 35000.0,
-                      tarifaJornalCampoDefecto: double.tryParse(_jornalCtrl.text) ?? 65000.0,
+                      auxilioTransporteMensual: aux > 0 ? aux : 162000.0,
+                      dotacionProvisionMensual: dot > 0 ? dot : 35000.0,
+                      tarifaJornalCampoDefecto: jor > 0 ? jor : 65000.0,
                     );
 
                     await ref.read(financeProvider.notifier).updatePayrollConfig(newConfig);

@@ -6,7 +6,7 @@ abstract class AppFailure {
   const AppFailure(this.message, [this.code]);
 
   @override
-  String toString() => 'AppFailure($code): $message';
+  String toString() => message;
 }
 
 class ServerFailure extends AppFailure {

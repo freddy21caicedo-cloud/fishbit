@@ -11,10 +11,13 @@ import 'package:fishbit_finance/modules/warehouse_inventory/presentation/provide
 import 'package:fishbit_finance/modules/finance_payroll/presentation/providers/finance_provider.dart';
 import 'package:fishbit_finance/modules/equipment_capex/presentation/providers/equipment_provider.dart';
 import 'package:fishbit_finance/modules/finance_payroll/domain/services/production_cost_engine.dart';
+import 'package:fishbit_finance/modules/finance_payroll/presentation/dialogs/inversion_finanzas_modal.dart';
 
 /// Tarjeta de Unit Economics & Radiografía de Costo por Kilogramo (CPK)
 class CpkBreakdownCard extends ConsumerStatefulWidget {
-  const CpkBreakdownCard({super.key});
+  final bool showHubButton;
+
+  const CpkBreakdownCard({super.key, this.showHubButton = false});
 
   @override
   ConsumerState<CpkBreakdownCard> createState() => _CpkBreakdownCardState();
@@ -42,12 +45,18 @@ class _CpkBreakdownCardState extends ConsumerState<CpkBreakdownCard> {
 
     final summary = ProductionCostEngine.calculate(
       ponds: ponds,
+      batches: batches,
+      jornalesList: financeState.jornales,
       totalAlimentoInsumos: totalAlimentoInsumosEfectivo,
       totalNominaFija: financeState.totalCostoNomina,
       totalJornales: financeState.totalCostoJornales,
       totalEnergia: financeState.totalCostoEnergia,
       totalDepreciacionCapex: equipmentState.depreciacionDiariaTotal * 30.0,
       precioMercadoKg: 10500.0,
+      inventarioAlimentoBodega: warehouseState.valorTotalConcentrados,
+      inventarioFarmaciaBodega: warehouseState.valorTotalInventario - warehouseState.valorTotalConcentrados,
+      activosFijosEquiposValorTotal: equipmentState.valorTotalActivos,
+      totalGastosOperativosMes: financeState.totalOpex,
     );
 
     final colorMargen = summary.margenBrutoPorcentaje >= 30.0
@@ -58,17 +67,52 @@ class _CpkBreakdownCardState extends ConsumerState<CpkBreakdownCard> {
       title: 'UNIT ECONOMICS • COSTO POR KG (CPK)',
       subtitle: 'Rentabilidad, desglose y punto de equilibrio por biomasa viva',
       glowColor: AppColors.cyanWater,
-      trailingWidget: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-        decoration: BoxDecoration(
-          color: colorMargen.withValues(alpha: 0.15),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: colorMargen.withValues(alpha: 0.4)),
-        ),
-        child: Text(
-          'Margen: ${summary.margenBrutoPorcentaje.toStringAsFixed(1)}%',
-          style: TextStyle(color: colorMargen, fontWeight: FontWeight.w900, fontSize: 11),
-        ),
+      trailingWidget: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (widget.showHubButton) ...[
+            InkWell(
+              onTap: () => InversionFinanzasModal.show(context),
+              borderRadius: BorderRadius.circular(10),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: AppColors.cyanWater.withValues(alpha: isDark ? 0.22 : 0.15),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppColors.cyanWater.withValues(alpha: 0.5)),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.hub_rounded, size: 13, color: AppColors.cyanWater),
+                    SizedBox(width: 4),
+                    Text(
+                      'Hub Inversión',
+                      style: TextStyle(
+                        color: AppColors.cyanWater,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+          ],
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            decoration: BoxDecoration(
+              color: colorMargen.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: colorMargen.withValues(alpha: 0.4)),
+            ),
+            child: Text(
+              'Margen: ${summary.margenBrutoPorcentaje.toStringAsFixed(1)}%',
+              style: TextStyle(color: colorMargen, fontWeight: FontWeight.w900, fontSize: 11),
+            ),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -148,16 +192,16 @@ class _CpkBreakdownCardState extends ConsumerState<CpkBreakdownCard> {
           ),
           const SizedBox(height: 10),
 
-          // Leyenda de Composición
+          // Leyenda de Composición (Sin emojis, iconografía y color tokens limpios)
           Wrap(
             spacing: 12,
             runSpacing: 6,
             alignment: WrapAlignment.spaceBetween,
             children: [
-              _buildLegendItem(context, '🍽️ Alimento', summary.pctAlimento, AppColors.greenBiomass),
-              _buildLegendItem(context, '🐟 Alevinos', summary.pctAlevinos, AppColors.cyanWater),
-              _buildLegendItem(context, '👷 Nómina/Jornales', summary.pctManoObra, AppColors.purpleAnalytics),
-              _buildLegendItem(context, '⚡ Energía', summary.pctEnergia, AppColors.amberWarning),
+              _buildLegendItem(context, 'Alimento', summary.pctAlimento, AppColors.greenBiomass),
+              _buildLegendItem(context, 'Alevinos', summary.pctAlevinos, AppColors.cyanWater),
+              _buildLegendItem(context, 'Nómina / Jornales', summary.pctManoObra, AppColors.purpleAnalytics),
+              _buildLegendItem(context, 'Energía', summary.pctEnergia, AppColors.amberWarning),
             ],
           ),
           const SizedBox(height: 12),

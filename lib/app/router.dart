@@ -8,6 +8,7 @@ import 'package:fishbit_finance/modules/auth_tenant/presentation/screens/sede_se
 import 'package:fishbit_finance/modules/auth_tenant/presentation/screens/login_screen.dart';
 import 'package:fishbit_finance/modules/auth_tenant/presentation/screens/register_company_screen.dart';
 import 'package:fishbit_finance/modules/auth_tenant/presentation/screens/onboarding_empresa_screen.dart';
+import 'package:fishbit_finance/modules/auth_tenant/presentation/screens/force_change_password_screen.dart';
 import 'package:fishbit_finance/modules/auth_tenant/presentation/screens/gestion_equipo_screen.dart';
 import 'package:fishbit_finance/modules/auth_tenant/presentation/screens/saas_console_screen.dart';
 import 'package:fishbit_finance/modules/home_dashboard/presentation/screens/home_dashboard_screen.dart';
@@ -45,6 +46,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       final isOnboardingRoute = loc == '/onboarding-empresa';
       final isSplashRoute = loc == '/splash';
       final isSedeRoute = loc == '/sede-selection';
+      final isChangePasswordRoute = loc == '/change-password';
 
       // Mientras carga la sesión → mantener en /splash
       if (authState.isLoading) {
@@ -74,6 +76,11 @@ final routerProvider = Provider<GoRouter>((ref) {
       // 2. Intento de acceso a consola sin permiso → inicio
       if (isSaasConsoleRoute) return '/';
 
+      // 2.5. Cambio obligatorio de contraseña en primer inicio de sesión
+      if (user?.requiereCambioClave == true) {
+        return isChangePasswordRoute ? null : '/change-password';
+      }
+
       // 3. Sin empresa configurada → onboarding
       final hasCompany = (user?.empresaId != null && user!.empresaId!.isNotEmpty) ||
           authState.currentCompany != null ||
@@ -88,7 +95,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       }
 
       // 5. Ya autenticado con empresa y sede → redirigir fuera de rutas de setup
-      if (isAuthRoute || isOnboardingRoute || isSplashRoute || isSedeRoute) {
+      if (isAuthRoute || isOnboardingRoute || isSplashRoute || isSedeRoute || isChangePasswordRoute) {
         return '/';
       }
 
@@ -110,6 +117,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/onboarding-empresa',
         builder: (context, state) => const OnboardingEmpresaScreen(),
+      ),
+      GoRoute(
+        path: '/change-password',
+        builder: (context, state) => const ForceChangePasswordScreen(),
       ),
       GoRoute(
         path: '/sede-selection',

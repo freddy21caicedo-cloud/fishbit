@@ -39,8 +39,8 @@ class _IngresoPersonalModalState extends ConsumerState<IngresoPersonalModal> {
   final _entidadCtrl = TextEditingController();
   final _motivoCtrl = TextEditingController();
   final _detalleOtrasCtrl = TextEditingController();
-  final _horaIngresoCtrl = TextEditingController(text: '08:00');
-  final _horaSalidaCtrl = TextEditingController(text: '17:00');
+  final _horaIngresoCtrl = TextEditingController();
+  final _horaSalidaCtrl = TextEditingController();
 
   TipoPersonaIca _tipoPersona = TipoPersonaIca.visitanteTecnico;
   CivilDate _fecha = CivilDate.today();
@@ -50,6 +50,15 @@ class _IngresoPersonalModalState extends ConsumerState<IngresoPersonalModal> {
   bool _desinfeccionCalzado = true;
   bool _indumentariaLimpia = true;
   bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final now = TimeOfDay.now();
+    final h = now.hour.toString().padLeft(2, '0');
+    final m = now.minute.toString().padLeft(2, '0');
+    _horaIngresoCtrl.text = '$h:$m';
+  }
 
   @override
   void dispose() {
@@ -70,7 +79,16 @@ class _IngresoPersonalModalState extends ConsumerState<IngresoPersonalModal> {
 
     try {
       final auth = ref.read(authProvider);
-      final empresaId = auth.currentCompany?.id ?? auth.currentUser?.empresaId ?? 'c1000000-0000-0000-0000-000000000001';
+      final empresaId = auth.currentCompany?.id ?? auth.currentUser?.empresaId;
+      if (empresaId == null || empresaId.isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('No hay una empresa activa seleccionada.')),
+          );
+          setState(() => _isLoading = false);
+        }
+        return;
+      }
       final unidadId = auth.activeUnitId ?? auth.currentUser?.unidadAcuicolaId ?? empresaId;
 
       final record = IcaPersonalRecord(
@@ -423,8 +441,8 @@ class _IngresoVehiculoModalState extends ConsumerState<IngresoVehiculoModal> {
   final _destinoInternoCtrl = TextEditingController(text: 'Zona de Descarga / Bodega Concentrados');
   final _desinfectanteCtrl = TextEditingController(text: 'Amonio Cuaternario 5ta Gen (Glutaraldehído)');
   final _concentracionCtrl = TextEditingController(text: '200 ppm (2.0 ml/L agua)');
-  final _horaIngresoCtrl = TextEditingController(text: '09:00');
-  final _horaSalidaCtrl = TextEditingController(text: '10:30');
+  final _horaIngresoCtrl = TextEditingController();
+  final _horaSalidaCtrl = TextEditingController();
 
   TipoVehiculoIca _tipoVehiculo = TipoVehiculoIca.camionAlimento;
   CivilDate _fecha = CivilDate.today();
@@ -432,6 +450,15 @@ class _IngresoVehiculoModalState extends ConsumerState<IngresoVehiculoModal> {
   bool _desinfeccionArco = true;
   final int _tiempoContacto = 5;
   bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final now = TimeOfDay.now();
+    final h = now.hour.toString().padLeft(2, '0');
+    final m = now.minute.toString().padLeft(2, '0');
+    _horaIngresoCtrl.text = '$h:$m';
+  }
 
   @override
   void dispose() {
@@ -455,7 +482,16 @@ class _IngresoVehiculoModalState extends ConsumerState<IngresoVehiculoModal> {
 
     try {
       final auth = ref.read(authProvider);
-      final empresaId = auth.currentCompany?.id ?? auth.currentUser?.empresaId ?? 'c1000000-0000-0000-0000-000000000001';
+      final empresaId = auth.currentCompany?.id ?? auth.currentUser?.empresaId;
+      if (empresaId == null || empresaId.isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('No hay una empresa activa seleccionada.')),
+          );
+          setState(() => _isLoading = false);
+        }
+        return;
+      }
       final unidadId = auth.activeUnitId ?? auth.currentUser?.unidadAcuicolaId ?? empresaId;
 
       final record = IcaVehiculoRecord(
@@ -762,21 +798,21 @@ class NecropsiaModal extends ConsumerStatefulWidget {
 
 class _NecropsiaModalState extends ConsumerState<NecropsiaModal> {
   final _formKey = GlobalKey<FormState>();
-  final _ejemplaresCtrl = TextEditingController(text: '3');
-  final _pesoPromCtrl = TextEditingController(text: '250.0');
-  final _tallaPromCtrl = TextEditingController(text: '22.0');
+  final _ejemplaresCtrl = TextEditingController();
+  final _pesoPromCtrl = TextEditingController();
+  final _tallaPromCtrl = TextEditingController();
 
   // Signología externa e interna
-  final _pielAletasCtrl = TextEditingController(text: 'Piel con coloración homogénea, aletas íntegras sin erosión.');
-  final _ojosCtrl = TextEditingController(text: 'Ojos claros, sin exoftalmia ni opacidad.');
-  final _branquiasCtrl = TextEditingController(text: 'Branquias de color rojo cereza, filamentos intactos.');
-  final _higadoCtrl = TextEditingController(text: 'Hígado rojizo de consistencia normal, bordes lisos.');
-  final _bazoCtrl = TextEditingController(text: 'Bazo sin esplenomegalia, color rojo oscuro normal.');
-  final _tractoCtrl = TextEditingController(text: 'Contenido alimenticio normal en estómago, sin enteritis.');
-  final _cavidadCtrl = TextEditingController(text: 'Sin presencia de líquido libre celómico (sin ascitis).');
-  final _rinonCtrl = TextEditingController(text: 'Riñón posterior de aspecto y tamaño conservado.');
-  final _diagnosticoCtrl = TextEditingController(text: 'Muestreo de rutina / Monitoreo preventivo.');
-  final _conductaCtrl = TextEditingController(text: 'Mantener tasa de aireación y recambio normal.');
+  final _pielAletasCtrl = TextEditingController();
+  final _ojosCtrl = TextEditingController();
+  final _branquiasCtrl = TextEditingController();
+  final _higadoCtrl = TextEditingController();
+  final _bazoCtrl = TextEditingController();
+  final _tractoCtrl = TextEditingController();
+  final _cavidadCtrl = TextEditingController();
+  final _rinonCtrl = TextEditingController();
+  final _diagnosticoCtrl = TextEditingController();
+  final _conductaCtrl = TextEditingController();
   final _profesionalCtrl = TextEditingController();
   final _tarjetaProfCtrl = TextEditingController();
 
@@ -827,7 +863,16 @@ class _NecropsiaModalState extends ConsumerState<NecropsiaModal> {
       final auth = ref.read(authProvider);
       final ponds = ref.read(pondsProvider).ponds;
       final batches = ref.read(pondsProvider).batches;
-      final empresaId = auth.currentCompany?.id ?? auth.currentUser?.empresaId ?? 'c1000000-0000-0000-0000-000000000001';
+      final empresaId = auth.currentCompany?.id ?? auth.currentUser?.empresaId;
+      if (empresaId == null || empresaId.isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('No hay una empresa activa seleccionada.')),
+          );
+          setState(() => _isLoading = false);
+        }
+        return;
+      }
       final unidadId = auth.activeUnitId ?? auth.currentUser?.unidadAcuicolaId ?? empresaId;
 
       final estanque = ponds.where((p) => p.id == _selectedPondId).firstOrNull ?? (ponds.isNotEmpty ? ponds.first : null);
@@ -841,8 +886,8 @@ class _NecropsiaModalState extends ConsumerState<NecropsiaModal> {
         loteCodigo: lote?.codigoLote,
         fecha: _fecha.toDateTime(),
         especie: _especie,
-        numeroEjemplares: int.tryParse(_ejemplaresCtrl.text) ?? 2,
-        pesoPromedioGramos: double.tryParse(_pesoPromCtrl.text) ?? 250.0,
+        numeroEjemplares: int.tryParse(_ejemplaresCtrl.text.trim()) ?? 1,
+        pesoPromedioGramos: double.tryParse(_pesoPromCtrl.text.trim()) ?? 0.0,
         tallaPromedioCm: double.tryParse(_tallaPromCtrl.text),
         hallazgosPielAletas: _pielAletasCtrl.text.trim(),
         hallazgosOjos: _ojosCtrl.text.trim(),
@@ -988,25 +1033,27 @@ class _NecropsiaModalState extends ConsumerState<NecropsiaModal> {
                       Expanded(
                         child: GlassFormField(
                           label: 'NO. EJEMPLARES',
-                          hint: '3',
+                          hint: 'Ej: 3',
                           controller: _ejemplaresCtrl,
                           keyboardType: TextInputType.number,
+                          validator: (v) => (int.tryParse(v ?? '') == null || int.parse(v!) <= 0) ? 'Requerido > 0' : null,
                         ),
                       ),
                       const SizedBox(width: 10),
                       Expanded(
                         child: GlassFormField(
                           label: 'PESO PROM. (g)',
-                          hint: '250.0',
+                          hint: 'Ej: 250.0',
                           controller: _pesoPromCtrl,
                           keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          validator: (v) => (double.tryParse(v ?? '') == null || double.parse(v!) <= 0) ? 'Requerido > 0' : null,
                         ),
                       ),
                       const SizedBox(width: 10),
                       Expanded(
                         child: GlassFormField(
                           label: 'TALLA PROM. (cm)',
-                          hint: '22.0',
+                          hint: 'Ej: 22.0',
                           controller: _tallaPromCtrl,
                           keyboardType: const TextInputType.numberWithOptions(decimal: true),
                         ),

@@ -79,18 +79,28 @@ class Supplier {
 
   factory Supplier.fromJson(Map<String, dynamic> json) {
     final rawCats = json['categorias'] as List<dynamic>? ?? json['types'] as List<dynamic>?;
-    final catList = rawCats?.map((e) => e.toString()).toList() ?? [];
-    final primaryCat = json['categoria_principal'] as String? ??
+    final catList = rawCats?.map((e) => e.toString().toLowerCase() == 'biologico' ? 'alevinos' : e.toString()).toList() ?? [];
+    var primaryCat = json['categoria_principal'] as String? ??
         (json['category_primary'] as String? ??
             (json['tipo'] as String? ?? (catList.isNotEmpty ? catList.first : 'concentrados')));
+    if (primaryCat.toLowerCase() == 'biologico') {
+      primaryCat = 'alevinos';
+    }
     if (catList.isEmpty && primaryCat.isNotEmpty) {
       catList.add(primaryCat);
     }
 
+    final parsedName = json['nombre'] as String? ?? (json['name'] as String? ?? '');
+    final parsedNit = json['nit'] as String? ?? '';
+    final parsedProducts = (json['productos_ofrecidos'] as List<dynamic>?)
+            ?.map((e) => e.toString())
+            .toList() ??
+        const [];
+
     return Supplier(
       id: json['id'] as String? ?? '',
-      nit: json['nit'] as String? ?? '',
-      nombre: json['nombre'] as String? ?? (json['name'] as String? ?? ''),
+      nit: parsedNit,
+      nombre: parsedName,
       tipoIdentificacion: json['tipo_identificacion'] as String? ?? 'NIT',
       telefono: json['telefono'] as String? ?? (json['phone'] as String?),
       email: json['email'] as String?,
@@ -101,10 +111,7 @@ class Supplier {
       direccion: json['direccion'] as String?,
       categoriaPrincipal: primaryCat,
       categorias: catList,
-      productosOfrecidos: (json['productos_ofrecidos'] as List<dynamic>?)
-              ?.map((e) => e.toString())
-              .toList() ??
-          const [],
+      productosOfrecidos: parsedProducts,
       empresaId: json['empresa_id'] as String?,
       unidadAcuicolaSigla: json['unidad_acuicola_sigla'] as String?,
       isCustom: json['empresa_id'] != null && (json['empresa_id'] as String).isNotEmpty,

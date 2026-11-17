@@ -6,7 +6,9 @@ import 'package:fishbit_finance/core/design_system/glass_container.dart';
 import 'package:fishbit_finance/core/design_system/glass_form_field.dart';
 import 'package:fishbit_finance/core/design_system/glass_button.dart';
 
+import 'package:fishbit_finance/modules/auth_tenant/domain/models/company.dart';
 import 'package:fishbit_finance/modules/auth_tenant/presentation/providers/auth_provider.dart';
+import 'package:fishbit_finance/core/utils/currency_formatters.dart';
 
 class AppConfigModal extends ConsumerStatefulWidget {
   const AppConfigModal({super.key});
@@ -27,8 +29,6 @@ class AppConfigModal extends ConsumerStatefulWidget {
 class _AppConfigModalState extends ConsumerState<AppConfigModal> {
   final _fcrCtrl = TextEditingController(text: '1.25');
   final _oxigenoMinCtrl = TextEditingController(text: '4.0');
-  final _tarifaEnergiaCtrl = TextEditingController(text: '850');
-  final _precioKgCtrl = TextEditingController(text: '9500');
   bool _notificacionesIca = true;
   bool _alertaSonoraSensores = true;
   bool _isSaving = false;
@@ -43,6 +43,7 @@ class _AppConfigModalState extends ConsumerState<AppConfigModal> {
   ];
 
   late List<String> _especiesSeleccionadas;
+  final Map<String, TextEditingController> _pesosCosechaCtrls = {};
 
   @override
   void initState() {
@@ -54,14 +55,22 @@ class _AppConfigModalState extends ConsumerState<AppConfigModal> {
       'Bocachico',
       'Pangasius',
     ]);
+
+    for (final sp in _todasEspecies) {
+      final targetGrams = company != null
+          ? company.getTargetHarvestWeightGrams(sp)
+          : Company.defaultHarvestWeightForSpecies(sp);
+      _pesosCosechaCtrls[sp] = TextEditingController(text: targetGrams.toInt().toString());
+    }
   }
 
   @override
   void dispose() {
     _fcrCtrl.dispose();
     _oxigenoMinCtrl.dispose();
-    _tarifaEnergiaCtrl.dispose();
-    _precioKgCtrl.dispose();
+    for (final ctrl in _pesosCosechaCtrls.values) {
+      ctrl.dispose();
+    }
     super.dispose();
   }
 
@@ -71,8 +80,17 @@ class _AppConfigModalState extends ConsumerState<AppConfigModal> {
     final currentCompany = ref.read(authProvider).currentCompany;
 
     if (currentCompany != null) {
+      final Map<String, dynamic> nuevosPesos = Map<String, dynamic>.from(currentCompany.pesosFinalesEspeciesG);
+      for (final entry in _pesosCosechaCtrls.entries) {
+        final val = double.tryParse(entry.value.text.trim());
+        if (val != null && val > 0) {
+          nuevosPesos[entry.key] = val;
+        }
+      }
+
       final updatedCompany = currentCompany.copyWith(
         especiesHabilitadas: _especiesSeleccionadas,
+        pesosFinalesEspeciesG: nuevosPesos,
       );
       await authNotifier.updateCompany(updatedCompany);
     }
@@ -92,6 +110,7 @@ class _AppConfigModalState extends ConsumerState<AppConfigModal> {
 
   @override
   Widget build(BuildContext context) {
+    final bool isDark = Theme.of(context).brightness == Brightness.dark;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: () => Navigator.of(context).pop(),
@@ -146,9 +165,8 @@ class _AppConfigModalState extends ConsumerState<AppConfigModal> {
                 ),
                 const SizedBox(height: 20),
 
-                // Sección 1: Parámetros Biológicos
                 // Sección 1: Especies Piscícolas Habilitadas
-                Text('🐟 ESPECIES HABILITADAS EN ESTA EMPRESA', style: AppTypography.labelMicro.copyWith(color: AppColors.cyanWater, letterSpacing: 1.2)),
+                Text('ESPECIES HABILITADAS EN ESTA EMPRESA', style: AppTypography.labelMicro.copyWith(color: AppColors.cyanWater, letterSpacing: 1.2)),
                 const SizedBox(height: 6),
                 Text('Marca las especies que tu granja cultiva para siembras y bitácoras:', style: AppTypography.bodySmall.copyWith(color: AppColors.textSecondaryDark, fontSize: 11.5)),
                 const SizedBox(height: 8),
@@ -178,10 +196,94 @@ class _AppConfigModalState extends ConsumerState<AppConfigModal> {
                     );
                   }).toList(),
                 ),
+                const SizedBox(height: 14),
+
+                // Sub-sección: Meta de Talla / Peso de Cosecha por Especie
+                Text(
+                  'META DE COSECHA POR ESPECIE (GRAMOS)',
+                  style: AppTypography.labelMicro.copyWith(color: AppColors.greenBiomass, letterSpacing: 1.1),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Define el peso objetivo de cosecha para calibrar la barra de progreso en las tarjetas:',
+                  style: AppTypography.bodySmall.copyWith(color: AppColors.textSecondaryDark, fontSize: 11),
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.04),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+                  ),
+                  child: Column(
+                    children: _especiesSeleccionadas.map((sp) {
+                      final ctrl = _pesosCosechaCtrls[sp];
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              flex: 3,
+                              child: Text(
+                                sp,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 12,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              flex: 2,
+                              child: SizedBox(
+                                height: 38,
+                                child: TextField(
+                                  controller: ctrl,
+                                  keyboardType: TextInputType.number,
+                                  textAlign: TextAlign.end,
+                                  style: const TextStyle(
+                                    color: AppColors.cyanWater,
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 13,
+                                  ),
+                                  decoration: InputDecoration(
+                                    suffixText: ' g',
+                                    suffixStyle: TextStyle(
+                                      color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                                      fontSize: 11,
+                                    ),
+                                    contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                    filled: true,
+                                    fillColor: Colors.white.withValues(alpha: 0.05),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                      borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
+                                    ),
+                                    enabledBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                      borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
+                                    ),
+                                    focusedBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                      borderSide: const BorderSide(color: AppColors.cyanWater),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
                 const SizedBox(height: 18),
 
                 // Sección 2: Parámetros Biológicos
-                Text('🧬 PARÁMETROS BIOLÓGICOS Y SANITARIOS', style: AppTypography.labelMicro.copyWith(color: AppColors.cyanWater, letterSpacing: 1.2)),
+                Text('PARÁMETROS BIOLÓGICOS Y SANITARIOS', style: AppTypography.labelMicro.copyWith(color: AppColors.cyanWater, letterSpacing: 1.2)),
                 const SizedBox(height: 10),
                 Row(
                   children: [
@@ -209,36 +311,8 @@ class _AppConfigModalState extends ConsumerState<AppConfigModal> {
                 const SizedBox(height: 16),
 
 
-                // Sección 2: Parámetros Económicos
-                Text('💰 PARÁMETROS FINANCIEROS Y DE COSTO', style: AppTypography.labelMicro.copyWith(color: AppColors.greenBiomass, letterSpacing: 1.2)),
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    Expanded(
-                      child: GlassFormField(
-                        label: 'TARIFA ENERGÍA (COP/kWh)',
-                        hint: '850',
-                        controller: _tarifaEnergiaCtrl,
-                        keyboardType: TextInputType.number,
-                        prefixIcon: Icons.bolt_rounded,
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: GlassFormField(
-                        label: 'PRECIO VENTA KG (COP)',
-                        hint: '9500',
-                        controller: _precioKgCtrl,
-                        keyboardType: TextInputType.number,
-                        prefixIcon: Icons.attach_money_rounded,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-
                 // Sección 3: Preferencias y Cumplimiento
-                Text('🛡️ PREFERENCIAS Y CUMPLIMIENTO', style: AppTypography.labelMicro.copyWith(color: AppColors.amberWarning, letterSpacing: 1.2)),
+                Text('PREFERENCIAS Y CUMPLIMIENTO', style: AppTypography.labelMicro.copyWith(color: AppColors.amberWarning, letterSpacing: 1.2)),
                 const SizedBox(height: 10),
                 GlassContainer(
                   borderRadius: 16,

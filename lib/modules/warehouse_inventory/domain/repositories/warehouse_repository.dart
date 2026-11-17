@@ -15,5 +15,8 @@ abstract class WarehouseRepository {
   Future<BiologicalPurchase> createBiologicalPurchase(BiologicalPurchase purchase);
 
   Future<List<Supplier>> fetchCustomSuppliers(String empresaId);
+  Future<void> ensureDefaultSuppliersSeeded(String empresaId);
   Future<Supplier> createSupplier(Supplier supplier);
+  Future<Supplier> updateSupplier(Supplier supplier);
+  Future<void> deleteSupplier(String supplierId);
 }

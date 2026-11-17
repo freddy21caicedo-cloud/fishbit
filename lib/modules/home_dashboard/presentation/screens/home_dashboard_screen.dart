@@ -9,12 +9,12 @@ import 'package:fishbit_finance/core/design_system/floating_dock_layout.dart';
 import 'package:fishbit_finance/core/design_system/glass_badge.dart';
 import 'package:fishbit_finance/core/design_system/glass_container.dart';
 import 'package:fishbit_finance/core/utils/currency_formatters.dart';
-import 'package:fishbit_finance/modules/ponds_batches/presentation/dialogs/siembra_modal.dart';
+import 'package:fishbit_finance/modules/feeding_nutrition/presentation/providers/nutrition_provider.dart';
+import 'package:fishbit_finance/modules/home_dashboard/presentation/widgets/biological_trends_card.dart';
+import 'package:fishbit_finance/modules/home_dashboard/presentation/widgets/pond_feed_ticker_board.dart';
+import 'package:fishbit_finance/modules/ponds_batches/domain/models/fish_batch.dart';
 import 'package:fishbit_finance/modules/ponds_batches/presentation/providers/ponds_provider.dart';
-import 'package:fishbit_finance/modules/sales_harvest/presentation/dialogs/venta_rapida_modal.dart';
-import 'package:fishbit_finance/modules/sales_harvest/presentation/providers/sales_provider.dart';
 import 'package:fishbit_finance/modules/warehouse_inventory/presentation/providers/warehouse_provider.dart';
-import 'package:fishbit_finance/modules/water_quality/presentation/dialogs/parametro_modal.dart';
 import 'package:fishbit_finance/modules/water_quality/presentation/providers/water_quality_provider.dart';
 
 class HomeDashboardScreen extends ConsumerWidget {
@@ -23,10 +23,45 @@ class HomeDashboardScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final pondsState = ref.watch(pondsProvider);
-    final salesState = ref.watch(salesProvider);
     final warehouseState = ref.watch(warehouseProvider);
     final waterState = ref.watch(waterQualityProvider);
+    final nutritionState = ref.watch(nutritionProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    // Métricas zootécnicas globales calculadas en vivo
+    final activeBatches = pondsState.batches.where((b) => b.estado == BatchStatus.active).toList();
+    final int poblacionViva = activeBatches.fold(0, (sum, b) => sum + b.cantidadActualPeces);
+    final validFcrBatches = activeBatches.where((b) => b.fcrOrNull != null).toList();
+    final double? fcrGlobal = validFcrBatches.isNotEmpty
+        ? validFcrBatches.fold(0.0, (sum, b) => sum + b.fcrOrNull!) / validFcrBatches.length
+        : null;
+
+    final double pesoPromedioGlobal = activeBatches.isNotEmpty
+        ? activeBatches.fold(0.0, (sum, b) => sum + b.pesoActualGramos) / activeBatches.length
+        : 0.0;
+
+    final double supervivenciaGlobal = activeBatches.isNotEmpty
+        ? activeBatches.fold(0.0, (sum, b) => sum + (100.0 - b.porcentajeMortalidad).clamp(0.0, 100.0)) /
+            activeBatches.length
+        : 0.0;
+
+    final double consumoProyectadoDiaKg = computeTotalProjectedFeedKgPerDay(
+      pondsState.ponds,
+      pondsState.batches,
+      nutritionState.tables,
+    );
+
+    final now = DateTime.now();
+    final double servidoHoyKg = nutritionState.records
+        .where((r) => r.fecha.year == now.year && r.fecha.month == now.month && r.fecha.day == now.day)
+        .fold(0.0, (sum, r) => sum + r.cantidadConsumidaKg);
+
+    final double? diasAutonomiaAlimento = consumoProyectadoDiaKg > 0
+        ? (warehouseState.totalAlimentoKg / consumoProyectadoDiaKg)
+        : null;
+
+    final double capacidadTotalM3 = pondsState.ponds.fold(0.0, (sum, p) => sum + p.capacidadM3);
+    final double densidadMediaKgM3 = capacidadTotalM3 > 0 ? (pondsState.biomasaTotalKg / capacidadTotalM3) : 0.0;
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -41,19 +76,19 @@ class HomeDashboardScreen extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // KPI Principal: Valor Total en Agua (Biomasa)
+                  // KPI Principal Zootécnico: Biomasa Viva Total en Agua (Kg)
                   GlassCard(
                     borderRadius: 24,
                     glowColor: AppColors.cyanWater,
-                    title: 'VALOR TOTAL DE BIOMASA EN AGUA',
-                    trailingWidget: const GlassBadge(text: 'EN VIVO', color: AppColors.greenBiomass, icon: Icons.circle),
+                    title: 'BIOMASA VIVA TOTAL EN AGUA',
+                    trailingWidget: const GlassBadge(text: 'PRODUCCIÓN', color: AppColors.greenBiomass, icon: Icons.circle),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         FittedBox(
                           fit: BoxFit.scaleDown,
                           child: Text(
-                            CurrencyFormatters.formatCOP(pondsState.biomasaTotalKg * 8500),
+                            CurrencyFormatters.formatKg(pondsState.biomasaTotalKg),
                             style: AppTypography.displayLarge.copyWith(
                               fontSize: 32,
                               color: AppColors.cyanWater,
@@ -63,21 +98,32 @@ class HomeDashboardScreen extends ConsumerWidget {
                         ),
                         const SizedBox(height: 8),
                         Wrap(
-                          spacing: 12,
+                          spacing: 14,
                           runSpacing: 4,
-                          alignment: WrapAlignment.spaceBetween,
                           crossAxisAlignment: WrapCrossAlignment.center,
                           children: [
                             Text(
-                              '${CurrencyFormatters.formatKg(pondsState.biomasaTotalKg)} totales',
+                              'Población: ${CurrencyFormatters.formatInt(poblacionViva)} peces',
                               style: AppTypography.bodyMedium.copyWith(
                                 color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                                fontWeight: FontWeight.w700,
                               ),
                             ),
                             Text(
-                              'Costo Inv: ${CurrencyFormatters.formatCOP(pondsState.costoTotalEnAgua)}',
-                              style: AppTypography.bodySmall.copyWith(color: AppColors.greenBiomass, fontWeight: FontWeight.w700),
+                              fcrGlobal != null ? 'FCR Global: ${fcrGlobal.toStringAsFixed(2)}:1' : 'FCR: --',
+                              style: AppTypography.bodySmall.copyWith(
+                                color: AppColors.greenBiomass,
+                                fontWeight: FontWeight.w800,
+                              ),
                             ),
+                            if (pesoPromedioGlobal > 0)
+                              Text(
+                                'Peso prom: ${pesoPromedioGlobal.toInt()} g',
+                                style: AppTypography.bodySmall.copyWith(
+                                  color: AppColors.amberWarning,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
                           ],
                         ),
                       ],
@@ -86,8 +132,7 @@ class HomeDashboardScreen extends ConsumerWidget {
 
                   const SizedBox(height: 14),
 
-                  // Banner de Estado Biológico y Sanitario (ICA/AUNAP)
-                  // KPI Sanitario y Calidad de Agua en vivo desde Bitácora
+                  // Banner de Estado Biológico y Sanitario (ICA/AUNAP) en vivo desde Bitácora
                   Builder(
                     builder: (context) {
                       final params = waterState.recentParameters;
@@ -171,7 +216,7 @@ class HomeDashboardScreen extends ConsumerWidget {
 
                   const SizedBox(height: 14),
 
-                  // Resumen de Bento Grid 2x2
+                  // Bento Grid Zootécnico y Operativo de Campo (2x2)
                   Row(
                     children: [
                       Expanded(
@@ -190,7 +235,7 @@ class HomeDashboardScreen extends ConsumerWidget {
                                 ),
                               ),
                               Text(
-                                'Productivos',
+                                'Densidad: ${densidadMediaKgM3.toStringAsFixed(1)} Kg/m³',
                                 style: AppTypography.labelMicro.copyWith(
                                   color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
                                 ),
@@ -202,7 +247,7 @@ class HomeDashboardScreen extends ConsumerWidget {
                       const SizedBox(width: 12),
                       Expanded(
                         child: GlassCard(
-                          title: 'Alimento',
+                          title: 'Alimento Bodega',
                           glowColor: AppColors.amberWarning,
                           onTap: () => context.go('/warehouse'),
                           child: Column(
@@ -216,9 +261,16 @@ class HomeDashboardScreen extends ConsumerWidget {
                                 ),
                               ),
                               Text(
-                                'En Bodega',
+                                diasAutonomiaAlimento != null
+                                    ? 'Autonomía: ${diasAutonomiaAlimento.toStringAsFixed(0)} días'
+                                    : 'En Bodega',
                                 style: AppTypography.labelMicro.copyWith(
-                                  color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                                  color: diasAutonomiaAlimento != null && diasAutonomiaAlimento < 7
+                                      ? AppColors.coralAction
+                                      : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
+                                  fontWeight: diasAutonomiaAlimento != null && diasAutonomiaAlimento < 7
+                                      ? FontWeight.w800
+                                      : FontWeight.w500,
                                 ),
                               ),
                             ],
@@ -234,21 +286,21 @@ class HomeDashboardScreen extends ConsumerWidget {
                     children: [
                       Expanded(
                         child: GlassCard(
-                          title: 'Ventas',
+                          title: 'Ración Proyectada Hoy',
                           glowColor: AppColors.greenBiomass,
-                          onTap: () => context.go('/sales'),
+                          onTap: () => context.go('/bitacora'),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               FittedBox(
                                 fit: BoxFit.scaleDown,
                                 child: Text(
-                                  CurrencyFormatters.formatCOP(salesState.totalIngresosBrutos),
-                                  style: AppTypography.numberKpi.copyWith(color: AppColors.greenBiomass, fontSize: 16),
+                                  '${consumoProyectadoDiaKg.toStringAsFixed(1)} Kg',
+                                  style: AppTypography.numberKpi.copyWith(color: AppColors.greenBiomass, fontSize: 18),
                                 ),
                               ),
                               Text(
-                                'Ingresos Cosechas',
+                                'Servido hoy: ${servidoHoyKg.toStringAsFixed(1)} Kg',
                                 style: AppTypography.labelMicro.copyWith(
                                   color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
                                 ),
@@ -260,21 +312,21 @@ class HomeDashboardScreen extends ConsumerWidget {
                       const SizedBox(width: 12),
                       Expanded(
                         child: GlassCard(
-                          title: 'Utilidad',
+                          title: 'Supervivencia',
                           glowColor: AppColors.purpleAnalytics,
-                          onTap: () => context.go('/finance'),
+                          onTap: () => context.go('/ponds'),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               FittedBox(
                                 fit: BoxFit.scaleDown,
                                 child: Text(
-                                  CurrencyFormatters.formatCOP(salesState.totalUtilidadNeta),
-                                  style: AppTypography.numberKpi.copyWith(color: AppColors.purpleAnalytics, fontSize: 16),
+                                  activeBatches.isNotEmpty ? '${supervivenciaGlobal.toStringAsFixed(1)}%' : '--',
+                                  style: AppTypography.numberKpi.copyWith(color: AppColors.purpleAnalytics, fontSize: 18),
                                 ),
                               ),
                               Text(
-                                'Margen Acumulado',
+                                '${activeBatches.length} lote(s) activos',
                                 style: AppTypography.labelMicro.copyWith(
                                   color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
                                 ),
@@ -286,93 +338,22 @@ class HomeDashboardScreen extends ConsumerWidget {
                     ],
                   ),
 
-                  const SizedBox(height: 24),
-                  Text(
-                    'ACCESOS RÁPIDOS OPERATIVOS',
-                    style: AppTypography.labelMicro.copyWith(
-                      color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                      letterSpacing: 1.5,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 20),
 
-                  // Accesos Rápidos
-                  Wrap(
-                    spacing: 10,
-                    runSpacing: 10,
-                    children: [
-                      _buildQuickAction(
-                        context: context,
-                        icon: Icons.add_circle_outline_rounded,
-                        label: 'Sembrar Lote',
-                        color: AppColors.cyanWater,
-                        onTap: () => SiembraModal.show(context),
-                      ),
-                      _buildQuickAction(
-                        context: context,
-                        icon: Icons.water_drop_outlined,
-                        label: 'Calidad Agua',
-                        color: AppColors.blueOcean,
-                        onTap: () => ParametroModal.show(context),
-                      ),
-                      _buildQuickAction(
-                        context: context,
-                        icon: Icons.point_of_sale_rounded,
-                        label: 'Venta Rápida',
-                        color: AppColors.greenBiomass,
-                        onTap: () => VentaRapidaModal.show(context),
-                      ),
-                      _buildQuickAction(
-                        context: context,
-                        icon: Icons.inventory_2_outlined,
-                        label: 'Ver Almacén',
-                        color: AppColors.amberWarning,
-                        onTap: () => context.go('/warehouse'),
-                      ),
-                    ],
-                  ),
+                  // Tablero Bursátil (Stock Ticker) de Consumo Proyectado Diario por Estanque
+                  const PondFeedTickerBoard(),
+
+                  const SizedBox(height: 20),
+
+                  // Analítica Biológica y Tendencias en Curvas
+                  const BiologicalTrendsCard(),
+
                   const DockBottomSpacer(), // Espacio para el Dock de navegación
                 ],
               ),
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildQuickAction({
-    required BuildContext context,
-    required IconData icon,
-    required String label,
-    required Color color,
-    required VoidCallback onTap,
-  }) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: isDark ? 0.12 : 0.08),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: color.withValues(alpha: isDark ? 0.3 : 0.25)),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, color: color, size: 18),
-            const SizedBox(width: 8),
-            Text(
-              label,
-              style: AppTypography.bodySmall.copyWith(
-                color: isDark ? Colors.white : AppColors.textPrimaryLight,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }

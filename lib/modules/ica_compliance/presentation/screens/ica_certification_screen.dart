@@ -14,8 +14,9 @@ import 'package:fishbit_finance/modules/water_quality/presentation/providers/wat
 import 'package:fishbit_finance/modules/sales_harvest/presentation/providers/sales_provider.dart';
 import 'package:fishbit_finance/modules/ica_compliance/presentation/providers/ica_compliance_provider.dart';
 
-// Modales interactivos de diligenciamiento exclusivo de Bioseguridad y Sanidad
+// Modales y Asistentes Paso a Paso de Bioseguridad y Sanidad
 import 'package:fishbit_finance/modules/ica_compliance/presentation/dialogs/ica_biosecurity_modals.dart';
+import 'package:fishbit_finance/modules/ica_compliance/presentation/screens/ica_biosecurity_wizards.dart';
 
 class IcaCertificationScreen extends ConsumerStatefulWidget {
   const IcaCertificationScreen({super.key});
@@ -185,7 +186,7 @@ class _IcaCertificationScreenState extends ConsumerState<IcaCertificationScreen>
         icono: Icons.badge_rounded,
         color: AppColors.cyanWater,
         onExport: () => engine.exportF01Personal(),
-        onDiligenciar: () => IngresoPersonalModal.show(context),
+        onDiligenciar: () => IngresoPersonalWizardScreen.open(context),
         badgeInfo: '${icaState.personalRecords.length} registrados',
         esDiligenciableEnIca: true,
       ),
@@ -197,7 +198,7 @@ class _IcaCertificationScreenState extends ConsumerState<IcaCertificationScreen>
         icono: Icons.local_shipping_rounded,
         color: AppColors.amberWarning,
         onExport: () => engine.exportF02Vehiculos(),
-        onDiligenciar: () => IngresoVehiculoModal.show(context),
+        onDiligenciar: () => IngresoVehiculoWizardScreen.open(context),
         badgeInfo: '${icaState.vehiculoRecords.length} desinfecciones',
         esDiligenciableEnIca: true,
       ),
@@ -209,7 +210,7 @@ class _IcaCertificationScreenState extends ConsumerState<IcaCertificationScreen>
         icono: Icons.biotech_rounded,
         color: Colors.purpleAccent,
         onExport: () => engine.exportF03Necropsias(),
-        onDiligenciar: () => NecropsiaModal.show(context),
+        onDiligenciar: () => NecropsiaWizardScreen.open(context),
         badgeInfo: '${icaState.necropsiaRecords.length} necropsias',
         esDiligenciableEnIca: true,
       ),
@@ -533,18 +534,28 @@ class _IcaCertificationScreenState extends ConsumerState<IcaCertificationScreen>
             ),
             const SizedBox(height: 12),
 
-            // Grid / Lista de Formatos
+            // Grid / Lista de Formatos Multi-pantalla Responsivo
             LayoutBuilder(
               builder: (context, constraints) {
-                final isWide = constraints.maxWidth > 650;
+                int crossAxisCount = 1;
+                double childAspectRatio = 1.55;
+
+                if (constraints.maxWidth > 900) {
+                  crossAxisCount = 3;
+                  childAspectRatio = 1.45;
+                } else if (constraints.maxWidth > 580) {
+                  crossAxisCount = 2;
+                  childAspectRatio = 1.55;
+                }
+
                 return GridView.builder(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
                   gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: isWide ? 2 : 1,
+                    crossAxisCount: crossAxisCount,
                     crossAxisSpacing: 12,
                     mainAxisSpacing: 12,
-                    childAspectRatio: isWide ? 1.75 : 1.6,
+                    childAspectRatio: childAspectRatio,
                   ),
                   itemCount: filtered.length,
                   itemBuilder: (context, index) {

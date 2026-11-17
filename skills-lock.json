@@ -43,6 +43,12 @@
       "skillPath": "stdlib/domains/farming/SKILL.md",
       "computedHash": "74dbe83fe889f7a11433c1605f15ceefc9551cbd743325584f195d84e63f8cf1"
     },
+    "find-skills": {
+      "source": "vercel-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/find-skills/SKILL.md",
+      "computedHash": "b146008599c31057cef1c145774cea5d5afb30e8f43fa802e47a4b461419aaaf"
+    },
     "flutter-add-integration-test": {
       "source": "flutter/agent-plugins",
       "sourceType": "github",
@@ -114,6 +120,18 @@
       "sourceType": "github",
       "skillPath": "skills/supabase/SKILL.md",
       "computedHash": "a6260582f48df8ba53380bb9b9e870ed2ae5fe147799e90ed783b8aa25167d50"
+    },
+    "supabase-audit-functions": {
+      "source": "yoanbernabeu/supabase-pentest-skills",
+      "sourceType": "github",
+      "skillPath": "skills/audit-functions/supabase-audit-functions/SKILL.md",
+      "computedHash": "15a708c0f963dd6291af8b663bb064e82dd6759d15f6f212193c0bd14f9f3a67"
+    },
+    "supabase-audit-rls": {
+      "source": "yoanbernabeu/supabase-pentest-skills",
+      "sourceType": "github",
+      "skillPath": "skills/audit-api/supabase-audit-rls/SKILL.md",
+      "computedHash": "2ac58ce5b714dc094940640e43fc3c42eec22a7234d2b46dd75885462a8c803c"
     },
     "supabase-postgres-best-practices": {
       "source": "supabase/agent-skills",

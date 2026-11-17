@@ -430,14 +430,46 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
-  Future<bool> updateTeamMember(UserMember member) async {
+  Future<bool> updateTeamMember(UserMember member, {String? newPassword}) async {
     try {
-      final updated = await _repository.updateTeamMember(member);
+      final updated = await _repository.updateTeamMember(member, newPassword: newPassword);
       final updatedList = state.teamMembers.map((m) => m.id == updated.id ? updated : m).toList();
       state = state.copyWith(teamMembers: updatedList);
       return true;
     } catch (e) {
       state = state.copyWith(errorMessage: e.toString());
+      return false;
+    }
+  }
+
+  Future<bool> deleteTeamMember(String memberId) async {
+    try {
+      await _repository.deleteMember(memberId);
+      final updatedList = state.teamMembers.where((m) => m.id != memberId).toList();
+      state = state.copyWith(teamMembers: updatedList);
+      return true;
+    } catch (e) {
+      state = state.copyWith(errorMessage: e.toString());
+      return false;
+    }
+  }
+
+  Future<bool> completeFirstLoginPasswordChange(String newPassword) async {
+    state = state.copyWith(isLoading: true, errorMessage: null);
+    try {
+      await _repository.updateInitialPassword(newPassword);
+      final updatedUser = state.currentUser?.copyWith(requiereCambioClave: false);
+      final updatedTeam = state.teamMembers
+          .map((m) => m.id == updatedUser?.id ? m.copyWith(requiereCambioClave: false) : m)
+          .toList();
+      state = state.copyWith(
+        isLoading: false,
+        currentUser: updatedUser,
+        teamMembers: updatedTeam,
+      );
+      return true;
+    } catch (e) {
+      state = state.copyWith(isLoading: false, errorMessage: e.toString());
       return false;
     }
   }

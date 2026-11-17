@@ -118,42 +118,6 @@ class _WarehouseScreenState extends ConsumerState<WarehouseScreen> with SingleTi
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Bento Grid KPIs de Almacén
-                  Row(
-                    children: [
-                      Expanded(
-                        child: GlassCard(
-                          title: 'Valor Total Inventario',
-                          glowColor: AppColors.amberWarning,
-                          child: FittedBox(
-                            fit: BoxFit.scaleDown,
-                            alignment: Alignment.centerLeft,
-                            child: Text(
-                              CurrencyFormatters.formatCOP(state.valorTotalInventario),
-                              style: AppTypography.numberKpi.copyWith(color: AppColors.amberWarning, fontSize: 18),
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: GlassCard(
-                          title: 'Alimento en Bodega',
-                          glowColor: AppColors.greenBiomass,
-                          child: FittedBox(
-                            fit: BoxFit.scaleDown,
-                            alignment: Alignment.centerLeft,
-                            child: Text(
-                              CurrencyFormatters.formatKg(state.totalAlimentoKg),
-                              style: AppTypography.numberKpi.copyWith(color: AppColors.greenBiomass, fontSize: 18),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 14),
-
                   // Barra de Búsqueda y Acciones Rápidas
                   Row(
                     children: [
@@ -492,7 +456,7 @@ class _QuickEntryDialogState extends ConsumerState<_QuickEntryDialog> {
   void initState() {
     super.initState();
     _cantCtrl = TextEditingController();
-    _costCtrl = TextEditingController(text: widget.item.costoUnitarioHistorico.toInt().toString());
+    _costCtrl = TextEditingController(text: CurrencyFormatters.formatCOP(widget.item.costoUnitarioHistorico));
     _facturaCtrl = TextEditingController();
     _fechaEntrada = CivilDate.today();
   }
@@ -547,7 +511,8 @@ class _QuickEntryDialogState extends ConsumerState<_QuickEntryDialog> {
             const SizedBox(height: 10),
             TextField(
               controller: _costCtrl,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              keyboardType: TextInputType.number,
+              inputFormatters: [CurrencyInputFormatter()],
               style: const TextStyle(color: Colors.white),
               decoration: InputDecoration(
                 labelText: 'Precio Unitario Compra (\$ COP)',
@@ -591,13 +556,13 @@ class _QuickEntryDialogState extends ConsumerState<_QuickEntryDialog> {
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           ),
           onPressed: () {
-            final cant = double.tryParse(_cantCtrl.text) ?? 0.0;
-            final costo = double.tryParse(_costCtrl.text) ?? widget.item.costoUnitarioHistorico;
+            final cant = double.tryParse(_cantCtrl.text.replaceAll(',', '.').trim()) ?? 0.0;
+            final costo = CurrencyFormatters.parseCOP(_costCtrl.text);
             if (cant > 0) {
               ref.read(warehouseProvider.notifier).registerPurchaseEntry(
                 itemId: widget.item.id,
                 cantidadIngresada: cant,
-                costoUnitarioCompra: costo,
+                costoUnitarioCompra: costo > 0 ? costo : widget.item.costoUnitarioHistorico,
                 numeroFactura: _facturaCtrl.text.trim().isNotEmpty ? _facturaCtrl.text.trim() : null,
                 proveedor: widget.item.marcaProveedor,
               );

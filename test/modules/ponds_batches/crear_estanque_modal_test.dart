@@ -74,7 +74,7 @@ class MockAuthRepository implements AuthRepository {
   @override
   Future<List<AquacultureUnit>> fetchUnits(String empresaId) async => [];
   @override
-  Future<AquacultureUnit> createUnit(String empresaId, String nombre, String sigla, String? ubicacion) async => throw UnimplementedError();
+  Future<AquacultureUnit> createUnit(String empresaId, String nombre, String sigla, String? ubicacion, {String? pais, String? departamento, String? ciudad, String? direccion, String? telefono}) async => throw UnimplementedError();
   @override
   Future<List<UserMember>> fetchTeamMembers(String empresaId) async => [];
   @override
@@ -129,7 +129,8 @@ class MockPondsRepository implements PondsRepository {
   @override
   Future<List<MortalityRecord>> fetchMortalityByUnit(String empresaId, String unidadAcuicolaId, {String? pondId, String? batchId}) async => [];
   @override
-  Future<BiometriaRecord> registerBiometry({String? empresaId, String? unidadAcuicolaId, required String estanqueId, required String loteId, required double nuevoPesoPromedioGramos, int? cantidadPecesMuestreados, double? pesoTotalCapturaKg, double? longitudPromedioCm, double? factorK, double? gdpGDia, String? observaciones, String? registradoPor, DateTime? fecha, String? hora}) async => throw UnimplementedError();
+  Future<BiometriaRecord> registerBiometry({String? empresaId, String? unidadAcuicolaId, required String estanqueId, required String loteId, required double nuevoPesoPromedioGramos,
+    double? biomasaCalculadaKg, int? cantidadPecesMuestreados, double? pesoTotalCapturaKg, double? longitudPromedioCm, double? factorK, double? gdpGDia, String? observaciones, String? registradoPor, DateTime? fecha, String? hora}) async => throw UnimplementedError();
   @override
   Future<MortalityRecord> registerMortality({String? empresaId, String? unidadAcuicolaId, required String estanqueId, required String loteId, required int cantidadPecesMuertos, required double pesoPromedioGramos, required String causaProbable, double? biomasaPerdidaKg, String? observaciones, String? registradoPor, DateTime? fecha, String? hora}) async => throw UnimplementedError();
   @override

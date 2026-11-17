@@ -339,12 +339,28 @@ class WarehouseNotifier extends StateNotifier<WarehouseState> {
       final remoteItems = await _repository.fetchInventory(empresaId);
       final invoices = await _repository.fetchInvoices(empresaId, unitId ?? empresaId);
       final bioPurchases = await _repository.fetchBiologicalPurchases(empresaId, unitId ?? empresaId);
-      final customSuppliers = await _repository.fetchCustomSuppliers(empresaId);
+      var customSuppliers = await _repository.fetchCustomSuppliers(empresaId);
 
       final isMockCompany = empresaId.startsWith('c1000000-');
+      if (!isMockCompany && customSuppliers.isEmpty) {
+        await _repository.ensureDefaultSuppliersSeeded(empresaId);
+        customSuppliers = await _repository.fetchCustomSuppliers(empresaId);
+      }
+
+      // Enriquecer catálogo de Sanoa si viene desde BD sin productosOfrecidos
+      final hydratedSuppliers = customSuppliers.map((s) {
+        if ((s.nit == '1094283101' || s.nombre.toLowerCase() == 'sanoa') &&
+            s.productosOfrecidos.isEmpty) {
+          return s.copyWith(productosOfrecidos: ProductCatalogService.kSanoaSupplier.productosOfrecidos);
+        }
+        return s;
+      }).toList();
+
       // Solo inicializar con catálogo demo si es una empresa de demostración/mock explícita
       final finalItems = (remoteItems.isNotEmpty || !isMockCompany) ? remoteItems : kDefaultInventoryItems;
-      final mergedSuppliers = [...kDefaultSuppliers, ...customSuppliers];
+      final mergedSuppliers = isMockCompany
+          ? [...kDefaultSuppliers, ...hydratedSuppliers]
+          : (hydratedSuppliers.isNotEmpty ? hydratedSuppliers : kDefaultSuppliers);
 
       state = state.copyWith(
         isLoading: false,
@@ -534,6 +550,21 @@ class WarehouseNotifier extends StateNotifier<WarehouseState> {
       );
       pendiente -= aDescontar;
     }
+  }
+
+  /// Actualizar un proveedor existente en Supabase y estado local
+  Future<Supplier> updateSupplier(Supplier supplier) async {
+    final updated = await _repository.updateSupplier(supplier);
+    final updatedList = state.suppliers.map((s) => s.id == updated.id ? updated : s).toList();
+    state = state.copyWith(suppliers: updatedList);
+    return updated;
+  }
+
+  /// Eliminar un proveedor del directorio en Supabase y estado local
+  Future<void> deleteSupplier(String supplierId) async {
+    await _repository.deleteSupplier(supplierId);
+    final updatedList = state.suppliers.where((s) => s.id != supplierId).toList();
+    state = state.copyWith(suppliers: updatedList);
   }
 }
 

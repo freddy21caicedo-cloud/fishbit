@@ -54,9 +54,9 @@ class _CrearColaboradorModalState extends ConsumerState<CrearColaboradorModal> {
     _telefonoCtrl = TextEditingController();
     _emailCtrl = TextEditingController(text: m?.email ?? '');
     _salarioCtrl = TextEditingController(
-      text: m != null && m.salarioBase > 0 ? m.salarioBase.toInt().toString() : '2000000',
+      text: m != null && m.salarioBase > 0 ? m.salarioBase.toInt().toString() : '',
     );
-    _passCtrl = TextEditingController(text: 'FishBit.2026');
+    _passCtrl = TextEditingController();
 
     _selectedRole = m?.role ?? UserRole.technician;
     _selectedUnitId = m?.unidadAcuicolaId;
@@ -97,7 +97,11 @@ class _CrearColaboradorModalState extends ConsumerState<CrearColaboradorModal> {
         salarioBase: salario,
         periodoPago: _periodoPago,
       );
-      success = await ref.read(authProvider.notifier).updateTeamMember(updated);
+      final newPw = _passCtrl.text.trim();
+      success = await ref.read(authProvider.notifier).updateTeamMember(
+            updated,
+            newPassword: newPw.isNotEmpty ? newPw : null,
+          );
     } else {
       success = await ref.read(authProvider.notifier).createTeamMember(
             nombre: _nombreCtrl.text,
@@ -138,10 +142,84 @@ class _CrearColaboradorModalState extends ConsumerState<CrearColaboradorModal> {
     }
   }
 
+  Future<void> _handleDelete() async {
+    final member = widget.memberToEdit;
+    if (member == null) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      barrierColor: Colors.black.withValues(alpha: 0.7),
+      builder: (dialogCtx) => AlertDialog(
+        backgroundColor: AppColors.surfaceDark,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: BorderSide(color: AppColors.coralAction.withValues(alpha: 0.4)),
+        ),
+        title: Row(
+          children: [
+            const Icon(Icons.warning_amber_rounded, color: AppColors.coralAction),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'Eliminar Colaborador',
+                style: AppTypography.titleMedium.copyWith(color: Colors.white),
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          '¿Deseas eliminar a ${member.nombre} (${member.email})? Se revocará su acceso y se eliminará su cuenta.',
+          style: AppTypography.bodySmall.copyWith(color: AppColors.textSecondaryDark),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogCtx).pop(false),
+            child: const Text('Cancelar', style: TextStyle(color: Colors.white70)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.coralAction,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            onPressed: () => Navigator.of(dialogCtx).pop(true),
+            child: const Text('Eliminar', style: TextStyle(fontWeight: FontWeight.w800)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+    setState(() => _isLoading = true);
+    final ok = await ref.read(authProvider.notifier).deleteTeamMember(member.id);
+    if (!mounted) return;
+    setState(() => _isLoading = false);
+
+    if (ok) {
+      Navigator.of(context).pop();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Colaborador ${member.nombre} eliminado del equipo.'),
+          backgroundColor: AppColors.greenBiomass,
+        ),
+      );
+    } else {
+      final err = ref.read(authProvider).errorMessage ?? 'Error al eliminar colaborador.';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(err), backgroundColor: AppColors.coralAction),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authProvider);
     final units = authState.units;
+    final currentUser = authState.currentUser;
+    final canDelete = widget.memberToEdit != null &&
+        currentUser != null &&
+        widget.memberToEdit!.id != currentUser.id &&
+        widget.memberToEdit!.email.toLowerCase() != currentUser.email.toLowerCase();
 
     if (_selectedUnitId == null && units.isNotEmpty) {
       _selectedUnitId = authState.activeUnitId ?? units.first.id;
@@ -321,7 +399,7 @@ class _CrearColaboradorModalState extends ConsumerState<CrearColaboradorModal> {
                       Expanded(
                         child: GlassFormField(
                           label: 'SALARIO MENSUAL (COP)',
-                          hint: '2.500.000',
+                          hint: 'Ej: 2.500.000',
                           controller: _salarioCtrl,
                           keyboardType: TextInputType.number,
                           prefixIcon: Icons.attach_money_rounded,
@@ -399,10 +477,14 @@ class _CrearColaboradorModalState extends ConsumerState<CrearColaboradorModal> {
                   ),
                   const SizedBox(height: 12),
 
-                  // Contraseña Inicial con Visibilidad Interactiva
+                  // Contraseña Temporal (Obligatoria al crear, Opcional al editar)
                   GlassFormField(
-                    label: 'CONTRASEÑA INICIAL DE ACCESO',
-                    hint: 'FishBit.2026',
+                    label: widget.memberToEdit == null
+                        ? 'CONTRASEÑA TEMPORAL DE ACCESO'
+                        : 'NUEVA CONTRASEÑA TEMPORAL (OPCIONAL)',
+                    hint: widget.memberToEdit == null
+                        ? 'Mínimo 8 caracteres'
+                        : 'Dejar vacío para mantener la actual',
                     controller: _passCtrl,
                     obscureText: _obscurePassword,
                     prefixIcon: Icons.lock_outline_rounded,
@@ -414,13 +496,46 @@ class _CrearColaboradorModalState extends ConsumerState<CrearColaboradorModal> {
                       ),
                       onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
                     ),
-                    validator: (v) => v == null || v.isEmpty ? 'Requerida' : null,
+                    validator: (v) {
+                      final trimmed = v?.trim() ?? '';
+                      if (widget.memberToEdit == null) {
+                        if (trimmed.isEmpty) return 'Requerida';
+                        if (trimmed.length < 8) return 'Mínimo 8 caracteres';
+                      } else if (trimmed.isNotEmpty && trimmed.length < 8) {
+                        return 'Mínimo 8 caracteres';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Al iniciar sesión por primera vez con esta clave temporal, el colaborador deberá definir una nueva contraseña personal.',
+                    style: AppTypography.labelMicro.copyWith(
+                      color: AppColors.cyanWater.withValues(alpha: 0.85),
+                      height: 1.35,
+                    ),
                   ),
                   const SizedBox(height: 20),
 
                   // Botones de Acción
                   Row(
                     children: [
+                      if (canDelete) ...[
+                        IconButton(
+                          tooltip: 'Eliminar Colaborador',
+                          style: IconButton.styleFrom(
+                            backgroundColor: AppColors.coralAction.withValues(alpha: 0.14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                              side: BorderSide(color: AppColors.coralAction.withValues(alpha: 0.35)),
+                            ),
+                            padding: const EdgeInsets.all(13),
+                          ),
+                          icon: const Icon(Icons.delete_outline_rounded, color: AppColors.coralAction),
+                          onPressed: _isLoading ? null : _handleDelete,
+                        ),
+                        const SizedBox(width: 10),
+                      ],
                       Expanded(
                         child: OutlinedButton(
                           style: OutlinedButton.styleFrom(

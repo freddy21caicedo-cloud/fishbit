@@ -195,8 +195,8 @@ class FishBatch {
       biomasaInicialKg: (json['biomasa_inicial_kg'] as num?)?.toDouble() ?? 0.0,
       biomasaActualKg: (json['biomasa_actual_kg'] as num?)?.toDouble() ?? 0.0,
       alimentoAcumuladoKg: (json['alimento_acumulado_kg'] as num?)?.toDouble() ?? 0.0,
-      diasRetiroSanitarioRestantes: json['dias_retiro_sanitario_restantes'] as int? ?? 0,
-      costoInicialAlevinos: (json['costo_inicial_alevinos'] as num?)?.toDouble() ?? 0.0,
+      costoInicialAlevinos: (json['costo_inicial_alevinos'] as num?)?.toDouble() ??
+          ((json['costo_inicial_alevines'] as num?)?.toDouble() ?? 0.0),
       costoAcumuladoInsumos: (json['costo_acumulado_insumos'] as num?)?.toDouble() ?? 0.0,
       costoAcumuladoFijo: (json['costo_acumulado_fijo'] as num?)?.toDouble() ?? 0.0,
       estado: parseStatus(json['estado'] as String? ?? 'Activo'),
@@ -226,10 +226,12 @@ class FishBatch {
       'peso_actual_gramos': pesoActualGramos,       // BUG-2: campo faltante
       'biomasa_inicial_kg': biomasaInicialKg,
       'biomasa_actual_kg': biomasaActualKg,
-      'costo_inicial_alevinos': costoInicialAlevinos, // BUG-1: typo alevines→alevinos corregido
+      'costo_inicial_alevinos': costoInicialAlevinos,
+      'costo_inicial_alevines': costoInicialAlevinos, // Compatibilidad bidireccional
       'costo_acumulado_insumos': costoAcumuladoInsumos,
       'costo_acumulado_fijo': costoAcumuladoFijo,
       'estado': statusToString(estado),
+      'fecha_siembra': fechaSiembra.toIso8601String().split('T').first,
     };
 
     if (lotePadreId != null && lotePadreId!.isNotEmpty) {
@@ -242,10 +244,10 @@ class FishBatch {
       map['unit_id'] = unidadAcuicolaId;
     }
     if (rolPolicultivo.isNotEmpty && rolPolicultivo != 'principal') {
-      map['rol_policultivo'] = rolPolicultivo;       // BUG-2: campo faltante
+      map['rol_policultivo'] = rolPolicultivo;
     }
     if (fechaCosechaEstimada != null) {
-      map['fecha_cosecha_estimada'] = fechaCosechaEstimada!.toIso8601String(); // BUG-2
+      map['fecha_cosecha_estimada'] = fechaCosechaEstimada!.toIso8601String();
     }
 
     return map;

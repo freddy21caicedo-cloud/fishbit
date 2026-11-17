@@ -65,6 +65,8 @@ class PondsNotifier extends StateNotifier<PondsState> {
   final Ref _ref;
   StreamSubscription<dynamic>? _feedingSub;
   StreamSubscription<dynamic>? _harvestSub;
+  StreamSubscription<dynamic>? _biometrySub;
+  StreamSubscription<dynamic>? _mortalitySub;
 
   PondsNotifier(this._repository, this._ref) : super(const PondsState(isLoading: true)) {
     loadPondsAndBatches();
@@ -85,13 +87,74 @@ class PondsNotifier extends StateNotifier<PondsState> {
     _harvestSub = eventBus.on<HarvestSaleRecordedEvent>().listen((event) {
       _handleHarvestSaleRecorded(event);
     });
+    _biometrySub = eventBus.on<BiometryRecordedEvent>().listen((event) {
+      _handleBiometryRecorded(event);
+    });
+    _mortalitySub = eventBus.on<MortalityRecordedEvent>().listen((event) {
+      _handleMortalityRecorded(event);
+    });
   }
 
   @override
   void dispose() {
     _feedingSub?.cancel();
     _harvestSub?.cancel();
+    _biometrySub?.cancel();
+    _mortalitySub?.cancel();
     super.dispose();
+  }
+
+  void _handleBiometryRecorded(BiometryRecordedEvent event) {
+    final bIndex = state.batches.indexWhere((b) => b.id == event.loteId);
+    if (bIndex != -1) {
+      final oldBatch = state.batches[bIndex];
+      final newBio = event.biomasaCalculadaKg ?? ((oldBatch.cantidadActualPeces * event.pesoPromedioGramos) / 1000.0);
+      final updatedBatch = oldBatch.copyWith(
+        pesoActualGramos: event.pesoPromedioGramos,
+        biomasaActualKg: newBio,
+      );
+
+      final updatedBatches = List<FishBatch>.from(state.batches);
+      updatedBatches[bIndex] = updatedBatch;
+
+      final updatedPonds = state.ponds.map((p) {
+        if (p.id == event.estanqueId) {
+          final pondBatches = updatedBatches.where((b) => b.estanqueId == event.estanqueId);
+          final pondBio = pondBatches.fold(0.0, (sum, b) => sum + b.biomasaActualKg);
+          return p.copyWith(biomasaKg: pondBio);
+        }
+        return p;
+      }).toList();
+
+      state = state.copyWith(batches: updatedBatches, ponds: updatedPonds);
+    }
+  }
+
+  void _handleMortalityRecorded(MortalityRecordedEvent event) {
+    final bIndex = state.batches.indexWhere((b) => b.id == event.loteId);
+    if (bIndex != -1) {
+      final oldBatch = state.batches[bIndex];
+      final newCount = (oldBatch.cantidadActualPeces - event.cantidadPecesMuertos).clamp(0, 9999999);
+      final newBio = (newCount * oldBatch.pesoActualGramos) / 1000.0;
+      final updatedBatch = oldBatch.copyWith(
+        cantidadActualPeces: newCount,
+        biomasaActualKg: newBio,
+      );
+
+      final updatedBatches = List<FishBatch>.from(state.batches);
+      updatedBatches[bIndex] = updatedBatch;
+
+      final updatedPonds = state.ponds.map((p) {
+        if (p.id == event.estanqueId) {
+          final pondBatches = updatedBatches.where((b) => b.estanqueId == event.estanqueId);
+          final pondBio = pondBatches.fold(0.0, (sum, b) => sum + b.biomasaActualKg);
+          return p.copyWith(biomasaKg: pondBio);
+        }
+        return p;
+      }).toList();
+
+      state = state.copyWith(batches: updatedBatches, ponds: updatedPonds);
+    }
   }
 
   void _handleDailyFeedingRecorded(DailyFeedingRecordedEvent event) {
@@ -128,24 +191,46 @@ class PondsNotifier extends StateNotifier<PondsState> {
     if (bIndex != -1) {
       final oldBatch = state.batches[bIndex];
       final remanenteBiomasa = (oldBatch.biomasaActualKg - event.biomasaVendidaKg).clamp(0.0, double.infinity);
-      final isTotalHarvest = remanenteBiomasa <= 5.0; // margen técnico de cierre
+
+      // Deducción exacta o proporcional de peces para prevenir peces fantasma
+      final int pecesVendidos = event.pecesVendidos > 0
+          ? event.pecesVendidos
+          : (oldBatch.biomasaActualKg > 0
+              ? (oldBatch.cantidadActualPeces * (event.biomasaVendidaKg / oldBatch.biomasaActualKg)).round()
+              : 0);
+      final int remanentePeces = (oldBatch.cantidadActualPeces - pecesVendidos).clamp(0, oldBatch.cantidadActualPeces);
+      final isTotalHarvest = remanenteBiomasa <= 5.0 || remanentePeces <= 0;
 
       final updatedBatch = oldBatch.copyWith(
-        biomasaActualKg: remanenteBiomasa,
+        biomasaActualKg: isTotalHarvest ? 0.0 : remanenteBiomasa,
+        cantidadActualPeces: isTotalHarvest ? 0 : remanentePeces,
         estado: isTotalHarvest ? BatchStatus.harvested : oldBatch.estado,
       );
 
       final updatedBatches = List<FishBatch>.from(state.batches);
       updatedBatches[bIndex] = updatedBatch;
 
+      // Soporte de policultivo: calcular la biomasa remanente total del estanque
+      // sumando todos los lotes que permanezcan ACTIVOS en dicho estanque
+      final activeBatchesInPond = updatedBatches.where(
+        (b) => b.estanqueId == oldBatch.estanqueId && b.estado == BatchStatus.active,
+      ).toList();
+
+      final totalBiomasaEstanque = activeBatchesInPond.fold<double>(
+        0.0, (acc, b) => acc + b.biomasaActualKg,
+      );
+      final bool pondHasActiveBatches = activeBatchesInPond.isNotEmpty;
+
       Pond? targetPondUpdated;
       final updatedPonds = state.ponds.map((p) {
         if (p.id == oldBatch.estanqueId) {
           final up = p.copyWith(
-            biomasaKg: remanenteBiomasa,
-            estado: isTotalHarvest ? PondStatus.available : p.estado,
-            especieActual: isTotalHarvest ? '' : p.especieActual,
-            costoAcumuladoBiologico: isTotalHarvest ? 0.0 : (p.costoAcumuladoBiologico - event.cogs).clamp(0.0, double.infinity),
+            biomasaKg: totalBiomasaEstanque,
+            estado: pondHasActiveBatches ? PondStatus.active : PondStatus.available,
+            especieActual: pondHasActiveBatches ? p.especieActual : '',
+            costoAcumuladoBiologico: pondHasActiveBatches
+                ? (p.costoAcumuladoBiologico - event.cogs).clamp(0.0, double.infinity)
+                : 0.0,
           );
           targetPondUpdated = up;
           return up;
@@ -154,6 +239,8 @@ class PondsNotifier extends StateNotifier<PondsState> {
       }).toList();
 
       state = state.copyWith(batches: updatedBatches, ponds: updatedPonds);
+
+      // Persistir en base de datos
       _repository.updateBatch(updatedBatch);
       if (targetPondUpdated != null) {
         _repository.updatePond(targetPondUpdated!);
@@ -216,12 +303,24 @@ class PondsNotifier extends StateNotifier<PondsState> {
     }
   }
 
+  Future<void> updatePond(Pond pond) async {
+    try {
+      await _repository.updatePond(pond);
+      final updatedPonds = state.ponds.map((p) => p.id == pond.id ? pond : p).toList();
+      state = state.copyWith(ponds: updatedPonds);
+    } catch (e) {
+      state = state.copyWith(errorMessage: e.toString());
+      rethrow;
+    }
+  }
+
   Future<void> addBatch(FishBatch batch) async {
     try {
       await _repository.createBatch(batch);
       await loadPondsAndBatches();
     } catch (e) {
       state = state.copyWith(errorMessage: e.toString());
+      rethrow;
     }
   }
 
@@ -236,6 +335,7 @@ class PondsNotifier extends StateNotifier<PondsState> {
     required String estanqueDestinoId,
     required int pecesTrasladados,
     required double biomasaTrasladadaKg,
+    double? pesoPromedioGramos,
     required bool esDesdoble,
     required String nuevoCodigoLote,
     String? registradoPor,
@@ -249,6 +349,7 @@ class PondsNotifier extends StateNotifier<PondsState> {
         estanqueDestinoId: estanqueDestinoId,
         pecesTrasladados: pecesTrasladados,
         biomasaTrasladadaKg: biomasaTrasladadaKg,
+        pesoPromedioGramos: pesoPromedioGramos,
         esDesdoble: esDesdoble,
         nuevoCodigoLote: nuevoCodigoLote,
         registradoPor: userName,
@@ -256,6 +357,7 @@ class PondsNotifier extends StateNotifier<PondsState> {
       await loadPondsAndBatches();
     } catch (e) {
       state = state.copyWith(errorMessage: e.toString());
+      rethrow;
     }
   }
 
@@ -292,12 +394,47 @@ class PondsNotifier extends StateNotifier<PondsState> {
         hora: hora,
       );
 
-      // Prepend to state immediately for responsive UI
+      // Optimistic local state update for immediate 60/120 FPS UI reactivity
+      final updatedBatches = state.batches.map((b) {
+        if (b.id == loteId) {
+          final newCount = (b.cantidadActualPeces - cantidadPecesMuertos).clamp(0, 9999999);
+          final effectivePeso = pesoPromedioGramos > 0 ? pesoPromedioGramos : b.pesoActualGramos;
+          final newBio = (newCount * effectivePeso) / 1000.0;
+          return b.copyWith(
+            cantidadActualPeces: newCount,
+            biomasaActualKg: newBio,
+          );
+        }
+        return b;
+      }).toList();
+
+      final updatedPonds = state.ponds.map((p) {
+        if (p.id == estanqueId) {
+          final pondBatches = updatedBatches.where((b) => b.estanqueId == estanqueId);
+          final pondBio = pondBatches.fold(0.0, (sum, b) => sum + b.biomasaActualKg);
+          return p.copyWith(biomasaKg: pondBio);
+        }
+        return p;
+      }).toList();
+
       state = state.copyWith(
         mortalityRecords: [savedRecord, ...state.mortalityRecords],
+        batches: updatedBatches,
+        ponds: updatedPonds,
       );
 
-      // Refresh ponds and batches to update population & biomass metrics
+      // Disparar evento de dominio para sincronizar otros módulos en tiempo real
+      _ref.read(eventBusProvider).fire(
+        MortalityRecordedEvent(
+          estanqueId: estanqueId,
+          loteId: loteId,
+          cantidadPecesMuertos: cantidadPecesMuertos,
+          biomasaPerdidaKg: biomasaPerdidaKg,
+          fecha: fecha,
+        ),
+      );
+
+      // Refresh ponds and batches to guarantee full consistency with DB triggers
       await loadPondsAndBatches();
       return true;
     } catch (e) {
@@ -310,6 +447,7 @@ class PondsNotifier extends StateNotifier<PondsState> {
     required String estanqueId,
     required String loteId,
     required double nuevoPesoPromedioGramos,
+    double? biomasaCalculadaKg,
     int? cantidadPecesMuestreados,
     double? pesoTotalCapturaKg,
     double? longitudPromedioCm,
@@ -332,6 +470,7 @@ class PondsNotifier extends StateNotifier<PondsState> {
         estanqueId: estanqueId,
         loteId: loteId,
         nuevoPesoPromedioGramos: nuevoPesoPromedioGramos,
+        biomasaCalculadaKg: biomasaCalculadaKg,
         cantidadPecesMuestreados: cantidadPecesMuestreados,
         pesoTotalCapturaKg: pesoTotalCapturaKg,
         longitudPromedioCm: longitudPromedioCm,
@@ -343,12 +482,45 @@ class PondsNotifier extends StateNotifier<PondsState> {
         hora: hora,
       );
 
-      // Prepend to state immediately for responsive UI
+      // Optimistic local state update for immediate 60/120 FPS UI reactivity
+      final updatedBatches = state.batches.map((b) {
+        if (b.id == loteId) {
+          final newBio = (b.cantidadActualPeces * nuevoPesoPromedioGramos) / 1000.0;
+          return b.copyWith(
+            pesoActualGramos: nuevoPesoPromedioGramos,
+            biomasaActualKg: newBio,
+          );
+        }
+        return b;
+      }).toList();
+
+      final updatedPonds = state.ponds.map((p) {
+        if (p.id == estanqueId) {
+          final pondBatches = updatedBatches.where((b) => b.estanqueId == estanqueId);
+          final pondBio = pondBatches.fold(0.0, (sum, b) => sum + b.biomasaActualKg);
+          return p.copyWith(biomasaKg: pondBio);
+        }
+        return p;
+      }).toList();
+
       state = state.copyWith(
         biometries: [savedRecord, ...state.biometries],
+        batches: updatedBatches,
+        ponds: updatedPonds,
       );
 
-      // Refresh ponds and batches to update weight & biomass metrics
+      // Disparar evento de dominio para sincronizar otros módulos en tiempo real
+      _ref.read(eventBusProvider).fire(
+        BiometryRecordedEvent(
+          estanqueId: estanqueId,
+          loteId: loteId,
+          pesoPromedioGramos: nuevoPesoPromedioGramos,
+          biomasaCalculadaKg: biomasaCalculadaKg,
+          fecha: fecha,
+        ),
+      );
+
+      // Refresh ponds and batches to update weight & biomass metrics from backend
       await loadPondsAndBatches();
       return true;
     } catch (e) {

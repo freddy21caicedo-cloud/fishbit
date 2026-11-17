@@ -30,6 +30,12 @@ class SalesState {
   double get totalCogs => sales.fold(0.0, (sum, s) => sum + s.cogs);
   double get totalUtilidadNeta => sales.fold(0.0, (sum, s) => sum + s.utilidadNeta);
   double get totalBiomasaVendidaKg => sales.fold(0.0, (sum, s) => sum + s.biomasaVendidaKg);
+  double get totalPesoArregladoKg => sales.fold(0.0, (sum, s) => sum + s.pesoArregladoKg);
+  double get totalMermaKg => sales.fold(0.0, (sum, s) => sum + s.mermaKg);
+  int get totalPecesVendidos => sales.fold(0, (sum, s) => sum + s.cantidadPeces);
+  double get margenNetoPromedioPct => totalIngresosBrutos > 0 ? (totalUtilidadNeta / totalIngresosBrutos) * 100.0 : 0.0;
+  double get mermaPromedioPct => totalBiomasaVendidaKg > 0 ? (totalMermaKg / totalBiomasaVendidaKg) * 100.0 : 0.0;
+  double get ticketPromedioCOP => sales.isNotEmpty ? (totalIngresosBrutos / sales.length) : 0.0;
 
   SalesState copyWith({
     bool? isLoading,
@@ -45,6 +51,7 @@ class SalesState {
     );
   }
 }
+
 
 class SalesNotifier extends StateNotifier<SalesState> {
   final SalesRepository _repository;

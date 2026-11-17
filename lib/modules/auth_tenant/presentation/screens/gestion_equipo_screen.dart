@@ -134,7 +134,11 @@ class GestionEquipoScreen extends ConsumerWidget {
                         final member = team[index];
                         final currentUser = authState.currentUser;
                         final isAdmin = currentUser?.role == UserRole.admin || currentUser?.role == UserRole.creator;
-                        return _buildMemberCard(context, member, isAdmin);
+                        final canDelete = isAdmin &&
+                            currentUser != null &&
+                            member.id != currentUser.id &&
+                            member.email.toLowerCase() != currentUser.email.toLowerCase();
+                        return _buildMemberCard(context, ref, member, isAdmin, canDelete);
                       },
                     ),
                   const SizedBox(height: 80),
@@ -196,7 +200,77 @@ class GestionEquipoScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildMemberCard(BuildContext context, UserMember member, bool isAdmin) {
+  Future<void> _confirmDeleteMember(BuildContext context, WidgetRef ref, UserMember member) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      barrierColor: Colors.black.withValues(alpha: 0.7),
+      builder: (dialogCtx) => AlertDialog(
+        backgroundColor: AppColors.surfaceDark,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: BorderSide(color: AppColors.coralAction.withValues(alpha: 0.4)),
+        ),
+        title: Row(
+          children: [
+            const Icon(Icons.warning_amber_rounded, color: AppColors.coralAction),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'Eliminar Colaborador',
+                style: AppTypography.titleMedium.copyWith(color: Colors.white),
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          '¿Estás seguro de eliminar a ${member.nombre} (${member.email})?\n\nSe revocará su acceso de inmediato y se eliminará su cuenta de la empresa.',
+          style: AppTypography.bodySmall.copyWith(color: AppColors.textSecondaryDark, height: 1.4),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogCtx).pop(false),
+            child: const Text('Cancelar', style: TextStyle(color: Colors.white70)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.coralAction,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            onPressed: () => Navigator.of(dialogCtx).pop(true),
+            child: const Text('Eliminar', style: TextStyle(fontWeight: FontWeight.w800)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !context.mounted) return;
+
+    final ok = await ref.read(authProvider.notifier).deleteTeamMember(member.id);
+    if (!context.mounted) return;
+
+    if (ok) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Colaborador ${member.nombre} eliminado del equipo.'),
+          backgroundColor: AppColors.greenBiomass,
+        ),
+      );
+    } else {
+      final err = ref.read(authProvider).errorMessage ?? 'No se pudo eliminar el colaborador.';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(err), backgroundColor: AppColors.coralAction),
+      );
+    }
+  }
+
+  Widget _buildMemberCard(
+    BuildContext context,
+    WidgetRef ref,
+    UserMember member,
+    bool isAdmin,
+    bool canDelete,
+  ) {
     Color roleColor;
     IconData roleIcon;
 
@@ -316,15 +390,36 @@ class GestionEquipoScreen extends ConsumerWidget {
               ),
               child: const Icon(Icons.edit_outlined, size: 15, color: AppColors.cyanWater),
             ),
+          if (canDelete)
+            Padding(
+              padding: const EdgeInsets.only(right: 6),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(20),
+                onTap: () => _confirmDeleteMember(context, ref, member),
+                child: Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: AppColors.coralAction.withValues(alpha: 0.12),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.delete_outline_rounded, size: 15, color: AppColors.coralAction),
+                ),
+              ),
+            ),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
             decoration: BoxDecoration(
-              color: AppColors.greenBiomass.withValues(alpha: 0.12),
+              color: (member.requiereCambioClave ? AppColors.amberWarning : AppColors.greenBiomass)
+                  .withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: const Text(
-              'Activo',
-              style: TextStyle(color: AppColors.greenBiomass, fontSize: 10.5, fontWeight: FontWeight.w700),
+            child: Text(
+              member.requiereCambioClave ? 'Clave Temporal' : 'Activo',
+              style: TextStyle(
+                color: member.requiereCambioClave ? AppColors.amberWarning : AppColors.greenBiomass,
+                fontSize: 10.5,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
         ],

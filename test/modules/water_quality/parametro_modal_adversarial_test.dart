@@ -73,6 +73,7 @@ class MockPondsRepo implements PondsRepository {
     required String estanqueId,
     required String loteId,
     required double nuevoPesoPromedioGramos,
+    double? biomasaCalculadaKg,
     int? cantidadPecesMuestreados,
     double? pesoTotalCapturaKg,
     double? longitudPromedioCm,
