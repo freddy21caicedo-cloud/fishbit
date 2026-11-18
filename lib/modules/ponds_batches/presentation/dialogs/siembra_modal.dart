@@ -7,6 +7,7 @@ import 'package:fishbit_finance/core/design_system/glass_container.dart';
 import 'package:fishbit_finance/core/design_system/glass_form_field.dart';
 import 'package:fishbit_finance/core/design_system/glass_button.dart';
 import 'package:fishbit_finance/core/design_system/glass_date_picker.dart';
+import 'package:fishbit_finance/core/design_system/glass_select_field.dart';
 import 'package:fishbit_finance/modules/auth_tenant/presentation/providers/auth_provider.dart';
 import 'package:fishbit_finance/modules/ponds_batches/domain/models/fish_batch.dart';
 import 'package:fishbit_finance/modules/ponds_batches/domain/models/pond.dart';
@@ -359,47 +360,33 @@ class _SiembraModalState extends ConsumerState<SiembraModal> {
                   const SizedBox(height: 16),
 
                   // Selector de Estanque
-                  Text('ESTANQUE DE DESTINO', style: AppTypography.labelMicro.copyWith(color: AppColors.textSecondaryDark)),
-                  const SizedBox(height: 6),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.06),
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
-                    ),
-                    child: DropdownButtonHideUnderline(
-                      child: DropdownButton<String>(
-                        value: _selectedPondId ?? (allPonds.isNotEmpty ? allPonds.first.id : null),
-                        dropdownColor: AppColors.surfaceDark,
-                        isExpanded: true,
-                        icon: const Icon(Icons.keyboard_arrow_down_rounded, color: AppColors.cyanWater),
-                        items: allPonds.map((p) {
-                          final batches = pondsState.batches.where((b) => b.estanqueId == p.id && b.estado == BatchStatus.active).toList();
-                          final statusLabel = batches.isNotEmpty
-                              ? ' (Policultivo: ${batches.map((b) => b.especie).join(", ")})'
-                              : ' (Disponible)';
-
-                          return DropdownMenuItem<String>(
-                            value: p.id,
-                            child: Text(
-                              '${p.sigla} - ${p.nombre}$statusLabel',
-                              style: TextStyle(
-                                color: batches.isNotEmpty ? Colors.purpleAccent : Colors.white,
-                                fontSize: 12.5,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          );
-                        }).toList(),
-                        onChanged: (val) {
-                          setState(() {
-                            _selectedPondId = val;
-                            _actualizarCodigoLote();
-                          });
-                        },
-                      ),
-                    ),
+                  GlassSelectField<String>(
+                    label: 'ESTANQUE DE DESTINO',
+                    value: _selectedPondId ?? (allPonds.isNotEmpty ? allPonds.first.id : null),
+                    accentColor: AppColors.cyanWater,
+                    leadingIcon: Icons.waves_rounded,
+                    options: allPonds.map((p) {
+                      final batches = pondsState.batches
+                          .where((b) => b.estanqueId == p.id && b.estado == BatchStatus.active)
+                          .toList();
+                      final hasBatches = batches.isNotEmpty;
+                      return GlassSelectOption<String>(
+                        value: p.id,
+                        label: '${p.sigla} - ${p.nombre}',
+                        subtitle: hasBatches
+                            ? 'Policultivo: ${batches.map((b) => b.especie).join(", ")}'
+                            : '${p.capacidadM3.toInt()} m³',
+                        icon: Icons.waves_rounded,
+                        badgeText: hasBatches ? 'POLICULTIVO' : 'DISPONIBLE',
+                        badgeColor: hasBatches ? Colors.purpleAccent : AppColors.greenBiomass,
+                      );
+                    }).toList(),
+                    onChanged: (val) {
+                      setState(() {
+                        _selectedPondId = val;
+                        _actualizarCodigoLote();
+                      });
+                    },
                   ),
                   if (isPolycultureTarget) ...[
                     const SizedBox(height: 8),
@@ -440,41 +427,32 @@ class _SiembraModalState extends ConsumerState<SiembraModal> {
                         _selectedEspecie = availableSpecies.first;
                       }
 
-                      return Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        decoration: BoxDecoration(
-                          color: isDark ? Colors.white.withValues(alpha: 0.06) : Colors.white,
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: isDark ? Colors.white.withValues(alpha: 0.12) : AppColors.glassBorderLight),
-                        ),
-                        child: DropdownButtonHideUnderline(
-                          child: DropdownButton<String>(
-                            value: _selectedEspecie,
-                            dropdownColor: isDark ? AppColors.surfaceDark : Colors.white,
-                            isExpanded: true,
-                            icon: const Icon(Icons.keyboard_arrow_down_rounded, color: AppColors.cyanWater),
-                            items: availableSpecies.map((sp) {
-                              return DropdownMenuItem<String>(
-                                value: sp,
-                                child: Text(sp, style: TextStyle(color: isDark ? Colors.white : AppColors.textPrimaryLight, fontSize: 13, fontWeight: FontWeight.w600)),
-                              );
-                            }).toList(),
-                            onChanged: (val) {
-                              if (val != null) {
-                                setState(() {
-                                  _selectedEspecie = val;
-                                  final comp = ref.read(authProvider).currentCompany;
-                                  if (comp != null) {
-                                    _metaCosechaCtrl.text = comp.getTargetHarvestWeightGrams(val).toInt().toString();
-                                  }
-                                  _actualizarCodigoLote();
-                                  _costoModificadoManualmente = false;
-                                  _recalcularCostoAutomatico();
-                                });
+                      return GlassSelectField<String>(
+                        value: _selectedEspecie,
+                        accentColor: AppColors.cyanWater,
+                        leadingIcon: Icons.set_meal_rounded,
+                        enableSearch: false,
+                        options: availableSpecies
+                            .map((sp) => GlassSelectOption<String>(
+                                  value: sp,
+                                  label: sp,
+                                  icon: Icons.set_meal_rounded,
+                                ))
+                            .toList(),
+                        onChanged: (val) {
+                          if (val != null) {
+                            setState(() {
+                              _selectedEspecie = val;
+                              final comp = ref.read(authProvider).currentCompany;
+                              if (comp != null) {
+                                _metaCosechaCtrl.text = comp.getTargetHarvestWeightGrams(val).toInt().toString();
                               }
-                            },
-                          ),
-                        ),
+                              _actualizarCodigoLote();
+                              _costoModificadoManualmente = false;
+                              _recalcularCostoAutomatico();
+                            });
+                          }
+                        },
                       );
                     },
                   ),
@@ -552,63 +530,29 @@ class _SiembraModalState extends ConsumerState<SiembraModal> {
                     ),
                   ] else ...[
                     // Selector Estricto de Lote de Alevinos / Semilla de Almacén
-                    Text(
-                      'LOTE ESPECÍFICO DE ALEVINOS (TRAZABILIDAD EN BODEGA)',
-                      style: AppTypography.labelMicro.copyWith(color: AppColors.cyanWater, fontWeight: FontWeight.w800),
-                    ),
-                    const SizedBox(height: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: isDark ? Colors.white.withValues(alpha: 0.06) : Colors.white,
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: _selectedInventoryItemId != null ? AppColors.greenBiomass : AppColors.amberWarning.withValues(alpha: 0.6)),
-                      ),
-                      child: DropdownButtonHideUnderline(
-                        child: DropdownButton<String>(
-                          value: _selectedInventoryItemId,
-                          hint: const Text(
-                            'Seleccionar lote / factura de alevinos...',
-                            style: TextStyle(color: AppColors.textSecondaryDark, fontSize: 12),
-                          ),
-                          dropdownColor: isDark ? AppColors.surfaceDark : Colors.white,
-                          isExpanded: true,
-                          icon: const Icon(Icons.keyboard_arrow_down_rounded, color: AppColors.cyanWater),
-                          items: alevinosDisponibles.map((item) {
-                            final prov = item.marcaProveedor?.isNotEmpty == true ? ' • ${item.marcaProveedor}' : '';
-                            final lote = item.loteFabricante?.isNotEmpty == true ? ' [Lote: ${item.loteFabricante}]' : '';
-                            return DropdownMenuItem<String>(
-                              value: item.id,
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Text(
-                                    '${item.nombre}$prov$lote',
-                                    style: TextStyle(
-                                      color: isDark ? Colors.white : AppColors.textPrimaryLight,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                  Text(
-                                    'Disponible: ${item.cantidadActualKg.toInt()} pcs • CPP: \$${item.costoUnitarioHistorico.toStringAsFixed(0)} COP/pez',
-                                    style: const TextStyle(color: AppColors.cyanWater, fontSize: 10),
-                                  ),
-                                ],
-                              ),
-                            );
-                          }).toList(),
-                          onChanged: (val) {
-                            setState(() {
-                              _selectedInventoryItemId = val;
-                              _costoModificadoManualmente = false;
-                              _recalcularCostoAutomatico();
-                            });
-                          },
-                        ),
-                      ),
+                    GlassSelectField<String>(
+                      label: 'LOTE ESPECÍFICO DE ALEVINOS (TRAZABILIDAD EN BODEGA)',
+                      placeholder: 'Seleccionar lote / factura de alevinos...',
+                      value: _selectedInventoryItemId,
+                      accentColor: _selectedInventoryItemId != null ? AppColors.greenBiomass : AppColors.amberWarning,
+                      leadingIcon: Icons.inventory_2_outlined,
+                      options: alevinosDisponibles.map((item) {
+                        final prov = item.marcaProveedor?.isNotEmpty == true ? ' • ${item.marcaProveedor}' : '';
+                        final lote = item.loteFabricante?.isNotEmpty == true ? ' [Lote: ${item.loteFabricante}]' : '';
+                        return GlassSelectOption<String>(
+                          value: item.id,
+                          label: '${item.nombre}$prov$lote',
+                          subtitle: 'Disponible: ${item.cantidadActualKg.toInt()} pcs • CPP: \$${item.costoUnitarioHistorico.toStringAsFixed(0)}/pez',
+                          icon: Icons.inventory_2_outlined,
+                        );
+                      }).toList(),
+                      onChanged: (val) {
+                        setState(() {
+                          _selectedInventoryItemId = val;
+                          _costoModificadoManualmente = false;
+                          _recalcularCostoAutomatico();
+                        });
+                      },
                     ),
                     const SizedBox(height: 8),
                     Container(

@@ -24,6 +24,7 @@
 
   <title>FishBit - ERP Piscícola</title>
   <link rel="manifest" href="manifest.json">
+  <script src="liquid_ether.js" defer></script>
 
   <style>
     body {
@@ -184,9 +185,10 @@
   </script>
 
   <script>
-    // Dinámicamente cargar flutter_bootstrap.js con cache-busting en cada recarga
+    // En localhost forzamos cache-busting; en producción usamos caché controlada por SW/version.json
+    const isLocalDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
     const bootstrapScript = document.createElement('script');
-    bootstrapScript.src = 'flutter_bootstrap.js?v=' + Date.now();
+    bootstrapScript.src = isLocalDev ? ('flutter_bootstrap.js?v=' + Date.now()) : 'flutter_bootstrap.js';
     bootstrapScript.async = true;
     document.body.appendChild(bootstrapScript);
   </script>

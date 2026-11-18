@@ -233,26 +233,31 @@ class UserProfileSheet extends ConsumerWidget {
                                   children: [
                                     const Icon(Icons.palette_outlined, size: 18, color: AppColors.cyanWater),
                                     const SizedBox(width: 8),
-                                    Text(
-                                      'Tema Visual',
-                                      style: TextStyle(
-                                        color: isDark ? Colors.white : AppColors.textPrimaryLight,
-                                        fontSize: 12.5,
-                                        fontWeight: FontWeight.w700,
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            'Tema Visual',
+                                            style: TextStyle(
+                                              color: isDark ? Colors.white : AppColors.textPrimaryLight,
+                                              fontSize: 12.5,
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                          ),
+                                          Text(
+                                            isDark ? 'Modo Oscuro' : 'Modo Claro',
+                                            style: TextStyle(
+                                              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                                              fontSize: 10.5,
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     ),
-                                    const Spacer(),
-                                    Text(
-                                      'Auto / Claro / Oscuro',
-                                      style: TextStyle(
-                                        color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                                        fontSize: 10.5,
-                                      ),
-                                    ),
+                                    const ThemeAnimatedGlassToggle(),
                                   ],
                                 ),
-                                const SizedBox(height: 10),
-                                const ThemeSegmentedGlassSelector(),
                               ],
                             ),
                           ),

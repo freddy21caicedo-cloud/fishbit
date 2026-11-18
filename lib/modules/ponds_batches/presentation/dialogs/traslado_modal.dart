@@ -5,6 +5,7 @@ import 'package:fishbit_finance/core/design_system/app_typography.dart';
 import 'package:fishbit_finance/core/design_system/glass_container.dart';
 import 'package:fishbit_finance/core/design_system/glass_button.dart';
 import 'package:fishbit_finance/core/design_system/glass_date_picker.dart';
+import 'package:fishbit_finance/core/design_system/glass_select_field.dart';
 import 'package:fishbit_finance/core/utils/currency_formatters.dart';
 import 'package:fishbit_finance/modules/ponds_batches/domain/models/fish_batch.dart';
 import 'package:fishbit_finance/modules/ponds_batches/domain/models/pond.dart';
@@ -345,39 +346,47 @@ class _TrasladoModalState extends ConsumerState<TrasladoModal> {
                   ),
                   const SizedBox(height: 14),
 
-                  _buildDropdownField(
+                  GlassSelectField<String>(
                     label: 'Estanque Receptor (Destino)',
-                    hint: 'Seleccione el estanque destino...',
+                    placeholder: 'Seleccione el estanque destino...',
                     value: destinationPonds.any((p) => p.id == _selectedPondDestinoId) ? _selectedPondDestinoId : null,
-                    items: destinationPonds.map((p) {
-                      final statusLabel = p.estado == PondStatus.active ? '🟠 En Uso' : '🟢 Disponible';
-                      return DropdownMenuItem<String>(
+                    accentColor: AppColors.greenBiomass,
+                    leadingIcon: Icons.waves_rounded,
+                    options: destinationPonds.map((p) {
+                      final isUsed = p.estado == PondStatus.active;
+                      return GlassSelectOption<String>(
                         value: p.id,
-                        child: Text('${p.nombreLimpio} (${p.capacidadM3.toInt()} m³) • $statusLabel', overflow: TextOverflow.ellipsis),
+                        label: p.nombreLimpio,
+                        subtitle: '${p.capacidadM3.toInt()} m³ • ${p.especieActual.isEmpty ? "Disponible" : p.especieActual}',
+                        icon: Icons.waves_rounded,
+                        badgeText: isUsed ? 'EN USO' : 'DISPONIBLE',
+                        badgeColor: isUsed ? AppColors.amberWarning : AppColors.greenBiomass,
                       );
                     }).toList(),
                     onChanged: (val) => setState(() => _selectedPondDestinoId = val),
                     validator: (val) => val == null || val.isEmpty ? 'Seleccione el estanque destino' : null,
-                    isDark: isDark,
                   ),
                   const SizedBox(height: 12),
 
                   if (batchesInOrigen.length > 1) ...[
-                    _buildDropdownField(
+                    GlassSelectField<String>(
                       label: 'Lote a Trasladar / Desdoblar',
-                      hint: 'Seleccione el lote...',
+                      placeholder: 'Seleccione el lote...',
                       value: _selectedBatchId,
-                      items: batchesInOrigen.map((b) {
-                        return DropdownMenuItem<String>(
+                      accentColor: AppColors.cyanWater,
+                      leadingIcon: Icons.set_meal_rounded,
+                      options: batchesInOrigen.map((b) {
+                        return GlassSelectOption<String>(
                           value: b.id,
-                          child: Text('${b.codigoLote} - ${b.especie} (${CurrencyFormatters.formatInt(b.cantidadActualPeces)} pcs)'),
+                          label: '${b.codigoLote} - ${b.especie}',
+                          subtitle: '${CurrencyFormatters.formatInt(b.cantidadActualPeces)} peces • ${b.pesoActualGramos.toStringAsFixed(1)} g',
+                          icon: Icons.set_meal_rounded,
                         );
                       }).toList(),
                       onChanged: (val) {
                         final found = batchesInOrigen.where((b) => b.id == val).firstOrNull;
                         if (found != null) _onBatchChanged(found);
                       },
-                      isDark: isDark,
                     ),
                     const SizedBox(height: 12),
                   ],

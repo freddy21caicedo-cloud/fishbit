@@ -299,6 +299,7 @@ class _GlassCalendarPopoverState extends State<GlassCalendarPopover> {
   CivilDate? _rangeStart;
   CivilDate? _rangeEnd;
   late CivilDate _focusedDate;
+  bool _showYearPicker = false;
   final FocusNode _focusNode = FocusNode();
 
   static const List<String> _weekdays = ['Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sá', 'Do'];
@@ -461,91 +462,148 @@ class _GlassCalendarPopoverState extends State<GlassCalendarPopover> {
   @override
   Widget build(BuildContext context) {
     final today = CivilDate.today();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textPrimary = isDark ? Colors.white : AppColors.textPrimaryLight;
+    final textSecondary = isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
 
     return KeyboardListener(
       focusNode: _focusNode,
       autofocus: true,
       onKeyEvent: _handleKeyEvent,
       child: GlassContainer(
-        borderRadius: 24,
+        borderRadius: 22,
         padding: const EdgeInsets.all(18),
         blur: 24,
-        opacity: 0.16,
-        borderColor: Colors.white.withValues(alpha: 0.16),
+        opacity: isDark ? 0.22 : 0.97,
+        tintColor: isDark ? AppColors.surfaceDarkRaised : Colors.white,
+        borderColor: isDark ? Colors.white.withValues(alpha: 0.14) : AppColors.glassBorderLight,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Header del Mes y Flechas de Navegación
+            // Calendar.Header: YearPickerTrigger a la izquierda + NavButtons a la derecha (HeroUI v3)
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                IconButton(
-                  icon: const Icon(Icons.chevron_left_rounded, color: Colors.white, size: 22),
-                  onPressed: () => setState(() => _currentMonth = _currentMonth.addMonths(-1)),
-                  tooltip: 'Mes anterior (PageUp)',
-                ),
-                Text(
-                  '${_monthNames[_currentMonth.month - 1]} ${_currentMonth.year}',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w800,
-                    fontSize: 15,
+                // Calendar.YearPickerTrigger
+                InkWell(
+                  onTap: () => setState(() => _showYearPicker = !_showYearPicker),
+                  borderRadius: BorderRadius.circular(10),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: _showYearPicker
+                          ? widget.accentColor.withValues(alpha: 0.15)
+                          : Colors.transparent,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          '${_monthNames[_currentMonth.month - 1]} ${_currentMonth.year}',
+                          style: TextStyle(
+                            color: _showYearPicker ? widget.accentColor : textPrimary,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 15,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        AnimatedRotation(
+                          turns: _showYearPicker ? 0.5 : 0.0,
+                          duration: const Duration(milliseconds: 180),
+                          child: Icon(
+                            Icons.keyboard_arrow_down_rounded,
+                            size: 18,
+                            color: _showYearPicker ? widget.accentColor : textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-                IconButton(
-                  icon: const Icon(Icons.chevron_right_rounded, color: Colors.white, size: 22),
-                  onPressed: () => setState(() => _currentMonth = _currentMonth.addMonths(1)),
-                  tooltip: 'Mes siguiente (PageDown)',
+
+                // Calendar.NavButton(previous) & Calendar.NavButton(next)
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _buildNavButton(
+                      icon: Icons.chevron_left_rounded,
+                      tooltip: _showYearPicker ? 'Año anterior' : 'Mes anterior',
+                      isDark: isDark,
+                      onPressed: () => setState(() {
+                        _currentMonth = _showYearPicker
+                            ? _currentMonth.addYears(-1)
+                            : _currentMonth.addMonths(-1);
+                      }),
+                    ),
+                    const SizedBox(width: 6),
+                    _buildNavButton(
+                      icon: Icons.chevron_right_rounded,
+                      tooltip: _showYearPicker ? 'Año siguiente' : 'Mes siguiente',
+                      isDark: isDark,
+                      onPressed: () => setState(() {
+                        _currentMonth = _showYearPicker
+                            ? _currentMonth.addYears(1)
+                            : _currentMonth.addMonths(1);
+                      }),
+                    ),
+                  ],
                 ),
               ],
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 12),
 
-            // Chips Rápidos de Presets
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [
-                  _buildPresetChip('Hoy'),
-                  const SizedBox(width: 6),
-                  _buildPresetChip('Ayer'),
-                  if (widget.mode == DatePickerSelectionMode.range) ...[
+            if (_showYearPicker) ...[
+              // Calendar.YearPickerGrid (Meses y Años rápidos)
+              _buildYearAndMonthPicker(isDark, textPrimary),
+            ] else ...[
+              // Chips Rápidos de Presets
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    _buildPresetChip('Hoy', isDark),
                     const SizedBox(width: 6),
-                    _buildPresetChip('Últimos 7d'),
-                    const SizedBox(width: 6),
-                    _buildPresetChip('Últimos 30d'),
-                    const SizedBox(width: 6),
-                    _buildPresetChip('Este Mes'),
+                    _buildPresetChip('Ayer', isDark),
+                    if (widget.mode == DatePickerSelectionMode.range) ...[
+                      const SizedBox(width: 6),
+                      _buildPresetChip('Últimos 7d', isDark),
+                      const SizedBox(width: 6),
+                      _buildPresetChip('Últimos 30d', isDark),
+                      const SizedBox(width: 6),
+                      _buildPresetChip('Este Mes', isDark),
+                    ],
                   ],
-                ],
+                ),
               ),
-            ),
-            const SizedBox(height: 14),
+              const SizedBox(height: 14),
 
-            // Días de la semana (Lu Ma Mi Ju Vi Sá Do)
-            Row(
-              children: _weekdays.map((w) {
-                return Expanded(
-                  child: Center(
-                    child: Text(
-                      w,
-                      style: AppTypography.labelMicro.copyWith(
-                        color: AppColors.textSecondaryDark,
-                        fontWeight: FontWeight.w700,
+              // Calendar.GridHeader (Lu Ma Mi Ju Vi Sá Do)
+              Row(
+                children: _weekdays.map((w) {
+                  return Expanded(
+                    child: Center(
+                      child: Text(
+                        w,
+                        style: AppTypography.labelMicro.copyWith(
+                          color: textSecondary,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 11,
+                        ),
                       ),
                     ),
-                  ),
-                );
-              }).toList(),
-            ),
-            const SizedBox(height: 8),
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 6),
 
-            // Grid Semanal estructurado (react-day-picker table structure)
-            _buildCalendarTable(today),
+              // Calendar.GridBody
+              _buildCalendarTable(today),
+            ],
 
             // Footer con confirmación en modo rango
-            if (widget.mode == DatePickerSelectionMode.range) ...[
-              const SizedBox(height: 16),
+            if (widget.mode == DatePickerSelectionMode.range && !_showYearPicker) ...[
+              const SizedBox(height: 14),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -586,20 +644,150 @@ class _GlassCalendarPopoverState extends State<GlassCalendarPopover> {
     );
   }
 
-  Widget _buildPresetChip(String label) {
+  Widget _buildNavButton({
+    required IconData icon,
+    required String tooltip,
+    required bool isDark,
+    required VoidCallback onPressed,
+  }) {
+    return Tooltip(
+      message: tooltip,
+      child: InkWell(
+        onTap: onPressed,
+        borderRadius: BorderRadius.circular(999),
+        child: Container(
+          width: 32,
+          height: 32,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: isDark ? Colors.white.withValues(alpha: 0.06) : Colors.black.withValues(alpha: 0.04),
+            border: Border.all(
+              color: isDark ? Colors.white.withValues(alpha: 0.12) : AppColors.glassBorderLight,
+            ),
+          ),
+          child: Icon(
+            icon,
+            size: 18,
+            color: isDark ? Colors.white : AppColors.textPrimaryLight,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildYearAndMonthPicker(bool isDark, Color textPrimary) {
+    final currentYear = _currentMonth.year;
+    final years = List.generate(7, (i) => currentYear - 3 + i);
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Selector horizontal de Años (Calendar.YearPickerGrid)
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: years.map((y) {
+              final isSel = y == _currentMonth.year;
+              return Padding(
+                padding: const EdgeInsets.only(right: 6),
+                child: InkWell(
+                  onTap: () => setState(() => _currentMonth = CivilDate(y, _currentMonth.month, 1)),
+                  borderRadius: BorderRadius.circular(10),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                    decoration: BoxDecoration(
+                      color: isSel
+                          ? widget.accentColor
+                          : (isDark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.04)),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      '$y',
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w800,
+                        color: isSel
+                            ? (widget.accentColor.computeLuminance() > 0.45 ? Colors.black : Colors.white)
+                            : textPrimary,
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ),
+        const SizedBox(height: 12),
+        // Cuadrícula de Meses
+        GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 3,
+            mainAxisSpacing: 8,
+            crossAxisSpacing: 8,
+            childAspectRatio: 2.3,
+          ),
+          itemCount: 12,
+          itemBuilder: (context, index) {
+            final monthNum = index + 1;
+            final isSel = monthNum == _currentMonth.month;
+            return InkWell(
+              onTap: () {
+                setState(() {
+                  _currentMonth = CivilDate(_currentMonth.year, monthNum, 1);
+                  _showYearPicker = false;
+                });
+              },
+              borderRadius: BorderRadius.circular(10),
+              child: Container(
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: isSel
+                      ? widget.accentColor.withValues(alpha: 0.22)
+                      : (isDark ? Colors.white.withValues(alpha: 0.04) : Colors.black.withValues(alpha: 0.03)),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: isSel ? widget.accentColor : Colors.transparent,
+                  ),
+                ),
+                child: Text(
+                  _monthNames[index].substring(0, 3),
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: isSel ? FontWeight.w800 : FontWeight.w600,
+                    color: isSel ? widget.accentColor : textPrimary,
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPresetChip(String label, bool isDark) {
     return InkWell(
       onTap: () => _applyPreset(label),
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: BorderRadius.circular(999),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.06),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+          color: isDark ? Colors.white.withValues(alpha: 0.06) : Colors.black.withValues(alpha: 0.04),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(
+            color: isDark ? Colors.white.withValues(alpha: 0.1) : AppColors.glassBorderLight,
+          ),
         ),
         child: Text(
           label,
-          style: const TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w600),
+          style: TextStyle(
+            color: isDark ? Colors.white70 : AppColors.textSecondaryLight,
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+          ),
         ),
       ),
     );
@@ -686,18 +874,18 @@ class _GlassCalendarPopoverState extends State<GlassCalendarPopover> {
 
     final isEndpoint = isSelectedSingle || isRangeStart || isRangeEnd;
 
-    // Estructura shadcn/ui: range_start, range_middle, range_end
+    // Estructura HeroUI v3: celdas circulares (999) y píldora continua en rangos
     BorderRadius borderRadius;
     if (isRangeStart && isRangeEnd) {
-      borderRadius = BorderRadius.circular(10);
+      borderRadius = BorderRadius.circular(999);
     } else if (isRangeStart) {
-      borderRadius = const BorderRadius.horizontal(left: Radius.circular(10));
+      borderRadius = const BorderRadius.horizontal(left: Radius.circular(999));
     } else if (isRangeEnd) {
-      borderRadius = const BorderRadius.horizontal(right: Radius.circular(10));
+      borderRadius = const BorderRadius.horizontal(right: Radius.circular(999));
     } else if (isRangeMiddle) {
       borderRadius = BorderRadius.zero;
     } else {
-      borderRadius = BorderRadius.circular(10);
+      borderRadius = BorderRadius.circular(999);
     }
 
     Color bgColor = Colors.transparent;

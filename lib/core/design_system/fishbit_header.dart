@@ -2,7 +2,6 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fishbit_finance/core/design_system/app_colors.dart';
-import 'package:fishbit_finance/core/design_system/fishbit_logo.dart';
 import 'package:fishbit_finance/modules/auth_tenant/presentation/providers/auth_provider.dart';
 import 'package:fishbit_finance/modules/auth_tenant/presentation/dialogs/sede_selector_modal.dart';
 import 'package:fishbit_finance/modules/auth_tenant/presentation/dialogs/user_profile_sheet.dart';
@@ -65,22 +64,12 @@ class FishBitHeader extends ConsumerWidget {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  // Branding FishBit con Isotipo Oficial
-                  const FittedBox(
-                    fit: BoxFit.scaleDown,
-                    child: FishBitLogo(
-                      size: 34,
-                      showWordmark: true,
-                      withSquircle: true,
-                      subtitle: 'Gestión Acuícola',
-                    ),
-                  ),
-
                   // Píldora Flotante Glassmorphic de Empresa & Sede (Notion / Dynamic Island Style)
                   Expanded(
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 4),
-                      child: Center(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: Align(
+                        alignment: Alignment.centerLeft,
                         child: FittedBox(
                           fit: BoxFit.scaleDown,
                           child: CompanyPillButton(

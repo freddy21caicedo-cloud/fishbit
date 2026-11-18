@@ -6,6 +6,7 @@ import 'package:fishbit_finance/core/design_system/glass_container.dart';
 import 'package:fishbit_finance/core/design_system/glass_form_field.dart';
 import 'package:fishbit_finance/core/design_system/glass_button.dart';
 import 'package:fishbit_finance/core/design_system/glass_date_picker.dart';
+import 'package:fishbit_finance/core/design_system/glass_select_field.dart';
 import 'package:fishbit_finance/modules/auth_tenant/presentation/providers/auth_provider.dart';
 import 'package:fishbit_finance/modules/ponds_batches/domain/models/fish_batch.dart';
 import 'package:fishbit_finance/modules/ponds_batches/domain/models/pond.dart';
@@ -143,40 +144,28 @@ class _MortalidadModalState extends ConsumerState<MortalidadModal> {
 
                   // Selector de Estanque si no se abrió desde uno específico
                   if (widget.pond == null && pondsList.isNotEmpty) ...[
-                    Text('ESTANQUE CON BAJAS', style: AppTypography.labelMicro.copyWith(color: AppColors.textSecondaryDark)),
-                    const SizedBox(height: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.06),
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
-                      ),
-                      child: DropdownButtonHideUnderline(
-                        child: DropdownButton<String>(
-                          value: activePond?.id,
-                          isExpanded: true,
-                          dropdownColor: AppColors.backgroundDark,
-                          items: pondsList.map((p) {
-                            return DropdownMenuItem(
-                              value: p.id,
-                              child: Text(
-                                '${p.sigla} - ${p.nombre} (${p.especieActual})',
-                                style: const TextStyle(color: Colors.white, fontSize: 13),
-                              ),
-                            );
-                          }).toList(),
-                          onChanged: (val) {
-                            setState(() {
-                              _selectedPondId = val;
-                              final batch = pondsState.batches.where((b) => b.estanqueId == val).firstOrNull;
-                              if (batch != null) {
-                                _pesoCtrl.text = batch.pesoActualGramos.toStringAsFixed(1);
-                              }
-                            });
-                          },
-                        ),
-                      ),
+                    GlassSelectField<String>(
+                      label: 'ESTANQUE CON BAJAS',
+                      value: activePond?.id,
+                      accentColor: AppColors.coralAction,
+                      leadingIcon: Icons.waves_rounded,
+                      options: pondsList
+                          .map((p) => GlassSelectOption<String>(
+                                value: p.id,
+                                label: '${p.sigla} - ${p.nombre}',
+                                subtitle: p.especieActual,
+                                icon: Icons.waves_rounded,
+                              ))
+                          .toList(),
+                      onChanged: (val) {
+                        setState(() {
+                          _selectedPondId = val;
+                          final batch = pondsState.batches.where((b) => b.estanqueId == val).firstOrNull;
+                          if (batch != null) {
+                            _pesoCtrl.text = batch.pesoActualGramos.toStringAsFixed(1);
+                          }
+                        });
+                      },
                     ),
                     const SizedBox(height: 12),
                   ],
@@ -239,41 +228,28 @@ class _MortalidadModalState extends ConsumerState<MortalidadModal> {
 
                   // Selector de Lote / Especie si el estanque está en Policultivo
                   if (activeBatches.length > 1) ...[
-                    Text('SELECCIONAR LOTE / ESPECIE (POLICULTIVO)', style: AppTypography.labelMicro.copyWith(color: Colors.purpleAccent, letterSpacing: 1.2)),
-                    const SizedBox(height: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      decoration: BoxDecoration(
-                        color: Colors.purpleAccent.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: Colors.purpleAccent.withValues(alpha: 0.35)),
-                      ),
-                      child: DropdownButtonHideUnderline(
-                        child: DropdownButton<String>(
-                          value: activeBatch?.id,
-                          dropdownColor: AppColors.backgroundDark,
-                          isExpanded: true,
-                          icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Colors.purpleAccent),
-                          items: activeBatches.map((b) {
-                            return DropdownMenuItem<String>(
-                              value: b.id,
-                              child: Text(
-                                '${b.especie} (${b.codigoLote}) • ${b.cantidadActualPeces} peces vivos',
-                                style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w700),
-                              ),
-                            );
-                          }).toList(),
-                          onChanged: (val) {
-                            setState(() {
-                              _selectedBatchId = val;
-                              final b = activeBatches.where((batch) => batch.id == val).firstOrNull;
-                              if (b != null) {
-                                _pesoCtrl.text = b.pesoActualGramos.toStringAsFixed(1);
-                              }
-                            });
-                          },
-                        ),
-                      ),
+                    GlassSelectField<String>(
+                      label: 'SELECCIONAR LOTE / ESPECIE (POLICULTIVO)',
+                      value: activeBatch?.id,
+                      accentColor: Colors.purpleAccent,
+                      leadingIcon: Icons.set_meal_rounded,
+                      options: activeBatches
+                          .map((b) => GlassSelectOption<String>(
+                                value: b.id,
+                                label: '${b.especie} (${b.codigoLote})',
+                                subtitle: '${b.cantidadActualPeces} peces vivos',
+                                icon: Icons.set_meal_rounded,
+                              ))
+                          .toList(),
+                      onChanged: (val) {
+                        setState(() {
+                          _selectedBatchId = val;
+                          final b = activeBatches.where((batch) => batch.id == val).firstOrNull;
+                          if (b != null) {
+                            _pesoCtrl.text = b.pesoActualGramos.toStringAsFixed(1);
+                          }
+                        });
+                      },
                     ),
                     const SizedBox(height: 14),
                   ],

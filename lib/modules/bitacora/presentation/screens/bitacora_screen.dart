@@ -7,6 +7,7 @@ import 'package:fishbit_finance/core/design_system/glass_card.dart';
 import 'package:fishbit_finance/core/design_system/floating_dock_layout.dart';
 import 'package:fishbit_finance/core/design_system/glass_container.dart';
 import 'package:fishbit_finance/core/design_system/glass_badge.dart';
+import 'package:fishbit_finance/core/design_system/glass_select_field.dart';
 import 'package:fishbit_finance/core/utils/currency_formatters.dart';
 import 'package:fishbit_finance/modules/water_quality/presentation/dialogs/parametro_modal.dart';
 import 'package:fishbit_finance/modules/water_quality/presentation/providers/water_quality_provider.dart';
@@ -449,83 +450,63 @@ class _BitacoraScreenState extends ConsumerState<BitacoraScreen> with SingleTick
                 constraints: const BoxConstraints(maxWidth: 1024),
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-                  child: Material(
-                    color: Colors.transparent,
-                    child: InkWell(
-                      onTap: () => _showPondFilterBottomSheet(context, waterState, nutritionState, pondsState),
-                      borderRadius: BorderRadius.circular(16),
-                      child: GlassContainer(
-                        borderRadius: 16,
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                        blur: 16,
-                        opacity: 0.14,
-                        borderColor: AppColors.cyanWater.withValues(alpha: 0.35),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Expanded(
-                              child: Row(
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.all(8),
-                                    decoration: BoxDecoration(
-                                      color: AppColors.cyanWater.withValues(alpha: 0.15),
-                                      borderRadius: BorderRadius.circular(10),
-                                    ),
-                                    child: const Icon(Icons.tune_rounded, color: AppColors.cyanWater, size: 18),
-                                  ),
-                                  const SizedBox(width: 10),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Text(
-                                          'ESTANQUE DE CONSULTA',
-                                          style: AppTypography.labelMicro.copyWith(color: AppColors.textSecondaryDark),
-                                        ),
-                                        const SizedBox(height: 2),
-                                        Text(
-                                          _selectedPondId == null
-                                              ? 'Todos los Estanques (${pondsState.ponds.length})'
-                                              : () {
-                                                  final p = pondMap[_selectedPondId];
-                                                  return p != null ? '${p.sigla} • ${p.nombreLimpio}' : 'Estanque Seleccionado';
-                                                }(),
-                                          overflow: TextOverflow.ellipsis,
-                                          maxLines: 1,
-                                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                if (_selectedPondId != null)
-                                  GestureDetector(
-                                    onTap: () => setState(() => _selectedPondId = null),
-                                    child: Container(
-                                      margin: const EdgeInsets.only(right: 6),
-                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                      decoration: BoxDecoration(
-                                        color: AppColors.coralAction.withValues(alpha: 0.15),
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                      child: const Text('Limpiar', style: TextStyle(color: AppColors.coralAction, fontSize: 11, fontWeight: FontWeight.w700)),
-                                    ),
-                                  ),
-                                const Icon(Icons.keyboard_arrow_down_rounded, color: AppColors.cyanWater, size: 22),
-                              ],
-                            ),
-                          ],
+                  child: Builder(
+                    builder: (context) {
+                      final totalDataCount = waterState.recentParameters.length +
+                          nutritionState.records.length +
+                          pondsState.biometries.length +
+                          pondsState.mortalityRecords.length;
+
+                      final options = <GlassSelectOption<String>>[
+                        GlassSelectOption<String>(
+                          value: '__ALL__',
+                          label: 'Todos los Estanques (${pondsState.ponds.length})',
+                          subtitle: 'Filtra las 4 pestañas simultáneamente',
+                          icon: Icons.grid_view_rounded,
+                          badgeText: '$totalDataCount datos',
+                          badgeColor: AppColors.cyanWater,
                         ),
-                      ),
-                    ),
+                        ...pondsState.ponds.map((pond) {
+                          final countWater = waterState.recentParameters.where((p) => p.estanqueId == pond.id).length;
+                          final countFeeding = nutritionState.records.where((r) => r.estanqueId == pond.id).length;
+                          final countBiometrias = pondsState.biometries.where((b) => b.estanqueId == pond.id).length;
+                          final countMortality = pondsState.mortalityRecords.where((m) => m.estanqueId == pond.id).length;
+                          final pondTotal = countWater + countFeeding + countBiometrias + countMortality;
+
+                          final parts = <String>[];
+                          if (countWater > 0) parts.add('$countWater O₂/pH');
+                          if (countFeeding > 0) parts.add('$countFeeding raciones');
+                          if (countBiometrias > 0) parts.add('$countBiometrias muestreo(s)');
+                          if (countMortality > 0) parts.add('$countMortality baja(s)');
+                          final subtitle = parts.isNotEmpty
+                              ? parts.join(' • ')
+                              : (pond.especieActual.isNotEmpty ? 'Cultivo: ${pond.especieActual}' : 'Estanque activo');
+
+                          return GlassSelectOption<String>(
+                            value: pond.id,
+                            label: '${pond.sigla} • ${pond.nombreLimpio}',
+                            subtitle: subtitle,
+                            icon: Icons.water_rounded,
+                            badgeText: '$pondTotal datos',
+                            badgeColor: pondTotal > 0 ? AppColors.cyanWater : AppColors.textSecondaryDark,
+                          );
+                        }),
+                      ];
+
+                      return GlassSelectField<String>(
+                        label: 'ESTANQUE DE CONSULTA',
+                        placeholder: 'Buscar estanque por nombre o sigla...',
+                        value: _selectedPondId ?? '__ALL__',
+                        accentColor: AppColors.cyanWater,
+                        leadingIcon: Icons.tune_rounded,
+                        options: options,
+                        onChanged: (val) {
+                          setState(() {
+                            _selectedPondId = (val == null || val == '__ALL__') ? null : val;
+                          });
+                        },
+                      );
+                    },
                   ),
                 ),
               ),

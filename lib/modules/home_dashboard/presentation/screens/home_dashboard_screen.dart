@@ -8,6 +8,7 @@ import 'package:fishbit_finance/core/design_system/glass_card.dart';
 import 'package:fishbit_finance/core/design_system/floating_dock_layout.dart';
 import 'package:fishbit_finance/core/design_system/glass_badge.dart';
 import 'package:fishbit_finance/core/design_system/glass_container.dart';
+import 'package:fishbit_finance/core/design_system/magic_bento.dart';
 import 'package:fishbit_finance/core/utils/currency_formatters.dart';
 import 'package:fishbit_finance/modules/feeding_nutrition/presentation/providers/nutrition_provider.dart';
 import 'package:fishbit_finance/modules/home_dashboard/presentation/widgets/biological_trends_card.dart';
@@ -216,123 +217,136 @@ class HomeDashboardScreen extends ConsumerWidget {
 
                   const SizedBox(height: 14),
 
-                  // Bento Grid Zootécnico y Operativo de Campo (2x2)
-                  Row(
-                    children: [
-                      Expanded(
-                        child: GlassCard(
-                          title: 'Estanques',
-                          glowColor: AppColors.cyanWater,
-                          onTap: () => context.go('/ponds'),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              FittedBox(
-                                fit: BoxFit.scaleDown,
-                                child: Text(
-                                  '${pondsState.estanquesActivosCount} / ${pondsState.ponds.length}',
-                                  style: AppTypography.numberKpi.copyWith(color: AppColors.cyanWater),
-                                ),
+                  // Bento Grid Zootécnico <MagicBento /> (React Bits)
+                  MagicBentoGrid(
+                    columns: 4,
+                    rowHeight: 200,
+                    gap: 12,
+                    radius: 20,
+                    enableBorderGlow: true,
+                    enableSpotlight: true,
+                    spotlightRadius: 420,
+                    clickEffect: true,
+                    enableStars: true,
+                    enableMagnetism: true,
+                    items: [
+                      MagicBentoCardData(
+                        title: 'Estanques',
+                        icon: Icons.water_drop_rounded,
+                        glowColor: AppColors.cyanWater,
+                        onTap: () => context.go('/ponds'),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(
+                                '${pondsState.estanquesActivosCount} / ${pondsState.ponds.length}',
+                                style: AppTypography.numberKpi.copyWith(color: AppColors.cyanWater),
                               ),
-                              Text(
-                                'Densidad: ${densidadMediaKgM3.toStringAsFixed(1)} Kg/m³',
-                                style: AppTypography.labelMicro.copyWith(
-                                  color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                                ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Densidad: ${densidadMediaKgM3.toStringAsFixed(1)} Kg/m³',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: AppTypography.labelMicro.copyWith(
+                                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
                               ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: GlassCard(
-                          title: 'Alimento Bodega',
-                          glowColor: AppColors.amberWarning,
-                          onTap: () => context.go('/warehouse'),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              FittedBox(
-                                fit: BoxFit.scaleDown,
-                                child: Text(
-                                  CurrencyFormatters.formatKg(warehouseState.totalAlimentoKg),
-                                  style: AppTypography.numberKpi.copyWith(color: AppColors.amberWarning),
-                                ),
+                      MagicBentoCardData(
+                        title: 'Alimento Bodega',
+                        icon: Icons.inventory_2_rounded,
+                        glowColor: AppColors.amberWarning,
+                        onTap: () => context.go('/warehouse'),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(
+                                CurrencyFormatters.formatKg(warehouseState.totalAlimentoKg),
+                                style: AppTypography.numberKpi.copyWith(color: AppColors.amberWarning),
                               ),
-                              Text(
-                                diasAutonomiaAlimento != null
-                                    ? 'Autonomía: ${diasAutonomiaAlimento.toStringAsFixed(0)} días'
-                                    : 'En Bodega',
-                                style: AppTypography.labelMicro.copyWith(
-                                  color: diasAutonomiaAlimento != null && diasAutonomiaAlimento < 7
-                                      ? AppColors.coralAction
-                                      : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
-                                  fontWeight: diasAutonomiaAlimento != null && diasAutonomiaAlimento < 7
-                                      ? FontWeight.w800
-                                      : FontWeight.w500,
-                                ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              diasAutonomiaAlimento != null
+                                  ? 'Autonomía: ${diasAutonomiaAlimento.toStringAsFixed(0)} días'
+                                  : 'En Bodega',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: AppTypography.labelMicro.copyWith(
+                                color: diasAutonomiaAlimento != null && diasAutonomiaAlimento < 7
+                                    ? AppColors.coralAction
+                                    : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
+                                fontWeight: diasAutonomiaAlimento != null && diasAutonomiaAlimento < 7
+                                    ? FontWeight.w800
+                                    : FontWeight.w500,
                               ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
                       ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 12),
-
-                  Row(
-                    children: [
-                      Expanded(
-                        child: GlassCard(
-                          title: 'Ración Proyectada Hoy',
-                          glowColor: AppColors.greenBiomass,
-                          onTap: () => context.go('/bitacora'),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              FittedBox(
-                                fit: BoxFit.scaleDown,
-                                child: Text(
-                                  '${consumoProyectadoDiaKg.toStringAsFixed(1)} Kg',
-                                  style: AppTypography.numberKpi.copyWith(color: AppColors.greenBiomass, fontSize: 18),
-                                ),
+                      MagicBentoCardData(
+                        title: 'Ración Hoy',
+                        icon: Icons.set_meal_rounded,
+                        glowColor: AppColors.greenBiomass,
+                        onTap: () => context.go('/bitacora'),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(
+                                '${consumoProyectadoDiaKg.toStringAsFixed(1)} Kg',
+                                style: AppTypography.numberKpi.copyWith(color: AppColors.greenBiomass, fontSize: 18),
                               ),
-                              Text(
-                                'Servido hoy: ${servidoHoyKg.toStringAsFixed(1)} Kg',
-                                style: AppTypography.labelMicro.copyWith(
-                                  color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                                ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Servido hoy: ${servidoHoyKg.toStringAsFixed(1)} Kg',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: AppTypography.labelMicro.copyWith(
+                                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
                               ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: GlassCard(
-                          title: 'Supervivencia',
-                          glowColor: AppColors.purpleAnalytics,
-                          onTap: () => context.go('/ponds'),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              FittedBox(
-                                fit: BoxFit.scaleDown,
-                                child: Text(
-                                  activeBatches.isNotEmpty ? '${supervivenciaGlobal.toStringAsFixed(1)}%' : '--',
-                                  style: AppTypography.numberKpi.copyWith(color: AppColors.purpleAnalytics, fontSize: 18),
-                                ),
+                      MagicBentoCardData(
+                        title: 'Supervivencia',
+                        icon: Icons.favorite_rounded,
+                        glowColor: AppColors.purpleAnalytics,
+                        onTap: () => context.go('/ponds'),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(
+                                activeBatches.isNotEmpty ? '${supervivenciaGlobal.toStringAsFixed(1)}%' : '--',
+                                style: AppTypography.numberKpi.copyWith(color: AppColors.purpleAnalytics, fontSize: 18),
                               ),
-                              Text(
-                                '${activeBatches.length} lote(s) activos',
-                                style: AppTypography.labelMicro.copyWith(
-                                  color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                                ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '${activeBatches.length} lote(s) activos',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: AppTypography.labelMicro.copyWith(
+                                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
                               ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
                       ),
                     ],

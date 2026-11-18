@@ -6,6 +6,7 @@ import 'package:fishbit_finance/core/design_system/glass_container.dart';
 import 'package:fishbit_finance/core/design_system/glass_form_field.dart';
 import 'package:fishbit_finance/core/design_system/glass_button.dart';
 import 'package:fishbit_finance/core/design_system/glass_date_picker.dart';
+import 'package:fishbit_finance/core/design_system/glass_select_field.dart';
 import 'package:fishbit_finance/modules/feeding_nutrition/presentation/providers/nutrition_provider.dart';
 import 'package:fishbit_finance/modules/ponds_batches/domain/models/fish_batch.dart';
 import 'package:fishbit_finance/modules/ponds_batches/domain/models/pond.dart';
@@ -166,41 +167,29 @@ class _AlimentarModalState extends ConsumerState<AlimentarModal> {
 
                 // Selector de Estanque si no vino especificado
                 if (widget.pond == null && pondsList.isNotEmpty) ...[
-                  Text('ESTANQUE DESTINO', style: AppTypography.labelMicro.copyWith(color: AppColors.textSecondaryDark)),
-                  const SizedBox(height: 6),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.06),
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
-                    ),
-                    child: DropdownButtonHideUnderline(
-                      child: DropdownButton<String>(
-                        value: activePond?.id,
-                        isExpanded: true,
-                        dropdownColor: AppColors.backgroundDark,
-                        items: pondsList.map((p) {
-                          return DropdownMenuItem(
-                            value: p.id,
-                            child: Text(
-                              '${p.sigla} - ${p.nombre} (${p.biomasaKg.toInt()} kg)',
-                              style: const TextStyle(color: Colors.white, fontSize: 13),
-                            ),
-                          );
-                        }).toList(),
-                        onChanged: (val) {
-                          setState(() {
-                            _selectedPondId = val;
-                            final b = pondsState.batches.where((b) => b.estanqueId == val).firstOrNull;
-                            if (b != null) {
-                              final r = _getSuggestedRationPct(b.especie, b.pesoActualGramos);
-                              _kgCtrl.text = ((b.biomasaActualKg * r) / 100).toStringAsFixed(1);
-                            }
-                          });
-                        },
-                      ),
-                    ),
+                  GlassSelectField<String>(
+                    label: 'ESTANQUE DESTINO',
+                    value: activePond?.id,
+                    accentColor: AppColors.greenBiomass,
+                    leadingIcon: Icons.waves_rounded,
+                    options: pondsList
+                        .map((p) => GlassSelectOption<String>(
+                              value: p.id,
+                              label: '${p.sigla} - ${p.nombre}',
+                              subtitle: '${p.biomasaKg.toInt()} kg en agua',
+                              icon: Icons.waves_rounded,
+                            ))
+                        .toList(),
+                    onChanged: (val) {
+                      setState(() {
+                        _selectedPondId = val;
+                        final b = pondsState.batches.where((b) => b.estanqueId == val).firstOrNull;
+                        if (b != null) {
+                          final r = _getSuggestedRationPct(b.especie, b.pesoActualGramos);
+                          _kgCtrl.text = ((b.biomasaActualKg * r) / 100).toStringAsFixed(1);
+                        }
+                      });
+                    },
                   ),
                   const SizedBox(height: 12),
                 ] else if (activePond != null) ...[
@@ -260,38 +249,25 @@ class _AlimentarModalState extends ConsumerState<AlimentarModal> {
                 ),
                 const SizedBox(height: 14),
 
-                // Selector de Alimento en Bodega
-                Text('ALIMENTO DISPONIBLE EN BODEGA', style: AppTypography.labelMicro.copyWith(color: AppColors.textSecondaryDark)),
-                const SizedBox(height: 6),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.06),
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
-                  ),
-                  child: DropdownButtonHideUnderline(
-                    child: DropdownButton<String>(
-                      value: _selectedInsumoId,
-                      isExpanded: true,
-                      dropdownColor: AppColors.backgroundDark,
-                      items: feedItems.map((item) {
-                        final tieneStock = item.cantidadActualKg > 0;
-                        return DropdownMenuItem(
-                          value: item.id,
-                          child: Text(
-                            '${item.nombre} (${tieneStock ? "${item.cantidadActualKg.toStringAsFixed(1)} kg disponibles" : "Sin Stock en bodega"} • \$${item.costoUnitarioHistorico.toInt()}/kg)',
-                            style: TextStyle(
-                              color: tieneStock ? Colors.white : AppColors.coralAction,
-                              fontSize: 12.5,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        );
-                      }).toList(),
-                      onChanged: (val) => setState(() => _selectedInsumoId = val),
-                    ),
-                  ),
+                GlassSelectField<String>(
+                  label: 'ALIMENTO DISPONIBLE EN BODEGA',
+                  value: _selectedInsumoId,
+                  accentColor: AppColors.amberWarning,
+                  leadingIcon: Icons.restaurant_rounded,
+                  options: feedItems.map((item) {
+                    final tieneStock = item.cantidadActualKg > 0;
+                    return GlassSelectOption<String>(
+                      value: item.id,
+                      label: item.nombre,
+                      subtitle: tieneStock
+                          ? '${item.cantidadActualKg.toStringAsFixed(1)} kg disponibles • \$${item.costoUnitarioHistorico.toInt()}/kg'
+                          : 'Sin Stock en bodega',
+                      icon: Icons.restaurant_rounded,
+                      badgeText: tieneStock ? 'STOCK' : 'AGOTADO',
+                      badgeColor: tieneStock ? AppColors.greenBiomass : AppColors.coralAction,
+                    );
+                  }).toList(),
+                  onChanged: (val) => setState(() => _selectedInsumoId = val),
                 ),
                 if (feedItems.isEmpty || sinStock) ...[
                   const SizedBox(height: 10),

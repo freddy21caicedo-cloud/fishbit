@@ -9,6 +9,7 @@ import 'package:fishbit_finance/core/design_system/glass_container.dart';
 import 'package:fishbit_finance/core/design_system/glass_form_field.dart';
 import 'package:fishbit_finance/core/design_system/glass_button.dart';
 import 'package:fishbit_finance/core/design_system/fishbit_icons.dart';
+import 'package:fishbit_finance/core/design_system/widgets/liquid_ether_background.dart';
 import 'package:fishbit_finance/modules/auth_tenant/presentation/providers/auth_provider.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -174,61 +175,21 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       backgroundColor: AppColors.backgroundDark,
       body: Stack(
         children: [
-          // 1. Textura de Fondo con Grabado Científico Vintage de Peces (Seamless Repeat)
-          Positioned.fill(
-            child: Image.asset(
-              'assets/images/fish_pattern_bg.jpg',
-              repeat: ImageRepeat.repeat,
-              fit: BoxFit.none,
-              scale: 2.2, // Escala refinada para grabado taxonómico nítido
-              alignment: Alignment.topLeft,
+          // 1. Fondo interactivo LiquidEther (WebGL2 Navier-Stokes en Web / fluido nativo en móvil)
+          const Positioned.fill(
+            child: LiquidEtherBackground(
+              colors: ['#06b6d4', '#f43f5e'],
+              mouseForce: 20,
+              cursorSize: 100,
+              persistence: 0.75,
+              autoDemo: true,
+              autoSpeed: 0.5,
+              autoIntensity: 2.2,
+              backgroundColor: '#0A0F18',
             ),
           ),
 
-          // 2. Capa de Tinte y Contraste Translúcido (Permite apreciar claramente las ilustraciones de peces)
-          Positioned.fill(
-            child: Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    AppColors.backgroundDark.withValues(alpha: 0.45),
-                    const Color(0xFF0A0F18).withValues(alpha: 0.40),
-                    AppColors.backgroundDark.withValues(alpha: 0.55),
-                  ],
-                ),
-              ),
-            ),
-          ),
-
-          // 3. Orbes de Resplandor Ambiental Atmosférico (Apple / Luxury Glow)
-          Positioned(
-            top: -60,
-            left: -60,
-            child: Container(
-              width: 320,
-              height: 320,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: AppColors.cyanWater.withValues(alpha: 0.20),
-              ),
-            ),
-          ),
-          Positioned(
-            bottom: -80,
-            right: -80,
-            child: Container(
-              width: 340,
-              height: 340,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: AppColors.coralAction.withValues(alpha: 0.18),
-              ),
-            ),
-          ),
-
-          // 4. Tarjeta Glassmorphic de Autenticación con animación de entrada
+          // 2. Tarjeta Glassmorphic de Autenticación con animación de entrada
           FadeTransition(
             opacity: _fadeAnim,
             child: SlideTransition(

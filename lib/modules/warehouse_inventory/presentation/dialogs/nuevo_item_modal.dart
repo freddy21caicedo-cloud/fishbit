@@ -4,6 +4,8 @@ import 'package:uuid/uuid.dart';
 import 'package:fishbit_finance/core/design_system/app_colors.dart';
 import 'package:fishbit_finance/core/design_system/app_typography.dart';
 import 'package:fishbit_finance/core/design_system/glass_container.dart';
+import 'package:fishbit_finance/core/design_system/glass_date_picker.dart';
+import 'package:fishbit_finance/core/design_system/glass_select_field.dart';
 import 'package:fishbit_finance/core/utils/currency_formatters.dart';
 import 'package:fishbit_finance/modules/auth_tenant/presentation/providers/auth_provider.dart';
 import 'package:fishbit_finance/modules/warehouse_inventory/domain/models/inventory_item.dart';
@@ -739,71 +741,33 @@ class _NuevoItemModalState extends ConsumerState<NuevoItemModal> {
           ],
         ),
         const SizedBox(height: 6),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          decoration: BoxDecoration(
-            color: isDark ? Colors.white.withValues(alpha: 0.06) : Colors.white,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: isDark ? Colors.white.withValues(alpha: 0.12) : AppColors.glassBorderLight),
-          ),
-          child: DropdownButtonHideUnderline(
-            child: DropdownButton<String>(
-              value: _selectedSupplier,
-              dropdownColor: isDark ? AppColors.surfaceDark : Colors.white,
-              isExpanded: true,
-              icon: Icon(Icons.keyboard_arrow_down_rounded, color: accentColor),
-              items: suppliers.map((s) {
-                final isCustom = s.isCustom;
-                return DropdownMenuItem(
-                  value: s.nombre,
-                  child: Row(
-                    children: [
-                      Icon(Icons.factory_outlined, size: 16, color: accentColor),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          s.nombre,
-                          style: TextStyle(
-                            color: isDark ? Colors.white : AppColors.textPrimaryLight,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: isCustom ? AppColors.cyanWater.withValues(alpha: 0.15) : AppColors.greenBiomass.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          isCustom ? 'PROPIO' : 'OFICIAL',
-                          style: TextStyle(
-                            color: isCustom ? AppColors.cyanWater : AppColors.greenBiomass,
-                            fontSize: 9,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              }).toList(),
-              onChanged: (val) {
-                if (val != null) {
-                  setState(() {
-                    _selectedSupplier = val;
-                    final supObj = suppliers.firstWhere((s) => s.nombre == val);
-                    if (supObj.productosOfrecidos.isNotEmpty) {
-                      _onProductSelected(supObj.productosOfrecidos.first);
-                    }
-                  });
+        GlassSelectField<String>(
+          placeholder: 'Seleccionar proveedor...',
+          value: _selectedSupplier,
+          accentColor: accentColor,
+          leadingIcon: Icons.factory_outlined,
+          options: suppliers.map((s) {
+            final isCustom = s.isCustom;
+            return GlassSelectOption<String>(
+              value: s.nombre,
+              label: s.nombre,
+              subtitle: s.ciudad ?? (s.nit.isNotEmpty ? 'NIT: ${s.nit}' : null),
+              icon: Icons.factory_outlined,
+              badgeText: isCustom ? 'PROPIO' : 'OFICIAL',
+              badgeColor: isCustom ? AppColors.cyanWater : AppColors.greenBiomass,
+            );
+          }).toList(),
+          onChanged: (val) {
+            if (val != null) {
+              setState(() {
+                _selectedSupplier = val;
+                final supObj = suppliers.firstWhere((s) => s.nombre == val);
+                if (supObj.productosOfrecidos.isNotEmpty) {
+                  _onProductSelected(supObj.productosOfrecidos.first);
                 }
-              },
-            ),
-          ),
+              });
+            }
+          },
         ),
       ],
     );
@@ -895,40 +859,23 @@ class _NuevoItemModalState extends ConsumerState<NuevoItemModal> {
             onChanged: (val) => _selectedProduct = val.trim(),
           )
         else
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
-            decoration: BoxDecoration(
-              color: isDark ? Colors.white.withValues(alpha: 0.06) : Colors.white,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: accentColor.withValues(alpha: 0.35)),
-            ),
-            child: DropdownButtonHideUnderline(
-              child: DropdownButton<String>(
-                value: availableProducts.contains(_selectedProduct)
-                    ? _selectedProduct
-                    : (availableProducts.isNotEmpty ? availableProducts.first : null),
-                dropdownColor: isDark ? AppColors.surfaceDark : Colors.white,
-                isExpanded: true,
-                icon: const Icon(Icons.check_circle_outline_rounded, color: AppColors.greenBiomass, size: 18),
-                items: availableProducts.map((p) {
-                  return DropdownMenuItem(
-                    value: p,
-                    child: Text(
-                      p,
-                      style: TextStyle(
-                        color: isDark ? Colors.white : AppColors.textPrimaryLight,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  );
-                }).toList(),
-                onChanged: (val) {
-                  if (val != null) _onProductSelected(val);
-                },
-              ),
-            ),
+          GlassSelectField<String>(
+            placeholder: 'Seleccionar producto...',
+            value: availableProducts.contains(_selectedProduct)
+                ? _selectedProduct
+                : (availableProducts.isNotEmpty ? availableProducts.first : null),
+            accentColor: accentColor,
+            leadingIcon: Icons.inventory_2_outlined,
+            options: availableProducts
+                .map((p) => GlassSelectOption<String>(
+                      value: p,
+                      label: p,
+                      icon: Icons.check_circle_outline_rounded,
+                    ))
+                .toList(),
+            onChanged: (val) {
+              if (val != null) _onProductSelected(val);
+            },
           ),
         const SizedBox(height: 14),
 
@@ -1005,43 +952,42 @@ class _NuevoItemModalState extends ConsumerState<NuevoItemModal> {
           Row(
             children: [
               Expanded(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: isDark ? Colors.white.withValues(alpha: 0.04) : Colors.white,
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: isDark ? Colors.white12 : AppColors.glassBorderLight),
-                  ),
-                  child: DropdownButtonHideUnderline(
-                    child: DropdownButton<int>(
-                      value: _diasRetiroSanitario,
-                      dropdownColor: isDark ? AppColors.surfaceDark : Colors.white,
-                      isExpanded: true,
-                      items: [0, 5, 10, 15, 21, 30, 45].map((d) {
-                        return DropdownMenuItem(
-                          value: d,
-                          child: Text(
-                            d == 0 ? 'Retiro: Inmediato (0 días)' : 'Retiro ICA: $d días',
-                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-                          ),
-                        );
-                      }).toList(),
-                      onChanged: (val) => setState(() => _diasRetiroSanitario = val ?? 0),
-                    ),
-                  ),
+                child: GlassSelectField<int>(
+                  value: _diasRetiroSanitario,
+                  accentColor: AppColors.coralAction,
+                  leadingIcon: Icons.timelapse_rounded,
+                  enableSearch: false,
+                  options: [0, 5, 10, 15, 21, 30, 45]
+                      .map((d) => GlassSelectOption<int>(
+                            value: d,
+                            label: d == 0 ? 'Retiro: Inmediato (0 días)' : 'Retiro ICA: $d días',
+                          ))
+                      .toList(),
+                  onChanged: (val) => setState(() => _diasRetiroSanitario = val ?? 0),
                 ),
               ),
               const SizedBox(width: 10),
               Expanded(
                 child: GestureDetector(
                   onTap: () async {
-                    final picked = await showDatePicker(
+                    final picked = await showDialog<CivilDate>(
                       context: context,
-                      initialDate: _fechaVencimiento ?? DateTime.now().add(const Duration(days: 365)),
-                      firstDate: DateTime.now(),
-                      lastDate: DateTime.now().add(const Duration(days: 365 * 5)),
+                      barrierColor: Colors.black.withValues(alpha: 0.55),
+                      builder: (ctx) => Dialog(
+                        backgroundColor: Colors.transparent,
+                        insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 380),
+                          child: GlassCalendarPopover(
+                            initialDate: CivilDate.fromDate(
+                              _fechaVencimiento ?? DateTime.now().add(const Duration(days: 365)),
+                            ),
+                            accentColor: AppColors.coralAction,
+                          ),
+                        ),
+                      ),
                     );
-                    if (picked != null) setState(() => _fechaVencimiento = picked);
+                    if (picked != null) setState(() => _fechaVencimiento = picked.toDateTime());
                   },
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
@@ -1074,31 +1020,19 @@ class _NuevoItemModalState extends ConsumerState<NuevoItemModal> {
             children: [
               Expanded(
                 flex: 3,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  decoration: BoxDecoration(
-                    color: isDark ? Colors.white.withValues(alpha: 0.04) : Colors.white,
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: isDark ? Colors.white12 : AppColors.glassBorderLight),
-                  ),
-                  child: DropdownButtonHideUnderline(
-                    child: DropdownButton<String>(
-                      value: companySpecies.contains(_especieAlevino)
-                          ? _especieAlevino
-                          : (companySpecies.isNotEmpty ? companySpecies.first : null),
-                      dropdownColor: isDark ? AppColors.surfaceDark : Colors.white,
-                      isExpanded: true,
-                      items: companySpecies.map((esp) {
-                        return DropdownMenuItem(
-                          value: esp,
-                          child: Text(esp, style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700)),
-                        );
-                      }).toList(),
-                      onChanged: (val) {
-                        if (val != null) setState(() => _especieAlevino = val);
-                      },
-                    ),
-                  ),
+                child: GlassSelectField<String>(
+                  value: companySpecies.contains(_especieAlevino)
+                      ? _especieAlevino
+                      : (companySpecies.isNotEmpty ? companySpecies.first : null),
+                  accentColor: AppColors.cyanWater,
+                  leadingIcon: Icons.set_meal_rounded,
+                  enableSearch: false,
+                  options: companySpecies
+                      .map((esp) => GlassSelectOption<String>(value: esp, label: esp))
+                      .toList(),
+                  onChanged: (val) {
+                    if (val != null) setState(() => _especieAlevino = val);
+                  },
                 ),
               ),
               const SizedBox(width: 10),
@@ -1128,95 +1062,62 @@ class _NuevoItemModalState extends ConsumerState<NuevoItemModal> {
           Row(
             children: [
               Expanded(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  decoration: BoxDecoration(
-                    color: isDark ? Colors.white.withValues(alpha: 0.04) : Colors.white,
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: isDark ? Colors.white12 : AppColors.glassBorderLight),
-                  ),
-                  child: DropdownButtonHideUnderline(
-                    child: DropdownButton<double>(
-                      value: _potenciaHp,
-                      dropdownColor: isDark ? AppColors.surfaceDark : Colors.white,
-                      isExpanded: true,
-                      items: [0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 4.0, 5.0].map((hp) {
-                        return DropdownMenuItem(
-                          value: hp,
-                          child: Text('${hp.toStringAsFixed(1)} HP Potencia', style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700)),
-                        );
-                      }).toList(),
-                      onChanged: (val) => setState(() => _potenciaHp = val ?? 2.0),
-                    ),
-                  ),
+                child: GlassSelectField<double>(
+                  value: _potenciaHp,
+                  accentColor: Colors.purpleAccent,
+                  leadingIcon: Icons.bolt_rounded,
+                  enableSearch: false,
+                  options: [0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 4.0, 5.0]
+                      .map((hp) => GlassSelectOption<double>(
+                            value: hp,
+                            label: '${hp.toStringAsFixed(1)} HP Potencia',
+                          ))
+                      .toList(),
+                  onChanged: (val) => setState(() => _potenciaHp = val ?? 2.0),
                 ),
               ),
               const SizedBox(width: 10),
               Expanded(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  decoration: BoxDecoration(
-                    color: isDark ? Colors.white.withValues(alpha: 0.04) : Colors.white,
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: isDark ? Colors.white12 : AppColors.glassBorderLight),
-                  ),
-                  child: DropdownButtonHideUnderline(
-                    child: DropdownButton<String>(
-                      value: _faseElectrica,
-                      dropdownColor: isDark ? AppColors.surfaceDark : Colors.white,
-                      isExpanded: true,
-                      items: ['Monofásico 110V/220V', 'Bifásico 220V', 'Trifásico 220V/440V', 'Solar Directo DC'].map((f) {
-                        return DropdownMenuItem(
-                          value: f,
-                          child: Text(f, style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600)),
-                        );
-                      }).toList(),
-                      onChanged: (val) => setState(() => _faseElectrica = val ?? 'Trifásico 220V/440V'),
-                    ),
-                  ),
+                child: GlassSelectField<String>(
+                  value: _faseElectrica,
+                  accentColor: Colors.purpleAccent,
+                  leadingIcon: Icons.electrical_services_rounded,
+                  enableSearch: false,
+                  options: ['Monofásico 110V/220V', 'Bifásico 220V', 'Trifásico 220V/440V', 'Solar Directo DC']
+                      .map((f) => GlassSelectOption<String>(value: f, label: f))
+                      .toList(),
+                  onChanged: (val) => setState(() => _faseElectrica = val ?? 'Trifásico 220V/440V'),
                 ),
               ),
             ],
           ),
         ] else if (_selectedType == InventoryItemType.insumo) ...[
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            decoration: BoxDecoration(
-              color: isDark ? Colors.white.withValues(alpha: 0.04) : Colors.white,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: isDark ? Colors.white12 : AppColors.glassBorderLight),
-            ),
-            child: DropdownButtonHideUnderline(
-              child: DropdownButton<String>(
-                value: _presentacionInsumo,
-                dropdownColor: isDark ? AppColors.surfaceDark : Colors.white,
-                isExpanded: true,
-                items: ['Saco 50 Kg', 'Saco 40 Kg', 'Caneca/Saco 25 Kg', 'Galón 3.8 L', 'Litro / Botella', 'Kilogramo Granel'].map((pres) {
-                  return DropdownMenuItem(
-                    value: pres,
-                    child: Text(pres, style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700)),
-                  );
-                }).toList(),
-                onChanged: (val) {
-                  if (val != null) {
-                    setState(() {
-                      _presentacionInsumo = val;
-                      if (val.contains('50')) {
-                        _kgPorUnidadInsumo = 50.0;
-                      } else if (val.contains('40')) {
-                        _kgPorUnidadInsumo = 40.0;
-                      } else if (val.contains('25')) {
-                        _kgPorUnidadInsumo = 25.0;
-                      } else if (val.contains('Galón')) {
-                        _kgPorUnidadInsumo = 3.8;
-                      } else {
-                        _kgPorUnidadInsumo = 1.0;
-                      }
-                    });
+          GlassSelectField<String>(
+            value: _presentacionInsumo,
+            accentColor: AppColors.amberWarning,
+            leadingIcon: Icons.inventory_rounded,
+            enableSearch: false,
+            options: ['Saco 50 Kg', 'Saco 40 Kg', 'Caneca/Saco 25 Kg', 'Galón 3.8 L', 'Litro / Botella', 'Kilogramo Granel']
+                .map((pres) => GlassSelectOption<String>(value: pres, label: pres))
+                .toList(),
+            onChanged: (val) {
+              if (val != null) {
+                setState(() {
+                  _presentacionInsumo = val;
+                  if (val.contains('50')) {
+                    _kgPorUnidadInsumo = 50.0;
+                  } else if (val.contains('40')) {
+                    _kgPorUnidadInsumo = 40.0;
+                  } else if (val.contains('25')) {
+                    _kgPorUnidadInsumo = 25.0;
+                  } else if (val.contains('Galón')) {
+                    _kgPorUnidadInsumo = 3.8;
+                  } else {
+                    _kgPorUnidadInsumo = 1.0;
                   }
-                },
-              ),
-            ),
+                });
+              }
+            },
           ),
         ],
 

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:fishbit_finance/core/design_system/app_colors.dart';
 import 'package:fishbit_finance/core/design_system/app_typography.dart';
+import 'package:fishbit_finance/core/design_system/silk_background.dart';
 
 /// Pantalla de carga inicial que se muestra mientras [AuthNotifier._initSession()]
 /// resuelve la sesión activa. Evita el parpadeo de la pantalla de login al arrancar.
@@ -38,29 +39,39 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
       backgroundColor: AppColors.backgroundDark,
       body: Stack(
         children: [
-          // Orbe cyan superior-izquierdo (mismo que login para transición fluida)
-          Positioned(
-            top: -80,
-            left: -80,
-            child: Container(
-              width: 320,
-              height: 320,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: AppColors.cyanWater.withValues(alpha: 0.18),
-              ),
+          // Fondo animado <Silk /> (React Bits)
+          const Positioned.fill(
+            child: SilkBackground(
+              color: Color(0xFF06B6D4),
+              sheenColor: Color(0xFFF43F5E),
+              speed: 5.0,
+              scale: 1.0,
+              rotation: 0.0,
+              sheen: 0.5,
+              depth: 0.5,
+              glow: 0.3,
+              noiseIntensity: 1.5,
+              mouseInteraction: true,
+              clickRipple: true,
+              intro: true,
             ),
           ),
-          // Orbe coral inferior-derecho
-          Positioned(
-            bottom: -100,
-            right: -100,
-            child: Container(
-              width: 360,
-              height: 360,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: AppColors.coralAction.withValues(alpha: 0.15),
+
+          // Velo radial sutil para asegurar legibilidad del logo sobre el shader
+          Positioned.fill(
+            child: IgnorePointer(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: RadialGradient(
+                    center: Alignment.center,
+                    radius: 0.85,
+                    colors: [
+                      Colors.black.withValues(alpha: 0.48),
+                      Colors.black.withValues(alpha: 0.16),
+                      Colors.transparent,
+                    ],
+                  ),
+                ),
               ),
             ),
           ),

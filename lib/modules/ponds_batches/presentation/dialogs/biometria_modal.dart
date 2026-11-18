@@ -6,6 +6,7 @@ import 'package:fishbit_finance/core/design_system/glass_container.dart';
 import 'package:fishbit_finance/core/design_system/glass_form_field.dart';
 import 'package:fishbit_finance/core/design_system/glass_button.dart';
 import 'package:fishbit_finance/core/design_system/glass_date_picker.dart';
+import 'package:fishbit_finance/core/design_system/glass_select_field.dart';
 import 'package:fishbit_finance/modules/ponds_batches/domain/models/fish_batch.dart';
 import 'package:fishbit_finance/modules/ponds_batches/domain/models/pond.dart';
 import 'package:fishbit_finance/modules/ponds_batches/presentation/providers/ponds_provider.dart';
@@ -151,36 +152,20 @@ class _BiometriaModalState extends ConsumerState<BiometriaModal> {
 
                   // Selector de Estanque si no se abrió desde uno específico
                   if (widget.pond == null && pondsList.isNotEmpty) ...[
-                    Text('ESTANQUE MUESTREADO', style: AppTypography.labelMicro.copyWith(color: AppColors.textSecondaryDark)),
-                    const SizedBox(height: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.06),
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
-                      ),
-                      child: DropdownButtonHideUnderline(
-                        child: DropdownButton<String>(
-                          value: activePond?.id,
-                          isExpanded: true,
-                          dropdownColor: AppColors.backgroundDark,
-                          items: pondsList.map((p) {
-                            return DropdownMenuItem(
-                              value: p.id,
-                              child: Text(
-                                '${p.sigla} - ${p.nombre} (${p.biomasaKg.toInt()} kg)',
-                                style: const TextStyle(color: Colors.white, fontSize: 13),
-                              ),
-                            );
-                          }).toList(),
-                          onChanged: (val) {
-                            setState(() {
-                              _selectedPondId = val;
-                            });
-                          },
-                        ),
-                      ),
+                    GlassSelectField<String>(
+                      label: 'ESTANQUE MUESTREADO',
+                      value: activePond?.id,
+                      accentColor: AppColors.cyanWater,
+                      leadingIcon: Icons.waves_rounded,
+                      options: pondsList
+                          .map((p) => GlassSelectOption<String>(
+                                value: p.id,
+                                label: '${p.sigla} - ${p.nombre}',
+                                subtitle: '${p.biomasaKg.toInt()} kg',
+                                icon: Icons.waves_rounded,
+                              ))
+                          .toList(),
+                      onChanged: (val) => setState(() => _selectedPondId = val),
                     ),
                     const SizedBox(height: 12),
                   ] else if (activePond != null) ...[
@@ -210,37 +195,20 @@ class _BiometriaModalState extends ConsumerState<BiometriaModal> {
 
                   // Selector de Lote / Especie si el estanque está en Policultivo
                   if (activeBatches.length > 1) ...[
-                    Text('ESPECIE / LOTE A MUESTREAR (POLICULTIVO)', style: AppTypography.labelMicro.copyWith(color: Colors.purpleAccent, letterSpacing: 1.2)),
-                    const SizedBox(height: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      decoration: BoxDecoration(
-                        color: Colors.purpleAccent.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: Colors.purpleAccent.withValues(alpha: 0.35)),
-                      ),
-                      child: DropdownButtonHideUnderline(
-                        child: DropdownButton<String>(
-                          value: activeBatch?.id,
-                          dropdownColor: AppColors.backgroundDark,
-                          isExpanded: true,
-                          icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Colors.purpleAccent),
-                          items: activeBatches.map((b) {
-                            return DropdownMenuItem<String>(
-                              value: b.id,
-                              child: Text(
-                                '${b.especie} (${b.codigoLote}) • Peso actual: ${b.pesoActualGramos.toStringAsFixed(1)}g',
-                                style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w700),
-                              ),
-                            );
-                          }).toList(),
-                          onChanged: (val) {
-                            setState(() {
-                              _selectedBatchId = val;
-                            });
-                          },
-                        ),
-                      ),
+                    GlassSelectField<String>(
+                      label: 'ESPECIE / LOTE A MUESTREAR (POLICULTIVO)',
+                      value: activeBatch?.id,
+                      accentColor: Colors.purpleAccent,
+                      leadingIcon: Icons.set_meal_rounded,
+                      options: activeBatches
+                          .map((b) => GlassSelectOption<String>(
+                                value: b.id,
+                                label: '${b.especie} (${b.codigoLote})',
+                                subtitle: 'Peso actual: ${b.pesoActualGramos.toStringAsFixed(1)} g',
+                                icon: Icons.set_meal_rounded,
+                              ))
+                          .toList(),
+                      onChanged: (val) => setState(() => _selectedBatchId = val),
                     ),
                     const SizedBox(height: 14),
                   ],

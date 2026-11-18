@@ -6,6 +6,7 @@ import 'package:fishbit_finance/core/design_system/app_colors.dart';
 import 'package:fishbit_finance/core/design_system/app_typography.dart';
 import 'package:fishbit_finance/core/design_system/glass_container.dart';
 import 'package:fishbit_finance/core/design_system/glass_date_picker.dart';
+import 'package:fishbit_finance/core/design_system/glass_select_field.dart';
 import 'package:fishbit_finance/core/utils/currency_formatters.dart';
 import 'package:fishbit_finance/modules/auth_tenant/presentation/providers/auth_provider.dart';
 import 'package:fishbit_finance/modules/warehouse_inventory/domain/models/inventory_item.dart';
@@ -1186,60 +1187,31 @@ class _NuevaFacturaModalState extends ConsumerState<NuevaFacturaModal> {
           ],
         ),
         const SizedBox(height: 5),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
-          decoration: BoxDecoration(
-            color: isDark ? Colors.white.withValues(alpha: 0.06) : Colors.white,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: isDark ? Colors.white12 : AppColors.glassBorderLight),
-          ),
-          child: DropdownButtonHideUnderline(
-            child: DropdownButton<Supplier>(
-              value: filteredSuppliers.contains(_selectedSupplier) ? _selectedSupplier : (filteredSuppliers.isNotEmpty ? filteredSuppliers.first : null),
-              isExpanded: true,
-              dropdownColor: isDark ? AppColors.surfaceDark : Colors.white,
-              hint: const Text('Seleccionar o registrar proveedor...', style: TextStyle(fontSize: 12, color: Colors.grey)),
-              style: TextStyle(color: isDark ? Colors.white : AppColors.textPrimaryLight, fontSize: 13, fontWeight: FontWeight.w600),
-              onChanged: (sup) {
-                setState(() {
-                  _selectedSupplier = sup;
-                  if (_items.isNotEmpty && _categoriaSeleccionada != 'concentrados' && _categoriaSeleccionada != 'alevinos') {
-                    final firstProd = sup?.productosOfrecidos.isNotEmpty == true ? sup!.productosOfrecidos.first : 'Producto';
-                    _items[0].nombre = firstProd;
-                    _items[0].costoUnitarioCtrl.text = _guessPrice(firstProd);
-                  }
-                });
-              },
-              items: filteredSuppliers.map((s) => DropdownMenuItem<Supplier>(
-                value: s,
-                child: Row(
-                  children: [
-                    if (s.isCustom)
-                      Container(
-                        margin: const EdgeInsets.only(right: 6),
-                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                        decoration: BoxDecoration(
-                          color: AppColors.cyanWater.withValues(alpha: 0.2),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: const Text('PROPIO', style: TextStyle(color: AppColors.cyanWater, fontSize: 8.5, fontWeight: FontWeight.w800)),
-                      )
-                    else
-                      Container(
-                        margin: const EdgeInsets.only(right: 6),
-                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                        decoration: BoxDecoration(
-                          color: AppColors.greenBiomass.withValues(alpha: 0.2),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: const Text('OFICIAL', style: TextStyle(color: AppColors.greenBiomass, fontSize: 8.5, fontWeight: FontWeight.w800)),
-                      ),
-                    Expanded(child: Text('${s.nombre} (${s.nit})', overflow: TextOverflow.ellipsis)),
-                  ],
-                ),
-              )).toList(),
-            ),
-          ),
+        GlassSelectField<Supplier>(
+          placeholder: 'Seleccionar o registrar proveedor...',
+          value: filteredSuppliers.contains(_selectedSupplier) ? _selectedSupplier : (filteredSuppliers.isNotEmpty ? filteredSuppliers.first : null),
+          accentColor: AppColors.cyanWater,
+          leadingIcon: Icons.factory_outlined,
+          options: filteredSuppliers
+              .map((s) => GlassSelectOption<Supplier>(
+                    value: s,
+                    label: s.nombre,
+                    subtitle: s.nit.isNotEmpty ? 'NIT: ${s.nit}' : null,
+                    icon: Icons.factory_outlined,
+                    badgeText: s.isCustom ? 'PROPIO' : 'OFICIAL',
+                    badgeColor: s.isCustom ? AppColors.cyanWater : AppColors.greenBiomass,
+                  ))
+              .toList(),
+          onChanged: (sup) {
+            setState(() {
+              _selectedSupplier = sup;
+              if (_items.isNotEmpty && _categoriaSeleccionada != 'concentrados' && _categoriaSeleccionada != 'alevinos') {
+                final firstProd = sup?.productosOfrecidos.isNotEmpty == true ? sup!.productosOfrecidos.first : 'Producto';
+                _items[0].nombre = firstProd;
+                _items[0].costoUnitarioCtrl.text = _guessPrice(firstProd);
+              }
+            });
+          },
         ),
       ],
     );
@@ -1424,70 +1396,52 @@ class _NuevaFacturaModalState extends ConsumerState<NuevaFacturaModal> {
     }
 
     final currentVal = availableProducts.contains(item.nombre) ? item.nombre : (availableProducts.isNotEmpty ? availableProducts.first : null);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
-      decoration: BoxDecoration(
-        color: isDark ? Colors.white.withValues(alpha: 0.04) : Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: isDark ? Colors.white12 : AppColors.glassBorderLight),
-      ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<String>(
-          value: currentVal,
-          isExpanded: true,
-          dropdownColor: isDark ? AppColors.surfaceDark : Colors.white,
-          style: TextStyle(color: isDark ? Colors.white : AppColors.textPrimaryLight, fontSize: 12, fontWeight: FontWeight.w700),
-          onChanged: (val) {
-            if (val != null) {
-              setState(() {
-                item.nombre = val;
-                item.costoUnitarioCtrl.text = _guessPrice(val);
-              });
-            }
-          },
-          items: availableProducts.map((p) => DropdownMenuItem<String>(value: p, child: Text(p, overflow: TextOverflow.ellipsis))).toList(),
-        ),
-      ),
+    return GlassSelectField<String>(
+      placeholder: 'Seleccionar producto...',
+      value: currentVal,
+      accentColor: AppColors.cyanWater,
+      options: availableProducts
+          .map((p) => GlassSelectOption<String>(value: p, label: p))
+          .toList(),
+      onChanged: (val) {
+        if (val != null) {
+          setState(() {
+            item.nombre = val;
+            item.costoUnitarioCtrl.text = _guessPrice(val);
+          });
+        }
+      },
     );
   }
 
   Widget _buildUnitDropdown(EditableInvoiceItem item, List<String> unidadesDisponibles, bool isDark) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
-      decoration: BoxDecoration(
-        color: isDark ? Colors.white.withValues(alpha: 0.04) : Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: isDark ? Colors.white12 : AppColors.glassBorderLight),
-      ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<String>(
-          value: unidadesDisponibles.contains(item.unidadMedida) ? item.unidadMedida : unidadesDisponibles.first,
-          isExpanded: true,
-          dropdownColor: isDark ? AppColors.surfaceDark : Colors.white,
-          style: TextStyle(color: isDark ? Colors.white : AppColors.textPrimaryLight, fontSize: 12),
-          onChanged: (val) {
-            if (val != null) {
-              setState(() {
-                item.unidadMedida = val;
-                if (val.contains('40')) {
-                  item.factorUnidadCtrl.text = '40';
-                } else if (val.contains('20')) {
-                  item.factorUnidadCtrl.text = '20';
-                } else if (val.contains('50')) {
-                  item.factorUnidadCtrl.text = '50';
-                } else if (val.contains('25')) {
-                  item.factorUnidadCtrl.text = '25';
-                } else if (val.contains('Millar')) {
-                  item.factorUnidadCtrl.text = '1000';
-                } else {
-                  item.factorUnidadCtrl.text = '1';
-                }
-              });
+    return GlassSelectField<String>(
+      value: unidadesDisponibles.contains(item.unidadMedida) ? item.unidadMedida : unidadesDisponibles.first,
+      accentColor: AppColors.amberWarning,
+      enableSearch: false,
+      options: unidadesDisponibles
+          .map((u) => GlassSelectOption<String>(value: u, label: u))
+          .toList(),
+      onChanged: (val) {
+        if (val != null) {
+          setState(() {
+            item.unidadMedida = val;
+            if (val.contains('40')) {
+              item.factorUnidadCtrl.text = '40';
+            } else if (val.contains('20')) {
+              item.factorUnidadCtrl.text = '20';
+            } else if (val.contains('50')) {
+              item.factorUnidadCtrl.text = '50';
+            } else if (val.contains('25')) {
+              item.factorUnidadCtrl.text = '25';
+            } else if (val.contains('Millar')) {
+              item.factorUnidadCtrl.text = '1000';
+            } else {
+              item.factorUnidadCtrl.text = '1';
             }
-          },
-          items: unidadesDisponibles.map((u) => DropdownMenuItem<String>(value: u, child: Text(u, overflow: TextOverflow.ellipsis))).toList(),
-        ),
-      ),
+          });
+        }
+      },
     );
   }
 

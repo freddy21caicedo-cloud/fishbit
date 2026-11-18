@@ -7,6 +7,7 @@ import 'package:fishbit_finance/core/design_system/glass_container.dart';
 import 'package:fishbit_finance/core/design_system/glass_form_field.dart';
 import 'package:fishbit_finance/core/design_system/glass_button.dart';
 import 'package:fishbit_finance/core/design_system/glass_date_picker.dart';
+import 'package:fishbit_finance/core/design_system/glass_select_field.dart';
 import 'package:fishbit_finance/modules/auth_tenant/presentation/providers/auth_provider.dart';
 import 'package:fishbit_finance/modules/ponds_batches/presentation/providers/ponds_provider.dart';
 import 'package:fishbit_finance/modules/water_quality/domain/models/water_parameter.dart';
@@ -156,41 +157,20 @@ class _ParametroModalState extends ConsumerState<ParametroModal> {
                   ),
                   const SizedBox(height: 16),
 
-                  Text('ESTANQUE DE MEDICIÓN', style: AppTypography.labelMicro.copyWith(color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight)),
-                  const SizedBox(height: 6),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    decoration: BoxDecoration(
-                      color: isDark ? Colors.white.withValues(alpha: 0.06) : Colors.black.withValues(alpha: 0.04),
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: isDark ? Colors.white.withValues(alpha: 0.12) : AppColors.glassBorderLight),
-                    ),
-                    child: DropdownButtonHideUnderline(
-                      child: DropdownButton<String>(
-                        value: ponds.any((p) => p.id == _selectedPondId) ? _selectedPondId : null,
-                        dropdownColor: isDark ? AppColors.surfaceDarkRaised : AppColors.surfaceLight,
-                        isExpanded: true,
-                        hint: Text(
-                          'Selecciona un estanque *',
-                          style: TextStyle(color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight, fontSize: 13, fontWeight: FontWeight.w500),
-                        ),
-                        icon: const Icon(Icons.keyboard_arrow_down_rounded, color: AppColors.cyanWater),
-                        items: ponds.map((p) {
-                          return DropdownMenuItem<String>(
-                            value: p.id,
-                            child: Text(
-                              '${p.nombre} (${p.sigla})',
-                              style: TextStyle(
-                                color: isDark ? Colors.white : AppColors.textPrimaryLight,
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          );
-                        }).toList(),
-                        onChanged: (val) => setState(() => _selectedPondId = val),
-                      ),
-                    ),
+                  GlassSelectField<String>(
+                    label: 'ESTANQUE DE MEDICIÓN',
+                    placeholder: 'Selecciona un estanque *',
+                    value: ponds.any((p) => p.id == _selectedPondId) ? _selectedPondId : null,
+                    accentColor: AppColors.cyanWater,
+                    leadingIcon: Icons.waves_rounded,
+                    options: ponds
+                        .map((p) => GlassSelectOption<String>(
+                              value: p.id,
+                              label: '${p.nombre} (${p.sigla})',
+                              icon: Icons.waves_rounded,
+                            ))
+                        .toList(),
+                    onChanged: (val) => setState(() => _selectedPondId = val),
                   ),
                   const SizedBox(height: 14),
 

@@ -24,11 +24,20 @@
       ]
     },
     {
-      "source": "/(flutter_service_worker.js|version.json)",
+      "source": "/(flutter_service_worker.js|flutter_bootstrap.js|version.json)",
       "headers": [
         {
           "key": "Cache-Control",
           "value": "no-cache, no-store, must-revalidate"
+        }
+      ]
+    },
+    {
+      "source": "/(canvaskit|assets|icons)/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
         }
       ]
     }

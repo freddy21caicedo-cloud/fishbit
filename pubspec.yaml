@@ -49,6 +49,8 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  shaders:
+    - shaders/silk.frag
   assets:
     - assets/fonts/
     - assets/videos/
