@@ -171,7 +171,7 @@ class _ParametroModalState extends ConsumerState<ParametroModal> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                widget.parameterToEdit != null ? '💧 Editar Calidad de Agua' : '💧 Calidad de Agua',
+                                widget.parameterToEdit != null ? 'Editar Calidad de Agua' : 'Calidad de Agua',
                                 style: AppTypography.titleMedium.copyWith(color: isDark ? Colors.white : AppColors.textPrimaryLight, fontWeight: FontWeight.w800),
                               ),
                               Text(
@@ -286,7 +286,7 @@ class _ParametroModalState extends ConsumerState<ParametroModal> {
                   ),
                   const SizedBox(height: 18),
 
-                  _buildSectionHeader('🫁 OXÍGENO Y TEMPERATURA', AppColors.cyanWater),
+                  _buildSectionHeader('OXÍGENO Y TEMPERATURA', AppColors.cyanWater),
                   const SizedBox(height: 8),
                   Row(
                     children: [
@@ -359,7 +359,7 @@ class _ParametroModalState extends ConsumerState<ParametroModal> {
                   ),
                   const SizedBox(height: 16),
 
-                  _buildSectionHeader('🧪 COMPUESTOS NITROGENADOS', AppColors.greenBiomass),
+                  _buildSectionHeader('COMPUESTOS NITROGENADOS', AppColors.greenBiomass),
                   const SizedBox(height: 8),
                   Row(
                     children: [
@@ -393,7 +393,7 @@ class _ParametroModalState extends ConsumerState<ParametroModal> {
                   ),
                   const SizedBox(height: 16),
 
-                  _buildSectionHeader('🛡️ BALANCE QUÍMICO Y DESINFECCIÓN', AppColors.purpleAnalytics),
+                  _buildSectionHeader('BALANCE QUÍMICO Y DESINFECCIÓN', AppColors.purpleAnalytics),
                   const SizedBox(height: 8),
                   Row(
                     children: [

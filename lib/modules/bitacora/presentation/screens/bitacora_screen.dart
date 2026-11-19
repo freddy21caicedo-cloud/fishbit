@@ -41,7 +41,7 @@ class _BitacoraScreenState extends ConsumerState<BitacoraScreen> with SingleTick
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController = TabController(length: 5, vsync: this);
   }
 
   @override
@@ -86,13 +86,14 @@ class _BitacoraScreenState extends ConsumerState<BitacoraScreen> with SingleTick
                       final totalDataCount = waterState.recentParameters.length +
                           nutritionState.records.length +
                           pondsState.biometries.length +
-                          pondsState.mortalityRecords.length;
+                          pondsState.mortalityRecords.length +
+                          pondsState.transferRecords.length;
 
                       final options = <GlassSelectOption<String>>[
                         GlassSelectOption<String>(
                           value: '__ALL__',
                           label: 'Todos los Estanques (${pondsState.ponds.length})',
-                          subtitle: 'Filtra las 4 pestañas simultáneamente',
+                          subtitle: 'Filtra las 5 pestañas simultáneamente',
                           icon: Icons.grid_view_rounded,
                           badgeText: '$totalDataCount datos',
                           badgeColor: AppColors.cyanWater,
@@ -102,13 +103,18 @@ class _BitacoraScreenState extends ConsumerState<BitacoraScreen> with SingleTick
                           final countFeeding = nutritionState.records.where((r) => r.estanqueId == pond.id).length;
                           final countBiometrias = pondsState.biometries.where((b) => b.estanqueId == pond.id).length;
                           final countMortality = pondsState.mortalityRecords.where((m) => m.estanqueId == pond.id).length;
-                          final pondTotal = countWater + countFeeding + countBiometrias + countMortality;
+                          final countTransfers = pondsState.transferRecords
+                              .where((t) => t.estanqueOrigenId == pond.id || t.estanqueDestinoId == pond.id)
+                              .length;
+                          final pondTotal =
+                              countWater + countFeeding + countBiometrias + countMortality + countTransfers;
 
                           final parts = <String>[];
                           if (countWater > 0) parts.add('$countWater O₂/pH');
                           if (countFeeding > 0) parts.add('$countFeeding raciones');
                           if (countBiometrias > 0) parts.add('$countBiometrias muestreo(s)');
                           if (countMortality > 0) parts.add('$countMortality baja(s)');
+                          if (countTransfers > 0) parts.add('$countTransfers traslado(s)');
                           final subtitle = parts.isNotEmpty
                               ? parts.join(' • ')
                               : (pond.especieActual.isNotEmpty ? 'Cultivo: ${pond.especieActual}' : 'Estanque activo');
@@ -152,6 +158,7 @@ class _BitacoraScreenState extends ConsumerState<BitacoraScreen> with SingleTick
                   child: Center(
                     child: HeroTabsBar(
                       controller: _tabController,
+                      borderless: true,
                       tabs: const [
                         HeroTabItem(
                           key: Key('tab_calidad_agua'),
@@ -177,6 +184,12 @@ class _BitacoraScreenState extends ConsumerState<BitacoraScreen> with SingleTick
                           icon: Icons.warning_amber_rounded,
                           accentColor: AppColors.coralAction,
                         ),
+                        HeroTabItem(
+                          key: Key('tab_traslados'),
+                          label: 'Traslados',
+                          icon: Icons.swap_horiz_rounded,
+                          accentColor: AppColors.amberWarning,
+                        ),
                       ],
                     ),
                   ),
@@ -199,6 +212,9 @@ class _BitacoraScreenState extends ConsumerState<BitacoraScreen> with SingleTick
 
             // Pestaña 4: Mortalidad y Sanidad (Bajas)
             _buildMortalityTab(context, pondsState, pondMap, batchMap, isAdmin),
+
+            // Pestaña 5: Traslados y Desdobles
+            _buildTransfersTab(context, pondsState, pondMap, isAdmin),
           ],
         ),
       ),
@@ -509,7 +525,11 @@ class _BitacoraScreenState extends ConsumerState<BitacoraScreen> with SingleTick
                               Text(pondTitulo, style: AppTypography.titleSmall.copyWith(color: AppColors.cyanWater, fontWeight: FontWeight.w800)),
                               if (pondSigla.isNotEmpty && pondSigla != pondTitulo)
                                 GlassBadge(text: pondSigla, color: AppColors.cyanWater),
-                              GlassBadge(text: '$fechaStr • ⏰ $horaStr', color: Colors.white),
+                              GlassBadge(
+                                text: '$fechaStr • $horaStr',
+                                icon: Icons.schedule_rounded,
+                                color: Colors.white,
+                              ),
                             ],
                           ),
                         ),
@@ -1173,13 +1193,8 @@ class _BitacoraScreenState extends ConsumerState<BitacoraScreen> with SingleTick
       return Colors.white70;
     }
 
-    final filteredTransfers = _selectedPondId != null
-        ? pondsState.transferRecords.where((t) => t.estanqueOrigenId.trim() == _selectedPondId!.trim() || t.estanqueDestinoId.trim() == _selectedPondId!.trim()).toList()
-        : pondsState.transferRecords;
-
     final mortCount = sortedRecords.isEmpty ? 1 : sortedRecords.length;
-    final transCount = filteredTransfers.isEmpty ? 1 : filteredTransfers.length;
-    final totalItems = 1 + mortCount + 1 + transCount + 1;
+    final totalItems = 1 + mortCount + 1;
 
     return Center(
       child: ConstrainedBox(
@@ -1348,7 +1363,11 @@ class _BitacoraScreenState extends ConsumerState<BitacoraScreen> with SingleTick
                               children: [
                                 Text(pondTitulo, style: AppTypography.titleSmall.copyWith(color: AppColors.cyanWater, fontWeight: FontWeight.w800)),
                                 GlassBadge(text: '$loteStr • $especieStr', color: Colors.white),
-                                GlassBadge(text: '$fechaStr • ⏰ $horaStr', color: Colors.white70),
+                                GlassBadge(
+                                  text: '$fechaStr • $horaStr',
+                                  icon: Icons.schedule_rounded,
+                                  color: Colors.white70,
+                                ),
                               ],
                             ),
                           ),
@@ -1463,127 +1482,287 @@ class _BitacoraScreenState extends ConsumerState<BitacoraScreen> with SingleTick
               );
             }
 
-            // 1 + mortCount: Cabecera de Traslados
-            if (index == 1 + mortCount) {
+            // Footer Spacer
+            return const DockBottomSpacer(extra: 48.0);
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTransfersTab(
+    BuildContext context,
+    PondsState pondsState,
+    Map<String, Pond> pondMap,
+    bool isAdmin,
+  ) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textSecondary = isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
+    final textPrimary = isDark ? Colors.white : AppColors.textPrimaryLight;
+
+    final filteredTransfers = (_selectedPondId != null
+            ? pondsState.transferRecords.where(
+                (t) =>
+                    t.estanqueOrigenId.trim() == _selectedPondId!.trim() ||
+                    t.estanqueDestinoId.trim() == _selectedPondId!.trim(),
+              )
+            : pondsState.transferRecords)
+        .toList()
+      ..sort((a, b) => b.fechaOperacion.compareTo(a.fechaOperacion));
+
+    final int totalPecesTrasladados =
+        filteredTransfers.fold<int>(0, (sum, t) => sum + t.pecesTrasladados);
+    final double totalBiomasaTrasladada =
+        filteredTransfers.fold<double>(0.0, (sum, t) => sum + t.biomasaTrasladadaKg);
+    final int totalDesdobles = filteredTransfers.where((t) => t.esDesdoble).length;
+    final int totalCompletos = filteredTransfers.length - totalDesdobles;
+
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 1024),
+        child: ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: filteredTransfers.isEmpty ? 3 : (filteredTransfers.length + 2),
+          itemBuilder: (context, index) {
+            if (index == 0) {
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const SizedBox(height: 16),
-                  Wrap(
-                    alignment: WrapAlignment.spaceBetween,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    spacing: 8,
-                    runSpacing: 4,
+                  Row(
                     children: [
-                      Text(
-                        '🔄 HISTORIAL DE TRASLADOS Y DESDOBLES',
-                        style: AppTypography.labelMicro.copyWith(color: AppColors.amberWarning, letterSpacing: 1.2, fontWeight: FontWeight.w800),
+                      Expanded(
+                        child: GlassCard(
+                          title: 'TOTAL TRASLADOS',
+                          glowColor: AppColors.amberWarning,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Text(
+                                  '${filteredTransfers.length} eventos',
+                                  style: AppTypography.titleLarge.copyWith(
+                                    color: AppColors.amberWarning,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                ),
+                              ),
+                              Text(
+                                '$totalDesdobles desdoble(s) • $totalCompletos total(es)',
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 1,
+                                style: AppTypography.labelMicro.copyWith(color: textSecondary),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
-                      Text(
-                        '${filteredTransfers.length} eventos',
-                        style: AppTypography.labelMicro.copyWith(color: textSecondary),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: GlassCard(
+                          title: 'PECES TRASLADADOS',
+                          glowColor: AppColors.cyanWater,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Text(
+                                  '${CurrencyFormatters.formatInt(totalPecesTrasladados)} peces',
+                                  style: AppTypography.titleLarge.copyWith(
+                                    color: AppColors.cyanWater,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                ),
+                              ),
+                              Text(
+                                'Biomasa: ${CurrencyFormatters.formatKg(totalBiomasaTrasladada)}',
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 1,
+                                style: AppTypography.labelMicro.copyWith(color: textSecondary),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 16),
+                  Text(
+                    'HISTORIAL DE TRASLADOS Y DESDOBLES (${filteredTransfers.length})',
+                    style: AppTypography.labelMicro.copyWith(
+                      color: AppColors.amberWarning,
+                      letterSpacing: 1.4,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
                 ],
               );
             }
 
-            // (2 + mortCount)..(2 + mortCount + transCount - 1): Registros de traslados o estado vacío
-            if (index >= 2 + mortCount && index < 2 + mortCount + transCount) {
-              if (filteredTransfers.isEmpty) {
-                return const Padding(
-                  padding: EdgeInsets.all(16),
+            if (filteredTransfers.isEmpty) {
+              if (index == 1) {
+                final selectedPond = _selectedPondId != null ? pondMap[_selectedPondId] : null;
+                final nombreEstanque = selectedPond != null ? selectedPond.nombreLimpio : 'esta unidad';
+
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 16),
                   child: Center(
-                    child: Text('No hay registros de traslados para este estanque.', style: TextStyle(color: AppColors.textSecondaryDark, fontSize: 12)),
+                    child: Column(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: AppColors.amberWarning.withValues(alpha: 0.12),
+                            shape: BoxShape.circle,
+                            border: Border.all(color: AppColors.amberWarning.withValues(alpha: 0.3)),
+                          ),
+                          child: const Icon(
+                            Icons.swap_horiz_rounded,
+                            color: AppColors.amberWarning,
+                            size: 38,
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                        Text(
+                          'Sin traslados registrados en $nombreEstanque',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: textPrimary,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 15,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          'Registra movimientos totales de lote o desdobles entre estanques para conservar trazabilidad.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: textSecondary, fontSize: 12),
+                        ),
+                        const SizedBox(height: 16),
+                        ElevatedButton.icon(
+                          onPressed: () {
+                            final targetPond = _selectedPondId != null
+                                ? ref.read(pondsProvider).ponds.where((p) => p.id == _selectedPondId).firstOrNull
+                                : null;
+                            TrasladoModal.show(context, pond: targetPond);
+                          },
+                          icon: const Icon(Icons.swap_horiz_rounded, size: 18),
+                          label: const Text(
+                            'Registrar Traslado',
+                            style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.amberWarning,
+                            foregroundColor: Colors.black,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 );
               }
-
-              final t = filteredTransfers[index - 2 - mortCount];
-              final origen = pondMap[t.estanqueOrigenId];
-              final destino = pondMap[t.estanqueDestinoId];
-              final fechaStr = '${t.fechaOperacion.day}/${t.fechaOperacion.month}/${t.fechaOperacion.year}';
-
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: GlassContainer(
-                  borderRadius: 18,
-                  padding: const EdgeInsets.all(14),
-                  blur: 16,
-                  opacity: 0.12,
-                  borderColor: AppColors.amberWarning.withValues(alpha: 0.25),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Expanded(
-                            child: Text(
-                              '${origen?.nombreLimpio ?? "Estanque"} ➔ ${destino?.nombreLimpio ?? "Estanque"}',
-                              overflow: TextOverflow.ellipsis,
-                              style: AppTypography.titleSmall.copyWith(color: Colors.white, fontWeight: FontWeight.w800),
-                            ),
-                          ),
-                          GlassBadge(
-                            text: t.tipoOperacionLabel,
-                            color: t.esDesdoble ? AppColors.amberWarning : AppColors.cyanWater,
-                          ),
-                          if (isAdmin) ...[
-                            const SizedBox(width: 4),
-                            _buildAdminActionButtons(
-                              onEdit: null,
-                              onDelete: () => _confirmDeleteRecord(
-                                context,
-                                title: 'Revertir y Eliminar Traslado',
-                                message: t.esDesdoble
-                                    ? '¿Deseas revertir este desdoble de ${t.pecesTrasladados} peces? Se reintegrarán al lote origen y se ajustarán ambos estanques.'
-                                    : '¿Deseas revertir este traslado total hacia ${destino?.nombreLimpio ?? "destino"} y devolver el lote a ${origen?.nombreLimpio ?? "origen"}?',
-                                onConfirm: () => ref.read(pondsProvider.notifier).deleteTransfer(t),
-                                successMessage: 'Traslado revertido y eliminado correctamente.',
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                      const SizedBox(height: 6),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            '${t.pecesFormatted} • ${t.biomasaFormatted} • ${t.pesoPromedioGramos.toStringAsFixed(1)} g',
-                            style: const TextStyle(color: AppColors.cyanWater, fontWeight: FontWeight.w700, fontSize: 11.5),
-                          ),
-                          Text(
-                            'Costo Transf: ${t.costoTotalFormatted}',
-                            style: const TextStyle(color: AppColors.greenBiomass, fontWeight: FontWeight.w800, fontSize: 11.5),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            'Fecha: $fechaStr ${t.nuevoCodigoLote != null ? "• Lote: ${t.nuevoCodigoLote}" : ""}',
-                            style: TextStyle(color: textSecondary, fontSize: 10),
-                          ),
-                          Text(
-                            'Resp: ${t.registradoPor ?? "Operador"}',
-                            style: TextStyle(color: textSecondary, fontSize: 10),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              );
+              return const DockBottomSpacer(extra: 48.0);
             }
 
-            // Footer Spacer
-            return const DockBottomSpacer(extra: 48.0);
+            if (index == filteredTransfers.length + 1) {
+              return const DockBottomSpacer(extra: 48.0);
+            }
+
+            final t = filteredTransfers[index - 1];
+            final origen = pondMap[t.estanqueOrigenId];
+            final destino = pondMap[t.estanqueDestinoId];
+            final fechaStr = '${t.fechaOperacion.day}/${t.fechaOperacion.month}/${t.fechaOperacion.year}';
+
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: GlassContainer(
+                borderRadius: 18,
+                padding: const EdgeInsets.all(14),
+                blur: 16,
+                opacity: 0.12,
+                borderColor: AppColors.amberWarning.withValues(alpha: 0.25),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            '${origen?.nombreLimpio ?? "Estanque"} → ${destino?.nombreLimpio ?? "Estanque"}',
+                            overflow: TextOverflow.ellipsis,
+                            style: AppTypography.titleSmall.copyWith(
+                              color: textPrimary,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        GlassBadge(
+                          text: t.tipoOperacionLabel,
+                          color: t.esDesdoble ? AppColors.amberWarning : AppColors.cyanWater,
+                        ),
+                        if (isAdmin) ...[
+                          const SizedBox(width: 4),
+                          _buildAdminActionButtons(
+                            onEdit: null,
+                            onDelete: () => _confirmDeleteRecord(
+                              context,
+                              title: 'Revertir y Eliminar Traslado',
+                              message: t.esDesdoble
+                                  ? '¿Deseas revertir este desdoble de ${t.pecesTrasladados} peces? Se reintegrarán al lote origen y se ajustarán ambos estanques.'
+                                  : '¿Deseas revertir este traslado total hacia ${destino?.nombreLimpio ?? "destino"} y devolver el lote a ${origen?.nombreLimpio ?? "origen"}?',
+                              onConfirm: () => ref.read(pondsProvider.notifier).deleteTransfer(t),
+                              successMessage: 'Traslado revertido y eliminado correctamente.',
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          '${t.pecesFormatted} • ${t.biomasaFormatted} • ${t.pesoPromedioGramos.toStringAsFixed(1)} g',
+                          style: const TextStyle(
+                            color: AppColors.cyanWater,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 11.5,
+                          ),
+                        ),
+                        Text(
+                          'Costo Transf: ${t.costoTotalFormatted}',
+                          style: const TextStyle(
+                            color: AppColors.greenBiomass,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 11.5,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Fecha: $fechaStr ${t.nuevoCodigoLote != null ? "• Lote: ${t.nuevoCodigoLote}" : ""}',
+                          style: TextStyle(color: textSecondary, fontSize: 10),
+                        ),
+                        Text(
+                          'Resp: ${t.registradoPor ?? "Operador"}',
+                          style: TextStyle(color: textSecondary, fontSize: 10),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
           },
         ),
       ),

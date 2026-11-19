@@ -507,20 +507,39 @@ void main() {
       await tester.pumpWidget(buildTestWidget());
       await tester.pumpAndSettle();
 
-      // Check header and tabs
+      // Check header and all 5 tabs (including dedicated Traslados tab)
       expect(find.text('Calidad de Agua'), findsOneWidget);
       expect(find.text('Alimentación'), findsOneWidget);
       expect(find.text('Biometrías y GDP'), findsOneWidget);
       expect(find.text('Bajas y Sanidad'), findsOneWidget);
+      expect(find.text('Traslados'), findsOneWidget);
 
       // Check filter bar displays "Todos los Estanques"
       expect(find.textContaining('Todos los Estanques'), findsOneWidget);
 
-      // Tab 1 (Calidad de Agua) default view
+      // Tab 1 (Calidad de Agua) default view — without emojis
       expect(find.text('OXÍGENO DISUELTO'), findsOneWidget);
       expect(find.text('PH DE AGUA'), findsOneWidget);
       expect(find.text('6.2 mg/L'), findsOneWidget);
       expect(find.text('7.3'), findsOneWidget);
+      expect(find.textContaining('⏰'), findsNothing);
+    });
+
+    testWidgets('Tab 5 (Traslados) is independent from Bajas y Sanidad and renders transfer KPIs', (tester) async {
+      tester.view.physicalSize = const Size(1024, 900);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+
+      await tester.pumpWidget(buildTestWidget(screenSize: const Size(1024, 900)));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('tab_traslados')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('TOTAL TRASLADOS'), findsOneWidget);
+      expect(find.text('PECES TRASLADADOS'), findsOneWidget);
+      expect(find.textContaining('HISTORIAL DE TRASLADOS Y DESDOBLES'), findsOneWidget);
+      expect(find.text('Registrar Traslado'), findsOneWidget);
     });
 
     testWidgets('Tab 3 (Biometrías y GDP) displays sampling history and chronological period GDP calculation', (tester) async {

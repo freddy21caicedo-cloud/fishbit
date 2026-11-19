@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 import 'dart:ui' as ui;
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:fishbit_finance/core/design_system/app_colors.dart';
@@ -31,8 +32,46 @@ class GradientWavesController {
   }
 }
 
-/// Fondo animado `<GradientWaves />` (React Bits) implementado con Fragment Shader GLSL nativo.
-/// Optimizado a ~30 FPS suaves con pausa automática en segundo plano y fallback estático para tests.
+class _WaveAnimState extends ChangeNotifier {
+  double time = 0.0;
+  Offset smoothedPointer = const Offset(0.5, 0.5);
+  Offset clickOrigin = const Offset(0.5, 0.5);
+  double clickRadius = 0.0;
+  double clickStrength = 0.0;
+
+  void advance({
+    required double dt,
+    required double speed,
+    required bool mouseInteraction,
+    required bool swellOnClick,
+    GradientWavesController? controller,
+  }) {
+    time += dt * speed;
+    if (controller != null) {
+      if (mouseInteraction) {
+        final k = 1.0 - math.exp(-dt * 5.0);
+        smoothedPointer =
+            Offset.lerp(smoothedPointer, controller._pointerNorm, k)!;
+      }
+      if (swellOnClick && controller._clickStrength > 0.001) {
+        controller._clickRadius += dt * 0.65;
+        controller._clickStrength =
+            math.max(0.0, controller._clickStrength - dt * 0.9);
+      }
+      clickOrigin = controller._clickOriginNorm;
+      clickRadius = controller._clickRadius;
+      clickStrength = swellOnClick ? controller._clickStrength : 0.0;
+    }
+    notifyListeners();
+  }
+}
+
+/// Fondo animado `<GradientWaves />` (React Bits).
+/// - Cero `setState()` por frame (usa `repaint: Listenable` para evitar parpadeos).
+/// - En PWA móvil (`kIsWeb` sobre Android/iOS) usa renderizado Skia 2D nativo
+///   para eliminar al 100% el parpadeo de *framebuffer readback* entre WebGL
+///   `RuntimeEffect` y `BackdropFilter`.
+/// - En escritorio y móvil nativo reutiliza una única instancia de `FragmentShader`.
 class GradientWavesBackground extends StatefulWidget {
   final Color horizonColor;
   final Color waveColor;
@@ -52,7 +91,7 @@ class GradientWavesBackground extends StatefulWidget {
 
   const GradientWavesBackground({
     super.key,
-    this.horizonColor = const Color(0xFF4A152E),
+    this.horizonColor = const Color(0xFF4C142B),
     this.waveColor = AppColors.cyanWater,
     this.crestColor = const Color(0xFF67E8F9),
     this.speed = 0.45,
@@ -70,23 +109,24 @@ class GradientWavesBackground extends StatefulWidget {
   });
 
   @override
-  State<GradientWavesBackground> createState() => _GradientWavesBackgroundState();
+  State<GradientWavesBackground> createState() =>
+      _GradientWavesBackgroundState();
 }
 
 class _GradientWavesBackgroundState extends State<GradientWavesBackground>
     with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   static Future<ui.FragmentProgram>? _programFuture;
 
-  ui.FragmentProgram? _program;
+  ui.FragmentShader? _cachedShader;
   late final Ticker _ticker;
+  final _WaveAnimState _animState = _WaveAnimState();
   Duration _lastElapsed = Duration.zero;
-  double _accumulatedDt = 0.0;
-  double _time = 0.0;
-  Offset _smoothedPointer = const Offset(0.5, 0.5);
   bool _appResumed = true;
 
-  // ~30 FPS cap: visualmente fluido para ondas lentas (speed ~0.45) reduciendo 50% carga GPU
-  static const double _frameIntervalSec = 1.0 / 30.0;
+  bool get _useMobilePwaCanvasRenderer =>
+      kIsWeb &&
+      (defaultTargetPlatform == TargetPlatform.android ||
+          defaultTargetPlatform == TargetPlatform.iOS);
 
   @override
   void initState() {
@@ -96,19 +136,24 @@ class _GradientWavesBackgroundState extends State<GradientWavesBackground>
     if (!widget.paused) {
       _ticker.start();
     }
-    _loadProgram();
+    if (!_useMobilePwaCanvasRenderer) {
+      _loadShader();
+    }
   }
 
-  Future<void> _loadProgram() async {
+  Future<void> _loadShader() async {
     try {
       _programFuture ??=
           ui.FragmentProgram.fromAsset('shaders/gradient_waves.frag');
       final program = await _programFuture!;
-      if (mounted) {
-        setState(() => _program = program);
-      }
+      if (!mounted) return;
+      final shader = program.fragmentShader();
+      setState(() {
+        _cachedShader?.dispose();
+        _cachedShader = shader;
+      });
     } catch (_) {
-      // Fallback gradient remains visible in environments without shader support
+      // Fallback al renderizador 2D si el entorno no soporta FragmentShader
     }
   }
 
@@ -136,38 +181,26 @@ class _GradientWavesBackgroundState extends State<GradientWavesBackground>
 
   void _onTick(Duration elapsed) {
     final dt = _lastElapsed == Duration.zero
-        ? _frameIntervalSec
-        : math.min(0.08, (elapsed - _lastElapsed).inMicroseconds / 1e6);
+        ? (1.0 / 60.0)
+        : math.min(0.05, (elapsed - _lastElapsed).inMicroseconds / 1e6);
     _lastElapsed = elapsed;
-    _accumulatedDt += dt;
-    if (_accumulatedDt < _frameIntervalSec) return;
 
-    final step = _accumulatedDt;
-    _accumulatedDt = 0.0;
-
-    final ctrl = widget.controller;
-    if (ctrl != null) {
-      if (widget.mouseInteraction) {
-        final k = 1.0 - math.exp(-step * 5.0);
-        _smoothedPointer = Offset.lerp(_smoothedPointer, ctrl._pointerNorm, k)!;
-      }
-      if (widget.swellOnClick && ctrl._clickStrength > 0.001) {
-        ctrl._clickRadius += step * 0.65;
-        ctrl._clickStrength = math.max(0.0, ctrl._clickStrength - step * 0.9);
-      }
-    }
-
-    if (mounted) {
-      setState(() {
-        _time += step * widget.speed;
-      });
-    }
+    // Sin setState: solo notifica al CustomPainter a través del Listenable
+    _animState.advance(
+      dt: dt,
+      speed: widget.speed,
+      mouseInteraction: widget.mouseInteraction,
+      swellOnClick: widget.swellOnClick,
+      controller: widget.controller,
+    );
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _ticker.dispose();
+    _cachedShader?.dispose();
+    _animState.dispose();
     super.dispose();
   }
 
@@ -175,20 +208,18 @@ class _GradientWavesBackgroundState extends State<GradientWavesBackground>
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final baseBg = isDark ? AppColors.backgroundDark : AppColors.backgroundLight;
+    final useShader = !_useMobilePwaCanvasRenderer && _cachedShader != null;
 
     return RepaintBoundary(
       child: Stack(
         fit: StackFit.expand,
         children: [
-          // Base sólida del tema (garantiza contraste WCAG 2.2 AA en todo momento)
           ColoredBox(color: baseBg),
-
-          // Capa de ondas shader o fallback suave
-          if (_program != null)
+          if (useShader)
             CustomPaint(
-              painter: _GradientWavesPainter(
-                program: _program!,
-                time: _time,
+              painter: _GradientWavesShaderPainter(
+                shader: _cachedShader!,
+                animState: _animState,
                 horizonColor: widget.horizonColor,
                 waveColor: widget.waveColor,
                 crestColor: widget.crestColor,
@@ -198,34 +229,24 @@ class _GradientWavesBackgroundState extends State<GradientWavesBackground>
                 waveScale: widget.waveScale,
                 swell: widget.swell,
                 turbulence: widget.turbulence,
-                pointerNorm: widget.mouseInteraction
-                    ? _smoothedPointer
-                    : const Offset(0.5, 0.5),
-                clickOriginNorm:
-                    widget.controller?._clickOriginNorm ?? const Offset(0.5, 0.5),
-                clickRadius: widget.controller?._clickRadius ?? 0.0,
-                clickStrength: widget.swellOnClick
-                    ? (widget.controller?._clickStrength ?? 0.0)
-                    : 0.0,
+                mouseInteraction: widget.mouseInteraction,
                 opacity: widget.opacity,
               ),
             )
           else
-            DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    widget.horizonColor.withValues(alpha: widget.opacity * 0.55),
-                    widget.waveColor.withValues(alpha: widget.opacity * 0.35),
-                    baseBg,
-                  ],
-                ),
+            CustomPaint(
+              painter: _SmoothRibbonWavesPainter(
+                animState: _animState,
+                horizonColor: widget.horizonColor,
+                waveColor: widget.waveColor,
+                crestColor: widget.crestColor,
+                amplitude: widget.amplitude,
+                waveScale: widget.waveScale,
+                mouseInteraction: widget.mouseInteraction,
+                opacity: widget.opacity,
+                isDark: isDark,
               ),
             ),
-
-          // Scrim sutil superior e inferior para legibilidad perfecta de header y dock
           IgnorePointer(
             child: DecoratedBox(
               decoration: BoxDecoration(
@@ -249,9 +270,9 @@ class _GradientWavesBackgroundState extends State<GradientWavesBackground>
   }
 }
 
-class _GradientWavesPainter extends CustomPainter {
-  final ui.FragmentProgram program;
-  final double time;
+class _GradientWavesShaderPainter extends CustomPainter {
+  final ui.FragmentShader shader;
+  final _WaveAnimState animState;
   final Color horizonColor;
   final Color waveColor;
   final Color crestColor;
@@ -261,15 +282,12 @@ class _GradientWavesPainter extends CustomPainter {
   final double waveScale;
   final double swell;
   final double turbulence;
-  final Offset pointerNorm;
-  final Offset clickOriginNorm;
-  final double clickRadius;
-  final double clickStrength;
+  final bool mouseInteraction;
   final double opacity;
 
-  const _GradientWavesPainter({
-    required this.program,
-    required this.time,
+  _GradientWavesShaderPainter({
+    required this.shader,
+    required this.animState,
     required this.horizonColor,
     required this.waveColor,
     required this.crestColor,
@@ -279,68 +297,201 @@ class _GradientWavesPainter extends CustomPainter {
     required this.waveScale,
     required this.swell,
     required this.turbulence,
-    required this.pointerNorm,
-    required this.clickOriginNorm,
-    required this.clickRadius,
-    required this.clickStrength,
+    required this.mouseInteraction,
     required this.opacity,
-  });
+  }) : super(repaint: animState);
 
   @override
   void paint(Canvas canvas, Size size) {
     if (size.isEmpty) return;
-    final shader = program.fragmentShader();
     final rad = lightAngleDeg * math.pi / 180.0;
+    final ptr =
+        mouseInteraction ? animState.smoothedPointer : const Offset(0.5, 0.5);
 
     int i = 0;
-    // uView (vec2)
     shader.setFloat(i++, size.width);
     shader.setFloat(i++, size.height);
-    // uTime (float)
-    shader.setFloat(i++, time);
-    // uHorizonColor (vec3)
+    shader.setFloat(i++, animState.time);
     shader.setFloat(i++, horizonColor.r);
     shader.setFloat(i++, horizonColor.g);
     shader.setFloat(i++, horizonColor.b);
-    // uWaveColor (vec3)
     shader.setFloat(i++, waveColor.r);
     shader.setFloat(i++, waveColor.g);
     shader.setFloat(i++, waveColor.b);
-    // uCrestColor (vec3)
     shader.setFloat(i++, crestColor.r);
     shader.setFloat(i++, crestColor.g);
     shader.setFloat(i++, crestColor.b);
-    // uAmplitude, uRelief
     shader.setFloat(i++, amplitude);
     shader.setFloat(i++, relief);
-    // uLightDir (vec2)
     shader.setFloat(i++, math.cos(rad));
     shader.setFloat(i++, math.sin(rad));
-    // uWaveScale, uSwell, uTurbulence
     shader.setFloat(i++, waveScale);
     shader.setFloat(i++, swell);
     shader.setFloat(i++, turbulence);
-    // uPointer (vec2)
-    shader.setFloat(i++, pointerNorm.dx);
-    shader.setFloat(i++, pointerNorm.dy);
-    // uClickWave (vec4)
-    shader.setFloat(i++, clickOriginNorm.dx);
-    shader.setFloat(i++, clickOriginNorm.dy);
-    shader.setFloat(i++, clickRadius);
-    shader.setFloat(i++, clickStrength);
-    // uOpacity (float)
+    shader.setFloat(i++, ptr.dx);
+    shader.setFloat(i++, ptr.dy);
+    shader.setFloat(i++, animState.clickOrigin.dx);
+    shader.setFloat(i++, animState.clickOrigin.dy);
+    shader.setFloat(i++, animState.clickRadius);
+    shader.setFloat(i++, animState.clickStrength);
     shader.setFloat(i++, opacity);
 
     canvas.drawRect(Offset.zero & size, Paint()..shader = shader);
   }
 
   @override
-  bool shouldRepaint(covariant _GradientWavesPainter oldDelegate) =>
-      oldDelegate.time != time ||
+  bool shouldRepaint(covariant _GradientWavesShaderPainter oldDelegate) =>
+      oldDelegate.shader != shader ||
       oldDelegate.horizonColor != horizonColor ||
       oldDelegate.waveColor != waveColor ||
       oldDelegate.crestColor != crestColor ||
-      oldDelegate.pointerNorm != pointerNorm ||
-      oldDelegate.clickStrength != clickStrength ||
       oldDelegate.opacity != opacity;
+}
+
+/// Renderizador Skia 2D sin parpadeo para PWA móvil (Android/iOS Web).
+/// Dibuja horizonte coral sutil + 5 capas de ondas oceánicas en perspectiva
+/// con crestas luminosas y pulso interactivo al toque, sin cambios de contexto WebGL.
+class _SmoothRibbonWavesPainter extends CustomPainter {
+  final _WaveAnimState animState;
+  final Color horizonColor;
+  final Color waveColor;
+  final Color crestColor;
+  final double amplitude;
+  final double waveScale;
+  final bool mouseInteraction;
+  final double opacity;
+  final bool isDark;
+
+  _SmoothRibbonWavesPainter({
+    required this.animState,
+    required this.horizonColor,
+    required this.waveColor,
+    required this.crestColor,
+    required this.amplitude,
+    required this.waveScale,
+    required this.mouseInteraction,
+    required this.opacity,
+    required this.isDark,
+  }) : super(repaint: animState);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (size.isEmpty) return;
+    final w = size.width;
+    final h = size.height;
+    final t = animState.time;
+    final ptr =
+        mouseInteraction ? animState.smoothedPointer : const Offset(0.5, 0.5);
+    final px = (ptr.dx - 0.5) * 28.0;
+    final py = (ptr.dy - 0.5) * 14.0;
+
+    // 1. Horizonte superior con resplandor coral/oceánico suave
+    final horizonRect = Offset.zero & size;
+    canvas.drawRect(
+      horizonRect,
+      Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          stops: const [0.0, 0.30, 0.65, 1.0],
+          colors: [
+            horizonColor.withValues(alpha: opacity * 0.72),
+            Color.lerp(horizonColor, waveColor, 0.55)!
+                .withValues(alpha: opacity * 0.45),
+            waveColor.withValues(alpha: opacity * 0.32),
+            waveColor.withValues(alpha: opacity * 0.14),
+          ],
+        ).createShader(horizonRect),
+    );
+
+    // 2. Capas de ondas en perspectiva (5 bandas fluidas)
+    const int layers = 5;
+    const int steps = 28;
+    for (int l = 0; l < layers; l++) {
+      final frac = l / (layers - 1);
+      final baseY = h * (0.24 + frac * 0.58) + py * (0.4 + frac * 0.6);
+      final layerAmp = (10.0 + frac * 18.0) * (amplitude / 1.6);
+      final freq = (1.6 + (1.0 - frac) * 1.4) * waveScale;
+      final phase = t * (0.85 + frac * 0.45) + l * 1.35 + px * 0.015;
+
+      final path = Path()..moveTo(0, h);
+      final crestPath = Path();
+
+      for (int s = 0; s <= steps; s++) {
+        final u = s / steps;
+        final x = u * w;
+        final wave1 = math.sin(u * math.pi * 2.0 * freq + phase);
+        final wave2 =
+            math.cos(u * math.pi * 3.2 * freq - phase * 0.72 + l) * 0.45;
+        final y = baseY + (wave1 + wave2) * layerAmp;
+
+        path.lineTo(x, y);
+        if (s == 0) {
+          crestPath.moveTo(x, y);
+        } else {
+          crestPath.lineTo(x, y);
+        }
+      }
+      path
+        ..lineTo(w, h)
+        ..close();
+
+      final layerColor = Color.lerp(
+        horizonColor,
+        waveColor,
+        0.35 + frac * 0.65,
+      )!;
+      final layerAlpha = (opacity * (0.22 + frac * 0.24)).clamp(0.0, 0.55);
+
+      canvas.drawPath(
+        path,
+        Paint()
+          ..shader = LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              layerColor.withValues(alpha: layerAlpha),
+              layerColor.withValues(alpha: layerAlpha * 0.15),
+            ],
+          ).createShader(Rect.fromLTWH(0, baseY - layerAmp, w, h - baseY + layerAmp)),
+      );
+
+      // Cresta luminosa sutil sobre cada ola
+      canvas.drawPath(
+        crestPath,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.2 + frac * 0.8
+          ..color = crestColor.withValues(alpha: opacity * (0.20 + frac * 0.22)),
+      );
+    }
+
+    // 3. Pulso expansivo suave al tocar (swellOnClick)
+    if (animState.clickStrength > 0.01) {
+      final center = Offset(
+        animState.clickOrigin.dx * w,
+        animState.clickOrigin.dy * h,
+      );
+      final maxR = math.max(w, h) * 0.55;
+      final r = math.max(12.0, animState.clickRadius * maxR);
+      canvas.drawCircle(
+        center,
+        r,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2.0
+          ..color = crestColor.withValues(
+            alpha: (animState.clickStrength * opacity * 0.65).clamp(0.0, 0.45),
+          ),
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _SmoothRibbonWavesPainter oldDelegate) =>
+      oldDelegate.horizonColor != horizonColor ||
+      oldDelegate.waveColor != waveColor ||
+      oldDelegate.crestColor != crestColor ||
+      oldDelegate.opacity != opacity ||
+      oldDelegate.isDark != isDark;
 }

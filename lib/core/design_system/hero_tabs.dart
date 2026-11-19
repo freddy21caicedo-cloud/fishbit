@@ -25,12 +25,14 @@ class HeroTabsBar extends StatefulWidget {
   final TabController controller;
   final List<HeroTabItem> tabs;
   final ValueChanged<int>? onTap;
+  final bool borderless;
 
   const HeroTabsBar({
     super.key,
     required this.controller,
     required this.tabs,
     this.onTap,
+    this.borderless = false,
   });
 
   @override
@@ -137,12 +139,16 @@ class _HeroTabsBarState extends State<HeroTabsBar> {
       },
       child: SizeChangedLayoutNotifier(
         child: Container(
-          decoration: BoxDecoration(
-            color: listBg,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: listBorder, width: 1),
-          ),
-          padding: const EdgeInsets.all(4),
+          decoration: widget.borderless
+              ? null
+              : BoxDecoration(
+                  color: listBg,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: listBorder, width: 1),
+                ),
+          padding: widget.borderless
+              ? const EdgeInsets.symmetric(vertical: 2)
+              : const EdgeInsets.all(4),
           child: SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             physics: const BouncingScrollPhysics(),
@@ -183,21 +189,31 @@ class _HeroTabsBarState extends State<HeroTabsBar> {
                         height: indicatorRect.height,
                         child: DecoratedBox(
                           decoration: BoxDecoration(
-                            color: isDark
-                                ? const Color(0xFF27272A)
-                                : Colors.white,
-                            borderRadius: BorderRadius.circular(10),
+                            color: widget.borderless
+                                ? (isDark
+                                    ? activeAccent.withValues(alpha: 0.18)
+                                    : Colors.white.withValues(alpha: 0.92))
+                                : (isDark
+                                    ? const Color(0xFF27272A)
+                                    : Colors.white),
+                            borderRadius: BorderRadius.circular(
+                              widget.borderless ? 999 : 10,
+                            ),
                             border: Border.all(
                               color: isDark
-                                  ? activeAccent.withValues(alpha: 0.35)
-                                  : Colors.black.withValues(alpha: 0.05),
+                                  ? activeAccent.withValues(
+                                      alpha: widget.borderless ? 0.45 : 0.35,
+                                    )
+                                  : (widget.borderless
+                                      ? activeAccent.withValues(alpha: 0.25)
+                                      : Colors.black.withValues(alpha: 0.05)),
                               width: 1,
                             ),
                             boxShadow: [
                               BoxShadow(
                                 color: Colors.black
-                                    .withValues(alpha: isDark ? 0.32 : 0.08),
-                                blurRadius: 6,
+                                    .withValues(alpha: isDark ? 0.28 : 0.08),
+                                blurRadius: 8,
                                 offset: const Offset(0, 2),
                               ),
                             ],
