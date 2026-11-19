@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fishbit_finance/core/design_system/app_colors.dart';
 import 'package:fishbit_finance/core/design_system/app_typography.dart';
+import 'package:fishbit_finance/core/design_system/fade_content.dart';
 import 'package:fishbit_finance/core/design_system/fishbit_header.dart';
 import 'package:fishbit_finance/core/design_system/glass_card.dart';
 import 'package:fishbit_finance/core/design_system/floating_dock_layout.dart';
@@ -130,18 +131,21 @@ class _BitacoraScreenState extends ConsumerState<BitacoraScreen> with SingleTick
                         }),
                       ];
 
-                      return GlassSelectField<String>(
-                        label: 'ESTANQUE DE CONSULTA',
-                        placeholder: 'Buscar estanque por nombre o sigla...',
-                        value: _selectedPondId ?? '__ALL__',
-                        accentColor: AppColors.cyanWater,
-                        leadingIcon: Icons.tune_rounded,
-                        options: options,
-                        onChanged: (val) {
-                          setState(() {
-                            _selectedPondId = (val == null || val == '__ALL__') ? null : val;
-                          });
-                        },
+                      return FadeContent(
+                        delay: const Duration(milliseconds: 30),
+                        child: GlassSelectField<String>(
+                          label: 'ESTANQUE DE CONSULTA',
+                          placeholder: 'Buscar estanque por nombre o sigla...',
+                          value: _selectedPondId ?? '__ALL__',
+                          accentColor: AppColors.cyanWater,
+                          leadingIcon: Icons.tune_rounded,
+                          options: options,
+                          onChanged: (val) {
+                            setState(() {
+                              _selectedPondId = (val == null || val == '__ALL__') ? null : val;
+                            });
+                          },
+                        ),
                       );
                     },
                   ),
@@ -150,47 +154,50 @@ class _BitacoraScreenState extends ConsumerState<BitacoraScreen> with SingleTick
             ),
           ),
           SliverToBoxAdapter(
-            child: Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 1024),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                  child: Center(
-                    child: HeroTabsBar(
-                      controller: _tabController,
-                      borderless: true,
-                      tabs: const [
-                        HeroTabItem(
-                          key: Key('tab_calidad_agua'),
-                          label: 'Calidad de Agua',
-                          icon: Icons.water_drop_rounded,
-                          accentColor: AppColors.cyanWater,
-                        ),
-                        HeroTabItem(
-                          key: Key('tab_alimentacion'),
-                          label: 'Alimentación',
-                          icon: Icons.restaurant_rounded,
-                          accentColor: AppColors.greenBiomass,
-                        ),
-                        HeroTabItem(
-                          key: Key('tab_biometrias'),
-                          label: 'Biometrías y GDP',
-                          icon: Icons.scale_rounded,
-                          accentColor: Colors.purpleAccent,
-                        ),
-                        HeroTabItem(
-                          key: Key('tab_bajas'),
-                          label: 'Bajas y Sanidad',
-                          icon: Icons.warning_amber_rounded,
-                          accentColor: AppColors.coralAction,
-                        ),
-                        HeroTabItem(
-                          key: Key('tab_traslados'),
-                          label: 'Traslados',
-                          icon: Icons.swap_horiz_rounded,
-                          accentColor: AppColors.amberWarning,
-                        ),
-                      ],
+            child: FadeContent(
+              delay: const Duration(milliseconds: 110),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 1024),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                    child: Center(
+                      child: HeroTabsBar(
+                        controller: _tabController,
+                        borderless: true,
+                        tabs: const [
+                          HeroTabItem(
+                            key: Key('tab_calidad_agua'),
+                            label: 'Calidad de Agua',
+                            icon: Icons.water_drop_rounded,
+                            accentColor: AppColors.cyanWater,
+                          ),
+                          HeroTabItem(
+                            key: Key('tab_alimentacion'),
+                            label: 'Alimentación',
+                            icon: Icons.restaurant_rounded,
+                            accentColor: AppColors.greenBiomass,
+                          ),
+                          HeroTabItem(
+                            key: Key('tab_biometrias'),
+                            label: 'Biometrías y GDP',
+                            icon: Icons.scale_rounded,
+                            accentColor: Colors.purpleAccent,
+                          ),
+                          HeroTabItem(
+                            key: Key('tab_bajas'),
+                            label: 'Bajas y Sanidad',
+                            icon: Icons.warning_amber_rounded,
+                            accentColor: AppColors.coralAction,
+                          ),
+                          HeroTabItem(
+                            key: Key('tab_traslados'),
+                            label: 'Traslados',
+                            icon: Icons.swap_horiz_rounded,
+                            accentColor: AppColors.amberWarning,
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -198,9 +205,11 @@ class _BitacoraScreenState extends ConsumerState<BitacoraScreen> with SingleTick
             ),
           ),
         ],
-        body: TabBarView(
-          controller: _tabController,
-          children: [
+        body: FadeContent(
+          delay: const Duration(milliseconds: 185),
+          child: TabBarView(
+            controller: _tabController,
+            children: [
             // Pestaña 1: Calidad de Agua
             _buildWaterQualityTab(context, waterState, pondsState, pondMap, isAdmin),
 
@@ -216,6 +225,7 @@ class _BitacoraScreenState extends ConsumerState<BitacoraScreen> with SingleTick
             // Pestaña 5: Traslados y Desdobles
             _buildTransfersTab(context, pondsState, pondMap, isAdmin),
           ],
+        ),
         ),
       ),
 

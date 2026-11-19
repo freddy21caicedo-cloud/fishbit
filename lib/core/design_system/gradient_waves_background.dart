@@ -2,7 +2,7 @@ import 'dart:math' as math;
 import 'dart:ui' as ui;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/scheduler.dart';
+import 'package:fishbit_finance/core/design_system/ambient_clock.dart';
 import 'package:fishbit_finance/core/design_system/app_colors.dart';
 
 /// Controlador ligero para alimentar `mouseInteraction` y `swellOnClick`
@@ -114,14 +114,21 @@ class GradientWavesBackground extends StatefulWidget {
 }
 
 class _GradientWavesBackgroundState extends State<GradientWavesBackground>
-    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
+    with WidgetsBindingObserver {
   static Future<ui.FragmentProgram>? _programFuture;
 
+  /// El fondo es decorativo y de movimiento lento: se alimenta del
+  /// [AmbientClock] compartido (~30 FPS) en lugar de un `Ticker` a 60 Hz.
+  /// Esto reduce a la mitad el trabajo de GPU (shader a pantalla completa +
+  /// recomposición de todos los BackdropFilter que hay encima: header, barra
+  /// de navegación y modales).
   ui.FragmentShader? _cachedShader;
-  late final Ticker _ticker;
+  bool _clockSubscribed = false;
   final _WaveAnimState _animState = _WaveAnimState();
   Duration _lastElapsed = Duration.zero;
   bool _appResumed = true;
+  bool _tickerModeEnabled = true;
+  bool _reduceMotion = false;
 
   bool get _useMobilePwaCanvasRenderer =>
       kIsWeb &&
@@ -132,13 +139,19 @@ class _GradientWavesBackgroundState extends State<GradientWavesBackground>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _ticker = createTicker(_onTick);
-    if (!widget.paused) {
-      _ticker.start();
-    }
     if (!_useMobilePwaCanvasRenderer) {
       _loadShader();
     }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Pausar cuando la ruta queda oculta (TickerMode) o cuando el sistema
+    // solicita reducir animaciones (accesibilidad / ahorro de batería).
+    _tickerModeEnabled = TickerMode.of(context);
+    _reduceMotion = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+    _syncTickerState();
   }
 
   Future<void> _loadShader() async {
@@ -170,19 +183,26 @@ class _GradientWavesBackgroundState extends State<GradientWavesBackground>
   }
 
   void _syncTickerState() {
-    final shouldRun = !widget.paused && _appResumed;
-    if (shouldRun && !_ticker.isActive) {
+    final shouldRun = !widget.paused &&
+        _appResumed &&
+        _tickerModeEnabled &&
+        !_reduceMotion;
+    if (shouldRun && !_clockSubscribed) {
       _lastElapsed = Duration.zero;
-      _ticker.start();
-    } else if (!shouldRun && _ticker.isActive) {
-      _ticker.stop();
+      AmbientClock.instance.subscribe(_onTick);
+      _clockSubscribed = true;
+    } else if (!shouldRun && _clockSubscribed) {
+      AmbientClock.instance.unsubscribe(_onTick);
+      _clockSubscribed = false;
     }
   }
 
   void _onTick(Duration elapsed) {
-    final dt = _lastElapsed == Duration.zero
-        ? (1.0 / 60.0)
-        : math.min(0.05, (elapsed - _lastElapsed).inMicroseconds / 1e6);
+    if (!mounted) return;
+    final rawDt = (elapsed - _lastElapsed).inMicroseconds / 1e6;
+    final dt = _lastElapsed == Duration.zero || rawDt <= 0
+        ? (1.0 / 30.0)
+        : math.min(0.05, rawDt);
     _lastElapsed = elapsed;
 
     // Sin setState: solo notifica al CustomPainter a través del Listenable
@@ -198,7 +218,10 @@ class _GradientWavesBackgroundState extends State<GradientWavesBackground>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _ticker.dispose();
+    if (_clockSubscribed) {
+      AmbientClock.instance.unsubscribe(_onTick);
+      _clockSubscribed = false;
+    }
     _cachedShader?.dispose();
     _animState.dispose();
     super.dispose();

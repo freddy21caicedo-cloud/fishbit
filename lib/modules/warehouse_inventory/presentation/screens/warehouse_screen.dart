@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fishbit_finance/core/design_system/app_colors.dart';
 import 'package:fishbit_finance/core/design_system/app_typography.dart';
+import 'package:fishbit_finance/core/design_system/fade_content.dart';
 import 'package:fishbit_finance/core/design_system/fishbit_header.dart';
 import 'package:fishbit_finance/core/design_system/glass_card.dart';
 import 'package:fishbit_finance/core/design_system/floating_dock_layout.dart';
@@ -167,8 +168,9 @@ class _WarehouseScreenState extends ConsumerState<WarehouseScreen> with SingleTi
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              child: FadeContentStagger(
+                stagger: const Duration(milliseconds: 90),
+                spacing: 14,
                 children: [
                   // Barra de Búsqueda y Acciones Rápidas
                   Row(
@@ -220,8 +222,6 @@ class _WarehouseScreenState extends ConsumerState<WarehouseScreen> with SingleTi
                     ],
                   ),
 
-                  const SizedBox(height: 16),
-
                   // 5 Tabs de Navegación Especializada (HeroUI v3 Tabs)
                   Center(
                     child: HeroTabsBar(
@@ -242,10 +242,8 @@ class _WarehouseScreenState extends ConsumerState<WarehouseScreen> with SingleTi
                     ),
                   ),
 
-                  if (categoryItems.isNotEmpty) ...[
-                    const SizedBox(height: 14),
+                  if (categoryItems.isNotEmpty)
                     _buildCategoryStockSummary(categoryItems, currentTabColor, isDark),
-                  ],
                 ],
               ),
             ),

@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:fishbit_finance/app/main_navigation_shell.dart';
+import 'package:fishbit_finance/core/design_system/fade_content.dart';
 import 'package:fishbit_finance/modules/auth_tenant/presentation/providers/auth_provider.dart';
 import 'package:fishbit_finance/modules/auth_tenant/presentation/screens/splash_screen.dart';
 import 'package:fishbit_finance/modules/auth_tenant/presentation/screens/sede_selection_screen.dart';
@@ -139,39 +140,66 @@ final routerProvider = Provider<GoRouter>((ref) {
         routes: [
           GoRoute(
             path: '/',
-            builder: (context, state) => const HomeDashboardScreen(),
+            pageBuilder: (context, state) => buildMistTransitionPage(
+              key: state.pageKey,
+              child: const HomeDashboardScreen(),
+            ),
           ),
           GoRoute(
             path: '/ponds',
-            builder: (context, state) => const PondsDashboardScreen(),
+            pageBuilder: (context, state) => buildMistTransitionPage(
+              key: state.pageKey,
+              child: const PondsDashboardScreen(),
+            ),
           ),
           GoRoute(
             path: '/warehouse',
-            builder: (context, state) => const WarehouseScreen(),
+            pageBuilder: (context, state) => buildMistTransitionPage(
+              key: state.pageKey,
+              child: const WarehouseScreen(),
+            ),
           ),
           GoRoute(
             path: '/bitacora',
-            builder: (context, state) => const BitacoraScreen(),
+            pageBuilder: (context, state) => buildMistTransitionPage(
+              key: state.pageKey,
+              child: const BitacoraScreen(),
+            ),
           ),
           GoRoute(
             path: '/records',
-            builder: (context, state) => const BitacoraScreen(),
+            pageBuilder: (context, state) => buildMistTransitionPage(
+              key: state.pageKey,
+              child: const BitacoraScreen(),
+            ),
           ),
           GoRoute(
             path: '/sales',
-            builder: (context, state) => const SalesScreen(),
+            pageBuilder: (context, state) => buildMistTransitionPage(
+              key: state.pageKey,
+              child: const SalesScreen(),
+            ),
           ),
           GoRoute(
             path: '/finance',
-            builder: (context, state) => const FinanceScreen(),
+            pageBuilder: (context, state) => buildMistTransitionPage(
+              key: state.pageKey,
+              child: const FinanceScreen(),
+            ),
           ),
           GoRoute(
             path: '/team',
-            builder: (context, state) => const GestionEquipoScreen(),
+            pageBuilder: (context, state) => buildMistTransitionPage(
+              key: state.pageKey,
+              child: const GestionEquipoScreen(),
+            ),
           ),
           GoRoute(
             path: '/ica',
-            builder: (context, state) => const IcaCertificationScreen(),
+            pageBuilder: (context, state) => buildMistTransitionPage(
+              key: state.pageKey,
+              child: const IcaCertificationScreen(),
+            ),
           ),
         ],
       ),

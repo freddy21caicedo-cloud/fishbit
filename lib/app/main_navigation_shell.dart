@@ -122,8 +122,8 @@ class _MainNavigationShellState extends ConsumerState<MainNavigationShell> {
               ),
             ),
 
-            // Pantalla actual activa (con Scaffold transparente sobre las ondas)
-            Positioned.fill(child: widget.child),
+            // Pantalla actual activa (aislada en RepaintBoundary sobre las ondas)
+            Positioned.fill(child: RepaintBoundary(child: widget.child)),
 
           // Barra Flotante <PillNav /> (React Bits: itemStyle="plain", hoverEffect="fill",
           // indicator="pill", layout="joined", size="sm", collapse="never")
@@ -520,7 +520,7 @@ class _PillNavBarState extends State<PillNavBar>
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(999),
                     child: BackdropFilter(
-                      filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+                      filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
                       child: DecoratedBox(
                         decoration: BoxDecoration(
                           color: frameBg,

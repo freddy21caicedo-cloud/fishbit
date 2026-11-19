@@ -38,10 +38,11 @@ class FishBitHeader extends ConsumerWidget {
       elevation: 0,
       toolbarHeight: 68,
       automaticallyImplyLeading: false,
-      flexibleSpace: ClipRect(
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-          child: Container(
+      flexibleSpace: RepaintBoundary(
+        child: ClipRect(
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+            child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             decoration: BoxDecoration(
               gradient: LinearGradient(
@@ -116,6 +117,7 @@ class FishBitHeader extends ConsumerWidget {
               ),
             ),
           ),
+        ),
         ),
       ),
     );

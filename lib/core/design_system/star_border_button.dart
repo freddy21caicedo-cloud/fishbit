@@ -1,8 +1,8 @@
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
-import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
+import 'package:fishbit_finance/core/design_system/ambient_clock.dart';
 
 enum StarBorderHoverMode { lap, brighten, reveal, none }
 
@@ -122,15 +122,16 @@ class StarBorderButton extends StatefulWidget {
   State<StarBorderButton> createState() => _StarBorderButtonState();
 }
 
-class _StarBorderButtonState extends State<StarBorderButton>
-    with SingleTickerProviderStateMixin {
+class _StarBorderButtonState extends State<StarBorderButton> {
   static const double _lapDuration = 0.9;
   static const double _tau = math.pi * 2;
 
   final GlobalKey _boxKey = GlobalKey();
   final math.Random _rng = math.Random();
   final ValueNotifier<int> _paintTick = ValueNotifier<int>(0);
-  late Ticker _ticker;
+  // Alimentado por el reloj decorativo compartido (~30 FPS) en lugar de un
+  // Ticker propio a 60 Hz: evita recomponer los blur de toda la escena.
+  bool _clockSubscribed = false;
   Duration _lastElapsed = Duration.zero;
 
   Size _size = Size.zero;
@@ -152,12 +153,30 @@ class _StarBorderButtonState extends State<StarBorderButton>
   void initState() {
     super.initState();
     _reveal = widget.hover == StarBorderHoverMode.reveal ? 0.0 : 1.0;
-    _ticker = createTicker(_onTick)..start();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Pausar si la ruta está oculta o el sistema pide reducir animaciones.
+    final shouldRun = TickerMode.of(context) &&
+        !(MediaQuery.maybeDisableAnimationsOf(context) ?? false);
+    if (shouldRun && !_clockSubscribed) {
+      _lastElapsed = Duration.zero;
+      AmbientClock.instance.subscribe(_onTick);
+      _clockSubscribed = true;
+    } else if (!shouldRun && _clockSubscribed) {
+      AmbientClock.instance.unsubscribe(_onTick);
+      _clockSubscribed = false;
+    }
   }
 
   @override
   void dispose() {
-    _ticker.dispose();
+    if (_clockSubscribed) {
+      AmbientClock.instance.unsubscribe(_onTick);
+      _clockSubscribed = false;
+    }
     _paintTick.dispose();
     super.dispose();
   }

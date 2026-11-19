@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fishbit_finance/core/design_system/app_colors.dart';
 import 'package:fishbit_finance/core/design_system/app_typography.dart';
+import 'package:fishbit_finance/core/design_system/fade_content.dart';
 import 'package:fishbit_finance/core/design_system/fishbit_header.dart';
 import 'package:fishbit_finance/core/design_system/floating_dock_layout.dart';
 import 'package:fishbit_finance/modules/auth_tenant/presentation/providers/auth_provider.dart';
@@ -66,76 +67,79 @@ class _PondsDashboardScreenState extends ConsumerState<PondsDashboardScreen> {
 
                 // Barra de Filtros Segmentados
                 SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Barra de Filtros Segmentados
-                        Wrap(
-                          alignment: WrapAlignment.spaceBetween,
-                          crossAxisAlignment: WrapCrossAlignment.center,
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: [
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  'ESTANQUES (${filteredPonds.length})',
-                                  style: AppTypography.labelMicro.copyWith(
-                                    color: AppColors.textSecondaryDark,
-                                    letterSpacing: 1.2,
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                InkWell(
-                                  onTap: () {
-                                    showDialog<void>(
-                                      context: context,
-                                      barrierColor: Colors.black.withAlpha(160),
-                                      builder: (_) => const CrearEstanqueModal(),
-                                    );
-                                  },
-                                  borderRadius: BorderRadius.circular(16),
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                    decoration: BoxDecoration(
-                                      color: AppColors.cyanWater.withAlpha(25),
-                                      borderRadius: BorderRadius.circular(16),
-                                      border: Border.all(color: AppColors.cyanWater.withAlpha(80), width: 0.8),
+                  child: FadeContent(
+                    delay: const Duration(milliseconds: 30),
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Barra de Filtros Segmentados
+                          Wrap(
+                            alignment: WrapAlignment.spaceBetween,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    'ESTANQUES (${filteredPonds.length})',
+                                    style: AppTypography.labelMicro.copyWith(
+                                      color: AppColors.textSecondaryDark,
+                                      letterSpacing: 1.2,
                                     ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        const Icon(Icons.add_rounded, size: 13, color: AppColors.cyanWater),
-                                        const SizedBox(width: 3),
-                                        Text(
-                                          'Nuevo',
-                                          style: AppTypography.labelMicro.copyWith(
-                                            color: AppColors.cyanWater,
-                                            fontWeight: FontWeight.w700,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  InkWell(
+                                    onTap: () {
+                                      showDialog<void>(
+                                        context: context,
+                                        barrierColor: Colors.black.withAlpha(160),
+                                        builder: (_) => const CrearEstanqueModal(),
+                                      );
+                                    },
+                                    borderRadius: BorderRadius.circular(16),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                      decoration: BoxDecoration(
+                                        color: AppColors.cyanWater.withAlpha(25),
+                                        borderRadius: BorderRadius.circular(16),
+                                        border: Border.all(color: AppColors.cyanWater.withAlpha(80), width: 0.8),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          const Icon(Icons.add_rounded, size: 13, color: AppColors.cyanWater),
+                                          const SizedBox(width: 3),
+                                          Text(
+                                            'Nuevo',
+                                            style: AppTypography.labelMicro.copyWith(
+                                              color: AppColors.cyanWater,
+                                              fontWeight: FontWeight.w700,
+                                            ),
                                           ),
-                                        ),
-                                      ],
+                                        ],
+                                      ),
                                     ),
                                   ),
-                                ),
-                              ],
-                            ),
-                            Wrap(
-                              spacing: 6,
-                              crossAxisAlignment: WrapCrossAlignment.center,
-                              children: [
-                                _buildFilterChip(label: 'Todos', index: 0),
-                                _buildFilterChip(label: 'Activos', index: 1),
-                                _buildFilterChip(label: 'Vacíos', index: 2),
-                              ],
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 10),
-                      ],
+                                ],
+                              ),
+                              Wrap(
+                                spacing: 6,
+                                crossAxisAlignment: WrapCrossAlignment.center,
+                                children: [
+                                  _buildFilterChip(label: 'Todos', index: 0),
+                                  _buildFilterChip(label: 'Activos', index: 1),
+                                  _buildFilterChip(label: 'Vacíos', index: 2),
+                                ],
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -170,23 +174,26 @@ class _PondsDashboardScreenState extends ConsumerState<PondsDashboardScreen> {
                           final activeBatches = batchesByPond[pond.id] ?? const <FishBatch>[];
                           final primaryBatch = activeBatches.firstOrNull;
 
-                          return PondBentoCard(
-                            pond: pond,
-                            batch: primaryBatch,
-                            batches: activeBatches,
-                            latestWaterParameter: waterQualityByPond[pond.id],
-                            targetWeightsBySpecies: targetWeightsBySpecies,
-                            onFeedPressed: () {
-                              if (primaryBatch != null) {
-                                AlimentarModal.show(context, pond: pond, batch: primaryBatch);
-                              } else {
-                                SiembraModal.show(context);
-                              }
-                            },
-                            onSamplePressed: primaryBatch != null ? () => BiometriaModal.show(context, pond: pond, batch: primaryBatch) : null,
-                            onMortalityPressed: primaryBatch != null ? () => MortalidadModal.show(context, pond: pond, batch: primaryBatch) : null,
-                            onTransferPressed: primaryBatch != null ? () => TrasladoModal.show(context, pond: pond, batch: primaryBatch) : null,
-                            onEditPondPressed: () => CrearEstanqueModal.show(context, pondToEdit: pond),
+                          return FadeContent(
+                            delay: Duration(milliseconds: 90 + (index.clamp(0, 6) * 75)),
+                            child: PondBentoCard(
+                              pond: pond,
+                              batch: primaryBatch,
+                              batches: activeBatches,
+                              latestWaterParameter: waterQualityByPond[pond.id],
+                              targetWeightsBySpecies: targetWeightsBySpecies,
+                              onFeedPressed: () {
+                                if (primaryBatch != null) {
+                                  AlimentarModal.show(context, pond: pond, batch: primaryBatch);
+                                } else {
+                                  SiembraModal.show(context);
+                                }
+                              },
+                              onSamplePressed: primaryBatch != null ? () => BiometriaModal.show(context, pond: pond, batch: primaryBatch) : null,
+                              onMortalityPressed: primaryBatch != null ? () => MortalidadModal.show(context, pond: pond, batch: primaryBatch) : null,
+                              onTransferPressed: primaryBatch != null ? () => TrasladoModal.show(context, pond: pond, batch: primaryBatch) : null,
+                              onEditPondPressed: () => CrearEstanqueModal.show(context, pondToEdit: pond),
+                            ),
                           );
                         },
                         childCount: filteredPonds.length,
@@ -207,23 +214,26 @@ class _PondsDashboardScreenState extends ConsumerState<PondsDashboardScreen> {
 
                           return Padding(
                             padding: const EdgeInsets.only(bottom: 16),
-                            child: PondBentoCard(
-                              pond: pond,
-                              batch: primaryBatch,
-                              batches: activeBatches,
-                              latestWaterParameter: waterQualityByPond[pond.id],
-                              targetWeightsBySpecies: targetWeightsBySpecies,
-                              onFeedPressed: () {
-                                if (primaryBatch != null) {
-                                  AlimentarModal.show(context, pond: pond, batch: primaryBatch);
-                                } else {
-                                  SiembraModal.show(context);
-                                }
-                              },
-                              onSamplePressed: primaryBatch != null ? () => BiometriaModal.show(context, pond: pond, batch: primaryBatch) : null,
-                              onMortalityPressed: primaryBatch != null ? () => MortalidadModal.show(context, pond: pond, batch: primaryBatch) : null,
-                              onTransferPressed: primaryBatch != null ? () => TrasladoModal.show(context, pond: pond, batch: primaryBatch) : null,
-                              onEditPondPressed: () => CrearEstanqueModal.show(context, pondToEdit: pond),
+                            child: FadeContent(
+                              delay: Duration(milliseconds: 90 + (index.clamp(0, 6) * 75)),
+                              child: PondBentoCard(
+                                pond: pond,
+                                batch: primaryBatch,
+                                batches: activeBatches,
+                                latestWaterParameter: waterQualityByPond[pond.id],
+                                targetWeightsBySpecies: targetWeightsBySpecies,
+                                onFeedPressed: () {
+                                  if (primaryBatch != null) {
+                                    AlimentarModal.show(context, pond: pond, batch: primaryBatch);
+                                  } else {
+                                    SiembraModal.show(context);
+                                  }
+                                },
+                                onSamplePressed: primaryBatch != null ? () => BiometriaModal.show(context, pond: pond, batch: primaryBatch) : null,
+                                onMortalityPressed: primaryBatch != null ? () => MortalidadModal.show(context, pond: pond, batch: primaryBatch) : null,
+                                onTransferPressed: primaryBatch != null ? () => TrasladoModal.show(context, pond: pond, batch: primaryBatch) : null,
+                                onEditPondPressed: () => CrearEstanqueModal.show(context, pondToEdit: pond),
+                              ),
                             ),
                           );
                         },

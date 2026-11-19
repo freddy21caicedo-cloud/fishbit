@@ -138,19 +138,24 @@ class _ThemeAnimatedGlassToggleState
   late final AnimationController _moonController;
   late final Animation<double> _moonTiltAnimation;
   bool _isFocused = false;
+  bool _isHovered = false;
 
   @override
   void initState() {
     super.initState();
+    // Los controladores NO se inician en bucle aquí: en Flutter Web cualquier
+    // animación infinita fuerza a recomponer toda la escena (incluidos los
+    // blur del header) en cada frame. Solo se anima el ícono visible y solo
+    // mientras el usuario interactúa (hover/foco).
     _sunController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 15),
-    )..repeat();
+    );
 
     _moonController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 5),
-    )..repeat();
+    );
 
     _moonTiltAnimation = TweenSequence<double>([
       TweenSequenceItem(
@@ -175,6 +180,20 @@ class _ThemeAnimatedGlassToggleState
     super.dispose();
   }
 
+  void _syncIconAnimations(bool isDark) {
+    final active = _isHovered || _isFocused;
+    if (active && isDark) {
+      if (_sunController.isAnimating) _sunController.stop();
+      if (!_moonController.isAnimating) _moonController.repeat();
+    } else if (active && !isDark) {
+      if (_moonController.isAnimating) _moonController.stop();
+      if (!_sunController.isAnimating) _sunController.repeat();
+    } else {
+      if (_sunController.isAnimating) _sunController.stop();
+      if (_moonController.isAnimating) _moonController.stop();
+    }
+  }
+
   void _handleToggle() {
     HapticFeedback.mediumImpact();
     ref.read(themeModeProvider.notifier).toggleTheme(context);
@@ -187,6 +206,8 @@ class _ThemeAnimatedGlassToggleState
     final isDark = themeMode == ThemeMode.dark ||
         (themeMode == ThemeMode.system && effectiveIsDark);
 
+    _syncIconAnimations(isDark);
+
     final toggle = RepaintBoundary(
       child: Semantics(
         toggled: isDark,
@@ -194,6 +215,12 @@ class _ThemeAnimatedGlassToggleState
         label: isDark ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro',
         child: FocusableActionDetector(
           mouseCursor: SystemMouseCursors.click,
+          onShowHoverHighlight: (hovered) {
+            if (_isHovered != hovered) {
+              _isHovered = hovered;
+              _syncIconAnimations(isDark);
+            }
+          },
           onShowFocusHighlight: (focused) {
             if (_isFocused != focused) {
               setState(() => _isFocused = focused);
