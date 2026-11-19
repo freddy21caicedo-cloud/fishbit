@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide AuthState;
@@ -523,11 +524,97 @@ class AuthNotifier extends StateNotifier<AuthState> {
     await _repository.sendPasswordResetEmail(email);
   }
 
-  Future<void> updateCompany(Company company) async {
+  Future<bool> updateCompany(Company company) async {
     try {
       await _repository.updateCompany(company);
-      state = state.copyWith(currentCompany: company);
-    } catch (_) {}
+      final updatedCompanies = state.availableCompanies
+          .map((c) => c.id == company.id ? company : c)
+          .toList();
+      state = state.copyWith(
+        currentCompany: company,
+        availableCompanies: updatedCompanies,
+      );
+      return true;
+    } catch (e) {
+      state = state.copyWith(errorMessage: e.toString());
+      return false;
+    }
+  }
+
+  Future<bool> updateMyProfile({
+    required String nombre,
+    String? telefono,
+    String? avatarUrl,
+  }) async {
+    final user = state.currentUser;
+    if (user == null) return false;
+    try {
+      final updated = await _repository.updateMyProfile(
+        currentUser: user,
+        nombre: nombre,
+        telefono: telefono,
+        avatarUrl: avatarUrl,
+      );
+      final updatedTeam = state.teamMembers
+          .map((m) => m.id == updated.id ? m.copyWith(nombre: updated.nombre, telefono: updated.telefono, avatarUrl: updated.avatarUrl) : m)
+          .toList();
+      state = state.copyWith(
+        currentUser: updated,
+        teamMembers: updatedTeam,
+      );
+      return true;
+    } catch (e) {
+      state = state.copyWith(errorMessage: e.toString());
+      return false;
+    }
+  }
+
+  Future<String?> uploadProfileAvatar(Uint8List bytes, String fileExtension) async {
+    final user = state.currentUser;
+    if (user == null) return null;
+    try {
+      final url = await _repository.uploadProfileAvatar(
+        userId: user.id,
+        bytes: bytes,
+        fileExtension: fileExtension,
+      );
+      await updateMyProfile(
+        nombre: user.nombre,
+        telefono: user.telefono,
+        avatarUrl: url,
+      );
+      return url;
+    } catch (e) {
+      state = state.copyWith(errorMessage: e.toString());
+      return null;
+    }
+  }
+
+  Future<String?> uploadCompanyLogo(Uint8List bytes, String fileExtension) async {
+    final company = state.currentCompany;
+    if (company == null) return null;
+    try {
+      final url = await _repository.uploadCompanyLogo(
+        empresaId: company.id,
+        bytes: bytes,
+        fileExtension: fileExtension,
+      );
+      await updateCompany(company.copyWith(logoUrl: url));
+      return url;
+    } catch (e) {
+      state = state.copyWith(errorMessage: e.toString());
+      return null;
+    }
+  }
+
+  Future<bool> changeMyPassword(String newPassword) async {
+    try {
+      await _repository.changeMyPassword(newPassword);
+      return true;
+    } catch (e) {
+      state = state.copyWith(errorMessage: e.toString());
+      return false;
+    }
   }
 
   Future<void> signOut() async {

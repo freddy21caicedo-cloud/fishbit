@@ -528,6 +528,61 @@ class PondsNotifier extends StateNotifier<PondsState> {
       return false;
     }
   }
+
+  Future<bool> updateBiometry(BiometriaRecord record) async {
+    try {
+      await _repository.updateBiometry(record);
+      await loadPondsAndBatches();
+      return true;
+    } catch (e) {
+      state = state.copyWith(errorMessage: e.toString());
+      return false;
+    }
+  }
+
+  Future<bool> deleteBiometry(BiometriaRecord record) async {
+    try {
+      await _repository.deleteBiometry(record);
+      await loadPondsAndBatches();
+      return true;
+    } catch (e) {
+      state = state.copyWith(errorMessage: e.toString());
+      return false;
+    }
+  }
+
+  Future<bool> updateMortality(MortalityRecord oldRecord, MortalityRecord newRecord) async {
+    try {
+      await _repository.updateMortality(oldRecord, newRecord);
+      await loadPondsAndBatches();
+      return true;
+    } catch (e) {
+      state = state.copyWith(errorMessage: e.toString());
+      return false;
+    }
+  }
+
+  Future<bool> deleteMortality(MortalityRecord record) async {
+    try {
+      await _repository.deleteMortality(record);
+      await loadPondsAndBatches();
+      return true;
+    } catch (e) {
+      state = state.copyWith(errorMessage: e.toString());
+      return false;
+    }
+  }
+
+  Future<bool> deleteTransfer(TransferRecord record) async {
+    try {
+      await _repository.deleteTransfer(record);
+      await loadPondsAndBatches();
+      return true;
+    } catch (e) {
+      state = state.copyWith(errorMessage: e.toString());
+      return false;
+    }
+  }
 }
 
 final pondsProvider = StateNotifierProvider<PondsNotifier, PondsState>((ref) {

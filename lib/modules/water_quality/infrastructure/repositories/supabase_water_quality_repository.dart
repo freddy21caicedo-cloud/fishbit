@@ -157,4 +157,57 @@ class SupabaseWaterQualityRepository implements WaterQualityRepository {
       return parameter;
     }
   }
+
+  @override
+  Future<WaterParameter> updateParameters(WaterParameter parameter) async {
+    final idx = _demoParameters.indexWhere((p) => p.id == parameter.id);
+    if (idx != -1) {
+      _demoParameters[idx] = parameter;
+    }
+    if (parameter.empresaId.startsWith('c1000000-')) {
+      return parameter;
+    }
+    final hourStr =
+        '${parameter.fecha.hour.toString().padLeft(2, '0')}:${parameter.fecha.minute.toString().padLeft(2, '0')}:00';
+    final updateData = {
+      'estanque_id': parameter.estanqueId,
+      'fecha': parameter.fecha.toIso8601String(),
+      'hora': hourStr,
+      'oxigeno_mg_l': parameter.oxigenoMgL,
+      'oxigeno_pct': parameter.oxigenoPct,
+      'ph': parameter.ph,
+      'temperatura': parameter.temperaturaC,
+      'amonio_mg_l': parameter.amonioMgL,
+      'nitritos_mg_l': parameter.nitritosMgL,
+      'nitratos_mg_l': parameter.nitratosMgL,
+      'alcalinidad_mg_l': parameter.alcalinidadMgL,
+      'co2_mg_l': parameter.co2MgL,
+      'dureza_mg_l': parameter.durezaMgL,
+      'cloro_mg_l': parameter.cloroMgL,
+      'observaciones': parameter.observaciones,
+    };
+
+    final res = await _supabase
+        .from('parametros_calidad_agua')
+        .update(updateData)
+        .eq('id', parameter.id)
+        .eq('empresa_id', parameter.empresaId)
+        .select()
+        .single();
+
+    return WaterParameter.fromJson(res);
+  }
+
+  @override
+  Future<void> deleteParameters(String id, String empresaId) async {
+    _demoParameters.removeWhere((p) => p.id == id);
+    if (empresaId.startsWith('c1000000-')) {
+      return;
+    }
+    await _supabase
+        .from('parametros_calidad_agua')
+        .delete()
+        .eq('id', id)
+        .eq('empresa_id', empresaId);
+  }
 }

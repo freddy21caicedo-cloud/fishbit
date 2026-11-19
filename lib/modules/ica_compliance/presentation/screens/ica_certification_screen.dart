@@ -54,7 +54,7 @@ class _IcaCertificationScreenState extends ConsumerState<IcaCertificationScreen>
     final icaState = ref.watch(icaComplianceProvider);
 
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      backgroundColor: Colors.transparent,
       body: NestedScrollView(
         headerSliverBuilder: (context, innerBoxIsScrolled) => [
           FishBitHeader(

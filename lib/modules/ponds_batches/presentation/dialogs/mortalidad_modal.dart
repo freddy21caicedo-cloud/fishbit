@@ -9,20 +9,31 @@ import 'package:fishbit_finance/core/design_system/glass_date_picker.dart';
 import 'package:fishbit_finance/core/design_system/glass_select_field.dart';
 import 'package:fishbit_finance/modules/auth_tenant/presentation/providers/auth_provider.dart';
 import 'package:fishbit_finance/modules/ponds_batches/domain/models/fish_batch.dart';
+import 'package:fishbit_finance/modules/ponds_batches/domain/models/mortality_record.dart';
 import 'package:fishbit_finance/modules/ponds_batches/domain/models/pond.dart';
 import 'package:fishbit_finance/modules/ponds_batches/presentation/providers/ponds_provider.dart';
 
 class MortalidadModal extends ConsumerStatefulWidget {
   final Pond? pond;
   final FishBatch? batch;
+  final MortalityRecord? recordToEdit;
 
-  const MortalidadModal({super.key, this.pond, this.batch});
+  const MortalidadModal({super.key, this.pond, this.batch, this.recordToEdit});
 
-  static Future<void> show(BuildContext context, {Pond? pond, FishBatch? batch}) {
+  static Future<void> show(
+    BuildContext context, {
+    Pond? pond,
+    FishBatch? batch,
+    MortalityRecord? recordToEdit,
+  }) {
     return showDialog(
       context: context,
       barrierDismissible: true,
-      builder: (context) => MortalidadModal(pond: pond, batch: batch),
+      builder: (context) => MortalidadModal(
+        pond: pond,
+        batch: batch,
+        recordToEdit: recordToEdit,
+      ),
     );
   }
 
@@ -54,12 +65,25 @@ class _MortalidadModalState extends ConsumerState<MortalidadModal> {
   @override
   void initState() {
     super.initState();
-    _selectedPondId = widget.pond?.id;
-    _selectedBatchId = widget.batch?.id;
-    final batchWeight = widget.batch?.pesoActualGramos;
-    _pesoCtrl = TextEditingController(
-      text: (batchWeight != null && batchWeight > 0) ? batchWeight.toStringAsFixed(1) : '',
-    );
+    final edit = widget.recordToEdit;
+    if (edit != null) {
+      _selectedPondId = edit.estanqueId;
+      _selectedBatchId = edit.loteId;
+      _muertosCtrl.text = edit.cantidadPecesMuertos.toString();
+      _pesoCtrl = TextEditingController(text: edit.pesoPromedioGramos.toStringAsFixed(1));
+      if (_causas.contains(edit.causaProbable)) {
+        _causaSeleccionada = edit.causaProbable;
+      }
+      if (edit.observaciones != null) _obsCtrl.text = edit.observaciones!;
+      _fechaRegistro = CivilDate.fromDate(edit.fecha);
+    } else {
+      _selectedPondId = widget.pond?.id;
+      _selectedBatchId = widget.batch?.id;
+      final batchWeight = widget.batch?.pesoActualGramos;
+      _pesoCtrl = TextEditingController(
+        text: (batchWeight != null && batchWeight > 0) ? batchWeight.toStringAsFixed(1) : '',
+      );
+    }
   }
 
   @override
@@ -78,8 +102,10 @@ class _MortalidadModalState extends ConsumerState<MortalidadModal> {
 
     // Estanque y lote activo
     final pondsList = pondsState.ponds.where((p) => p.estado == PondStatus.active).toList();
-    final activePond = widget.pond ??
-        (pondsList.where((p) => p.id == _selectedPondId).firstOrNull ?? (pondsList.isNotEmpty ? pondsList.first : null));
+    final effectivePondId = _selectedPondId ?? widget.pond?.id;
+    final activePond = pondsList.where((p) => p.id == effectivePondId).firstOrNull ??
+        widget.pond ??
+        (pondsList.isNotEmpty ? pondsList.first : null);
     final activeBatches = activePond != null
         ? pondsState.batches.where((b) => b.estanqueId == activePond.id && b.estado == BatchStatus.active).toList()
         : <FishBatch>[];
@@ -90,9 +116,10 @@ class _MortalidadModalState extends ConsumerState<MortalidadModal> {
     final pesoG = double.tryParse(_pesoCtrl.text.replaceAll(',', '.').trim()) ?? (activeBatch?.pesoActualGramos ?? 0.0);
     final biomasaPerdidaKg = (muertos * pesoG) / 1000.0;
     final poblacionPrevia = activeBatch?.cantidadActualPeces ?? 0;
-    final superacionPoblacion = muertos > poblacionPrevia;
-    final nuevaPoblacion = (poblacionPrevia - muertos).clamp(0, 9999999);
-    final tasaMortalidadPct = poblacionPrevia > 0 ? (muertos / poblacionPrevia) * 100.0 : 0.0;
+    final poblacionDisponible = poblacionPrevia + (widget.recordToEdit?.cantidadPecesMuertos ?? 0);
+    final superacionPoblacion = poblacionDisponible > 0 && muertos > poblacionDisponible;
+    final nuevaPoblacion = (poblacionDisponible - muertos).clamp(0, 9999999);
+    final tasaMortalidadPct = poblacionDisponible > 0 ? (muertos / poblacionDisponible) * 100.0 : 0.0;
     final esAlertaCritica = tasaMortalidadPct >= 2.0;
 
     return Dialog(
@@ -129,7 +156,7 @@ class _MortalidadModalState extends ConsumerState<MortalidadModal> {
                           ),
                           const SizedBox(width: 10),
                           Text(
-                            'Registro de Mortalidad',
+                            widget.recordToEdit != null ? 'Editar Mortalidad' : 'Registro de Mortalidad',
                             style: AppTypography.titleMedium.copyWith(color: Colors.white, fontWeight: FontWeight.w800),
                           ),
                         ],
@@ -142,8 +169,8 @@ class _MortalidadModalState extends ConsumerState<MortalidadModal> {
                   ),
                   const SizedBox(height: 12),
 
-                  // Selector de Estanque si no se abrió desde uno específico
-                  if (widget.pond == null && pondsList.isNotEmpty) ...[
+                  // Selector de Estanque si no es edición
+                  if (widget.recordToEdit == null && pondsList.isNotEmpty) ...[
                     GlassSelectField<String>(
                       label: 'ESTANQUE CON BAJAS',
                       value: activePond?.id,
@@ -160,7 +187,8 @@ class _MortalidadModalState extends ConsumerState<MortalidadModal> {
                       onChanged: (val) {
                         setState(() {
                           _selectedPondId = val;
-                          final batch = pondsState.batches.where((b) => b.estanqueId == val).firstOrNull;
+                          _selectedBatchId = null;
+                          final batch = pondsState.batches.where((b) => b.estanqueId == val && b.estado == BatchStatus.active).firstOrNull;
                           if (batch != null) {
                             _pesoCtrl.text = batch.pesoActualGramos.toStringAsFixed(1);
                           }
@@ -264,8 +292,11 @@ class _MortalidadModalState extends ConsumerState<MortalidadModal> {
                           validator: (val) {
                             final n = int.tryParse(val?.trim() ?? '');
                             if (n == null || n <= 0) return 'Ingresa bajas (> 0)';
-                            if (poblacionPrevia > 0 && n > poblacionPrevia) {
-                              return 'Supera población ($poblacionPrevia)';
+                            if (poblacionDisponible <= 0) {
+                              return 'Lote sin peces vivos';
+                            }
+                            if (n > poblacionDisponible) {
+                              return 'Supera población ($poblacionDisponible)';
                             }
                             return null;
                           },
@@ -391,41 +422,94 @@ class _MortalidadModalState extends ConsumerState<MortalidadModal> {
 
                   // Botón de Confirmación
                   GlassButton(
-                    label: 'Confirmar Registro de Mortalidad',
+                    label: widget.recordToEdit != null
+                        ? 'Actualizar Registro de Mortalidad'
+                        : 'Confirmar Registro de Mortalidad',
                     height: 46,
                     backgroundColor: AppColors.coralAction,
                     isLoading: _isLoading,
-                    onPressed: (activePond == null || activeBatch == null || muertos <= 0 || superacionPoblacion)
-                        ? null
-                        : () async {
-                            if (!_formKey.currentState!.validate()) return;
-                            final nav = Navigator.of(context);
-                            final messenger = ScaffoldMessenger.of(context);
-                            setState(() => _isLoading = true);
-                            final ok = await ref.read(pondsProvider.notifier).recordMortality(
-                                  estanqueId: activePond.id,
-                                  loteId: activeBatch.id,
-                                  cantidadPecesMuertos: muertos,
-                                  pesoPromedioGramos: pesoG,
-                                  causaProbable: _causaSeleccionada,
-                                  biomasaPerdidaKg: biomasaPerdidaKg,
-                                  fecha: _fechaRegistro.toDateTime(),
-                                  observaciones: _obsCtrl.text.trim().isEmpty ? null : _obsCtrl.text.trim(),
-                                  registradoPor: user?.nombre,
-                                );
-                            if (mounted) {
-                              setState(() => _isLoading = false);
-                              if (ok) {
-                                nav.pop();
-                                messenger.showSnackBar(
-                                  SnackBar(
-                                    content: Text('Mortalidad registrada en ${activePond.sigla} (-$muertos peces). Biomasa recalculada.'),
-                                    backgroundColor: AppColors.coralAction,
-                                  ),
-                                );
-                              }
-                            }
-                          },
+                    onPressed: () async {
+                      if (_isLoading) return;
+                      final messenger = ScaffoldMessenger.of(context);
+                      if (activePond == null || activeBatch == null) {
+                        messenger.showSnackBar(
+                          const SnackBar(
+                            content: Text('Seleccione un estanque con lote activo para registrar la mortalidad.'),
+                            backgroundColor: AppColors.coralAction,
+                            behavior: SnackBarBehavior.floating,
+                          ),
+                        );
+                        return;
+                      }
+                      if (!_formKey.currentState!.validate() || muertos <= 0 || superacionPoblacion) {
+                        messenger.showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              superacionPoblacion
+                                  ? 'La cantidad de bajas ($muertos) supera la población disponible ($poblacionDisponible peces).'
+                                  : 'Complete la cantidad de peces muertos y el peso promedio.',
+                            ),
+                            backgroundColor: AppColors.coralAction,
+                            behavior: SnackBarBehavior.floating,
+                          ),
+                        );
+                        return;
+                      }
+
+                      final nav = Navigator.of(context);
+                      setState(() => _isLoading = true);
+
+                      final bool ok;
+                      if (widget.recordToEdit != null) {
+                        final updated = widget.recordToEdit!.copyWith(
+                          cantidadPecesMuertos: muertos,
+                          pesoPromedioGramos: pesoG,
+                          causaProbable: _causaSeleccionada,
+                          biomasaPerdidaKg: biomasaPerdidaKg,
+                          fecha: _fechaRegistro.toDateTime(),
+                          observaciones: _obsCtrl.text.trim().isEmpty ? null : _obsCtrl.text.trim(),
+                        );
+                        ok = await ref.read(pondsProvider.notifier).updateMortality(widget.recordToEdit!, updated);
+                      } else {
+                        ok = await ref.read(pondsProvider.notifier).recordMortality(
+                              estanqueId: activePond.id,
+                              loteId: activeBatch.id,
+                              cantidadPecesMuertos: muertos,
+                              pesoPromedioGramos: pesoG,
+                              causaProbable: _causaSeleccionada,
+                              biomasaPerdidaKg: biomasaPerdidaKg,
+                              fecha: _fechaRegistro.toDateTime(),
+                              observaciones: _obsCtrl.text.trim().isEmpty ? null : _obsCtrl.text.trim(),
+                              registradoPor: user?.nombre,
+                            );
+                      }
+
+                      if (mounted) {
+                        setState(() => _isLoading = false);
+                        if (ok) {
+                          nav.pop();
+                          messenger.showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                widget.recordToEdit != null
+                                    ? 'Mortalidad actualizada en ${activePond.sigla} ($muertos peces). Biomasa recalculada.'
+                                    : 'Mortalidad registrada en ${activePond.sigla} (-$muertos peces). Biomasa recalculada.',
+                              ),
+                              backgroundColor: AppColors.coralAction,
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                        } else {
+                          messenger.showSnackBar(
+                            SnackBar(
+                              content: Text('Error al guardar mortalidad: ${ref.read(pondsProvider).errorMessage ?? "Verifique su conexión"}'),
+                              backgroundColor: AppColors.coralAction,
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                        }
+                      }
+                    },
                   ),
                 ],
               ),

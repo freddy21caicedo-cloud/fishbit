@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fishbit_finance/core/design_system/app_colors.dart';
 import 'package:fishbit_finance/core/design_system/app_typography.dart';
+import 'package:fishbit_finance/core/design_system/glass_container.dart';
 import 'package:fishbit_finance/core/design_system/theme_provider.dart';
 
 /// Calculates WCAG 2.2 Relative Luminance according to W3C specification:
@@ -142,6 +143,119 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
+    });
+
+    test('8. Dark glass overlay base passes WCAG 2.2 AA contrast for primary and secondary dark text', () {
+      expect(
+        contrastRatio(AppColors.textPrimaryDark, AppColors.glassOverlayDarkBase),
+        greaterThanOrEqualTo(4.5),
+      );
+      expect(
+        contrastRatio(AppColors.textSecondaryDark, AppColors.glassOverlayDarkBase),
+        greaterThanOrEqualTo(4.5),
+      );
+      expect(AppColors.glassOverlayDarkOpacity, greaterThanOrEqualTo(0.85));
+    });
+
+    testWidgets('9. GlassContainer applies frosted dark obsidian overlay inside PopupRoute without duplicating blur on nested containers', (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: appDarkTheme,
+          home: Builder(
+            builder: (context) => Scaffold(
+              body: ElevatedButton(
+                onPressed: () {
+                  showGeneralDialog<void>(
+                    context: context,
+                    barrierDismissible: true,
+                    barrierLabel: 'Cerrar',
+                    pageBuilder: (_, __, ___) => const Center(
+                      child: GlassContainer(
+                        key: ValueKey('outer_menu'),
+                        blur: 28,
+                        opacity: 0.18,
+                        child: GlassContainer(
+                          key: ValueKey('inner_tile'),
+                          blur: 16,
+                          opacity: 0.08,
+                          child: Text('Opción de menú'),
+                        ),
+                      ),
+                    ),
+                  );
+                },
+                child: const Text('Abrir menú'),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('Abrir menú'));
+      await tester.pumpAndSettle();
+
+      // Solo la carcasa externa activa BackdropFilter (el contenedor anidado no lo duplica)
+      expect(find.byType(BackdropFilter), findsOneWidget);
+
+      // Verificar que la carcasa externa usa gradiente oscuro de alta opacidad (>= 0.85)
+      final outerContainers = tester.widgetList<Container>(
+        find.descendant(
+          of: find.byKey(const ValueKey('outer_menu')),
+          matching: find.byType(Container),
+        ),
+      );
+      final gradientDecoration = outerContainers
+          .map((c) => c.decoration)
+          .whereType<BoxDecoration>()
+          .firstWhere((d) => d.gradient is LinearGradient);
+      final gradient = gradientDecoration.gradient! as LinearGradient;
+      expect(gradient.colors.last.a, greaterThanOrEqualTo(0.85));
+    });
+
+    testWidgets('10. GlassContainer keeps light mode frosted acrylic behavior unchanged inside PopupRoute', (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: appLightTheme,
+          home: Builder(
+            builder: (context) => Scaffold(
+              body: ElevatedButton(
+                onPressed: () {
+                  showGeneralDialog<void>(
+                    context: context,
+                    barrierDismissible: true,
+                    barrierLabel: 'Cerrar',
+                    pageBuilder: (_, __, ___) => const Center(
+                      child: GlassContainer(
+                        key: ValueKey('light_menu'),
+                        blur: 28,
+                        opacity: 0.94,
+                        isOverlay: true,
+                        child: Text('Menú Claro'),
+                      ),
+                    ),
+                  );
+                },
+                child: const Text('Abrir menú claro'),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('Abrir menú claro'));
+      await tester.pumpAndSettle();
+
+      final lightContainers = tester.widgetList<Container>(
+        find.descendant(
+          of: find.byKey(const ValueKey('light_menu')),
+          matching: find.byType(Container),
+        ),
+      );
+      final solidDecoration = lightContainers
+          .map((c) => c.decoration)
+          .whereType<BoxDecoration>()
+          .firstWhere((d) => d.color != null);
+      expect(solidDecoration.color!.a, closeTo(0.94, 0.01));
     });
   });
 }

@@ -19,7 +19,7 @@ class SedeSelectorModal extends ConsumerStatefulWidget {
       context: context,
       barrierDismissible: true,
       barrierLabel: 'Cerrar Selector',
-      barrierColor: Colors.black.withValues(alpha: 0.55),
+      barrierColor: Colors.black.withValues(alpha: 0.65),
       transitionDuration: const Duration(milliseconds: 240),
       pageBuilder: (dialogCtx, anim1, anim2) => const Material(
         type: MaterialType.transparency,
@@ -218,6 +218,8 @@ class _SedeSelectorModalState extends ConsumerState<SedeSelectorModal> {
                     padding: const EdgeInsets.all(20),
                     blur: 28,
                     opacity: isDark ? 0.20 : 0.95,
+                    enableBlur: true,
+                    isOverlay: true,
                     borderColor: AppColors.cyanWater.withValues(alpha: isDark ? 0.40 : 0.30),
                     child: SingleChildScrollView(
                       child: Column(

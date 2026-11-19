@@ -139,5 +139,43 @@ void main() {
 
       expect(prefs.getString('fishbit_app_theme_mode'), equals('dark'));
     });
+
+    testWidgets('ThemeAnimatedGlassToggle renders 64x34 switch and toggles light/dark mode', (tester) async {
+      SharedPreferences.setMockInitialValues({
+        'fishbit_app_theme_mode': 'light',
+      });
+
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp(
+            theme: appLightTheme,
+            darkTheme: appDarkTheme,
+            home: const Scaffold(
+              body: Center(
+                child: ThemeAnimatedGlassToggle(),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump(const Duration(milliseconds: 50));
+
+      final toggleFinder = find.byType(ThemeAnimatedGlassToggle);
+      expect(toggleFinder, findsOneWidget);
+      expect(tester.getSize(toggleFinder), equals(const Size(64, 34)));
+
+      // Tap to switch from light -> dark
+      await tester.tap(toggleFinder);
+      await tester.pump(const Duration(milliseconds: 450));
+
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString('fishbit_app_theme_mode'), equals('dark'));
+
+      // Tap to switch from dark -> light
+      await tester.tap(toggleFinder);
+      await tester.pump(const Duration(milliseconds: 450));
+
+      expect(prefs.getString('fishbit_app_theme_mode'), equals('light'));
+    });
   });
 }

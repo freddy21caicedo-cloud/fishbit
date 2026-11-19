@@ -5,7 +5,7 @@ class FloatingDockLayout {
   FloatingDockLayout._();
 
   /// Height of the floating dock container itself.
-  static const double dockHeight = 66.0;
+  static const double dockHeight = 56.0;
 
   /// Bottom margin between dock and system gesture insets / screen edge.
   static const double dockBottomMargin = 12.0;

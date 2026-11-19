@@ -1,12 +1,12 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:fl_chart/fl_chart.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:fishbit_finance/core/design_system/app_colors.dart';
 import 'package:fishbit_finance/core/design_system/app_typography.dart';
-import 'package:fishbit_finance/core/design_system/glass_card.dart';
 import 'package:fishbit_finance/core/design_system/glass_container.dart';
-import 'package:fishbit_finance/core/utils/currency_formatters.dart';
+import 'package:fishbit_finance/core/design_system/glass_select_field.dart';
 import 'package:fishbit_finance/modules/feeding_nutrition/presentation/providers/nutrition_provider.dart';
 import 'package:fishbit_finance/modules/ponds_batches/domain/models/pond.dart';
 import 'package:fishbit_finance/modules/ponds_batches/presentation/providers/ponds_provider.dart';
@@ -21,16 +21,104 @@ enum BiologicalCurveType {
   supervivencia,
 }
 
+class _DailyRangeBar {
+  final String dayLabel;
+  final DateTime date;
+  final double? minVal;
+  final double? maxVal;
+  final double? avgVal;
+  final int count;
+  final bool showTopDot;
+  final bool showBottomDot;
+
+  const _DailyRangeBar({
+    required this.dayLabel,
+    required this.date,
+    this.minVal,
+    this.maxVal,
+    this.avgVal,
+    this.count = 0,
+    this.showTopDot = false,
+    this.showBottomDot = false,
+  });
+
+  bool get hasData => minVal != null && maxVal != null && count > 0;
+}
+
+class _RecentReading {
+  final String timeLabel;
+  final String valueLabel;
+
+  const _RecentReading({
+    required this.timeLabel,
+    required this.valueLabel,
+  });
+}
+
+class _TrendDataset {
+  final String title;
+  final String unit;
+  final Color accent;
+  final Color accentLight;
+  final double? minVal;
+  final double? maxVal;
+  final double? avgVal;
+  final int decimals;
+  final String dateRangeLabel;
+  final String thresholdLabel;
+  final String emptyTitle;
+  final String emptySubtitle;
+  final IconData emptyIcon;
+  final List<_DailyRangeBar> bars;
+  final List<_RecentReading> readings;
+
+  const _TrendDataset({
+    required this.title,
+    required this.unit,
+    required this.accent,
+    required this.accentLight,
+    this.minVal,
+    this.maxVal,
+    this.avgVal,
+    this.decimals = 1,
+    required this.dateRangeLabel,
+    required this.thresholdLabel,
+    required this.emptyTitle,
+    required this.emptySubtitle,
+    required this.emptyIcon,
+    required this.bars,
+    required this.readings,
+  });
+
+  bool get hasData => minVal != null && maxVal != null && avgVal != null;
+
+  String formatValue(double v) =>
+      decimals == 0 ? v.round().toString() : v.toStringAsFixed(decimals);
+
+  String get rangeText {
+    if (!hasData) return '--';
+    final lo = formatValue(minVal!);
+    final hi = formatValue(maxVal!);
+    return lo == hi ? lo : '$lo-$hi';
+  }
+
+  String get avgBadgeText =>
+      avgVal != null ? 'Prom. ${formatValue(avgVal!)}' : 'Prom. --';
+}
+
 class BiologicalTrendsCard extends ConsumerStatefulWidget {
   const BiologicalTrendsCard({super.key});
 
   @override
-  ConsumerState<BiologicalTrendsCard> createState() => _BiologicalTrendsCardState();
+  ConsumerState<BiologicalTrendsCard> createState() =>
+      _BiologicalTrendsCardState();
 }
 
 class _BiologicalTrendsCardState extends ConsumerState<BiologicalTrendsCard> {
   BiologicalCurveType _selectedCurve = BiologicalCurveType.oxigeno;
-  String? _selectedPondId; // null = Todos (Promedio granja)
+  String? _selectedPondId; // null = Todos los estanques
+
+  static const _dayShortNames = ['Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sá', 'Do'];
 
   @override
   Widget build(BuildContext context) {
@@ -40,101 +128,397 @@ class _BiologicalTrendsCardState extends ConsumerState<BiologicalTrendsCard> {
     final nutritionState = ref.watch(nutritionProvider);
 
     final ponds = pondsState.ponds;
+    final pondMap = {for (final p in ponds) p.id: p};
 
-    return GlassCard(
-      borderRadius: 24,
-      glowColor: _getCurveColor(_selectedCurve),
-      title: 'ANALÍTICA BIOLÓGICA Y TENDENCIAS',
-      trailingWidget: _buildPondSelectorBtn(ponds, isDark),
+    final dataset = _buildDataset(
+      type: _selectedCurve,
+      waterState: waterState,
+      pondsState: pondsState,
+      nutritionState: nutritionState,
+      pondMap: pondMap,
+    );
+
+    final cardBg = isDark ? AppColors.surfaceDark : Colors.white;
+    final dividerColor = isDark
+        ? Colors.white.withValues(alpha: 0.08)
+        : const Color(0xFFF0F0F0);
+    final titleColor = isDark ? Colors.white : const Color(0xFF1A1A1A);
+    final mutedColor =
+        isDark ? AppColors.textSecondaryDark : const Color(0xFF999999);
+    final unitColor =
+        isDark ? AppColors.textTertiaryDark : const Color(0xFFB0B0B0);
+
+    return GlassContainer(
+      borderRadius: 20,
+      padding: const EdgeInsets.all(18),
+      isOverlay: false,
+      tintColor: cardBg,
+      opacity: isDark ? 0.92 : 0.98,
+      borderColor: isDark
+          ? dataset.accent.withValues(alpha: 0.28)
+          : AppColors.glassBorderLight,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Selector de Curva (6 Chips horizontales scrolleables)
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: [
-                _buildCurveChip(
-                  type: BiologicalCurveType.oxigeno,
-                  label: 'Oxígeno (O₂)',
-                  icon: Icons.waves_rounded,
-                  color: AppColors.cyanWater,
+          // Kicker de sección
+          Text(
+            'ANALÍTICA BIOLÓGICA Y TENDENCIAS',
+            style: AppTypography.labelMicro.copyWith(
+              color: dataset.accent,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 1.1,
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // Selectores estilo Bitácora (Estanque + Analítica)
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final pondSelector = _buildPondSelector(
+                ponds: ponds,
+                waterState: waterState,
+                pondsState: pondsState,
+                nutritionState: nutritionState,
+              );
+              final metricSelector = _buildAnalyticsSelector();
+
+              if (constraints.maxWidth >= 560) {
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(child: pondSelector),
+                    const SizedBox(width: 12),
+                    Expanded(child: metricSelector),
+                  ],
+                );
+              }
+              return Column(
+                children: [
+                  pondSelector,
+                  const SizedBox(height: 10),
+                  metricSelector,
+                ],
+              );
+            },
+          ),
+          const SizedBox(height: 18),
+
+          // ─── Cabecera estilo Uiverse NK2552003 (.header) ───
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Expanded(
+                child: Text(
+                  dataset.title,
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: titleColor,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(width: 8),
-                _buildCurveChip(
-                  type: BiologicalCurveType.temperaturaPh,
-                  label: 'Temp & pH (°C)',
-                  icon: Icons.thermostat_rounded,
-                  color: AppColors.blueOcean,
+              ),
+              const SizedBox(width: 8),
+              _FullStatsButton(
+                label: 'Ver bitácora →',
+                isDark: isDark,
+                onTap: () => GoRouter.maybeOf(context)?.go('/bitacora'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+
+          // ─── Rango principal (.range) ───
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Flexible(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    dataset.rangeText,
+                    style: TextStyle(
+                      fontSize: 30,
+                      fontWeight: FontWeight.w700,
+                      color: titleColor,
+                      letterSpacing: -0.5,
+                      height: 1.1,
+                    ),
+                  ),
                 ),
-                const SizedBox(width: 8),
-                _buildCurveChip(
-                  type: BiologicalCurveType.toxicos,
-                  label: 'Tóxicos (NH₃/NO₂)',
-                  icon: Icons.warning_amber_rounded,
-                  color: AppColors.coralAction,
+              ),
+              const SizedBox(width: 5),
+              Text(
+                dataset.unit,
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w300,
+                  color: unitColor,
+                  height: 1.1,
                 ),
-                const SizedBox(width: 8),
-                _buildCurveChip(
-                  type: BiologicalCurveType.crecimiento,
-                  label: 'Crecimiento (g)',
-                  icon: Icons.show_chart_rounded,
-                  color: AppColors.greenBiomass,
-                ),
-                const SizedBox(width: 8),
-                _buildCurveChip(
-                  type: BiologicalCurveType.conversion,
-                  label: 'Conversión (FCR)',
-                  icon: Icons.restaurant_rounded,
-                  color: AppColors.amberWarning,
-                ),
-                const SizedBox(width: 8),
-                _buildCurveChip(
-                  type: BiologicalCurveType.supervivencia,
-                  label: 'Supervivencia (%)',
-                  icon: Icons.favorite_rounded,
-                  color: AppColors.purpleAnalytics,
-                ),
-              ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+
+          // ─── Rango de fechas (.date-range) ───
+          Text(
+            dataset.dateRangeLabel,
+            style: TextStyle(
+              fontSize: 11,
+              color: mutedColor,
+              fontWeight: FontWeight.w500,
             ),
           ),
           const SizedBox(height: 18),
 
-          // Área de Gráfica FL Chart con recorte seguro anti-desbordes
-          SizedBox(
-            height: 200,
-            child: ClipRect(
-              child: _buildChart(
-                isDark: isDark,
-                waterState: waterState,
-                pondsState: pondsState,
-                nutritionState: nutritionState,
+          // ─── Gráfica de barras de rango flotantes (.chart-container) ───
+          if (dataset.hasData)
+            _RangeBarChart(
+              dataset: dataset,
+              isDark: isDark,
+            )
+          else
+            _buildEmptyChartState(
+              isDark: isDark,
+              icon: dataset.emptyIcon,
+              color: dataset.accent,
+              title: dataset.emptyTitle,
+              subtitle: dataset.emptySubtitle,
+            ),
+          const SizedBox(height: 18),
+
+          // ─── Lecturas recientes + Meta/Umbral (.readings) ───
+          Container(
+            decoration: BoxDecoration(
+              border: Border(
+                top: BorderSide(color: dividerColor, width: 1.5),
               ),
             ),
-          ),
-
-          const SizedBox(height: 14),
-
-          // KPIs y Referencias de la curva seleccionada
-          _buildMetricsFooter(
-            isDark: isDark,
-            waterState: waterState,
-            pondsState: pondsState,
-            nutritionState: nutritionState,
+            padding: const EdgeInsets.only(top: 10),
+            child: Column(
+              children: [
+                ...dataset.readings.map(
+                  (r) => Container(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    decoration: BoxDecoration(
+                      border: Border(
+                        bottom: BorderSide(color: dividerColor, width: 1.5),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            r.timeLabel,
+                            style: TextStyle(
+                              fontSize: 10.5,
+                              color: mutedColor,
+                              fontWeight: FontWeight.w500,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          r.valueLabel,
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w700,
+                            color: titleColor,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.only(top: 8, bottom: 2),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Meta / Umbral',
+                        style: TextStyle(
+                          fontSize: 10.5,
+                          color: mutedColor,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      Text(
+                        dataset.thresholdLabel,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: dataset.accent,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
     );
   }
 
-  Color _getCurveColor(BiologicalCurveType type) {
+  Widget _buildPondSelector({
+    required List<Pond> ponds,
+    required dynamic waterState,
+    required dynamic pondsState,
+    required dynamic nutritionState,
+  }) {
+    final totalDataCount = waterState.recentParameters.length +
+        nutritionState.records.length +
+        pondsState.biometries.length +
+        pondsState.mortalityRecords.length;
+
+    final options = <GlassSelectOption<String>>[
+      GlassSelectOption<String>(
+        value: '__ALL__',
+        label: 'Todos los Estanques (${ponds.length})',
+        subtitle: 'Promedio general de la granja',
+        icon: Icons.grid_view_rounded,
+        badgeText: '$totalDataCount datos',
+        badgeColor: AppColors.cyanWater,
+      ),
+      ...ponds.map((pond) {
+        final countWater = waterState.recentParameters
+            .where((p) => p.estanqueId == pond.id)
+            .length;
+        final countFeeding = nutritionState.records
+            .where((r) => r.estanqueId == pond.id)
+            .length;
+        final countBio = pondsState.biometries
+            .where((b) => b.estanqueId == pond.id)
+            .length;
+        final countMort = pondsState.mortalityRecords
+            .where((m) => m.estanqueId == pond.id)
+            .length;
+        final pondTotal = countWater + countFeeding + countBio + countMort;
+
+        final parts = <String>[];
+        if (countWater > 0) parts.add('$countWater O₂/pH');
+        if (countFeeding > 0) parts.add('$countFeeding raciones');
+        if (countBio > 0) parts.add('$countBio muestreo(s)');
+        if (countMort > 0) parts.add('$countMort baja(s)');
+        final subtitle = parts.isNotEmpty
+            ? parts.join(' • ')
+            : (pond.especieActual.isNotEmpty
+                ? 'Cultivo: ${pond.especieActual}'
+                : 'Estanque activo');
+
+        return GlassSelectOption<String>(
+          value: pond.id,
+          label: '${pond.sigla} • ${pond.nombreLimpio}',
+          subtitle: subtitle,
+          icon: Icons.water_rounded,
+          badgeText: '$pondTotal datos',
+          badgeColor:
+              pondTotal > 0 ? AppColors.cyanWater : AppColors.textSecondaryDark,
+        );
+      }),
+    ];
+
+    return GlassSelectField<String>(
+      label: 'ESTANQUE DE CONSULTA',
+      placeholder: 'Buscar estanque por nombre o sigla...',
+      value: _selectedPondId ?? '__ALL__',
+      accentColor: AppColors.cyanWater,
+      leadingIcon: Icons.tune_rounded,
+      options: options,
+      onChanged: (val) {
+        setState(() {
+          _selectedPondId = (val == null || val == '__ALL__') ? null : val;
+        });
+      },
+    );
+  }
+
+  Widget _buildAnalyticsSelector() {
+    final accent = _getCurveAccent(_selectedCurve);
+    const options = <GlassSelectOption<BiologicalCurveType>>[
+      GlassSelectOption<BiologicalCurveType>(
+        value: BiologicalCurveType.oxigeno,
+        label: 'Oxígeno (O₂)',
+        subtitle: 'Calidad de agua • mg/L',
+        icon: Icons.waves_rounded,
+        badgeText: 'Mín 4.0',
+        badgeColor: AppColors.cyanWater,
+      ),
+      GlassSelectOption<BiologicalCurveType>(
+        value: BiologicalCurveType.temperaturaPh,
+        label: 'Temp & pH (°C)',
+        subtitle: 'Confort térmico y pH • °C',
+        icon: Icons.thermostat_rounded,
+        badgeText: '26–30°C',
+        badgeColor: AppColors.blueOcean,
+      ),
+      GlassSelectOption<BiologicalCurveType>(
+        value: BiologicalCurveType.toxicos,
+        label: 'Tóxicos (NH₃/NO₂)',
+        subtitle: 'Amonio y nitritos • ppm',
+        icon: Icons.warning_amber_rounded,
+        badgeText: 'Máx 0.50',
+        badgeColor: AppColors.coralAction,
+      ),
+      GlassSelectOption<BiologicalCurveType>(
+        value: BiologicalCurveType.crecimiento,
+        label: 'Crecimiento (g)',
+        subtitle: 'Biometrías y peso promedio • g',
+        icon: Icons.show_chart_rounded,
+        badgeText: 'Meta 650g',
+        badgeColor: AppColors.greenBiomass,
+      ),
+      GlassSelectOption<BiologicalCurveType>(
+        value: BiologicalCurveType.conversion,
+        label: 'Conversión (FCR)',
+        subtitle: 'Consumo diario y eficiencia • kg',
+        icon: Icons.restaurant_rounded,
+        badgeText: 'Obj 1.25',
+        badgeColor: AppColors.amberWarning,
+      ),
+      GlassSelectOption<BiologicalCurveType>(
+        value: BiologicalCurveType.supervivencia,
+        label: 'Supervivencia (%)',
+        subtitle: 'Población viva por lote • %',
+        icon: Icons.favorite_rounded,
+        badgeText: 'Mín 90%',
+        badgeColor: AppColors.purpleAnalytics,
+      ),
+    ];
+
+    return GlassSelectField<BiologicalCurveType>(
+      label: 'ANALÍTICA',
+      placeholder: 'Seleccionar métrica biológica...',
+      value: _selectedCurve,
+      accentColor: accent,
+      leadingIcon: Icons.analytics_outlined,
+      options: options,
+      onChanged: (val) {
+        if (val != null) {
+          setState(() => _selectedCurve = val);
+        }
+      },
+    );
+  }
+
+  Color _getCurveAccent(BiologicalCurveType type) {
     switch (type) {
       case BiologicalCurveType.oxigeno:
         return AppColors.cyanWater;
       case BiologicalCurveType.temperaturaPh:
         return AppColors.blueOcean;
       case BiologicalCurveType.toxicos:
-        return AppColors.coralAction;
+        return const Color(0xFFFF5A76);
       case BiologicalCurveType.crecimiento:
         return AppColors.greenBiomass;
       case BiologicalCurveType.conversion:
@@ -144,137 +528,331 @@ class _BiologicalTrendsCardState extends ConsumerState<BiologicalTrendsCard> {
     }
   }
 
-  Widget _buildPondSelectorBtn(List<Pond> ponds, bool isDark) {
-    final activePonds = ponds.where((p) => p.nombre.isNotEmpty).toList();
-    final currentPondName = _selectedPondId == null
-        ? 'Todos'
-        : (activePonds.where((p) => p.id == _selectedPondId).firstOrNull?.nombre ?? 'Estanque');
-
-    return InkWell(
-      onTap: () => _openGlassPondModal(context, activePonds, isDark),
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: isDark ? 0.08 : 0.2),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppColors.cyanWater.withValues(alpha: 0.3)),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.filter_list_rounded, size: 14, color: AppColors.cyanWater),
-            const SizedBox(width: 5),
-            Text(
-              currentPondName,
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-                color: isDark ? Colors.white : AppColors.textPrimaryLight,
-              ),
-            ),
-            const SizedBox(width: 2),
-            Icon(Icons.keyboard_arrow_down_rounded, size: 14, color: isDark ? Colors.white54 : AppColors.textTertiaryLight),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _openGlassPondModal(BuildContext context, List<Pond> ponds, bool isDark) {
-    showGeneralDialog(
-      context: context,
-      barrierDismissible: true,
-      barrierLabel: 'Cerrar Filtro',
-      barrierColor: Colors.black.withValues(alpha: 0.65),
-      transitionDuration: const Duration(milliseconds: 240),
-      pageBuilder: (dialogCtx, anim1, anim2) => Material(
-        type: MaterialType.transparency,
-        child: _GlassPondSelectorDialog(
-          ponds: ponds,
-          selectedPondId: _selectedPondId,
-          onSelected: (id) {
-            setState(() => _selectedPondId = id);
-            Navigator.of(dialogCtx).pop();
-          },
-        ),
-      ),
-      transitionBuilder: (dialogCtx, anim, secondaryAnim, child) {
-        final curved = CurvedAnimation(parent: anim, curve: Curves.easeOutCubic);
-        return ScaleTransition(
-          scale: Tween<double>(begin: 0.94, end: 1.0).animate(curved),
-          child: FadeTransition(opacity: curved, child: child),
-        );
-      },
-    );
-  }
-
-  Widget _buildCurveChip({
-    required BiologicalCurveType type,
-    required String label,
-    required IconData icon,
-    required Color color,
-  }) {
-    final isSelected = _selectedCurve == type;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return InkWell(
-      onTap: () => setState(() => _selectedCurve = type),
-      borderRadius: BorderRadius.circular(12),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          color: isSelected ? color.withValues(alpha: 0.2) : Colors.white.withValues(alpha: isDark ? 0.04 : 0.1),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isSelected ? color : Colors.white.withValues(alpha: 0.08),
-            width: isSelected ? 1.5 : 1.0,
-          ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 14, color: isSelected ? color : (isDark ? Colors.white60 : AppColors.textSecondaryLight)),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 11.5,
-                fontWeight: isSelected ? FontWeight.w800 : FontWeight.w500,
-                color: isSelected ? (isDark ? Colors.white : color) : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildChart({
-    required bool isDark,
-    required dynamic waterState,
-    required dynamic pondsState,
-    required dynamic nutritionState,
-  }) {
-    switch (_selectedCurve) {
+  Color _getCurveAccentLight(BiologicalCurveType type) {
+    switch (type) {
       case BiologicalCurveType.oxigeno:
-        return _buildOxygenChart(isDark, waterState);
+        return const Color(0xFF67E8F9);
       case BiologicalCurveType.temperaturaPh:
-        return _buildTemperaturePhChart(isDark, waterState);
+        return const Color(0xFF60A5FA);
       case BiologicalCurveType.toxicos:
-        return _buildToxicsChart(isDark, waterState);
+        return const Color(0xFFFF8FA3);
       case BiologicalCurveType.crecimiento:
-        return _buildGrowthChart(isDark, pondsState);
+        return const Color(0xFF6EE7B7);
       case BiologicalCurveType.conversion:
-        return _buildConversionChart(isDark, pondsState, nutritionState);
+        return const Color(0xFFFCD34D);
       case BiologicalCurveType.supervivencia:
-        return _buildSurvivalChart(isDark, pondsState);
+        return const Color(0xFFC4B5FD);
     }
   }
 
-  Widget _buildEmptyChartState(
-    bool isDark, {
+  String _formatReadingTime(DateTime dt, {String? pondSigla}) {
+    final now = DateTime.now();
+    final isToday =
+        dt.year == now.year && dt.month == now.month && dt.day == now.day;
+    final timeStr = DateFormat('HH:mm').format(dt);
+    final base = isToday
+        ? 'Hoy ($timeStr)'
+        : '${DateFormat('d MMM').format(dt)} ($timeStr)';
+    if (_selectedPondId == null && pondSigla != null && pondSigla.isNotEmpty) {
+      return '$base · $pondSigla';
+    }
+    return base;
+  }
+
+  _TrendDataset _buildDataset({
+    required BiologicalCurveType type,
+    required dynamic waterState,
+    required dynamic pondsState,
+    required dynamic nutritionState,
+    required Map<String, Pond> pondMap,
+  }) {
+    final accent = _getCurveAccent(type);
+    final accentLight = _getCurveAccentLight(type);
+
+    final List<({DateTime date, double value, String? pondId, String? extra})>
+        rawPoints = [];
+
+    late String title;
+    late String unit;
+    late int decimals;
+    late String thresholdLabel;
+    late String emptyTitle;
+    late String emptySubtitle;
+    late IconData emptyIcon;
+    double? lowAlert;
+    double? highAlert;
+
+    switch (type) {
+      case BiologicalCurveType.oxigeno:
+        title = 'Oxígeno (O₂)';
+        unit = 'mg/L';
+        decimals = 1;
+        thresholdLabel = 'Mín: 4.0 mg/L';
+        emptyTitle = 'Sin registros de oxígeno (O₂)';
+        emptySubtitle = _selectedPondId == null
+            ? 'Aún no hay lecturas de calidad de agua en la granja.'
+            : 'Este estanque no tiene lecturas de oxígeno registradas.';
+        emptyIcon = Icons.waves_rounded;
+        lowAlert = 4.0;
+        for (final p in waterState.recentParameters) {
+          if (_selectedPondId != null && p.estanqueId != _selectedPondId) {
+            continue;
+          }
+          final v = (p.oxigenoMgL as double?);
+          if (v != null && v > 0.5) {
+            rawPoints.add((
+              date: p.fecha as DateTime,
+              value: v,
+              pondId: p.estanqueId as String?,
+              extra: p.ph != null ? 'pH ${(p.ph as double).toStringAsFixed(1)}' : null,
+            ));
+          }
+        }
+        break;
+
+      case BiologicalCurveType.temperaturaPh:
+        title = 'Temp & pH';
+        unit = '°C';
+        decimals = 1;
+        thresholdLabel = 'Rango: 26° - 30°C';
+        emptyTitle = 'Sin registros de temperatura y pH';
+        emptySubtitle = _selectedPondId == null
+            ? 'Aún no hay lecturas térmicas registradas en la granja.'
+            : 'Este estanque no tiene lecturas de temperatura registradas.';
+        emptyIcon = Icons.thermostat_rounded;
+        lowAlert = 24.0;
+        highAlert = 31.0;
+        for (final p in waterState.recentParameters) {
+          if (_selectedPondId != null && p.estanqueId != _selectedPondId) {
+            continue;
+          }
+          final v = (p.temperaturaC as double?);
+          if (v != null && v > 5.0) {
+            rawPoints.add((
+              date: p.fecha as DateTime,
+              value: v,
+              pondId: p.estanqueId as String?,
+              extra: p.ph != null ? 'pH ${(p.ph as double).toStringAsFixed(1)}' : null,
+            ));
+          }
+        }
+        break;
+
+      case BiologicalCurveType.toxicos:
+        title = 'Tóxicos (NH₃/NO₂)';
+        unit = 'ppm';
+        decimals = 2;
+        thresholdLabel = 'Máx: 0.50 ppm';
+        emptyTitle = 'Sin registros de tóxicos (NH₃/NO₂)';
+        emptySubtitle = _selectedPondId == null
+            ? 'Aún no hay mediciones de amonio o nitritos en la granja.'
+            : 'Este estanque no tiene mediciones de amonio registradas.';
+        emptyIcon = Icons.warning_amber_rounded;
+        highAlert = 0.50;
+        for (final p in waterState.recentParameters) {
+          if (_selectedPondId != null && p.estanqueId != _selectedPondId) {
+            continue;
+          }
+          final v = (p.amonioMgL as double?);
+          if (v != null) {
+            rawPoints.add((
+              date: p.fecha as DateTime,
+              value: v,
+              pondId: p.estanqueId as String?,
+              extra: p.nitritosMgL != null
+                  ? 'NO₂ ${(p.nitritosMgL as double).toStringAsFixed(2)}'
+                  : null,
+            ));
+          }
+        }
+        break;
+
+      case BiologicalCurveType.crecimiento:
+        title = 'Crecimiento';
+        unit = 'g';
+        decimals = 0;
+        thresholdLabel = 'Meta: 650 g';
+        emptyTitle = 'Sin biometrías registradas';
+        emptySubtitle = _selectedPondId == null
+            ? 'Registra muestreos de peso para visualizar la tendencia de crecimiento.'
+            : 'Este estanque aún no tiene biometrías registradas.';
+        emptyIcon = Icons.show_chart_rounded;
+        for (final b in pondsState.biometries) {
+          if (_selectedPondId != null && b.estanqueId != _selectedPondId) {
+            continue;
+          }
+          rawPoints.add((
+            date: b.fecha as DateTime,
+            value: (b.pesoPromedioG as num).toDouble(),
+            pondId: b.estanqueId as String?,
+            extra: null,
+          ));
+        }
+        break;
+
+      case BiologicalCurveType.conversion:
+        title = 'Conversión (FCR)';
+        unit = 'kg';
+        decimals = 1;
+        thresholdLabel = 'Obj: 1.25:1';
+        emptyTitle = 'Sin registros de alimentación';
+        emptySubtitle = _selectedPondId == null
+            ? 'Aún no hay raciones registradas para visualizar el consumo.'
+            : 'Este estanque no tiene raciones de alimento registradas.';
+        emptyIcon = Icons.restaurant_rounded;
+        for (final f in nutritionState.records) {
+          if (_selectedPondId != null && f.estanqueId != _selectedPondId) {
+            continue;
+          }
+          rawPoints.add((
+            date: f.fecha as DateTime,
+            value: (f.cantidadConsumidaKg as num).toDouble(),
+            pondId: f.estanqueId as String?,
+            extra: null,
+          ));
+        }
+        break;
+
+      case BiologicalCurveType.supervivencia:
+        title = 'Supervivencia';
+        unit = '%';
+        decimals = 1;
+        thresholdLabel = 'Mín: 90.0%';
+        emptyTitle = 'Sin lotes activos para supervivencia';
+        emptySubtitle = _selectedPondId == null
+            ? 'Siembra un lote para monitorear el porcentaje de supervivencia.'
+            : 'Este estanque no tiene lotes activos o históricos.';
+        emptyIcon = Icons.favorite_rounded;
+        lowAlert = 90.0;
+        for (final b in pondsState.batches) {
+          if (_selectedPondId != null && b.estanqueId != _selectedPondId) {
+            continue;
+          }
+          final surv = (b.supervivenciaPct as double?) ?? 90.0;
+          rawPoints.add((
+            date: (b.fechaSiembra as DateTime?) ?? DateTime.now(),
+            value: surv,
+            pondId: b.estanqueId as String?,
+            extra: b.codigoLote as String?,
+          ));
+        }
+        break;
+    }
+
+    if (rawPoints.isEmpty) {
+      return _TrendDataset(
+        title: title,
+        unit: unit,
+        accent: accent,
+        accentLight: accentLight,
+        decimals: decimals,
+        dateRangeLabel: 'Últimos 7 días',
+        thresholdLabel: thresholdLabel,
+        emptyTitle: emptyTitle,
+        emptySubtitle: emptySubtitle,
+        emptyIcon: emptyIcon,
+        bars: const [],
+        readings: const [],
+      );
+    }
+
+    rawPoints.sort((a, b) => a.date.compareTo(b.date));
+
+    // Construir ventana de 7 días terminando en la fecha del último registro
+    final endDate = DateTime(
+      rawPoints.last.date.year,
+      rawPoints.last.date.month,
+      rawPoints.last.date.day,
+    );
+    final startDate = endDate.subtract(const Duration(days: 6));
+
+    final windowPoints = rawPoints.where((pt) {
+      final d = DateTime(pt.date.year, pt.date.month, pt.date.day);
+      return !d.isBefore(startDate) && !d.isAfter(endDate);
+    }).toList();
+
+    final effectivePoints = windowPoints.isNotEmpty ? windowPoints : rawPoints;
+    final allVals = effectivePoints.map((e) => e.value).toList();
+    final globalMin = allVals.reduce(math.min);
+    final globalMax = allVals.reduce(math.max);
+    final globalAvg = allVals.fold(0.0, (s, v) => s + v) / allVals.length;
+
+    final Map<String, List<double>> byDayKey = {};
+    for (final pt in effectivePoints) {
+      final key = DateFormat('yyyy-MM-dd').format(pt.date);
+      byDayKey.putIfAbsent(key, () => []).add(pt.value);
+    }
+
+    final bars = <_DailyRangeBar>[];
+    for (int i = 0; i < 7; i++) {
+      final day = startDate.add(Duration(days: i));
+      final key = DateFormat('yyyy-MM-dd').format(day);
+      final vals = byDayKey[key];
+      final dayLabel = _dayShortNames[(day.weekday - 1).clamp(0, 6)];
+
+      if (vals == null || vals.isEmpty) {
+        bars.add(_DailyRangeBar(dayLabel: dayLabel, date: day));
+      } else {
+        final dMin = vals.reduce(math.min);
+        final dMax = vals.reduce(math.max);
+        final dAvg = vals.fold(0.0, (s, v) => s + v) / vals.length;
+        final isPeak = (dMax - globalMax).abs() < 1e-6 ||
+            (highAlert != null && dMax >= highAlert);
+        final isValley = (dMin - globalMin).abs() < 1e-6 ||
+            (lowAlert != null && dMin <= lowAlert);
+
+        bars.add(
+          _DailyRangeBar(
+            dayLabel: dayLabel,
+            date: day,
+            minVal: dMin,
+            maxVal: dMax,
+            avgVal: dAvg,
+            count: vals.length,
+            showTopDot: isPeak,
+            showBottomDot: isValley,
+          ),
+        );
+      }
+    }
+
+    final recentDesc = rawPoints.reversed.take(3).map((pt) {
+      final pondSigla = pt.pondId != null ? pondMap[pt.pondId!]?.sigla : null;
+      final formattedVal = decimals == 0
+          ? '${pt.value.round()} $unit'
+          : '${pt.value.toStringAsFixed(decimals)} $unit';
+      final valueWithExtra =
+          pt.extra != null ? '$formattedVal · ${pt.extra}' : formattedVal;
+      return _RecentReading(
+        timeLabel: _formatReadingTime(pt.date, pondSigla: pondSigla),
+        valueLabel: valueWithExtra,
+      );
+    }).toList();
+
+    final dateRangeLabel =
+        '${DateFormat('d MMM').format(startDate)} – ${DateFormat('d MMM yyyy').format(endDate)}';
+
+    return _TrendDataset(
+      title: title,
+      unit: unit,
+      accent: accent,
+      accentLight: accentLight,
+      minVal: globalMin,
+      maxVal: globalMax,
+      avgVal: globalAvg,
+      decimals: decimals,
+      dateRangeLabel: dateRangeLabel,
+      thresholdLabel: thresholdLabel,
+      emptyTitle: emptyTitle,
+      emptySubtitle: emptySubtitle,
+      emptyIcon: emptyIcon,
+      bars: bars,
+      readings: recentDesc,
+    );
+  }
+
+  Widget _buildEmptyChartState({
+    required bool isDark,
     required IconData icon,
     required Color color,
     required String title,
@@ -282,34 +860,36 @@ class _BiologicalTrendsCardState extends ConsumerState<BiologicalTrendsCard> {
   }) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: isDark ? 0.03 : 0.12),
-        borderRadius: BorderRadius.circular(18),
+        color: isDark
+            ? Colors.white.withValues(alpha: 0.03)
+            : const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(color: color.withValues(alpha: 0.22)),
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Container(
-            padding: const EdgeInsets.all(10),
+            padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
               color: color.withValues(alpha: 0.14),
               shape: BoxShape.circle,
             ),
-            child: Icon(icon, size: 24, color: color),
+            child: Icon(icon, size: 20, color: color),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 8),
           Text(
             title,
             textAlign: TextAlign.center,
             style: TextStyle(
-              fontSize: 13,
+              fontSize: 12.5,
               fontWeight: FontWeight.w800,
-              color: isDark ? Colors.white : AppColors.textPrimaryLight,
+              color: isDark ? Colors.white : const Color(0xFF1A1A1A),
             ),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 3),
           Text(
             subtitle,
             textAlign: TextAlign.center,
@@ -317,1282 +897,316 @@ class _BiologicalTrendsCardState extends ConsumerState<BiologicalTrendsCard> {
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
               fontSize: 11,
-              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+              color: isDark
+                  ? AppColors.textSecondaryDark
+                  : AppColors.textSecondaryLight,
             ),
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildOxygenChart(bool isDark, dynamic waterState) {
-    List<dynamic> params = List.from(waterState.recentParameters);
-    if (_selectedPondId != null) {
-      params = params.where((p) => p.estanqueId == _selectedPondId).toList();
-    }
-    // Filtrar únicamente lecturas reales donde se midió oxígeno (evitar 0.0 que son omisiones de toma)
-    params = params.where((p) => (p.oxigenoMgL ?? 0.0) > 0.5).toList();
-    params.sort((a, b) => a.fecha.compareTo(b.fecha));
-
-    // Consolidar por día para evitar fechas repetidas y picos artificiales
-    final Map<String, List<dynamic>> byDay = {};
-    for (final p in params) {
-      final dKey = DateFormat('yyyy-MM-dd').format(p.fecha);
-      byDay.putIfAbsent(dKey, () => []).add(p);
-    }
-
-    final sortedDays = byDay.keys.toList()..sort();
-    final List<FlSpot> spots = [];
-    final List<DateTime> spotDates = [];
-
-    if (sortedDays.isEmpty) {
-      return _buildEmptyChartState(
-        isDark,
-        icon: Icons.waves_rounded,
-        color: AppColors.cyanWater,
-        title: 'Sin registros de oxígeno (O₂)',
-        subtitle: _selectedPondId == null
-            ? 'Aún no hay lecturas de calidad de agua en la granja.'
-            : 'Este estanque no tiene lecturas de oxígeno registradas.',
-      );
-    }
-
-    for (int i = 0; i < sortedDays.length; i++) {
-      final dayList = byDay[sortedDays[i]]!;
-      final avgO2 = dayList.fold(0.0, (sum, p) => sum + (p.oxigenoMgL as double)) / dayList.length;
-      spots.add(FlSpot(i.toDouble(), double.parse(avgO2.toStringAsFixed(2))));
-      spotDates.add(dayList.first.fecha);
-    }
-    if (spots.length == 1) {
-      spots.insert(0, FlSpot(0, spots[0].y * 0.95));
-      spots[1] = FlSpot(1, spots[1].y);
-    }
-
-    const double minY = 4.0;
-    const double maxY = 15.0;
-
-    final int xStep = (spots.length / 5).ceil().clamp(1, 10);
-
-    return LineChart(
-      LineChartData(
-        clipData: const FlClipData.all(),
-        minY: minY,
-        maxY: maxY,
-        gridData: FlGridData(
-          show: true,
-          drawVerticalLine: false,
-          horizontalInterval: 3.0,
-          getDrawingHorizontalLine: (val) => FlLine(
-            color: Colors.white.withValues(alpha: 0.06),
-            strokeWidth: 1,
-          ),
-        ),
-        titlesData: FlTitlesData(
-          topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-          rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-          leftTitles: AxisTitles(
-            sideTitles: SideTitles(
-              showTitles: true,
-              reservedSize: 32,
-              interval: 3.0,
-              getTitlesWidget: (val, meta) => Text(
-                '${val.toInt()}m',
-                style: TextStyle(fontSize: 10, color: isDark ? AppColors.textTertiaryDark : AppColors.textTertiaryLight),
-              ),
-            ),
-          ),
-          bottomTitles: AxisTitles(
-            sideTitles: SideTitles(
-              showTitles: true,
-              reservedSize: 22,
-              interval: 1.0,
-              getTitlesWidget: (val, meta) {
-                final int idx = val.toInt();
-                if (idx < 0 || idx >= spots.length) return const SizedBox.shrink();
-                if (idx % xStep != 0 && idx != spots.length - 1) return const SizedBox.shrink();
-                return Padding(
-                  padding: const EdgeInsets.only(top: 4),
-                  child: Text(
-                    spotDates.isNotEmpty && idx < spotDates.length
-                        ? DateFormat('d/M').format(spotDates[idx])
-                        : 'P${idx + 1}',
-                    style: TextStyle(fontSize: 9.5, color: isDark ? AppColors.textTertiaryDark : AppColors.textTertiaryLight),
-                  ),
-                );
-              },
-            ),
-          ),
-        ),
-        borderData: FlBorderData(show: false),
-        lineBarsData: [
-          LineChartBarData(
-            spots: [FlSpot(0, 4.0), FlSpot((spots.length - 1).toDouble(), 4.0)],
-            isCurved: false,
-            color: AppColors.coralAction.withValues(alpha: 0.6),
-            barWidth: 1.5,
-            dashArray: [5, 4],
-            dotData: const FlDotData(show: false),
-          ),
-          LineChartBarData(
-            spots: spots,
-            isCurved: true,
-            preventCurveOverShooting: true,
-            curveSmoothness: 0.22,
-            color: AppColors.cyanWater,
-            barWidth: 3,
-            isStrokeCapRound: true,
-            dotData: FlDotData(
-              show: true,
-              getDotPainter: (spot, percent, barData, index) => FlDotCirclePainter(
-                radius: 4,
-                color: AppColors.cyanWater,
-                strokeWidth: 2,
-                strokeColor: isDark ? const Color(0xFF0F172A) : Colors.white,
-              ),
-            ),
-            belowBarData: BarAreaData(
-              show: true,
-              gradient: LinearGradient(
-                colors: [
-                  AppColors.cyanWater.withValues(alpha: 0.28),
-                  AppColors.cyanWater.withValues(alpha: 0.0),
-                ],
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-              ),
-            ),
-          ),
-        ],
-        lineTouchData: LineTouchData(
-          touchTooltipData: LineTouchTooltipData(
-            getTooltipItems: (touchedSpots) {
-              return touchedSpots.map((spot) {
-                if (spot.barIndex == 0) return null;
-                return LineTooltipItem(
-                  '${spot.y.toStringAsFixed(1)} mg/L O₂',
-                  const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11),
-                );
-              }).toList();
-            },
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTemperaturePhChart(bool isDark, dynamic waterState) {
-    List<dynamic> params = List.from(waterState.recentParameters);
-    if (_selectedPondId != null) {
-      params = params.where((p) => p.estanqueId == _selectedPondId).toList();
-    }
-    // Filtrar únicamente lecturas reales donde se midió temperatura (evitar 0.0 que son omisiones de toma)
-    params = params.where((p) => (p.temperaturaC ?? 0.0) > 5.0).toList();
-    params.sort((a, b) => a.fecha.compareTo(b.fecha));
-
-    // Consolidar por día para evitar fechas repetidas y picos artificiales
-    final Map<String, List<dynamic>> byDay = {};
-    for (final p in params) {
-      final dKey = DateFormat('yyyy-MM-dd').format(p.fecha);
-      byDay.putIfAbsent(dKey, () => []).add(p);
-    }
-
-    final sortedDays = byDay.keys.toList()..sort();
-    final List<FlSpot> spots = [];
-    final List<dynamic> consolidatedParams = [];
-
-    if (sortedDays.isEmpty) {
-      return _buildEmptyChartState(
-        isDark,
-        icon: Icons.thermostat_rounded,
-        color: AppColors.blueOcean,
-        title: 'Sin registros de temperatura y pH',
-        subtitle: _selectedPondId == null
-            ? 'Aún no hay lecturas térmicas registradas en la granja.'
-            : 'Este estanque no tiene lecturas de temperatura registradas.',
-      );
-    }
-
-    for (int i = 0; i < sortedDays.length; i++) {
-      final dayList = byDay[sortedDays[i]]!;
-      final avgT = dayList.fold(0.0, (sum, p) => sum + (p.temperaturaC as double)) / dayList.length;
-      spots.add(FlSpot(i.toDouble(), double.parse(avgT.toStringAsFixed(1))));
-      consolidatedParams.add(dayList.first);
-    }
-    if (spots.length == 1) {
-      spots.insert(0, FlSpot(0, spots[0].y * 0.98));
-      spots[1] = FlSpot(1, spots[1].y);
-    }
-
-    const double minY = 0.0;
-    const double maxY = 40.0;
-
-    final int xStep = (spots.length / 5).ceil().clamp(1, 10);
-
-    return LineChart(
-      LineChartData(
-        clipData: const FlClipData.all(),
-        minY: minY,
-        maxY: maxY,
-        gridData: FlGridData(
-          show: true,
-          drawVerticalLine: false,
-          horizontalInterval: 10.0,
-          getDrawingHorizontalLine: (val) => FlLine(
-            color: Colors.white.withValues(alpha: 0.06),
-            strokeWidth: 1,
-          ),
-        ),
-        titlesData: FlTitlesData(
-          topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-          rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-          leftTitles: AxisTitles(
-            sideTitles: SideTitles(
-              showTitles: true,
-              reservedSize: 32,
-              interval: 10.0,
-              getTitlesWidget: (val, meta) => Text(
-                '${val.toInt()}°',
-                style: TextStyle(fontSize: 10, color: isDark ? AppColors.textTertiaryDark : AppColors.textTertiaryLight),
-              ),
-            ),
-          ),
-          bottomTitles: AxisTitles(
-            sideTitles: SideTitles(
-              showTitles: true,
-              reservedSize: 22,
-              interval: 1.0,
-              getTitlesWidget: (val, meta) {
-                final int idx = val.toInt();
-                if (idx < 0 || idx >= spots.length) return const SizedBox.shrink();
-                if (idx % xStep != 0 && idx != spots.length - 1) return const SizedBox.shrink();
-                return Padding(
-                  padding: const EdgeInsets.only(top: 4),
-                  child: Text(
-                    consolidatedParams.isNotEmpty && idx < consolidatedParams.length
-                        ? DateFormat('d/M').format(consolidatedParams[idx].fecha)
-                        : 'T${idx + 1}',
-                    style: TextStyle(fontSize: 9.5, color: isDark ? AppColors.textTertiaryDark : AppColors.textTertiaryLight),
-                  ),
-                );
-              },
-            ),
-          ),
-        ),
-        borderData: FlBorderData(show: false),
-        lineBarsData: [
-          // Límite de confort zootécnico (31.0°C)
-          LineChartBarData(
-            spots: [FlSpot(0, 31.0), FlSpot((spots.length - 1).toDouble(), 31.0)],
-            isCurved: false,
-            color: AppColors.amberWarning.withValues(alpha: 0.6),
-            barWidth: 1.5,
-            dashArray: [5, 4],
-            dotData: const FlDotData(show: false),
-          ),
-          LineChartBarData(
-            spots: spots,
-            isCurved: true,
-            preventCurveOverShooting: true,
-            curveSmoothness: 0.22,
-            color: AppColors.blueOcean,
-            barWidth: 3,
-            isStrokeCapRound: true,
-            dotData: FlDotData(
-              show: true,
-              getDotPainter: (spot, percent, barData, index) => FlDotCirclePainter(
-                radius: 4,
-                color: AppColors.blueOcean,
-                strokeWidth: 2,
-                strokeColor: isDark ? const Color(0xFF0F172A) : Colors.white,
-              ),
-            ),
-            belowBarData: BarAreaData(
-              show: true,
-              gradient: LinearGradient(
-                colors: [
-                  AppColors.blueOcean.withValues(alpha: 0.28),
-                  AppColors.blueOcean.withValues(alpha: 0.0),
-                ],
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-              ),
-            ),
-          ),
-        ],
-        lineTouchData: LineTouchData(
-          touchTooltipData: LineTouchTooltipData(
-            getTooltipItems: (touchedSpots) {
-              return touchedSpots.map((spot) {
-                if (spot.barIndex == 0) return null;
-                final idx = spot.x.toInt();
-                final phStr = consolidatedParams.isNotEmpty && idx < consolidatedParams.length && consolidatedParams[idx].ph != null
-                    ? ' • pH: ${consolidatedParams[idx].ph!.toStringAsFixed(1)}'
-                    : '';
-                return LineTooltipItem(
-                  '${spot.y.toStringAsFixed(1)} °C$phStr',
-                  const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11),
-                );
-              }).toList();
-            },
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildToxicsChart(bool isDark, dynamic waterState) {
-    List<dynamic> params = List.from(waterState.recentParameters);
-    if (_selectedPondId != null) {
-      params = params.where((p) => p.estanqueId == _selectedPondId).toList();
-    }
-    // Filtrar únicamente lecturas reales donde se midió amonio (evitar null)
-    params = params.where((p) => p.amonioMgL != null).toList();
-    params.sort((a, b) => a.fecha.compareTo(b.fecha));
-
-    // Consolidar por día para evitar fechas repetidas y picos artificiales
-    final Map<String, List<dynamic>> byDay = {};
-    for (final p in params) {
-      final dKey = DateFormat('yyyy-MM-dd').format(p.fecha);
-      byDay.putIfAbsent(dKey, () => []).add(p);
-    }
-
-    final sortedDays = byDay.keys.toList()..sort();
-    final List<FlSpot> spots = [];
-    final List<dynamic> consolidatedParams = [];
-
-    if (sortedDays.isEmpty) {
-      return _buildEmptyChartState(
-        isDark,
-        icon: Icons.warning_amber_rounded,
-        color: AppColors.coralAction,
-        title: 'Sin registros de tóxicos (NH₃/NO₂)',
-        subtitle: _selectedPondId == null
-            ? 'Aún no hay mediciones de amonio o nitritos en la granja.'
-            : 'Este estanque no tiene mediciones de amonio registradas.',
-      );
-    }
-
-    for (int i = 0; i < sortedDays.length; i++) {
-      final dayList = byDay[sortedDays[i]]!;
-      final avgNh3 = dayList.fold(0.0, (sum, p) => sum + (p.amonioMgL as double)) / dayList.length;
-      spots.add(FlSpot(i.toDouble(), double.parse(avgNh3.toStringAsFixed(2))));
-      consolidatedParams.add(dayList.first);
-    }
-    if (spots.length == 1) {
-      spots.insert(0, FlSpot(0, spots[0].y * 0.9));
-      spots[1] = FlSpot(1, spots[1].y);
-    }
-
-    const double minY = 0.0;
-    const double maxY = 5.0;
-    const double intervalY = 1.0;
-
-    final int xStep = (spots.length / 5).ceil().clamp(1, 10);
-
-    return LineChart(
-      LineChartData(
-        clipData: const FlClipData.all(),
-        minY: minY,
-        maxY: maxY,
-        gridData: FlGridData(
-          show: true,
-          drawVerticalLine: false,
-          horizontalInterval: intervalY,
-          getDrawingHorizontalLine: (val) => FlLine(
-            color: Colors.white.withValues(alpha: 0.06),
-            strokeWidth: 1,
-          ),
-        ),
-        titlesData: FlTitlesData(
-          topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-          rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-          leftTitles: AxisTitles(
-            sideTitles: SideTitles(
-              showTitles: true,
-              reservedSize: 32,
-              interval: intervalY,
-              getTitlesWidget: (val, meta) => Text(
-                val.toStringAsFixed(1),
-                style: TextStyle(fontSize: 10, color: isDark ? AppColors.textTertiaryDark : AppColors.textTertiaryLight),
-              ),
-            ),
-          ),
-          bottomTitles: AxisTitles(
-            sideTitles: SideTitles(
-              showTitles: true,
-              reservedSize: 22,
-              interval: 1.0,
-              getTitlesWidget: (val, meta) {
-                final int idx = val.toInt();
-                if (idx < 0 || idx >= spots.length) return const SizedBox.shrink();
-                if (idx % xStep != 0 && idx != spots.length - 1) return const SizedBox.shrink();
-                return Padding(
-                  padding: const EdgeInsets.only(top: 4),
-                  child: Text(
-                    consolidatedParams.isNotEmpty && idx < consolidatedParams.length
-                        ? DateFormat('d/M').format(consolidatedParams[idx].fecha)
-                        : 'X${idx + 1}',
-                    style: TextStyle(fontSize: 9.5, color: isDark ? AppColors.textTertiaryDark : AppColors.textTertiaryLight),
-                  ),
-                );
-              },
-            ),
-          ),
-        ),
-        borderData: FlBorderData(show: false),
-        lineBarsData: [
-          // Umbral crítico de Amonio (0.50 ppm)
-          LineChartBarData(
-            spots: [FlSpot(0, 0.50), FlSpot((spots.length - 1).toDouble(), 0.50)],
-            isCurved: false,
-            color: AppColors.coralAction.withValues(alpha: 0.8),
-            barWidth: 1.5,
-            dashArray: [5, 4],
-            dotData: const FlDotData(show: false),
-          ),
-          LineChartBarData(
-            spots: spots,
-            isCurved: true,
-            preventCurveOverShooting: true,
-            curveSmoothness: 0.22,
-            color: AppColors.coralAction,
-            barWidth: 3,
-            isStrokeCapRound: true,
-            dotData: FlDotData(
-              show: true,
-              getDotPainter: (spot, percent, barData, index) => FlDotCirclePainter(
-                radius: 4,
-                color: AppColors.coralAction,
-                strokeWidth: 2,
-                strokeColor: isDark ? const Color(0xFF0F172A) : Colors.white,
-              ),
-            ),
-            belowBarData: BarAreaData(
-              show: true,
-              gradient: LinearGradient(
-                colors: [
-                  AppColors.coralAction.withValues(alpha: 0.28),
-                  AppColors.coralAction.withValues(alpha: 0.0),
-                ],
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-              ),
-            ),
-          ),
-        ],
-        lineTouchData: LineTouchData(
-          touchTooltipData: LineTouchTooltipData(
-            getTooltipItems: (touchedSpots) {
-              return touchedSpots.map((spot) {
-                if (spot.barIndex == 0) return null;
-                return LineTooltipItem(
-                  '${spot.y.toStringAsFixed(2)} ppm NH₃ (Amonio)',
-                  const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11),
-                );
-              }).toList();
-            },
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildGrowthChart(bool isDark, dynamic pondsState) {
-    List<dynamic> bios = List.from(pondsState.biometries);
-    if (_selectedPondId != null) {
-      bios = bios.where((b) => b.estanqueId == _selectedPondId).toList();
-    }
-    bios.sort((a, b) => a.fecha.compareTo(b.fecha));
-
-    if (bios.isEmpty) {
-      return _buildEmptyChartState(
-        isDark,
-        icon: Icons.show_chart_rounded,
-        color: AppColors.greenBiomass,
-        title: 'Sin biometrías registradas',
-        subtitle: _selectedPondId == null
-            ? 'Registra muestreos de peso para visualizar la curva de crecimiento.'
-            : 'Este estanque aún no tiene biometrías registradas.',
-      );
-    }
-
-    List<FlSpot> spots = [];
-    for (int i = 0; i < bios.length; i++) {
-      spots.add(FlSpot(i.toDouble(), bios[i].pesoPromedioG));
-    }
-    if (spots.length == 1) {
-      spots = [FlSpot(0, spots[0].y * 0.7), FlSpot(1, spots[0].y)];
-    }
-
-    const double minY = 0.0;
-    const double maxY = 1500.0;
-    final int xStep = (spots.length / 5).ceil().clamp(1, 10);
-
-    return LineChart(
-      LineChartData(
-        clipData: const FlClipData.all(),
-        minY: minY,
-        maxY: maxY,
-        gridData: FlGridData(
-          show: true,
-          drawVerticalLine: false,
-          horizontalInterval: 300.0,
-          getDrawingHorizontalLine: (val) => FlLine(
-            color: Colors.white.withValues(alpha: 0.06),
-            strokeWidth: 1,
-          ),
-        ),
-        titlesData: FlTitlesData(
-          topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-          rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-          leftTitles: AxisTitles(
-            sideTitles: SideTitles(
-              showTitles: true,
-              reservedSize: 38,
-              interval: 300.0,
-              getTitlesWidget: (val, meta) => Text(
-                '${val.toInt()}g',
-                style: TextStyle(fontSize: 10, color: isDark ? AppColors.textTertiaryDark : AppColors.textTertiaryLight),
-              ),
-            ),
-          ),
-          bottomTitles: AxisTitles(
-            sideTitles: SideTitles(
-              showTitles: true,
-              reservedSize: 22,
-              interval: 1.0,
-              getTitlesWidget: (val, meta) {
-                final int idx = val.toInt();
-                if (idx < 0 || idx >= spots.length) return const SizedBox.shrink();
-                if (idx % xStep != 0 && idx != spots.length - 1) return const SizedBox.shrink();
-                return Padding(
-                  padding: const EdgeInsets.only(top: 4),
-                  child: Text(
-                    bios.isNotEmpty && idx < bios.length ? DateFormat('d/M').format(bios[idx].fecha) : 'S${idx + 1}',
-                    style: TextStyle(fontSize: 9.5, color: isDark ? AppColors.textTertiaryDark : AppColors.textTertiaryLight),
-                  ),
-                );
-              },
-            ),
-          ),
-        ),
-        borderData: FlBorderData(show: false),
-        lineBarsData: [
-          LineChartBarData(
-            spots: spots,
-            isCurved: true,
-            preventCurveOverShooting: true,
-            curveSmoothness: 0.3,
-            color: AppColors.greenBiomass,
-            barWidth: 3,
-            isStrokeCapRound: true,
-            dotData: FlDotData(
-              show: true,
-              getDotPainter: (spot, percent, barData, index) => FlDotCirclePainter(
-                radius: 4,
-                color: AppColors.greenBiomass,
-                strokeWidth: 2,
-                strokeColor: isDark ? const Color(0xFF0F172A) : Colors.white,
-              ),
-            ),
-            belowBarData: BarAreaData(
-              show: true,
-              gradient: LinearGradient(
-                colors: [
-                  AppColors.greenBiomass.withValues(alpha: 0.28),
-                  AppColors.greenBiomass.withValues(alpha: 0.0),
-                ],
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-              ),
-            ),
-          ),
-        ],
-        lineTouchData: LineTouchData(
-          touchTooltipData: LineTouchTooltipData(
-            getTooltipItems: (touchedSpots) => touchedSpots.map((spot) {
-              return LineTooltipItem(
-                '${spot.y.toInt()} g',
-                const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11),
-              );
-            }).toList(),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildConversionChart(bool isDark, dynamic pondsState, dynamic nutritionState) {
-    List<dynamic> feeds = List.from(nutritionState.records);
-    if (_selectedPondId != null) {
-      feeds = feeds.where((f) => f.estanqueId == _selectedPondId).toList();
-    }
-    feeds.sort((a, b) => a.fecha.compareTo(b.fecha));
-
-    if (feeds.isEmpty) {
-      return _buildEmptyChartState(
-        isDark,
-        icon: Icons.restaurant_rounded,
-        color: AppColors.amberWarning,
-        title: 'Sin registros de alimentación',
-        subtitle: _selectedPondId == null
-            ? 'Aún no hay raciones registradas para calcular la curva de consumo.'
-            : 'Este estanque no tiene raciones de alimento registradas.',
-      );
-    }
-
-    List<FlSpot> spots = [];
-    for (int i = 0; i < feeds.length; i++) {
-      final kg = feeds[i].cantidadConsumidaKg;
-      spots.add(FlSpot(i.toDouble(), kg));
-    }
-    if (spots.length == 1) {
-      spots = [FlSpot(0, spots[0].y * 0.9), FlSpot(1, spots[0].y)];
-    }
-
-    const double minY = 0.1;
-    const double maxY = 2.0;
-    final int xStep = (spots.length / 5).ceil().clamp(1, 10);
-
-    return LineChart(
-      LineChartData(
-        clipData: const FlClipData.all(),
-        minY: minY,
-        maxY: maxY,
-        gridData: FlGridData(
-          show: true,
-          drawVerticalLine: false,
-          horizontalInterval: 0.5,
-          getDrawingHorizontalLine: (val) => FlLine(
-            color: Colors.white.withValues(alpha: 0.06),
-            strokeWidth: 1,
-          ),
-        ),
-        titlesData: FlTitlesData(
-          topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-          rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-          leftTitles: AxisTitles(
-            sideTitles: SideTitles(
-              showTitles: true,
-              reservedSize: 32,
-              interval: 0.5,
-              getTitlesWidget: (val, meta) => Text(
-                val.toStringAsFixed(1),
-                style: TextStyle(fontSize: 10, color: isDark ? AppColors.textTertiaryDark : AppColors.textTertiaryLight),
-              ),
-            ),
-          ),
-          bottomTitles: AxisTitles(
-            sideTitles: SideTitles(
-              showTitles: true,
-              reservedSize: 22,
-              interval: 1.0,
-              getTitlesWidget: (val, meta) {
-                final int idx = val.toInt();
-                if (idx < 0 || idx >= spots.length) return const SizedBox.shrink();
-                if (idx % xStep != 0 && idx != spots.length - 1) return const SizedBox.shrink();
-                return Padding(
-                  padding: const EdgeInsets.only(top: 4),
-                  child: Text(
-                    feeds.isNotEmpty && idx < feeds.length ? DateFormat('d/M').format(feeds[idx].fecha) : 'D${idx + 1}',
-                    style: TextStyle(fontSize: 9.5, color: isDark ? AppColors.textTertiaryDark : AppColors.textTertiaryLight),
-                  ),
-                );
-              },
-            ),
-          ),
-        ),
-        borderData: FlBorderData(show: false),
-        lineBarsData: [
-          LineChartBarData(
-            spots: spots,
-            isCurved: true,
-            preventCurveOverShooting: true,
-            curveSmoothness: 0.3,
-            color: AppColors.amberWarning,
-            barWidth: 3,
-            isStrokeCapRound: true,
-            dotData: FlDotData(
-              show: true,
-              getDotPainter: (spot, percent, barData, index) => FlDotCirclePainter(
-                radius: 4,
-                color: AppColors.amberWarning,
-                strokeWidth: 2,
-                strokeColor: isDark ? const Color(0xFF0F172A) : Colors.white,
-              ),
-            ),
-            belowBarData: BarAreaData(
-              show: true,
-              gradient: LinearGradient(
-                colors: [
-                  AppColors.amberWarning.withValues(alpha: 0.28),
-                  AppColors.amberWarning.withValues(alpha: 0.0),
-                ],
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-              ),
-            ),
-          ),
-        ],
-        lineTouchData: LineTouchData(
-          touchTooltipData: LineTouchTooltipData(
-            getTooltipItems: (touchedSpots) => touchedSpots.map((spot) {
-              return LineTooltipItem(
-                feeds.isEmpty ? 'FCR: ${spot.y.toStringAsFixed(2)}:1' : '${spot.y.toStringAsFixed(1)} Kg',
-                const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11),
-              );
-            }).toList(),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSurvivalChart(bool isDark, dynamic pondsState) {
-    List<dynamic> batches = List.from(pondsState.batches);
-    if (_selectedPondId != null) {
-      batches = batches.where((b) => b.estanqueId == _selectedPondId).toList();
-    }
-
-    if (batches.isEmpty) {
-      return _buildEmptyChartState(
-        isDark,
-        icon: Icons.favorite_rounded,
-        color: AppColors.purpleAnalytics,
-        title: 'Sin lotes activos para supervivencia',
-        subtitle: _selectedPondId == null
-            ? 'Siembra un lote para monitorear el porcentaje de supervivencia.'
-            : 'Este estanque no tiene lotes activos o históricos.',
-      );
-    }
-
-    final double avgSurvival =
-        batches.fold(0.0, (sum, b) => sum + (b.supervivenciaPct ?? 90.0)) / batches.length;
-
-    final List<FlSpot> spots = [
-      const FlSpot(0, 100),
-      FlSpot(1, 98.2),
-      FlSpot(2, 96.5),
-      FlSpot(3, 95.1),
-      FlSpot(4, avgSurvival),
-    ];
-
-    const double minY = 0.0;
-    const double maxY = 100.0;
-
-    return LineChart(
-      LineChartData(
-        clipData: const FlClipData.all(),
-        minY: minY,
-        maxY: maxY,
-        gridData: FlGridData(
-          show: true,
-          drawVerticalLine: false,
-          horizontalInterval: 25.0,
-          getDrawingHorizontalLine: (val) => FlLine(
-            color: Colors.white.withValues(alpha: 0.06),
-            strokeWidth: 1,
-          ),
-        ),
-        titlesData: FlTitlesData(
-          topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-          rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-          leftTitles: AxisTitles(
-            sideTitles: SideTitles(
-              showTitles: true,
-              reservedSize: 34,
-              interval: 25.0,
-              getTitlesWidget: (val, meta) => Text(
-                '${val.toInt()}%',
-                style: TextStyle(fontSize: 10, color: isDark ? AppColors.textTertiaryDark : AppColors.textTertiaryLight),
-              ),
-            ),
-          ),
-          bottomTitles: AxisTitles(
-            sideTitles: SideTitles(
-              showTitles: true,
-              reservedSize: 22,
-              interval: 1.0,
-              getTitlesWidget: (val, meta) {
-                final int idx = val.toInt();
-                if (idx < 0 || idx >= spots.length) return const SizedBox.shrink();
-                return Padding(
-                  padding: const EdgeInsets.only(top: 4),
-                  child: Text(
-                    'Mes ${idx + 1}',
-                    style: TextStyle(fontSize: 9.5, color: isDark ? AppColors.textTertiaryDark : AppColors.textTertiaryLight),
-                  ),
-                );
-              },
-            ),
-          ),
-        ),
-        borderData: FlBorderData(show: false),
-        lineBarsData: [
-          LineChartBarData(
-            spots: [FlSpot(0, 90.0), FlSpot(4, 90.0)],
-            isCurved: false,
-            color: AppColors.coralAction.withValues(alpha: 0.5),
-            barWidth: 1.5,
-            dashArray: [5, 4],
-            dotData: const FlDotData(show: false),
-          ),
-          LineChartBarData(
-            spots: spots,
-            isCurved: true,
-            preventCurveOverShooting: true,
-            curveSmoothness: 0.3,
-            color: AppColors.purpleAnalytics,
-            barWidth: 3,
-            isStrokeCapRound: true,
-            dotData: FlDotData(
-              show: true,
-              getDotPainter: (spot, percent, barData, index) => FlDotCirclePainter(
-                radius: 4,
-                color: AppColors.purpleAnalytics,
-                strokeWidth: 2,
-                strokeColor: isDark ? const Color(0xFF0F172A) : Colors.white,
-              ),
-            ),
-            belowBarData: BarAreaData(
-              show: true,
-              gradient: LinearGradient(
-                colors: [
-                  AppColors.purpleAnalytics.withValues(alpha: 0.28),
-                  AppColors.purpleAnalytics.withValues(alpha: 0.0),
-                ],
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-              ),
-            ),
-          ),
-        ],
-        lineTouchData: LineTouchData(
-          touchTooltipData: LineTouchTooltipData(
-            getTooltipItems: (touchedSpots) => touchedSpots.map((spot) {
-              return LineTooltipItem(
-                '${spot.y.toStringAsFixed(1)}% vivos',
-                const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11),
-              );
-            }).toList(),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildMetricsFooter({
-    required bool isDark,
-    required dynamic waterState,
-    required dynamic pondsState,
-    required dynamic nutritionState,
-  }) {
-    String label1 = 'ÚLTIMO REGISTRO';
-    String val1 = '--';
-    String label2 = 'PROMEDIO / TENDENCIA';
-    String val2 = '--';
-    String label3 = 'META / UMBRAL';
-    String val3 = '--';
-    Color color = _getCurveColor(_selectedCurve);
-
-    switch (_selectedCurve) {
-      case BiologicalCurveType.oxigeno:
-        List<dynamic> params = List.from(waterState.recentParameters);
-        if (_selectedPondId != null) {
-          params = params.where((p) => p.estanqueId == _selectedPondId).toList();
-        }
-        params = params.where((p) => (p.oxigenoMgL ?? 0.0) > 0.5).toList();
-        params.sort((a, b) => b.fecha.compareTo(a.fecha));
-        final latest = params.isNotEmpty ? params.first : null;
-        val1 = latest?.oxigenoMgL != null ? '${latest.oxigenoMgL!.toStringAsFixed(1)} mg/L' : 'Sin datos';
-        val2 = latest?.ph != null ? 'pH: ${latest.ph!.toStringAsFixed(1)}' : '--';
-        val3 = 'Mín: 4.0 mg/L';
-        break;
-      case BiologicalCurveType.temperaturaPh:
-        List<dynamic> params = List.from(waterState.recentParameters);
-        if (_selectedPondId != null) {
-          params = params.where((p) => p.estanqueId == _selectedPondId).toList();
-        }
-        params = params.where((p) => (p.temperaturaC ?? 0.0) > 5.0).toList();
-        params.sort((a, b) => b.fecha.compareTo(a.fecha));
-        final latest = params.isNotEmpty ? params.first : null;
-        val1 = latest?.temperaturaC != null ? '${latest.temperaturaC!.toStringAsFixed(1)} °C' : 'Sin datos';
-        val2 = latest?.ph != null ? 'pH: ${latest.ph!.toStringAsFixed(1)}' : '--';
-        val3 = 'Rango: 26° - 30°C';
-        break;
-      case BiologicalCurveType.toxicos:
-        List<dynamic> params = List.from(waterState.recentParameters);
-        if (_selectedPondId != null) {
-          params = params.where((p) => p.estanqueId == _selectedPondId).toList();
-        }
-        params = params.where((p) => p.amonioMgL != null).toList();
-        params.sort((a, b) => b.fecha.compareTo(a.fecha));
-        final latest = params.isNotEmpty ? params.first : null;
-        val1 = latest?.amonioMgL != null ? '${latest.amonioMgL!.toStringAsFixed(2)} ppm NH₃' : 'Sin datos';
-        val2 = latest?.nitritosMgL != null ? 'NO₂: ${latest.nitritosMgL!.toStringAsFixed(2)} ppm' : '--';
-        val3 = 'Máx: 0.50 ppm';
-        break;
-      case BiologicalCurveType.crecimiento:
-        List<dynamic> bios = List.from(pondsState.biometries);
-        if (_selectedPondId != null) {
-          bios = bios.where((b) => b.estanqueId == _selectedPondId).toList();
-        }
-        final latest = bios.isNotEmpty ? bios.last : null;
-        val1 = latest != null ? '${latest.pesoPromedioG.toInt()} g' : 'Sin datos';
-        val2 = latest != null ? 'Muestreos: ${bios.length}' : '--';
-        val3 = 'Meta: 650 g';
-        break;
-      case BiologicalCurveType.conversion:
-        List<dynamic> batches = List.from(pondsState.batches);
-        if (_selectedPondId != null) {
-          batches = batches.where((b) => b.estanqueId == _selectedPondId).toList();
-        }
-        final validBatches = batches.where((b) => b.fcrOrNull != null).toList();
-        val1 = validBatches.isNotEmpty
-            ? '${(validBatches.fold(0.0, (s, b) => s + b.fcrOrNull!) / validBatches.length).toStringAsFixed(2)}:1'
-            : 'Sin datos';
-        val2 = validBatches.isNotEmpty ? 'Eficiencia Activa' : '--';
-        val3 = 'Obj: 1.25';
-        break;
-      case BiologicalCurveType.supervivencia:
-        List<dynamic> batches = List.from(pondsState.batches);
-        if (_selectedPondId != null) {
-          batches = batches.where((b) => b.estanqueId == _selectedPondId).toList();
-        }
-        if (batches.isEmpty) {
-          val1 = 'Sin datos';
-          val2 = '--';
-        } else {
-          final avgSurv = batches.fold(0.0, (sum, b) => sum + (b.supervivenciaPct ?? 90.0)) / batches.length;
-          val1 = '${avgSurv.toStringAsFixed(1)}%';
-          val2 = '${batches.length} lote(s)';
-        }
-        val3 = 'Mín: 90.0%';
-        break;
-    }
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: isDark ? 0.04 : 0.15),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          _buildMiniMetric(label1, val1, color, isDark),
-          Container(width: 1, height: 24, color: Colors.white.withValues(alpha: 0.1)),
-          _buildMiniMetric(label2, val2, isDark ? Colors.white : AppColors.textPrimaryLight, isDark),
-          Container(width: 1, height: 24, color: Colors.white.withValues(alpha: 0.1)),
-          _buildMiniMetric(label3, val3, AppColors.cyanWater, isDark),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMiniMetric(String label, String value, Color valColor, bool isDark) {
-    return Column(
-      children: [
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 9,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 0.5,
-            color: isDark ? AppColors.textTertiaryDark : AppColors.textTertiaryLight,
-          ),
-        ),
-        const SizedBox(height: 2),
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: 12.5,
-            fontWeight: FontWeight.w800,
-            color: valColor,
-          ),
-        ),
-      ],
     );
   }
 }
 
-// ============================================================================
-// CAJA FLOTANTE GLASSMORPHISM PARA FILTRADO DE ESTANQUES
-// ============================================================================
-class _GlassPondSelectorDialog extends StatefulWidget {
-  final List<Pond> ponds;
-  final String? selectedPondId;
-  final ValueChanged<String?> onSelected;
+class _FullStatsButton extends StatefulWidget {
+  final String label;
+  final bool isDark;
+  final VoidCallback onTap;
 
-  const _GlassPondSelectorDialog({
-    required this.ponds,
-    required this.selectedPondId,
-    required this.onSelected,
+  const _FullStatsButton({
+    required this.label,
+    required this.isDark,
+    required this.onTap,
   });
 
   @override
-  State<_GlassPondSelectorDialog> createState() => _GlassPondSelectorDialogState();
+  State<_FullStatsButton> createState() => _FullStatsButtonState();
 }
 
-class _GlassPondSelectorDialogState extends State<_GlassPondSelectorDialog> {
-  final _searchCtrl = TextEditingController();
-  String _filter = '';
-
-  @override
-  void dispose() {
-    _searchCtrl.dispose();
-    super.dispose();
-  }
+class _FullStatsButtonState extends State<_FullStatsButton> {
+  bool _hovered = false;
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bg = widget.isDark
+        ? (_hovered
+            ? Colors.white.withValues(alpha: 0.10)
+            : Colors.white.withValues(alpha: 0.04))
+        : (_hovered ? const Color(0xFFF5F5F5) : Colors.white);
+    final border = widget.isDark
+        ? Colors.white.withValues(alpha: _hovered ? 0.24 : 0.14)
+        : (_hovered ? const Color(0xFFD0D0D0) : const Color(0xFFE0E0E0));
+    final fg = widget.isDark ? Colors.white : const Color(0xFF1A1A1A);
 
-    final filtered = widget.ponds.where((p) {
-      final name = p.nombre.toLowerCase();
-      final sigla = p.sigla.toLowerCase();
-      final especie = p.especieActual.toLowerCase();
-      final query = _filter.toLowerCase().trim();
-      return name.contains(query) || sigla.contains(query) || especie.contains(query);
-    }).toList();
-
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 420, maxHeight: 460),
-          child: GlassContainer(
-            borderRadius: 24,
-            padding: const EdgeInsets.all(18),
-            blur: 24,
-            opacity: isDark ? 0.22 : 0.96,
-            borderColor: AppColors.cyanWater.withValues(alpha: 0.35),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Cabecera del diálogo
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: AppColors.cyanWater.withValues(alpha: 0.15),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: const Icon(Icons.tune_rounded, color: AppColors.cyanWater, size: 18),
-                        ),
-                        const SizedBox(width: 10),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Filtrar por Estanque',
-                              style: AppTypography.titleSmall.copyWith(
-                                color: isDark ? Colors.white : AppColors.textPrimaryLight,
-                                fontWeight: FontWeight.w900,
-                              ),
-                            ),
-                            Text(
-                              'Visualiza curvas individuales o consolidadas',
-                              style: AppTypography.labelMicro.copyWith(color: AppColors.textSecondaryDark),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.close_rounded, size: 20),
-                      onPressed: () => Navigator.of(context).pop(),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-
-                // Buscador Instantáneo
-                TextField(
-                  controller: _searchCtrl,
-                  onChanged: (val) => setState(() => _filter = val),
-                  style: const TextStyle(fontSize: 12.5),
-                  decoration: InputDecoration(
-                    hintText: 'Buscar por estanque o especie...',
-                    prefixIcon: const Icon(Icons.search_rounded, size: 18, color: AppColors.cyanWater),
-                    suffixIcon: _filter.isNotEmpty
-                        ? IconButton(
-                            icon: const Icon(Icons.clear_rounded, size: 16),
-                            onPressed: () {
-                              _searchCtrl.clear();
-                              setState(() => _filter = '');
-                            },
-                          )
-                        : null,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    filled: true,
-                    fillColor: Colors.white.withValues(alpha: isDark ? 0.05 : 0.5),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(14),
-                      borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.12)),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(14),
-                      borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.12)),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(14),
-                      borderSide: const BorderSide(color: AppColors.cyanWater),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-
-                // Opción Destacada: Todos los Estanques
-                InkWell(
-                  onTap: () => widget.onSelected(null),
-                  borderRadius: BorderRadius.circular(14),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                    decoration: BoxDecoration(
-                      color: widget.selectedPondId == null
-                          ? AppColors.cyanWater.withValues(alpha: 0.2)
-                          : Colors.white.withValues(alpha: isDark ? 0.03 : 0.4),
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(
-                        color: widget.selectedPondId == null
-                            ? AppColors.cyanWater
-                            : (isDark ? Colors.white10 : Colors.black12),
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.grid_view_rounded,
-                          size: 18,
-                          color: widget.selectedPondId == null ? AppColors.cyanWater : Colors.grey,
-                        ),
-                        const SizedBox(width: 10),
-                        const Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Todos los Estanques (Promedio Granja)',
-                                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12),
-                              ),
-                              Text(
-                                'Curva consolidada global de la piscícola',
-                                style: TextStyle(fontSize: 10.5, color: Colors.grey),
-                              ),
-                            ],
-                          ),
-                        ),
-                        if (widget.selectedPondId == null)
-                          const Icon(Icons.check_circle_rounded, color: AppColors.cyanWater, size: 18),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 8),
-
-                // Lista de Estanques con Tarjetas Compactas
-                Expanded(
-                  child: filtered.isEmpty
-                      ? const Center(
-                          child: Text(
-                            'No se encontraron estanques coincidentes',
-                            style: TextStyle(fontSize: 12, color: Colors.grey),
-                          ),
-                        )
-                      : ListView.separated(
-                          itemCount: filtered.length,
-                          separatorBuilder: (_, __) => const SizedBox(height: 6),
-                          itemBuilder: (context, index) {
-                            final p = filtered[index];
-                            final isSel = widget.selectedPondId == p.id;
-                            final bioKg = p.biomasaKg;
-                            final especie = p.especieActual;
-
-                            return InkWell(
-                              onTap: () => widget.onSelected(p.id),
-                              borderRadius: BorderRadius.circular(14),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                decoration: BoxDecoration(
-                                  color: isSel
-                                      ? AppColors.cyanWater.withValues(alpha: 0.18)
-                                      : Colors.white.withValues(alpha: isDark ? 0.03 : 0.4),
-                                  borderRadius: BorderRadius.circular(14),
-                                  border: Border.all(
-                                    color: isSel ? AppColors.cyanWater : Colors.white.withValues(alpha: 0.08),
-                                  ),
-                                ),
-                                child: Row(
-                                  children: [
-                                    Container(
-                                      padding: const EdgeInsets.all(6),
-                                      decoration: BoxDecoration(
-                                        color: AppColors.cyanWater.withValues(alpha: 0.1),
-                                        shape: BoxShape.circle,
-                                      ),
-                                      child: const Icon(Icons.water_rounded, size: 14, color: AppColors.cyanWater),
-                                    ),
-                                    const SizedBox(width: 10),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            p.nombre,
-                                            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
-                                          ),
-                                          Text(
-                                            especie.isEmpty ? 'Sin lote activo' : especie,
-                                            style: TextStyle(
-                                              fontSize: 10.5,
-                                              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    Column(
-                                      crossAxisAlignment: CrossAxisAlignment.end,
-                                      children: [
-                                        Text(
-                                          CurrencyFormatters.formatKg(bioKg),
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.w800,
-                                            fontSize: 11.5,
-                                            color: AppColors.greenBiomass,
-                                          ),
-                                        ),
-                                        Text(
-                                          'Biomasa',
-                                          style: TextStyle(
-                                            fontSize: 9.5,
-                                            color: isDark ? AppColors.textTertiaryDark : AppColors.textTertiaryLight,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    if (isSel) ...[
-                                      const SizedBox(width: 8),
-                                      const Icon(Icons.check_circle_rounded, color: AppColors.cyanWater, size: 16),
-                                    ],
-                                  ],
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                ),
-              ],
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+          decoration: BoxDecoration(
+            color: bg,
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(color: border, width: 1.5),
+          ),
+          child: Text(
+            widget.label,
+            style: TextStyle(
+              fontSize: 10.5,
+              fontWeight: FontWeight.w600,
+              color: fg,
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Gráfica de barras de rango flotantes estilo Uiverse NK2552003
+class _RangeBarChart extends StatefulWidget {
+  final _TrendDataset dataset;
+  final bool isDark;
+
+  const _RangeBarChart({
+    required this.dataset,
+    required this.isDark,
+  });
+
+  @override
+  State<_RangeBarChart> createState() => _RangeBarChartState();
+}
+
+class _RangeBarChartState extends State<_RangeBarChart> {
+  int _hoveredIdx = -1;
+
+  @override
+  Widget build(BuildContext context) {
+    const double plotHeight = 96.0;
+    const double labelAreaHeight = 20.0;
+    final dataset = widget.dataset;
+    final isDark = widget.isDark;
+
+    final minV = dataset.minVal ?? 0.0;
+    final maxV = dataset.maxVal ?? 1.0;
+    final span = (maxV - minV).abs();
+    final pad = span < 1e-4 ? math.max(1.0, maxV.abs() * 0.25) : span * 0.18;
+    final domainMin = minV - pad;
+    final domainMax = maxV + pad;
+    final domainSpan = math.max(1e-4, domainMax - domainMin);
+
+    double toFrac(double v) => ((v - domainMin) / domainSpan).clamp(0.0, 1.0);
+
+    final avgFrac = toFrac(dataset.avgVal ?? minV);
+    final avgTop = ((1.0 - avgFrac) * (plotHeight - 14) + 7).clamp(14.0, plotHeight - 14.0);
+
+    final lineColor = isDark
+        ? Colors.white.withValues(alpha: 0.14)
+        : const Color(0xFFE0E0E0);
+    final avgPillBg = isDark ? const Color(0xFFF4F4F5) : const Color(0xFF1A1A1A);
+    final avgPillFg = isDark ? const Color(0xFF18181B) : Colors.white;
+    final dayLabelColor =
+        isDark ? AppColors.textSecondaryDark : const Color(0xFF999999);
+    final dotFill = isDark ? AppColors.surfaceDark : Colors.white;
+
+    return SizedBox(
+      height: plotHeight + labelAreaHeight + 6,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          // Línea horizontal del promedio (.avg-line)
+          Positioned(
+            left: 0,
+            right: 0,
+            top: avgTop,
+            child: Container(
+              height: 1.5,
+              color: lineColor,
+            ),
+          ),
+
+          // Pastilla de promedio (.avg-label)
+          Positioned(
+            right: 0,
+            top: math.max(0.0, avgTop - 22),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: avgPillBg,
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Text(
+                dataset.avgBadgeText,
+                style: TextStyle(
+                  color: avgPillFg,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
+
+          // Columnas de 7 días (.chart)
+          Positioned.fill(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: List.generate(dataset.bars.length, (index) {
+                  final bar = dataset.bars[index];
+                  final isHovered = _hoveredIdx == index;
+
+                  double barHeight = 0;
+                  double bottomMargin = 8;
+                  if (bar.hasData) {
+                    final loFrac = toFrac(bar.minVal!);
+                    final hiFrac = toFrac(bar.maxVal!);
+                    final rawH = (hiFrac - loFrac) * (plotHeight - 16);
+                    barHeight = rawH.clamp(22.0, plotHeight - 12);
+                    bottomMargin =
+                        (loFrac * (plotHeight - barHeight - 8) + 4)
+                            .clamp(4.0, plotHeight - barHeight - 2);
+                  }
+
+                  final tooltipMsg = bar.hasData
+                      ? '${DateFormat('d MMM').format(bar.date)}\n'
+                          'Mín: ${dataset.formatValue(bar.minVal!)} ${dataset.unit}\n'
+                          'Prom: ${dataset.formatValue(bar.avgVal!)} ${dataset.unit}\n'
+                          'Máx: ${dataset.formatValue(bar.maxVal!)} ${dataset.unit}'
+                      : '${DateFormat('d MMM').format(bar.date)}: sin registros';
+
+                  return Expanded(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        SizedBox(
+                          height: plotHeight,
+                          child: Align(
+                            alignment: Alignment.bottomCenter,
+                            child: bar.hasData
+                                ? Padding(
+                                    padding: EdgeInsets.only(bottom: bottomMargin),
+                                    child: Tooltip(
+                                      message: tooltipMsg,
+                                      child: MouseRegion(
+                                        cursor: SystemMouseCursors.click,
+                                        onEnter: (_) =>
+                                            setState(() => _hoveredIdx = index),
+                                        onExit: (_) =>
+                                            setState(() => _hoveredIdx = -1),
+                                        child: AnimatedScale(
+                                          scale: isHovered ? 1.08 : 1.0,
+                                          duration:
+                                              const Duration(milliseconds: 220),
+                                          curve: Curves.easeOutCubic,
+                                          child: SizedBox(
+                                            width: 20,
+                                            height: barHeight,
+                                            child: Stack(
+                                              clipBehavior: Clip.none,
+                                              alignment: Alignment.center,
+                                              children: [
+                                                Container(
+                                                  width: 20,
+                                                  height: barHeight,
+                                                  decoration: BoxDecoration(
+                                                    borderRadius:
+                                                        BorderRadius.circular(10),
+                                                    gradient: LinearGradient(
+                                                      begin: Alignment.topCenter,
+                                                      end: Alignment.bottomCenter,
+                                                      colors: [
+                                                        dataset.accent,
+                                                        dataset.accentLight,
+                                                      ],
+                                                    ),
+                                                  ),
+                                                ),
+                                                if (bar.showTopDot)
+                                                  Positioned(
+                                                    top: -4,
+                                                    child: _EndpointDot(
+                                                      fillColor: dotFill,
+                                                      borderColor: dataset.accent,
+                                                    ),
+                                                  ),
+                                                if (bar.showBottomDot)
+                                                  Positioned(
+                                                    bottom: -4,
+                                                    child: _EndpointDot(
+                                                      fillColor: dotFill,
+                                                      borderColor: dataset.accent,
+                                                    ),
+                                                  ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  )
+                                : Padding(
+                                    padding: const EdgeInsets.only(bottom: 10),
+                                    child: Container(
+                                      width: 8,
+                                      height: 8,
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        color: isDark
+                                            ? Colors.white.withValues(alpha: 0.08)
+                                            : Colors.black.withValues(alpha: 0.06),
+                                      ),
+                                    ),
+                                  ),
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        SizedBox(
+                          height: labelAreaHeight,
+                          child: Text(
+                            bar.dayLabel,
+                            style: TextStyle(
+                              fontSize: 9.5,
+                              color: isHovered ? dataset.accent : dayLabelColor,
+                              fontWeight:
+                                  isHovered ? FontWeight.w700 : FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _EndpointDot extends StatelessWidget {
+  final Color fillColor;
+  final Color borderColor;
+
+  const _EndpointDot({
+    required this.fillColor,
+    required this.borderColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 8,
+      height: 8,
+      decoration: BoxDecoration(
+        color: fillColor,
+        shape: BoxShape.circle,
+        border: Border.all(color: borderColor, width: 1.5),
       ),
     );
   }

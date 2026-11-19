@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import '../models/user_member.dart';
 import '../models/company.dart';
 import '../models/aquaculture_unit.dart';
@@ -86,4 +87,22 @@ abstract class AuthRepository {
   Future<void> updateMemberStatus(String memberId, MemberStatus newStatus);
   Future<void> deleteMember(String memberId);
   Future<void> updateInitialPassword(String newPassword);
+
+  Future<UserMember> updateMyProfile({
+    required UserMember currentUser,
+    required String nombre,
+    String? telefono,
+    String? avatarUrl,
+  });
+  Future<String> uploadProfileAvatar({
+    required String userId,
+    required Uint8List bytes,
+    required String fileExtension,
+  });
+  Future<String> uploadCompanyLogo({
+    required String empresaId,
+    required Uint8List bytes,
+    required String fileExtension,
+  });
+  Future<void> changeMyPassword(String newPassword);
 }

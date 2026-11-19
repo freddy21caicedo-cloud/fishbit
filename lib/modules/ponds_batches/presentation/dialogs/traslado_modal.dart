@@ -86,8 +86,14 @@ class _TrasladoModalState extends ConsumerState<TrasladoModal> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final pondsState = ref.watch(pondsProvider);
 
+    final activeSourcePonds = pondsState.ponds.where((p) {
+      return pondsState.batches.any(
+        (b) => b.estanqueId == p.id && b.estado == BatchStatus.active && b.cantidadActualPeces > 0,
+      );
+    }).toList();
+
     Pond? pondOrigen = pondsState.ponds.where((p) => p.id == _selectedPondOrigenId).firstOrNull;
-    pondOrigen ??= widget.pond ?? pondsState.ponds.where((p) => p.estado == PondStatus.active).firstOrNull;
+    pondOrigen ??= widget.pond ?? activeSourcePonds.firstOrNull ?? pondsState.ponds.where((p) => p.estado == PondStatus.active).firstOrNull;
 
     final batchesInOrigen = pondOrigen != null
         ? pondsState.batches.where((b) => b.estanqueId == pondOrigen!.id && b.estado == BatchStatus.active).toList()
@@ -96,10 +102,24 @@ class _TrasladoModalState extends ConsumerState<TrasladoModal> {
     FishBatch? batchOrigen = batchesInOrigen.where((b) => b.id == _selectedBatchId).firstOrNull;
     batchOrigen ??= widget.batch ?? batchesInOrigen.firstOrNull;
 
+    if (batchOrigen != null && _selectedBatchId == null && _pecesCtrl.text.isEmpty) {
+      _selectedBatchId = batchOrigen.id;
+      _pesoCtrl.text = batchOrigen.pesoActualGramos.toStringAsFixed(1);
+      _pecesCtrl.text = _esDesdoble
+          ? (batchOrigen.cantidadActualPeces > 1 ? (batchOrigen.cantidadActualPeces ~/ 2) : batchOrigen.cantidadActualPeces).toString()
+          : batchOrigen.cantidadActualPeces.toString();
+      _nuevoCodigoCtrl.text = '${batchOrigen.codigoLote}-B';
+    }
+
     final destinationPonds = pondsState.ponds.where((p) => p.id != pondOrigen?.id).toList();
 
     final maxPeces = batchOrigen?.cantidadActualPeces ?? 0;
-    final pecesTrasladados = (int.tryParse(_pecesCtrl.text.replaceAll(RegExp(r'[^\d]'), '')) ?? 0).clamp(0, maxPeces > 0 ? maxPeces : 1000000);
+    final rawPecesTrasladados = int.tryParse(_pecesCtrl.text.replaceAll(RegExp(r'[^\d]'), '')) ?? 0;
+    final pecesTrasladados = rawPecesTrasladados;
+    final bool isExceedingMax = maxPeces <= 0 || rawPecesTrasladados > maxPeces;
+    final bool isInvalidSplit = _esDesdoble && (maxPeces <= 1 || rawPecesTrasladados <= 0 || rawPecesTrasladados >= maxPeces);
+    final bool isInvalidTotal = !_esDesdoble && (maxPeces <= 0 || rawPecesTrasladados <= 0 || rawPecesTrasladados > maxPeces);
+    final bool hasInvalidCount = isExceedingMax || isInvalidSplit || isInvalidTotal;
     final pesoPromedioG = double.tryParse(_pesoCtrl.text.replaceAll(RegExp(r'[^\d.]'), '')) ?? (batchOrigen?.pesoActualGramos ?? 0.0);
     final biomasaTrasladadaKg = (pecesTrasladados * pesoPromedioG) / 1000.0;
 
@@ -346,6 +366,52 @@ class _TrasladoModalState extends ConsumerState<TrasladoModal> {
                   ),
                   const SizedBox(height: 14),
 
+                  if (widget.pond == null && activeSourcePonds.isNotEmpty) ...[
+                    GlassSelectField<String>(
+                      label: 'Estanque Emisor (Origen)',
+                      placeholder: 'Seleccione el estanque origen...',
+                      value: pondOrigen?.id,
+                      accentColor: AppColors.cyanWater,
+                      leadingIcon: Icons.waves_rounded,
+                      options: activeSourcePonds.map((p) {
+                        final pondFish = pondsState.batches
+                            .where((b) => b.estanqueId == p.id && b.estado == BatchStatus.active)
+                            .fold<int>(0, (sum, b) => sum + b.cantidadActualPeces);
+                        return GlassSelectOption<String>(
+                          value: p.id,
+                          label: p.nombreLimpio,
+                          subtitle: '${CurrencyFormatters.formatInt(pondFish)} peces vivos • ${p.especieActual}',
+                          icon: Icons.waves_rounded,
+                          badgeText: p.sigla,
+                          badgeColor: AppColors.cyanWater,
+                        );
+                      }).toList(),
+                      onChanged: (val) {
+                        setState(() {
+                          _selectedPondOrigenId = val;
+                          _selectedBatchId = null;
+                          if (_selectedPondDestinoId == val) {
+                            _selectedPondDestinoId = null;
+                          }
+                          final firstBatch = pondsState.batches
+                              .where((b) => b.estanqueId == val && b.estado == BatchStatus.active)
+                              .firstOrNull;
+                          if (firstBatch != null) {
+                            _selectedBatchId = firstBatch.id;
+                            _pesoCtrl.text = firstBatch.pesoActualGramos.toStringAsFixed(1);
+                            _pecesCtrl.text = _esDesdoble
+                                ? (firstBatch.cantidadActualPeces > 1 ? (firstBatch.cantidadActualPeces ~/ 2) : firstBatch.cantidadActualPeces).toString()
+                                : firstBatch.cantidadActualPeces.toString();
+                            _nuevoCodigoCtrl.text = '${firstBatch.codigoLote}-B';
+                          } else {
+                            _pecesCtrl.clear();
+                          }
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+
                   GlassSelectField<String>(
                     label: 'Estanque Receptor (Destino)',
                     placeholder: 'Seleccione el estanque destino...',
@@ -411,11 +477,12 @@ class _TrasladoModalState extends ConsumerState<TrasladoModal> {
                           ),
                           onChanged: (_) => setState(() {}),
                           validator: (v) {
-                            final val = int.tryParse(v ?? '') ?? 0;
+                            final val = int.tryParse((v ?? '').replaceAll(RegExp(r'[^\d]'), '')) ?? 0;
+                            if (maxPeces <= 0) return 'Lote sin peces vivos';
                             if (val <= 0) return 'Ingrese cantidad > 0';
                             if (val > maxPeces) return 'Máximo $maxPeces peces';
                             if (_esDesdoble && maxPeces > 1 && val >= maxPeces) {
-                              return 'Debe ser menor a $maxPeces (use Traslado Total)';
+                              return 'Máximo ${maxPeces - 1} en desdoble';
                             }
                             return null;
                           },
@@ -545,6 +612,36 @@ class _TrasladoModalState extends ConsumerState<TrasladoModal> {
                       ],
                     ),
                   ),
+                  if (hasInvalidCount && _pecesCtrl.text.trim().isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: AppColors.coralAction.withValues(alpha: 0.14),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppColors.coralAction.withValues(alpha: 0.45)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.error_outline_rounded, color: AppColors.coralAction, size: 16),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              maxPeces <= 0
+                                  ? 'El lote origen no tiene peces vivos disponibles.'
+                                  : (rawPecesTrasladados > maxPeces
+                                      ? 'No puedes ${_esDesdoble ? "desdoblar" : "trasladar"} $rawPecesTrasladados peces porque el lote solo tiene $maxPeces vivos.'
+                                      : (_esDesdoble && rawPecesTrasladados >= maxPeces
+                                          ? 'En desdoble parcial debes dejar al menos 1 pez en el estanque origen (máximo ${maxPeces - 1}). Para mover los $maxPeces usa Traslado Total.'
+                                          : 'Ingresa una cantidad válida mayor a 0.')),
+                              style: const TextStyle(color: AppColors.coralAction, fontSize: 11.5, fontWeight: FontWeight.w700),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+
                   const SizedBox(height: 18),
 
                   GlassButton(
@@ -554,7 +651,9 @@ class _TrasladoModalState extends ConsumerState<TrasladoModal> {
                     icon: Icon(_esDesdoble ? Icons.call_split_rounded : Icons.swap_horiz_rounded, size: 18),
                     backgroundColor: _esDesdoble ? AppColors.amberWarning : AppColors.cyanWater,
                     isLoading: _isLoading,
-                    onPressed: () async {
+                    onPressed: hasInvalidCount
+                        ? null
+                        : () async {
                       if (!_formKey.currentState!.validate()) return;
                       if (_selectedPondDestinoId == null) {
                         ScaffoldMessenger.of(context).showSnackBar(

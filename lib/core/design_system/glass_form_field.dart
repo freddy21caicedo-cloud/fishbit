@@ -197,6 +197,7 @@ class _GlassFormFieldState extends State<GlassFormField> {
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
             opacity: isDark ? (_isFocused ? 0.08 : 0.04) : (_isFocused ? 0.98 : 0.90),
             borderColor: borderColor.withValues(alpha: borderAlpha),
+            isOverlay: false,
             child: TextFormField(
               controller: widget.controller,
               focusNode: _focusNode,

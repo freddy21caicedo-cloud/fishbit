@@ -97,30 +97,41 @@ class _PondBentoCardState extends State<PondBentoCard> with SingleTickerProvider
     final isPolyculture = allBatches.length > 1;
     final isActive = widget.pond.estado == PondStatus.active || allBatches.isNotEmpty;
 
-    final frontWidget = RepaintBoundary(
-      child: _buildFrontCard(context, allBatches, isPolyculture, isActive),
-    );
-    final backWidget = Transform(
-      alignment: FractionalOffset.center,
-      transform: Matrix4.identity()..rotateY(math.pi), // Espejo reverso
-      child: RepaintBoundary(
-        child: _buildBackCard(context, allBatches, isPolyculture, isActive),
-      ),
-    );
-
-    // Cacheamos el frente y reverso dentro de RepaintBoundary para aceleración por GPU (60/120 FPS)
+    // Instanciación perezosa por cara y salto de Transform 3D en reposo para fluidez 60/120 FPS
     return AnimatedBuilder(
       animation: _animation,
-      builder: (context, child) {
-        final angle = _animation.value * math.pi;
+      builder: (context, _) {
+        final v = _animation.value;
+        if (v == 0.0) {
+          return RepaintBoundary(
+            child: _buildFrontCard(context, allBatches, isPolyculture, isActive),
+          );
+        }
+        if (v == 1.0) {
+          return RepaintBoundary(
+            child: _buildBackCard(context, allBatches, isPolyculture, isActive),
+          );
+        }
+
+        final angle = v * math.pi;
         final isFront = angle <= math.pi / 2;
 
         return Transform(
           alignment: FractionalOffset.center,
           transform: Matrix4.identity()
-            ..setEntry(3, 2, 0.0015) // Perspectiva 3D
+            ..setEntry(3, 2, 0.0015) // Perspectiva 3D solo durante el giro
             ..rotateY(angle),
-          child: isFront ? frontWidget : backWidget,
+          child: isFront
+              ? RepaintBoundary(
+                  child: _buildFrontCard(context, allBatches, isPolyculture, isActive),
+                )
+              : Transform(
+                  alignment: FractionalOffset.center,
+                  transform: Matrix4.identity()..rotateY(math.pi),
+                  child: RepaintBoundary(
+                    child: _buildBackCard(context, allBatches, isPolyculture, isActive),
+                  ),
+                ),
         );
       },
     );
@@ -214,7 +225,7 @@ class _PondBentoCardState extends State<PondBentoCard> with SingleTickerProvider
                     child: Icon(
                       Icons.flip_camera_android_rounded,
                       size: 18,
-                      color: isRealActive ? (isDark ? Colors.white : AppColors.textPrimaryDark) : AppColors.textTertiaryDark,
+                      color: isRealActive ? (isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight) : AppColors.textTertiaryDark,
                     ),
                   ),
                 ),
@@ -245,7 +256,7 @@ class _PondBentoCardState extends State<PondBentoCard> with SingleTickerProvider
                             child: Text(
                               '• ${b.especie} (${b.codigoLote})',
                               overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
+                              style: TextStyle(color: isDark ? Colors.white : AppColors.textPrimaryLight, fontSize: 12, fontWeight: FontWeight.w600),
                             ),
                           ),
                           const SizedBox(width: 8),
@@ -507,9 +518,9 @@ class _PondBentoCardState extends State<PondBentoCard> with SingleTickerProvider
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.undo_rounded, size: 14, color: isDark ? Colors.white : AppColors.textPrimaryDark),
+                Icon(Icons.undo_rounded, size: 14, color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight),
                 const SizedBox(width: 6),
-                Text('VOLVER', style: TextStyle(color: isDark ? Colors.white : AppColors.textPrimaryDark, fontSize: 11, fontWeight: FontWeight.w800)),
+                Text('VOLVER', style: TextStyle(color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight, fontSize: 11, fontWeight: FontWeight.w800)),
               ],
             ),
           ),
@@ -563,7 +574,7 @@ class _PondBentoCardState extends State<PondBentoCard> with SingleTickerProvider
                                     style: TextStyle(
                                       color: isSelected
                                           ? Colors.purpleAccent
-                                          : (isDark ? Colors.white70 : AppColors.textPrimaryDark),
+                                          : (isDark ? Colors.white70 : AppColors.textPrimaryLight),
                                       fontSize: 10.5,
                                       fontWeight: isSelected ? FontWeight.w800 : FontWeight.w500,
                                     ),
@@ -1384,6 +1395,7 @@ class _PondOperationsSheetContent extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
               blur: 24,
               opacity: isDark ? 0.22 : 0.16,
+              isOverlay: true,
               borderColor: AppColors.cyanWater.withValues(alpha: 0.35),
               child: SingleChildScrollView(
                 physics: const BouncingScrollPhysics(),

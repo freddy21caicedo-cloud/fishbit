@@ -1,8 +1,21 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fishbit_finance/core/design_system/theme_provider.dart';
 import 'router.dart';
+
+class AppScrollBehavior extends MaterialScrollBehavior {
+  const AppScrollBehavior();
+
+  @override
+  Set<PointerDeviceKind> get dragDevices => {
+        PointerDeviceKind.touch,
+        PointerDeviceKind.mouse,
+        PointerDeviceKind.trackpad,
+        PointerDeviceKind.stylus,
+      };
+}
 
 class FishBitApp extends ConsumerWidget {
   const FishBitApp({super.key});
@@ -15,6 +28,7 @@ class FishBitApp extends ConsumerWidget {
     return MaterialApp.router(
       title: 'FishBit Finance',
       debugShowCheckedModeBanner: false,
+      scrollBehavior: const AppScrollBehavior(),
       routerConfig: router,
       themeMode: themeMode,
       theme: appLightTheme,

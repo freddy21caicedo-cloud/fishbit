@@ -183,6 +183,83 @@ final List<InventoryItem> kDefaultInventoryItems = [
   ),
 ];
 
+final List<PurchaseInvoice> kDefaultPurchaseInvoices = [
+  PurchaseInvoice(
+    id: 'fac-demo-01',
+    empresaId: 'c1000000-0000-0000-0000-000000000001',
+    unidadAcuicolaId: 'u1000000-0000-0000-0000-000000000001',
+    unidadAcuicolaSigla: 'PRIN',
+    tipoFactura: 'concentrados',
+    numeroFactura: 'FACT-884210',
+    proveedorNombre: 'Italcol S.A.',
+    proveedorNit: '860.026.895-8',
+    fechaExpedicion: DateTime.now().subtract(const Duration(days: 10)),
+    fechaVencimiento: DateTime.now().add(const Duration(days: 20)),
+    esCredito: true,
+    diasCredito: 30,
+    totalKilos: 2000.0,
+    totalNeto: 6476190.0,
+    totalIva: 323810.0,
+    totalFactura: 6800000.0,
+    costoFlete: 180000.0,
+    estadoPago: 'Pendiente',
+    placaVehiculo: 'WPA-412',
+    productos: [
+      const InvoiceItemLine(
+        codigo: 'ITA-38',
+        nombre: 'Aquatilapia 38% E (Levante I)',
+        loteFabricante: 'LOT-ITA-38-992',
+        cantidadBultos: 50,
+        kgPorBulto: 40.0,
+        kilosTotales: 2000.0,
+        valorUnitarioBulto: 129524.0,
+        valorBruto: 6476190.0,
+        baseGravable: 6476190.0,
+        ivaPct: 5.0,
+        valorIva: 323810.0,
+        valorTotal: 6800000.0,
+      ),
+    ],
+    creadoEn: DateTime.now().subtract(const Duration(days: 10)),
+  ),
+  PurchaseInvoice(
+    id: 'fac-demo-02',
+    empresaId: 'c1000000-0000-0000-0000-000000000001',
+    unidadAcuicolaId: 'u1000000-0000-0000-0000-000000000001',
+    unidadAcuicolaSigla: 'PRIN',
+    tipoFactura: 'insumos',
+    numeroFactura: 'FACT-319044',
+    proveedorNombre: 'Suministros Acuícolas del Caribe',
+    proveedorNit: '900.412.881-3',
+    fechaExpedicion: DateTime.now().subtract(const Duration(days: 18)),
+    fechaVencimiento: DateTime.now().subtract(const Duration(days: 18)),
+    esCredito: false,
+    diasCredito: 0,
+    totalKilos: 1200.0,
+    totalNeto: 600000.0,
+    totalIva: 0.0,
+    totalFactura: 600000.0,
+    costoFlete: 45000.0,
+    estadoPago: 'Paga',
+    productos: [
+      const InvoiceItemLine(
+        codigo: 'CAL-40',
+        nombre: 'Cal Agrícola (Carbonato de Calcio)',
+        cantidadBultos: 30,
+        kgPorBulto: 40.0,
+        kilosTotales: 1200.0,
+        valorUnitarioBulto: 20000.0,
+        valorBruto: 600000.0,
+        baseGravable: 600000.0,
+        ivaPct: 0.0,
+        valorIva: 0.0,
+        valorTotal: 600000.0,
+      ),
+    ],
+    creadoEn: DateTime.now().subtract(const Duration(days: 18)),
+  ),
+];
+
 class WarehouseState {
   final bool isLoading;
   final List<InventoryItem> items;
@@ -330,6 +407,7 @@ class WarehouseNotifier extends StateNotifier<WarehouseState> {
         isLoading: false,
         suppliers: kDefaultSuppliers,
         items: kDefaultInventoryItems,
+        invoices: kDefaultPurchaseInvoices,
       );
       return;
     }
@@ -358,6 +436,7 @@ class WarehouseNotifier extends StateNotifier<WarehouseState> {
 
       // Solo inicializar con catálogo demo si es una empresa de demostración/mock explícita
       final finalItems = (remoteItems.isNotEmpty || !isMockCompany) ? remoteItems : kDefaultInventoryItems;
+      final finalInvoices = (invoices.isNotEmpty || !isMockCompany) ? invoices : kDefaultPurchaseInvoices;
       final mergedSuppliers = isMockCompany
           ? [...kDefaultSuppliers, ...hydratedSuppliers]
           : (hydratedSuppliers.isNotEmpty ? hydratedSuppliers : kDefaultSuppliers);
@@ -366,7 +445,7 @@ class WarehouseNotifier extends StateNotifier<WarehouseState> {
         isLoading: false,
         items: finalItems,
         suppliers: mergedSuppliers,
-        invoices: invoices,
+        invoices: finalInvoices,
         bioPurchases: bioPurchases,
       );
     } catch (e) {
@@ -426,6 +505,30 @@ class WarehouseNotifier extends StateNotifier<WarehouseState> {
         costoTotal: nuevoCostoTotal,
       );
 
+      try {
+        await _repository.updateInventoryItem(updated);
+      } catch (_) {}
+
+      final list = [...state.items];
+      list[idx] = updated;
+      state = state.copyWith(items: list);
+    }
+  }
+
+  /// Reintegra existencias al inventario cuando se edita o elimina un consumo en Bitácora
+  Future<void> restoreStock({
+    required String itemId,
+    required double cantidadKg,
+  }) async {
+    if (cantidadKg <= 0) return;
+    final idx = state.items.indexWhere((i) => i.id == itemId);
+    if (idx != -1) {
+      final item = state.items[idx];
+      final nuevoStock = item.cantidadActualKg + cantidadKg;
+      final updated = item.copyWith(
+        cantidadActualKg: nuevoStock,
+        costoTotal: nuevoStock * item.costoUnitarioHistorico,
+      );
       try {
         await _repository.updateInventoryItem(updated);
       } catch (_) {}
@@ -550,6 +653,107 @@ class WarehouseNotifier extends StateNotifier<WarehouseState> {
       );
       pendiente -= aDescontar;
     }
+  }
+
+  /// Actualizar una factura de compra existente y ajustar stock diferencial en bodega
+  Future<void> updatePurchaseInvoice(
+    PurchaseInvoice oldInvoice,
+    PurchaseInvoice newInvoice,
+    List<InventoryItem> newItems,
+  ) async {
+    try {
+      final updatedInv = await _repository.updatePurchaseInvoice(newInvoice);
+      final updatedItemsList = List<InventoryItem>.from(state.items);
+
+      // 1. Revertir cantidades de la factura anterior
+      for (final oldLine in oldInvoice.productos) {
+        final idx = updatedItemsList.indexWhere(
+          (i) => i.nombre.trim().toLowerCase() == oldLine.nombre.trim().toLowerCase(),
+        );
+        if (idx != -1) {
+          final existing = updatedItemsList[idx];
+          final revertedStock = (existing.cantidadActualKg - oldLine.kilosTotales).clamp(0.0, double.infinity);
+          final updated = existing.copyWith(
+            cantidadActualKg: revertedStock,
+            costoTotal: revertedStock * existing.costoUnitarioHistorico,
+          );
+          try {
+            await _repository.updateInventoryItem(updated);
+          } catch (_) {}
+          updatedItemsList[idx] = updated;
+        }
+      }
+
+      // 2. Aplicar nuevas líneas de la factura editada
+      for (final newItem in newItems) {
+        final idx = updatedItemsList.indexWhere(
+          (i) => i.nombre.trim().toLowerCase() == newItem.nombre.trim().toLowerCase() && i.tipo == newItem.tipo,
+        );
+        if (idx != -1) {
+          final existing = updatedItemsList[idx];
+          final stockAnterior = existing.cantidadActualKg;
+          final stockNuevo = stockAnterior + newItem.cantidadActualKg;
+          final nuevoCostoUnitario = stockNuevo > 0
+              ? ((stockAnterior * existing.costoUnitarioHistorico) + (newItem.cantidadActualKg * newItem.costoUnitarioHistorico)) / stockNuevo
+              : newItem.costoUnitarioHistorico;
+          final updated = existing.copyWith(
+            cantidadActualKg: stockNuevo,
+            costoUnitarioHistorico: nuevoCostoUnitario,
+            costoTotal: stockNuevo * nuevoCostoUnitario,
+            loteFabricante: newItem.loteFabricante ?? existing.loteFabricante,
+          );
+          try {
+            await _repository.updateInventoryItem(updated);
+          } catch (_) {}
+          updatedItemsList[idx] = updated;
+        } else {
+          try {
+            final created = await _repository.addInventoryItem(newItem);
+            updatedItemsList.add(created);
+          } catch (_) {
+            updatedItemsList.add(newItem);
+          }
+        }
+      }
+
+      state = state.copyWith(
+        invoices: state.invoices.map((inv) => inv.id == updatedInv.id ? updatedInv : inv).toList(),
+        items: updatedItemsList,
+      );
+    } catch (_) {
+      state = state.copyWith(
+        invoices: state.invoices.map((inv) => inv.id == newInvoice.id ? newInvoice : inv).toList(),
+      );
+    }
+  }
+
+  /// Eliminar una factura de compra y descontar el stock ingresado por ella
+  Future<void> deletePurchaseInvoice(PurchaseInvoice invoice) async {
+    await _repository.deletePurchaseInvoice(invoice.id, invoice.empresaId);
+    final updatedItemsList = List<InventoryItem>.from(state.items);
+
+    for (final line in invoice.productos) {
+      final idx = updatedItemsList.indexWhere(
+        (i) => i.nombre.trim().toLowerCase() == line.nombre.trim().toLowerCase(),
+      );
+      if (idx != -1) {
+        final existing = updatedItemsList[idx];
+        final revertedStock = (existing.cantidadActualKg - line.kilosTotales).clamp(0.0, double.infinity);
+        final updated = existing.copyWith(
+          cantidadActualKg: revertedStock,
+          costoTotal: revertedStock * existing.costoUnitarioHistorico,
+        );
+        try {
+          await _repository.updateInventoryItem(updated);
+        } catch (_) {}
+        updatedItemsList[idx] = updated;
+      }
+    }
+
+    state = state.copyWith(
+      invoices: state.invoices.where((inv) => inv.id != invoice.id).toList(),
+      items: updatedItemsList,
+    );
   }
 
   /// Actualizar un proveedor existente en Supabase y estado local

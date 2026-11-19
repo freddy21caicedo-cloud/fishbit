@@ -84,6 +84,7 @@ class GlassCard extends StatelessWidget {
     final card = GlassContainer(
       borderRadius: borderRadius,
       padding: padding ?? const EdgeInsets.all(16),
+      isOverlay: false,
       borderColor: glowColor?.withValues(alpha: 0.3) ??
           (isDark ? Colors.white.withValues(alpha: 0.08) : AppColors.glassBorderLight),
       child: LayoutBuilder(

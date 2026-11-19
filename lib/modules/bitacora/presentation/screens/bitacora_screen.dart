@@ -8,15 +8,20 @@ import 'package:fishbit_finance/core/design_system/floating_dock_layout.dart';
 import 'package:fishbit_finance/core/design_system/glass_container.dart';
 import 'package:fishbit_finance/core/design_system/glass_badge.dart';
 import 'package:fishbit_finance/core/design_system/glass_select_field.dart';
+import 'package:fishbit_finance/core/design_system/hero_tabs.dart';
 import 'package:fishbit_finance/core/utils/currency_formatters.dart';
+import 'package:fishbit_finance/modules/auth_tenant/presentation/providers/auth_provider.dart';
+import 'package:fishbit_finance/modules/water_quality/domain/models/water_parameter.dart';
 import 'package:fishbit_finance/modules/water_quality/presentation/dialogs/parametro_modal.dart';
 import 'package:fishbit_finance/modules/water_quality/presentation/providers/water_quality_provider.dart';
+import 'package:fishbit_finance/modules/feeding_nutrition/domain/models/feeding_record.dart';
 import 'package:fishbit_finance/modules/feeding_nutrition/presentation/providers/nutrition_provider.dart';
 import 'package:fishbit_finance/modules/ponds_batches/presentation/providers/ponds_provider.dart';
 import 'package:fishbit_finance/modules/ponds_batches/domain/models/pond.dart';
 import 'package:fishbit_finance/modules/ponds_batches/domain/models/fish_batch.dart';
 import 'package:fishbit_finance/modules/ponds_batches/domain/models/biometria_record.dart';
 import 'package:fishbit_finance/modules/ponds_batches/domain/models/mortality_record.dart';
+import 'package:fishbit_finance/modules/ponds_batches/domain/models/transfer_record.dart';
 import 'package:fishbit_finance/modules/ponds_batches/presentation/dialogs/alimentar_modal.dart';
 import 'package:fishbit_finance/modules/ponds_batches/presentation/dialogs/biometria_modal.dart';
 import 'package:fishbit_finance/modules/ponds_batches/presentation/dialogs/mortalidad_modal.dart';
@@ -45,379 +50,10 @@ class _BitacoraScreenState extends ConsumerState<BitacoraScreen> with SingleTick
     super.dispose();
   }
 
-  void _showQuickRecordSheet(BuildContext context) {
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 480),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: GlassContainer(
-              borderRadius: 26,
-              padding: const EdgeInsets.all(20),
-              blur: 24,
-              opacity: 0.18,
-              borderColor: AppColors.cyanWater.withValues(alpha: 0.35),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        '➕ Registrar en Bitácora',
-                        style: AppTypography.titleMedium.copyWith(color: Colors.white, fontWeight: FontWeight.w800),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.close_rounded, color: AppColors.textSecondaryDark),
-                        onPressed: () => Navigator.of(ctx).pop(),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 14),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _buildQuickOption(
-                          icon: Icons.water_drop_rounded,
-                          color: AppColors.cyanWater,
-                          title: 'O₂ y pH',
-                          onTap: () {
-                            Navigator.of(ctx).pop();
-                            ParametroModal.show(context, preselectedPondId: _selectedPondId);
-                          },
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: _buildQuickOption(
-                          icon: Icons.restaurant_rounded,
-                          color: AppColors.greenBiomass,
-                          title: 'Alimentar',
-                          onTap: () {
-                            Navigator.of(ctx).pop();
-                            final targetPond = _selectedPondId != null ? ref.read(pondsProvider).ponds.where((p) => p.id == _selectedPondId).firstOrNull : null;
-                            AlimentarModal.show(context, pond: targetPond);
-                          },
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _buildQuickOption(
-                          icon: Icons.scale_rounded,
-                          color: Colors.purpleAccent,
-                          title: 'Biometría',
-                          onTap: () {
-                            Navigator.of(ctx).pop();
-                            final targetPond = _selectedPondId != null ? ref.read(pondsProvider).ponds.where((p) => p.id == _selectedPondId).firstOrNull : null;
-                            BiometriaModal.show(context, pond: targetPond);
-                          },
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: _buildQuickOption(
-                          icon: Icons.warning_amber_rounded,
-                          color: AppColors.coralAction,
-                          title: 'Bajas / Mort.',
-                          onTap: () {
-                            Navigator.of(ctx).pop();
-                            final targetPond = _selectedPondId != null ? ref.read(pondsProvider).ponds.where((p) => p.id == _selectedPondId).firstOrNull : null;
-                            MortalidadModal.show(context, pond: targetPond);
-                          },
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: _buildQuickOption(
-                          icon: Icons.swap_horiz_rounded,
-                          color: AppColors.amberWarning,
-                          title: 'Traslado',
-                          onTap: () {
-                            Navigator.of(ctx).pop();
-                            final targetPond = _selectedPondId != null ? ref.read(pondsProvider).ponds.where((p) => p.id == _selectedPondId).firstOrNull : null;
-                            TrasladoModal.show(context, pond: targetPond);
-                          },
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildQuickOption({
-    required IconData icon,
-    required Color color,
-    required String title,
-    required VoidCallback onTap,
-  }) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.12),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: color.withValues(alpha: 0.35)),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, color: color, size: 20),
-              const SizedBox(width: 8),
-              Text(
-                title,
-                style: TextStyle(
-                  color: Theme.of(context).brightness == Brightness.dark ? Colors.white : AppColors.textPrimaryLight,
-                  fontWeight: FontWeight.w800,
-                  fontSize: 13,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _showPondFilterBottomSheet(
-    BuildContext context,
-    WaterQualityState waterState,
-    NutritionState nutritionState,
-    PondsState pondsState,
-  ) {
-    final allPonds = pondsState.ponds;
-    final totalDataCount = waterState.recentParameters.length +
-        nutritionState.records.length +
-        pondsState.biometries.length +
-        pondsState.mortalityRecords.length;
-
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (ctx) => Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 500),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-            child: GlassContainer(
-              borderRadius: 28,
-              padding: const EdgeInsets.all(22),
-              blur: 24,
-              opacity: 0.18,
-              borderColor: AppColors.cyanWater.withValues(alpha: 0.35),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: AppColors.cyanWater.withValues(alpha: 0.15),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: const Icon(Icons.waves_rounded, color: AppColors.cyanWater, size: 20),
-                            ),
-                            const SizedBox(width: 10),
-                            const Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Filtrar por Estanque',
-                                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 16),
-                                  ),
-                                  Text(
-                                    'Filtra las 4 pestañas simultáneamente',
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(color: AppColors.textSecondaryDark, fontSize: 11),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.close_rounded, color: AppColors.textSecondaryDark),
-                        onPressed: () => Navigator.of(ctx).pop(),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 14),
-
-                  // Opción: Todos los Estanques
-                  _buildPondItem(
-                    title: 'Todos los Estanques',
-                    subtitle: '${allPonds.length} estanques disponibles',
-                    badgeText: '$totalDataCount datos',
-                    isSelected: _selectedPondId == null,
-                    icon: Icons.grid_view_rounded,
-                    onTap: () {
-                      setState(() => _selectedPondId = null);
-                      Navigator.of(ctx).pop();
-                    },
-                  ),
-                  const SizedBox(height: 8),
-                  const Divider(color: Colors.white12, height: 1),
-                  const SizedBox(height: 8),
-
-                  if (allPonds.isEmpty)
-                    const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 20),
-                      child: Center(
-                        child: Text(
-                          'No hay estanques registrados aún.',
-                          style: TextStyle(color: AppColors.textSecondaryDark, fontSize: 12),
-                        ),
-                      ),
-                    )
-                  else
-                    ConstrainedBox(
-                      constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.42),
-                      child: ListView.separated(
-                        shrinkWrap: true,
-                        itemCount: allPonds.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 8),
-                        itemBuilder: (_, index) {
-                          final pond = allPonds[index];
-                          final countWater = waterState.recentParameters.where((p) => p.estanqueId == pond.id).length;
-                          final countFeeding = nutritionState.records.where((r) => r.estanqueId == pond.id).length;
-                          final countBiometrias = pondsState.biometries.where((b) => b.estanqueId == pond.id).length;
-                          final countMortality = pondsState.mortalityRecords.where((m) => m.estanqueId == pond.id).length;
-                          final pondTotal = countWater + countFeeding + countBiometrias + countMortality;
-
-                          final parts = <String>[];
-                          if (countWater > 0) parts.add('$countWater O₂/pH');
-                          if (countFeeding > 0) parts.add('$countFeeding raciones');
-                          if (countBiometrias > 0) parts.add('$countBiometrias muestreo(s)');
-                          if (countMortality > 0) parts.add('$countMortality baja(s)');
-                          final subtitle = parts.isNotEmpty
-                              ? parts.join(' • ')
-                              : (pond.especieActual.isNotEmpty ? 'Cultivo: ${pond.especieActual}' : 'Estanque activo');
-
-                          return _buildPondItem(
-                            title: '${pond.sigla} • ${pond.nombreLimpio}',
-                            subtitle: subtitle,
-                            badgeText: '$pondTotal datos',
-                            isSelected: _selectedPondId == pond.id,
-                            icon: Icons.water_rounded,
-                            onTap: () {
-                              setState(() => _selectedPondId = pond.id);
-                              Navigator.of(ctx).pop();
-                            },
-                          );
-                        },
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPondItem({
-    required String title,
-    required String subtitle,
-    required String badgeText,
-    required bool isSelected,
-    required IconData icon,
-    required VoidCallback onTap,
-  }) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          decoration: BoxDecoration(
-            color: isSelected ? AppColors.cyanWater.withValues(alpha: 0.15) : Colors.white.withValues(alpha: 0.05),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: isSelected ? AppColors.cyanWater.withValues(alpha: 0.5) : Colors.white.withValues(alpha: 0.1),
-              width: isSelected ? 1.5 : 1.0,
-            ),
-          ),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: isSelected ? AppColors.cyanWater.withValues(alpha: 0.25) : Colors.white.withValues(alpha: 0.06),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(icon, color: isSelected ? AppColors.cyanWater : Colors.white70, size: 18),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      overflow: TextOverflow.ellipsis,
-                      maxLines: 1,
-                      style: TextStyle(
-                        color: isSelected ? AppColors.cyanWater : Colors.white,
-                        fontWeight: FontWeight.w800,
-                        fontSize: 13,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      subtitle,
-                      overflow: TextOverflow.ellipsis,
-                      maxLines: 1,
-                      style: const TextStyle(color: AppColors.textSecondaryDark, fontSize: 11),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              GlassBadge(
-                text: badgeText,
-                color: isSelected ? AppColors.cyanWater : Colors.white54,
-              ),
-              if (isSelected) ...[
-                const SizedBox(width: 8),
-                const Icon(Icons.check_circle_rounded, color: AppColors.cyanWater, size: 18),
-              ],
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
+    final currentUser = ref.watch(authProvider).currentUser;
+    final isAdmin = (currentUser?.isAdmin ?? false) || (currentUser?.isCreator ?? false);
     final waterState = ref.watch(waterQualityProvider);
     final nutritionState = ref.watch(nutritionProvider);
     final pondsState = ref.watch(pondsProvider);
@@ -427,15 +63,10 @@ class _BitacoraScreenState extends ConsumerState<BitacoraScreen> with SingleTick
     final batchMap = {for (final b in pondsState.batches) b.id: b};
 
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      floatingActionButtonLocation: FloatingDockFabLocation.endFloat,
-      floatingActionButton: FloatingActionButton.extended(
-        backgroundColor: AppColors.cyanWater,
-        icon: const Icon(Icons.edit_note_rounded, color: Colors.black, size: 22),
-        label: const Text('Registrar en Bitácora', style: TextStyle(color: Colors.black, fontWeight: FontWeight.w900, fontSize: 13)),
-        onPressed: () => _showQuickRecordSheet(context),
-      ),
-      body: NestedScrollView(
+      backgroundColor: Colors.transparent,
+      body: Stack(
+        children: [
+          NestedScrollView(
         headerSliverBuilder: (context, innerBoxIsScrolled) => [
           FishBitHeader(
             onRefresh: () {
@@ -516,25 +147,38 @@ class _BitacoraScreenState extends ConsumerState<BitacoraScreen> with SingleTick
             child: Center(
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 1024),
-                child: Container(
-                  color: Colors.transparent,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                  child: TabBar(
-                    controller: _tabController,
-                    isScrollable: true,
-                    tabAlignment: TabAlignment.start,
-                    indicatorColor: AppColors.cyanWater,
-                    indicatorWeight: 3,
-                    labelColor: AppColors.cyanWater,
-                    unselectedLabelColor: Theme.of(context).brightness == Brightness.dark
-                        ? AppColors.textSecondaryDark
-                        : AppColors.textSecondaryLight,
-                    tabs: const [
-                      Tab(key: Key('tab_calidad_agua'), icon: Icon(Icons.water_drop_rounded, size: 16), text: 'Calidad de Agua'),
-                      Tab(key: Key('tab_alimentacion'), icon: Icon(Icons.restaurant_rounded, size: 16), text: 'Alimentación'),
-                      Tab(key: Key('tab_biometrias'), icon: Icon(Icons.scale_rounded, size: 16), text: 'Biometrías y GDP'),
-                      Tab(key: Key('tab_bajas'), icon: Icon(Icons.warning_amber_rounded, size: 16), text: 'Bajas y Sanidad'),
-                    ],
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                  child: Center(
+                    child: HeroTabsBar(
+                      controller: _tabController,
+                      tabs: const [
+                        HeroTabItem(
+                          key: Key('tab_calidad_agua'),
+                          label: 'Calidad de Agua',
+                          icon: Icons.water_drop_rounded,
+                          accentColor: AppColors.cyanWater,
+                        ),
+                        HeroTabItem(
+                          key: Key('tab_alimentacion'),
+                          label: 'Alimentación',
+                          icon: Icons.restaurant_rounded,
+                          accentColor: AppColors.greenBiomass,
+                        ),
+                        HeroTabItem(
+                          key: Key('tab_biometrias'),
+                          label: 'Biometrías y GDP',
+                          icon: Icons.scale_rounded,
+                          accentColor: Colors.purpleAccent,
+                        ),
+                        HeroTabItem(
+                          key: Key('tab_bajas'),
+                          label: 'Bajas y Sanidad',
+                          icon: Icons.warning_amber_rounded,
+                          accentColor: AppColors.coralAction,
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -545,20 +189,152 @@ class _BitacoraScreenState extends ConsumerState<BitacoraScreen> with SingleTick
           controller: _tabController,
           children: [
             // Pestaña 1: Calidad de Agua
-            _buildWaterQualityTab(context, waterState, pondsState, pondMap),
+            _buildWaterQualityTab(context, waterState, pondsState, pondMap, isAdmin),
 
             // Pestaña 2: Alimentación Diaria
-            _buildFeedingTab(context, nutritionState, pondsState, pondMap, batchMap),
+            _buildFeedingTab(context, nutritionState, pondsState, pondMap, batchMap, isAdmin),
 
             // Pestaña 3: Biometrías y Curvas (GDP)
-            _buildBiometryTab(context, pondsState, pondMap, batchMap),
+            _buildBiometryTab(context, pondsState, pondMap, batchMap, isAdmin),
 
             // Pestaña 4: Mortalidad y Sanidad (Bajas)
-            _buildMortalityTab(context, pondsState, pondMap, batchMap),
+            _buildMortalityTab(context, pondsState, pondMap, batchMap, isAdmin),
           ],
         ),
       ),
+
+          // Botón flotante desplegable vertical unilateral (Estilo Uiverse risabbir)
+          Positioned.fill(
+            child: _BitacoraVerticalSpeedDial(
+              bottomOffset:
+                  FloatingDockLayout.dockTopOffset(context) + FloatingDockLayout.fabDockGap,
+              actions: [
+                _BitacoraDialAction(
+                  label: 'O₂ y pH',
+                  icon: Icons.water_drop_rounded,
+                  onTap: () => ParametroModal.show(context, preselectedPondId: _selectedPondId),
+                ),
+                _BitacoraDialAction(
+                  label: 'Alimentar',
+                  icon: Icons.restaurant_rounded,
+                  onTap: () {
+                    final targetPond = _selectedPondId != null
+                        ? ref.read(pondsProvider).ponds.where((p) => p.id == _selectedPondId).firstOrNull
+                        : null;
+                    AlimentarModal.show(context, pond: targetPond);
+                  },
+                ),
+                _BitacoraDialAction(
+                  label: 'Biometría',
+                  icon: Icons.scale_rounded,
+                  onTap: () {
+                    final targetPond = _selectedPondId != null
+                        ? ref.read(pondsProvider).ponds.where((p) => p.id == _selectedPondId).firstOrNull
+                        : null;
+                    BiometriaModal.show(context, pond: targetPond);
+                  },
+                ),
+                _BitacoraDialAction(
+                  label: 'Bajas / Mort.',
+                  icon: Icons.warning_amber_rounded,
+                  onTap: () {
+                    final targetPond = _selectedPondId != null
+                        ? ref.read(pondsProvider).ponds.where((p) => p.id == _selectedPondId).firstOrNull
+                        : null;
+                    MortalidadModal.show(context, pond: targetPond);
+                  },
+                ),
+                _BitacoraDialAction(
+                  label: 'Traslado',
+                  icon: Icons.swap_horiz_rounded,
+                  onTap: () {
+                    final targetPond = _selectedPondId != null
+                        ? ref.read(pondsProvider).ponds.where((p) => p.id == _selectedPondId).firstOrNull
+                        : null;
+                    TrasladoModal.show(context, pond: targetPond);
+                  },
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
+  }
+
+  Widget _buildAdminActionButtons({
+    VoidCallback? onEdit,
+    required VoidCallback onDelete,
+  }) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (onEdit != null)
+          IconButton(
+            tooltip: 'Editar registro',
+            visualDensity: VisualDensity.compact,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+            icon: const Icon(Icons.edit_outlined, size: 16, color: AppColors.cyanWater),
+            onPressed: onEdit,
+          ),
+        IconButton(
+          tooltip: 'Eliminar registro',
+          visualDensity: VisualDensity.compact,
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+          icon: const Icon(Icons.delete_outline_rounded, size: 16, color: AppColors.coralAction),
+          onPressed: onDelete,
+        ),
+      ],
+    );
+  }
+
+  Future<void> _confirmDeleteRecord(
+    BuildContext context, {
+    required String title,
+    required String message,
+    required Future<bool> Function() onConfirm,
+    required String successMessage,
+  }) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surfaceDark,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 16)),
+        content: Text(message, style: const TextStyle(color: AppColors.textSecondaryDark, fontSize: 13)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancelar', style: TextStyle(color: Colors.white70)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.coralAction,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Eliminar', style: TextStyle(fontWeight: FontWeight.w800)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true && context.mounted) {
+      final messenger = ScaffoldMessenger.of(context);
+      final ok = await onConfirm();
+      if (context.mounted) {
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text(ok ? successMessage : 'No se pudo eliminar el registro. Verifica tus permisos de administrador.'),
+            backgroundColor: ok ? AppColors.coralAction : AppColors.amberWarning,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
   }
 
   Widget _buildWaterQualityTab(
@@ -566,6 +342,7 @@ class _BitacoraScreenState extends ConsumerState<BitacoraScreen> with SingleTick
     WaterQualityState waterState,
     PondsState pondsState,
     Map<String, Pond> pondMap,
+    bool isAdmin,
   ) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final textSecondary = isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
@@ -696,7 +473,7 @@ class _BitacoraScreenState extends ConsumerState<BitacoraScreen> with SingleTick
               );
             }
             if (index == filteredParams.length + 1) {
-              return const SizedBox(height: 80);
+              return const DockBottomSpacer(extra: 48.0);
             }
 
             final p = filteredParams[index - 1];
@@ -741,6 +518,19 @@ class _BitacoraScreenState extends ConsumerState<BitacoraScreen> with SingleTick
                           text: estadoSanitario,
                           color: isOptimal ? AppColors.greenBiomass : AppColors.coralAction,
                         ),
+                        if (isAdmin) ...[
+                          const SizedBox(width: 4),
+                          _buildAdminActionButtons(
+                            onEdit: () => ParametroModal.show(context, parameterToEdit: p),
+                            onDelete: () => _confirmDeleteRecord(
+                              context,
+                              title: 'Eliminar Medición de Agua',
+                              message: '¿Deseas eliminar esta medición fisicoquímica de $pondTitulo ($fechaStr • $horaStr)?',
+                              onConfirm: () => ref.read(waterQualityProvider.notifier).deleteWaterQuality(p.id),
+                              successMessage: 'Medición de calidad de agua eliminada.',
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                     const SizedBox(height: 10),
@@ -770,21 +560,24 @@ class _BitacoraScreenState extends ConsumerState<BitacoraScreen> with SingleTick
                     const SizedBox(height: 6),
 
                     // Fila 2: Nitrógenos (Amonio, Nitrito, Nitrato)
-                    Wrap(
-                      spacing: 12,
-                      runSpacing: 4,
-                      children: [
-                        Text('Amonio: ${(p.amonioMgL ?? 0.15).toStringAsFixed(2)} ppm',
-                            style: TextStyle(color: (p.amonioMgL ?? 0.0) > 0.5 ? AppColors.coralAction : textSecondary, fontSize: 11, fontWeight: FontWeight.w600)),
-                        if (p.nitritosMgL != null)
-                          Text('Nitrito NO₂: ${p.nitritosMgL!.toStringAsFixed(2)} ppm',
-                              style: TextStyle(color: p.nitritosMgL! > 0.2 ? AppColors.coralAction : textSecondary, fontSize: 11)),
-                        if (p.nitratosMgL != null)
-                          Text('Nitrato NO₃: ${p.nitratosMgL!.toStringAsFixed(1)} ppm',
-                              style: TextStyle(color: textSecondary, fontSize: 11)),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
+                    if (p.amonioMgL != null || p.nitritosMgL != null || p.nitratosMgL != null) ...[
+                      Wrap(
+                        spacing: 12,
+                        runSpacing: 4,
+                        children: [
+                          if (p.amonioMgL != null)
+                            Text('Amonio: ${p.amonioMgL!.toStringAsFixed(2)} ppm',
+                                style: TextStyle(color: p.amonioMgL! > 0.5 ? AppColors.coralAction : textSecondary, fontSize: 11, fontWeight: FontWeight.w600)),
+                          if (p.nitritosMgL != null)
+                            Text('Nitrito NO₂: ${p.nitritosMgL!.toStringAsFixed(2)} ppm',
+                                style: TextStyle(color: p.nitritosMgL! > 0.2 ? AppColors.coralAction : textSecondary, fontSize: 11)),
+                          if (p.nitratosMgL != null)
+                            Text('Nitrato NO₃: ${p.nitratosMgL!.toStringAsFixed(1)} ppm',
+                                style: TextStyle(color: textSecondary, fontSize: 11)),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                    ],
 
                     // Fila 3: Balance Químico (Alcalinidad, CO2, Dureza, Cloro)
                     Wrap(
@@ -822,6 +615,7 @@ class _BitacoraScreenState extends ConsumerState<BitacoraScreen> with SingleTick
     PondsState pondsState,
     Map<String, Pond> pondMap,
     Map<String, FishBatch> batchMap,
+    bool isAdmin,
   ) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final textSecondary = isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
@@ -939,7 +733,7 @@ class _BitacoraScreenState extends ConsumerState<BitacoraScreen> with SingleTick
               );
             }
             if (index == records.length + 1) {
-              return const SizedBox(height: 80);
+              return const DockBottomSpacer(extra: 48.0);
             }
 
             final r = records[index - 1];
@@ -1006,6 +800,25 @@ class _BitacoraScreenState extends ConsumerState<BitacoraScreen> with SingleTick
                     ),
                     const SizedBox(width: 8),
                     Text(CurrencyFormatters.formatCOP(r.costoCalculado), style: const TextStyle(color: AppColors.greenBiomass, fontWeight: FontWeight.w800, fontSize: 13)),
+                    if (isAdmin) ...[
+                      const SizedBox(width: 4),
+                      _buildAdminActionButtons(
+                        onEdit: () => AlimentarModal.show(
+                          context,
+                          pond: pond,
+                          batch: batch,
+                          recordToEdit: r,
+                        ),
+                        onDelete: () => _confirmDeleteRecord(
+                          context,
+                          title: 'Eliminar Registro de Alimentación',
+                          message:
+                              '¿Deseas eliminar esta ración de ${r.cantidadConsumidaKg.toStringAsFixed(1)} kg en $pondTitulo? Se reintegrará el alimento al inventario de Almacén y se recalculará el costo del lote.',
+                          onConfirm: () => ref.read(nutritionProvider.notifier).deleteDailyFeeding(r),
+                          successMessage: 'Alimentación eliminada y stock reintegrado en Almacén.',
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -1021,6 +834,7 @@ class _BitacoraScreenState extends ConsumerState<BitacoraScreen> with SingleTick
     PondsState pondsState,
     Map<String, Pond> pondMap,
     Map<String, FishBatch> batchMap,
+    bool isAdmin,
   ) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final textSecondary = isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
@@ -1157,7 +971,7 @@ class _BitacoraScreenState extends ConsumerState<BitacoraScreen> with SingleTick
               );
             }
             if (index == sortedBiometries.length + 1) {
-              return const SizedBox(height: 80);
+              return const DockBottomSpacer(extra: 48.0);
             }
 
             final bio = sortedBiometries[index - 1];
@@ -1201,6 +1015,25 @@ class _BitacoraScreenState extends ConsumerState<BitacoraScreen> with SingleTick
                           text: '+${periodGdp.toStringAsFixed(2)} g/d',
                           color: periodGdp >= 1.5 ? AppColors.greenBiomass : (periodGdp >= 0.8 ? AppColors.cyanWater : AppColors.amberWarning),
                         ),
+                        if (isAdmin) ...[
+                          const SizedBox(width: 4),
+                          _buildAdminActionButtons(
+                            onEdit: () => BiometriaModal.show(
+                              context,
+                              pond: pond,
+                              batch: batch,
+                              recordToEdit: bio,
+                            ),
+                            onDelete: () => _confirmDeleteRecord(
+                              context,
+                              title: 'Eliminar Muestreo Biométrico',
+                              message:
+                                  '¿Deseas eliminar la biometría de $pondTitulo (${bio.pesoPromedioG.toStringAsFixed(1)} g)? El peso promedio y la biomasa del lote se recalcularán automáticamente.',
+                              onConfirm: () => ref.read(pondsProvider.notifier).deleteBiometry(bio),
+                              successMessage: 'Biometría eliminada y biomasa del lote recalculada.',
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                     const SizedBox(height: 10),
@@ -1293,6 +1126,7 @@ class _BitacoraScreenState extends ConsumerState<BitacoraScreen> with SingleTick
     PondsState pondsState,
     Map<String, Pond> pondMap,
     Map<String, FishBatch> batchMap,
+    bool isAdmin,
   ) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final textSecondary = isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
@@ -1523,6 +1357,25 @@ class _BitacoraScreenState extends ConsumerState<BitacoraScreen> with SingleTick
                             text: r.causaProbable,
                             color: causeColor,
                           ),
+                          if (isAdmin) ...[
+                            const SizedBox(width: 4),
+                            _buildAdminActionButtons(
+                              onEdit: () => MortalidadModal.show(
+                                context,
+                                pond: pond,
+                                batch: batch,
+                                recordToEdit: r,
+                              ),
+                              onDelete: () => _confirmDeleteRecord(
+                                context,
+                                title: 'Eliminar Registro de Mortalidad',
+                                message:
+                                    '¿Deseas eliminar este reporte de ${r.cantidadPecesMuertos} bajas en $pondTitulo? Los peces se reintegrarán al inventario vivo del lote.',
+                                onConfirm: () => ref.read(pondsProvider.notifier).deleteMortality(r),
+                                successMessage: 'Registro de mortalidad eliminado y población del lote restaurada.',
+                              ),
+                            ),
+                          ],
                         ],
                       ),
                       const SizedBox(height: 10),
@@ -1667,18 +1520,32 @@ class _BitacoraScreenState extends ConsumerState<BitacoraScreen> with SingleTick
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Row(
-                            children: [
-                              Text(
-                                '${origen?.nombreLimpio ?? "Estanque"} ➔ ${destino?.nombreLimpio ?? "Estanque"}',
-                                style: AppTypography.titleSmall.copyWith(color: Colors.white, fontWeight: FontWeight.w800),
-                              ),
-                            ],
+                          Expanded(
+                            child: Text(
+                              '${origen?.nombreLimpio ?? "Estanque"} ➔ ${destino?.nombreLimpio ?? "Estanque"}',
+                              overflow: TextOverflow.ellipsis,
+                              style: AppTypography.titleSmall.copyWith(color: Colors.white, fontWeight: FontWeight.w800),
+                            ),
                           ),
                           GlassBadge(
                             text: t.tipoOperacionLabel,
                             color: t.esDesdoble ? AppColors.amberWarning : AppColors.cyanWater,
                           ),
+                          if (isAdmin) ...[
+                            const SizedBox(width: 4),
+                            _buildAdminActionButtons(
+                              onEdit: null,
+                              onDelete: () => _confirmDeleteRecord(
+                                context,
+                                title: 'Revertir y Eliminar Traslado',
+                                message: t.esDesdoble
+                                    ? '¿Deseas revertir este desdoble de ${t.pecesTrasladados} peces? Se reintegrarán al lote origen y se ajustarán ambos estanques.'
+                                    : '¿Deseas revertir este traslado total hacia ${destino?.nombreLimpio ?? "destino"} y devolver el lote a ${origen?.nombreLimpio ?? "origen"}?',
+                                onConfirm: () => ref.read(pondsProvider.notifier).deleteTransfer(t),
+                                successMessage: 'Traslado revertido y eliminado correctamente.',
+                              ),
+                            ),
+                          ],
                         ],
                       ),
                       const SizedBox(height: 6),
@@ -1716,7 +1583,7 @@ class _BitacoraScreenState extends ConsumerState<BitacoraScreen> with SingleTick
             }
 
             // Footer Spacer
-            return const SizedBox(height: 80);
+            return const DockBottomSpacer(extra: 48.0);
           },
         ),
       ),
@@ -1839,6 +1706,291 @@ class _BiometryAnalysis {
       sortedBiometries: sortedBiometries,
       latestAvgWeight: latestAvgWeight,
       avgGdp: avgGdp,
+    );
+  }
+}
+
+class _BitacoraDialAction {
+  final String label;
+  final IconData icon;
+  final VoidCallback onTap;
+
+  const _BitacoraDialAction({
+    required this.label,
+    required this.icon,
+    required this.onTap,
+  });
+}
+
+/// Speed Dial vertical unilateral hacia arriba inspirado en Uiverse (`risabbir`).
+class _BitacoraVerticalSpeedDial extends StatefulWidget {
+  final double bottomOffset;
+  final List<_BitacoraDialAction> actions;
+
+  const _BitacoraVerticalSpeedDial({
+    required this.bottomOffset,
+    required this.actions,
+  });
+
+  @override
+  State<_BitacoraVerticalSpeedDial> createState() =>
+      _BitacoraVerticalSpeedDialState();
+}
+
+class _BitacoraVerticalSpeedDialState extends State<_BitacoraVerticalSpeedDial>
+    with SingleTickerProviderStateMixin {
+  bool _isOpen = false;
+  bool _isMainHovered = false;
+  int _hoveredItemIndex = -1;
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 560),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _toggle() {
+    setState(() {
+      _isOpen = !_isOpen;
+      if (_isOpen) {
+        _controller.forward();
+      } else {
+        _controller.reverse();
+      }
+    });
+  }
+
+  void _close() {
+    if (!_isOpen) return;
+    setState(() {
+      _isOpen = false;
+      _hoveredItemIndex = -1;
+      _controller.reverse();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        // Scrim para cerrar al tocar fuera cuando está abierto
+        if (_isOpen)
+          Positioned.fill(
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: _close,
+              child: AnimatedOpacity(
+                opacity: _isOpen ? 1.0 : 0.0,
+                duration: const Duration(milliseconds: 220),
+                child: Container(
+                  color: Colors.black.withValues(alpha: isDark ? 0.28 : 0.10),
+                ),
+              ),
+            ),
+          ),
+
+        // Sub-botones desplegándose verticalmente hacia arriba desde el botón +
+        ...List.generate(widget.actions.length, (index) {
+          final action = widget.actions[index];
+          final startInterval = (index * 0.08).clamp(0.0, 0.45);
+          final endInterval = (startInterval + 0.55).clamp(0.0, 1.0);
+          final springAnim = CurvedAnimation(
+            parent: _controller,
+            curve: Interval(
+              startInterval,
+              endInterval,
+              curve: const Cubic(0.68, -0.55, 0.27, 1.55),
+            ),
+            reverseCurve: Interval(
+              0.0,
+              0.7,
+              curve: Curves.easeInCubic,
+            ),
+          );
+          final opacityAnim = CurvedAnimation(
+            parent: _controller,
+            curve: Interval(startInterval, (startInterval + 0.35).clamp(0.0, 1.0)),
+          );
+          final labelOpacityAnim = CurvedAnimation(
+            parent: _controller,
+            curve: Interval(
+              (startInterval + 0.22).clamp(0.0, 0.8),
+              1.0,
+              curve: Curves.easeOut,
+            ),
+          );
+
+          final targetOffsetY = 76.0 + index * 60.0;
+          final isHovered = _hoveredItemIndex == index;
+
+          return AnimatedBuilder(
+            animation: _controller,
+            builder: (context, child) {
+              if (_controller.value == 0.0 && !_isOpen) {
+                return const SizedBox.shrink();
+              }
+              final dy = targetOffsetY * springAnim.value;
+              return Positioned(
+                right: 24, // Alineado al centro del botón de 64px (16 + 8)
+                bottom: widget.bottomOffset + 8 + dy,
+                child: Opacity(
+                  opacity: opacityAnim.value.clamp(0.0, 1.0),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      // Etiqueta lateral
+                      Opacity(
+                        opacity: labelOpacityAnim.value.clamp(0.0, 1.0),
+                        child: Container(
+                          margin: const EdgeInsets.only(right: 12),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 5,
+                          ),
+                          decoration: BoxDecoration(
+                            color: isDark
+                                ? const Color(0xFF1F2937).withValues(alpha: 0.92)
+                                : Colors.white.withValues(alpha: 0.94),
+                            borderRadius: BorderRadius.circular(10),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.12),
+                                blurRadius: 8,
+                                offset: const Offset(0, 3),
+                              ),
+                            ],
+                          ),
+                          child: Text(
+                            action.label,
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: isDark
+                                  ? const Color(0xFFF3F4F6)
+                                  : const Color(0xFF374151),
+                            ),
+                          ),
+                        ),
+                      ),
+
+                      // Círculo blanco 48x48 (risabbir)
+                      MouseRegion(
+                        cursor: SystemMouseCursors.click,
+                        onEnter: (_) => setState(() => _hoveredItemIndex = index),
+                        onExit: (_) => setState(() => _hoveredItemIndex = -1),
+                        child: GestureDetector(
+                          onTap: () {
+                            _close();
+                            action.onTap();
+                          },
+                          child: AnimatedScale(
+                            scale: isHovered ? 1.10 : 1.0,
+                            duration: const Duration(milliseconds: 200),
+                            curve: Curves.easeOutCubic,
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 200),
+                              width: 48,
+                              height: 48,
+                              decoration: BoxDecoration(
+                                color: isHovered
+                                    ? const Color(0xFFF3F4F6)
+                                    : Colors.white,
+                                shape: BoxShape.circle,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.16),
+                                    blurRadius: 14,
+                                    offset: const Offset(0, 6),
+                                  ),
+                                ],
+                              ),
+                              alignment: Alignment.center,
+                              child: Icon(
+                                action.icon,
+                                size: 20,
+                                color: isHovered
+                                    ? const Color(0xFF3B82F6)
+                                    : const Color(0xFF9CA3AF),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          );
+        }),
+
+        // Botón principal 64x64 (#3b82f6 -> #2563eb, icono + rota 45°)
+        Positioned(
+          right: 16,
+          bottom: widget.bottomOffset,
+          child: MouseRegion(
+            cursor: SystemMouseCursors.click,
+            onEnter: (_) => setState(() => _isMainHovered = true),
+            onExit: (_) => setState(() => _isMainHovered = false),
+            child: GestureDetector(
+              onTap: _toggle,
+              child: AnimatedScale(
+                scale: (_isMainHovered || _isOpen) ? 1.10 : 1.0,
+                duration: const Duration(milliseconds: 300),
+                curve: Curves.easeOutCubic,
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 300),
+                  width: 64,
+                  height: 64,
+                  decoration: BoxDecoration(
+                    color: (_isMainHovered || _isOpen)
+                        ? const Color(0xFF2563EB)
+                        : const Color(0xFF3B82F6),
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF3B82F6).withValues(alpha: 0.35),
+                        blurRadius: 20,
+                        offset: const Offset(0, 8),
+                      ),
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.18),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  alignment: Alignment.center,
+                  child: AnimatedRotation(
+                    turns: _isOpen ? 0.125 : 0.0, // 45°
+                    duration: const Duration(milliseconds: 500),
+                    curve: Curves.easeInOut,
+                    child: const Icon(
+                      Icons.add_rounded,
+                      size: 32,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

@@ -54,4 +54,30 @@ class FeedingRecord {
         'costo_calculado': costoCalculado,
         'fecha': fecha.toIso8601String().split('T')[0],
       };
+
+  FeedingRecord copyWith({
+    String? id,
+    String? empresaId,
+    String? unidadAcuicolaId,
+    String? estanqueId,
+    String? loteId,
+    String? insumoId,
+    double? cantidadConsumidaKg,
+    double? costoCalculado,
+    DateTime? fecha,
+    DateTime? creadoEn,
+  }) {
+    return FeedingRecord(
+      id: id ?? this.id,
+      empresaId: empresaId ?? this.empresaId,
+      unidadAcuicolaId: unidadAcuicolaId ?? this.unidadAcuicolaId,
+      estanqueId: estanqueId ?? this.estanqueId,
+      loteId: loteId ?? this.loteId,
+      insumoId: insumoId ?? this.insumoId,
+      cantidadConsumidaKg: cantidadConsumidaKg ?? this.cantidadConsumidaKg,
+      costoCalculado: costoCalculado ?? this.costoCalculado,
+      fecha: fecha ?? this.fecha,
+      creadoEn: creadoEn ?? this.creadoEn,
+    );
+  }
 }

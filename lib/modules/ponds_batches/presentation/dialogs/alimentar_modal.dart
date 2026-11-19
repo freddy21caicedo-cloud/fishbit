@@ -7,6 +7,7 @@ import 'package:fishbit_finance/core/design_system/glass_form_field.dart';
 import 'package:fishbit_finance/core/design_system/glass_button.dart';
 import 'package:fishbit_finance/core/design_system/glass_date_picker.dart';
 import 'package:fishbit_finance/core/design_system/glass_select_field.dart';
+import 'package:fishbit_finance/modules/feeding_nutrition/domain/models/feeding_record.dart';
 import 'package:fishbit_finance/modules/feeding_nutrition/presentation/providers/nutrition_provider.dart';
 import 'package:fishbit_finance/modules/ponds_batches/domain/models/fish_batch.dart';
 import 'package:fishbit_finance/modules/ponds_batches/domain/models/pond.dart';
@@ -19,14 +20,24 @@ import 'package:fishbit_finance/modules/warehouse_inventory/presentation/dialogs
 class AlimentarModal extends ConsumerStatefulWidget {
   final Pond? pond;
   final FishBatch? batch;
+  final FeedingRecord? recordToEdit;
 
-  const AlimentarModal({super.key, this.pond, this.batch});
+  const AlimentarModal({super.key, this.pond, this.batch, this.recordToEdit});
 
-  static Future<void> show(BuildContext context, {Pond? pond, FishBatch? batch}) {
+  static Future<void> show(
+    BuildContext context, {
+    Pond? pond,
+    FishBatch? batch,
+    FeedingRecord? recordToEdit,
+  }) {
     return showDialog(
       context: context,
       barrierDismissible: true,
-      builder: (context) => AlimentarModal(pond: pond, batch: batch),
+      builder: (context) => AlimentarModal(
+        pond: pond,
+        batch: batch,
+        recordToEdit: recordToEdit,
+      ),
     );
   }
 
@@ -45,7 +56,15 @@ class _AlimentarModalState extends ConsumerState<AlimentarModal> {
   @override
   void initState() {
     super.initState();
-    _selectedPondId = widget.pond?.id;
+    final edit = widget.recordToEdit;
+    if (edit != null) {
+      _selectedPondId = edit.estanqueId;
+      _selectedInsumoId = edit.insumoId;
+      _kgCtrl.text = edit.cantidadConsumidaKg.toStringAsFixed(1);
+      _fechaAlimentacion = CivilDate.fromDate(edit.fecha);
+    } else {
+      _selectedPondId = widget.pond?.id;
+    }
   }
 
   @override
@@ -88,8 +107,10 @@ class _AlimentarModalState extends ConsumerState<AlimentarModal> {
         .toList();
 
     final pondsList = pondsState.ponds.where((p) => p.estado == PondStatus.active).toList();
-    final activePond = widget.pond ??
-        (pondsList.where((p) => p.id == _selectedPondId).firstOrNull ?? (pondsList.isNotEmpty ? pondsList.first : null));
+    final effectivePondId = _selectedPondId ?? widget.pond?.id;
+    final activePond = pondsList.where((p) => p.id == effectivePondId).firstOrNull ??
+        widget.pond ??
+        (pondsList.isNotEmpty ? pondsList.first : null);
     final activeBatch = widget.batch ??
         (activePond != null
             ? pondsState.batches.where((b) => b.estanqueId == activePond.id && b.estado == BatchStatus.active).firstOrNull
@@ -100,20 +121,27 @@ class _AlimentarModalState extends ConsumerState<AlimentarModal> {
       _selectedInsumoId = itemConStock?.id ?? feedItems.first.id;
     }
 
-    final pesoProm = activeBatch?.pesoActualGramos ?? 250.0;
-    final biomasaKg = activeBatch?.biomasaActualKg ?? activePond?.biomasaKg ?? 1000.0;
+    final hasBatch = activeBatch != null;
+    final pesoProm = activeBatch?.pesoActualGramos ?? 0.0;
+    final biomasaKg = activeBatch?.biomasaActualKg ?? 0.0;
     final especie = activeBatch?.especie ?? 'Tilapia Roja';
-    final rationPct = _getSuggestedRationPct(especie, pesoProm);
-    final racionSugeridaDiaKg = (biomasaKg * rationPct) / 100.0;
+    final rationPct = hasBatch ? _getSuggestedRationPct(especie, pesoProm) : 0.0;
+    final racionSugeridaDiaKg = hasBatch ? (biomasaKg * rationPct) / 100.0 : 0.0;
 
-    if (_kgCtrl.text.isEmpty && racionSugeridaDiaKg > 0) {
+    if (widget.recordToEdit == null && _kgCtrl.text.isEmpty && hasBatch && racionSugeridaDiaKg > 0) {
       _kgCtrl.text = racionSugeridaDiaKg.toStringAsFixed(1);
     }
 
     final selectedItem = feedItems.where((i) => i.id == _selectedInsumoId).firstOrNull;
-    final stockDisponibleKg = selectedItem?.cantidadActualKg ?? 0.0;
-    final costoUnitario = selectedItem?.costoUnitarioHistorico ?? 4800.0;
-    final kgSuministrados = double.tryParse(_kgCtrl.text.replaceAll(',', '.').trim()) ?? racionSugeridaDiaKg;
+    final extraEdicionKg = (widget.recordToEdit != null && widget.recordToEdit!.insumoId == _selectedInsumoId)
+        ? widget.recordToEdit!.cantidadConsumidaKg
+        : 0.0;
+    final stockDisponibleKg = (selectedItem?.cantidadActualKg ?? 0.0) + extraEdicionKg;
+    final costoUnitario = selectedItem?.costoUnitarioHistorico ??
+        (widget.recordToEdit != null && widget.recordToEdit!.cantidadConsumidaKg > 0
+            ? widget.recordToEdit!.costoCalculado / widget.recordToEdit!.cantidadConsumidaKg
+            : 4800.0);
+    final kgSuministrados = double.tryParse(_kgCtrl.text.replaceAll(',', '.').trim()) ?? 0.0;
     final sinStock = selectedItem == null || stockDisponibleKg <= 0;
     final stockInsuficiente = sinStock || (kgSuministrados > stockDisponibleKg);
     final costoTotal = kgSuministrados * costoUnitario;
@@ -152,7 +180,7 @@ class _AlimentarModalState extends ConsumerState<AlimentarModal> {
                         ),
                         const SizedBox(width: 10),
                         Text(
-                          'Alimentación y FCR',
+                          widget.recordToEdit != null ? 'Editar Alimentación y FCR' : 'Alimentación y FCR',
                           style: AppTypography.titleMedium.copyWith(color: Colors.white, fontWeight: FontWeight.w800),
                         ),
                       ],
@@ -165,8 +193,8 @@ class _AlimentarModalState extends ConsumerState<AlimentarModal> {
                 ),
                 const SizedBox(height: 12),
 
-                // Selector de Estanque si no vino especificado
-                if (widget.pond == null && pondsList.isNotEmpty) ...[
+                // Selector de Estanque si no es edición
+                if (widget.recordToEdit == null && pondsList.isNotEmpty) ...[
                   GlassSelectField<String>(
                     label: 'ESTANQUE DESTINO',
                     value: activePond?.id,
@@ -183,10 +211,12 @@ class _AlimentarModalState extends ConsumerState<AlimentarModal> {
                     onChanged: (val) {
                       setState(() {
                         _selectedPondId = val;
-                        final b = pondsState.batches.where((b) => b.estanqueId == val).firstOrNull;
+                        final b = pondsState.batches.where((b) => b.estanqueId == val && b.estado == BatchStatus.active).firstOrNull;
                         if (b != null) {
                           final r = _getSuggestedRationPct(b.especie, b.pesoActualGramos);
                           _kgCtrl.text = ((b.biomasaActualKg * r) / 100).toStringAsFixed(1);
+                        } else {
+                          _kgCtrl.clear();
                         }
                       });
                     },
@@ -217,36 +247,58 @@ class _AlimentarModalState extends ConsumerState<AlimentarModal> {
                   const SizedBox(height: 12),
                 ],
 
-                // Sugerencia Acuícola de Precisión
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: AppColors.cyanWater.withValues(alpha: 0.10),
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: AppColors.cyanWater.withValues(alpha: 0.3)),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.auto_graph_rounded, color: AppColors.cyanWater, size: 20),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Ración Sugerida: ${racionSugeridaDiaKg.toStringAsFixed(1)} kg/día ($rationPct% de biomasa)',
-                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 12),
-                            ),
-                            Text(
-                              'Para peso promedio de ${pesoProm.toStringAsFixed(1)}g en ${activeBatch?.especie ?? "Tilapia"}',
-                              style: const TextStyle(color: AppColors.textSecondaryDark, fontSize: 10.5),
-                            ),
-                          ],
+                // Sugerencia Acuícola de Precisión o Aviso de Estanque sin Lote
+                if (!hasBatch)
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppColors.amberWarning.withValues(alpha: 0.14),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: AppColors.amberWarning.withValues(alpha: 0.4)),
+                    ),
+                    child: const Row(
+                      children: [
+                        Icon(Icons.info_outline_rounded, color: AppColors.amberWarning, size: 20),
+                        SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            'Este estanque no tiene un lote activo sembrado. Seleccione un estanque con peces activos o realice primero una siembra.',
+                            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 11.5),
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
+                  )
+                else
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppColors.cyanWater.withValues(alpha: 0.10),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: AppColors.cyanWater.withValues(alpha: 0.3)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.auto_graph_rounded, color: AppColors.cyanWater, size: 20),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Ración Sugerida: ${racionSugeridaDiaKg.toStringAsFixed(1)} kg/día ($rationPct% de biomasa)',
+                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 12),
+                              ),
+                              Text(
+                                'Para peso promedio de ${pesoProm.toStringAsFixed(1)}g en ${activeBatch.especie}',
+                                style: const TextStyle(color: AppColors.textSecondaryDark, fontSize: 10.5),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
                 const SizedBox(height: 14),
 
                 GlassSelectField<String>(
@@ -410,47 +462,112 @@ class _AlimentarModalState extends ConsumerState<AlimentarModal> {
 
                 // Botón de Confirmación
                 GlassButton(
-                  label: 'Registrar Suministro de Alimento',
+                  label: widget.recordToEdit != null
+                      ? 'Actualizar Suministro de Alimento'
+                      : 'Registrar Suministro de Alimento',
                   height: 46,
                   backgroundColor: AppColors.greenBiomass,
                   isLoading: _isLoading,
-                  onPressed: (activePond == null || activeBatch == null || kgSuministrados <= 0 || stockInsuficiente)
-                      ? null
-                      : () async {
-                          final nav = Navigator.of(context);
-                          final messenger = ScaffoldMessenger.of(context);
-                          setState(() => _isLoading = true);
-                          // 1. Descontar inventario en Bodega
-                          if (_selectedInsumoId != null) {
-                            await ref.read(warehouseProvider.notifier).discountStock(
-                                  itemId: _selectedInsumoId!,
-                                  cantidadKg: kgSuministrados,
-                                  motivo: 'Alimentación en estanque ${activePond.sigla}',
-                                );
-                          }
-                          // 2. Registrar en módulo de nutrición
-                          await ref.read(nutritionProvider.notifier).recordDailyFeeding(
-                                estanqueId: activePond.id,
-                                loteId: activeBatch.id,
-                                insumoId: _selectedInsumoId,
-                                kgConsumidos: kgSuministrados,
-                                costoUnitarioAlimento: costoUnitario,
-                                fecha: _fechaAlimentacion.toDateTime(),
-                              );
-                          // 3. Recargar estanques para actualizar FCR y costo
-                          await ref.read(pondsProvider.notifier).loadPondsAndBatches();
+                  onPressed: () async {
+                    if (_isLoading) return;
+                    final messenger = ScaffoldMessenger.of(context);
+                    if (activePond == null || activeBatch == null) {
+                      messenger.showSnackBar(
+                        const SnackBar(
+                          content: Text('Seleccione un estanque con un lote activo sembrado para registrar alimentación.'),
+                          backgroundColor: AppColors.coralAction,
+                          behavior: SnackBarBehavior.floating,
+                        ),
+                      );
+                      return;
+                    }
+                    if (kgSuministrados <= 0) {
+                      messenger.showSnackBar(
+                        const SnackBar(
+                          content: Text('Ingrese una cantidad de alimento mayor a 0 kg.'),
+                          backgroundColor: AppColors.coralAction,
+                          behavior: SnackBarBehavior.floating,
+                        ),
+                      );
+                      return;
+                    }
+                    if (stockInsuficiente) {
+                      messenger.showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            sinStock
+                                ? 'No hay concentrado con stock disponible en Almacén.'
+                                : 'La cantidad (${kgSuministrados.toStringAsFixed(1)} kg) supera el stock en bodega (${stockDisponibleKg.toStringAsFixed(1)} kg).',
+                          ),
+                          backgroundColor: AppColors.coralAction,
+                          behavior: SnackBarBehavior.floating,
+                        ),
+                      );
+                      return;
+                    }
 
-                          if (mounted) {
-                            setState(() => _isLoading = false);
-                            nav.pop();
-                            messenger.showSnackBar(
-                              SnackBar(
-                                content: Text('Alimentación registrada en ${activePond.sigla} (${kgSuministrados.toStringAsFixed(1)} kg). Stock descontado en Bodega.'),
-                                backgroundColor: AppColors.greenBiomass,
-                              ),
+                    final nav = Navigator.of(context);
+                    setState(() => _isLoading = true);
+
+                    bool ok = false;
+                    if (widget.recordToEdit != null) {
+                      ok = await ref.read(nutritionProvider.notifier).updateDailyFeeding(
+                            oldRecord: widget.recordToEdit!,
+                            newKg: kgSuministrados,
+                            costoUnitario: costoUnitario,
+                            newInsumoId: _selectedInsumoId,
+                            newFecha: _fechaAlimentacion.toDateTime(),
+                          );
+                    } else {
+                      // 1. Registrar en módulo de nutrición
+                      ok = await ref.read(nutritionProvider.notifier).recordDailyFeeding(
+                            estanqueId: activePond.id,
+                            loteId: activeBatch.id,
+                            insumoId: _selectedInsumoId,
+                            kgConsumidos: kgSuministrados,
+                            costoUnitarioAlimento: costoUnitario,
+                            fecha: _fechaAlimentacion.toDateTime(),
+                          );
+                      // 2. Descontar inventario en Bodega solo si se guardó en BD
+                      if (ok && _selectedInsumoId != null) {
+                        await ref.read(warehouseProvider.notifier).discountStock(
+                              itemId: _selectedInsumoId!,
+                              cantidadKg: kgSuministrados,
+                              motivo: 'Alimentación en estanque ${activePond.sigla}',
                             );
-                          }
-                        },
+                      }
+                      // 3. Recargar estanques para actualizar FCR y costo
+                      if (ok) {
+                        await ref.read(pondsProvider.notifier).loadPondsAndBatches();
+                      }
+                    }
+
+                    if (mounted) {
+                      setState(() => _isLoading = false);
+                      if (ok) {
+                        nav.pop();
+                        messenger.showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              widget.recordToEdit != null
+                                  ? 'Alimentación actualizada (${kgSuministrados.toStringAsFixed(1)} kg) y stock sincronizado.'
+                                  : 'Alimentación registrada en ${activePond.sigla} (${kgSuministrados.toStringAsFixed(1)} kg). Stock descontado en Bodega.',
+                            ),
+                            backgroundColor: AppColors.greenBiomass,
+                            behavior: SnackBarBehavior.floating,
+                          ),
+                        );
+                      } else {
+                        messenger.showSnackBar(
+                          SnackBar(
+                            content: Text('Error al guardar alimentación: ${ref.read(nutritionProvider).errorMessage ?? "Verifique su conexión"}'),
+                            backgroundColor: AppColors.coralAction,
+                            behavior: SnackBarBehavior.floating,
+                          ),
+                        );
+                      }
+                    }
+                  },
                 ),
               ],
             ),

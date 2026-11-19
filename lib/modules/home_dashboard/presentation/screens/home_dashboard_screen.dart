@@ -6,9 +6,9 @@ import 'package:fishbit_finance/core/design_system/app_typography.dart';
 import 'package:fishbit_finance/core/design_system/fishbit_header.dart';
 import 'package:fishbit_finance/core/design_system/glass_card.dart';
 import 'package:fishbit_finance/core/design_system/floating_dock_layout.dart';
-import 'package:fishbit_finance/core/design_system/glass_badge.dart';
 import 'package:fishbit_finance/core/design_system/glass_container.dart';
 import 'package:fishbit_finance/core/design_system/magic_bento.dart';
+import 'package:fishbit_finance/core/design_system/reflective_card.dart';
 import 'package:fishbit_finance/core/utils/currency_formatters.dart';
 import 'package:fishbit_finance/modules/feeding_nutrition/presentation/providers/nutrition_provider.dart';
 import 'package:fishbit_finance/modules/home_dashboard/presentation/widgets/biological_trends_card.dart';
@@ -65,7 +65,7 @@ class HomeDashboardScreen extends ConsumerWidget {
     final double densidadMediaKgM3 = capacidadTotalM3 > 0 ? (pondsState.biomasaTotalKg / capacidadTotalM3) : 0.0;
 
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      backgroundColor: Colors.transparent,
       body: CustomScrollView(
         slivers: [
           // Barra Superior Unificada FishBitHeader
@@ -78,11 +78,16 @@ class HomeDashboardScreen extends ConsumerWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // KPI Principal Zootécnico: Biomasa Viva Total en Agua (Kg)
-                  GlassCard(
+                  ReflectiveCard(
                     borderRadius: 24,
-                    glowColor: AppColors.cyanWater,
                     title: 'BIOMASA VIVA TOTAL EN AGUA',
-                    trailingWidget: const GlassBadge(text: 'PRODUCCIÓN', color: AppColors.greenBiomass, icon: Icons.circle),
+                    statusText: 'ACTIVA',
+                    tint: AppColors.greenBiomass,
+                    metalness: 1.0,
+                    roughness: 0.3,
+                    blurStrength: 6.0,
+                    shine: 1.0,
+                    glare: 0.5,
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -92,8 +97,14 @@ class HomeDashboardScreen extends ConsumerWidget {
                             CurrencyFormatters.formatKg(pondsState.biomasaTotalKg),
                             style: AppTypography.displayLarge.copyWith(
                               fontSize: 32,
-                              color: AppColors.cyanWater,
+                              color: Colors.white,
                               fontWeight: FontWeight.w900,
+                              shadows: [
+                                Shadow(
+                                  color: AppColors.greenBiomass.withValues(alpha: 0.55),
+                                  blurRadius: 16,
+                                ),
+                              ],
                             ),
                           ),
                         ),
@@ -106,14 +117,14 @@ class HomeDashboardScreen extends ConsumerWidget {
                             Text(
                               'Población: ${CurrencyFormatters.formatInt(poblacionViva)} peces',
                               style: AppTypography.bodyMedium.copyWith(
-                                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                                color: Colors.white.withValues(alpha: 0.88),
                                 fontWeight: FontWeight.w700,
                               ),
                             ),
                             Text(
                               fcrGlobal != null ? 'FCR Global: ${fcrGlobal.toStringAsFixed(2)}:1' : 'FCR: --',
                               style: AppTypography.bodySmall.copyWith(
-                                color: AppColors.greenBiomass,
+                                color: const Color(0xFF6EE7B7),
                                 fontWeight: FontWeight.w800,
                               ),
                             ),
@@ -121,7 +132,7 @@ class HomeDashboardScreen extends ConsumerWidget {
                               Text(
                                 'Peso prom: ${pesoPromedioGlobal.toInt()} g',
                                 style: AppTypography.bodySmall.copyWith(
-                                  color: AppColors.amberWarning,
+                                  color: const Color(0xFFFCD34D),
                                   fontWeight: FontWeight.w700,
                                 ),
                               ),

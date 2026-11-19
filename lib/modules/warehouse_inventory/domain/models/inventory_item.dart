@@ -94,7 +94,7 @@ class InventoryItem {
       case InventoryItemType.farmacia:
         return 'Farmacia';
       case InventoryItemType.oxigenador:
-        return 'Oxigenador';
+        return 'Aireador';
       case InventoryItemType.alevino:
         return 'Alevino';
       case InventoryItemType.herramienta:

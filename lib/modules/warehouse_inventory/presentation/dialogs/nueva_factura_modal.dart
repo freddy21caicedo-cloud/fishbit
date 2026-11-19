@@ -7,6 +7,8 @@ import 'package:fishbit_finance/core/design_system/app_typography.dart';
 import 'package:fishbit_finance/core/design_system/glass_container.dart';
 import 'package:fishbit_finance/core/design_system/glass_date_picker.dart';
 import 'package:fishbit_finance/core/design_system/glass_select_field.dart';
+import 'package:fishbit_finance/core/design_system/app_notification.dart';
+import 'package:fishbit_finance/core/design_system/star_border_button.dart';
 import 'package:fishbit_finance/core/utils/currency_formatters.dart';
 import 'package:fishbit_finance/modules/auth_tenant/presentation/providers/auth_provider.dart';
 import 'package:fishbit_finance/modules/warehouse_inventory/domain/models/inventory_item.dart';
@@ -26,6 +28,11 @@ class EditableInvoiceItem {
   TextEditingController factorUnidadCtrl; // ej. 40 para bulto 40kg, 1.0 para kg/unidad, etc.
   TextEditingController costoUnitarioCtrl;
   TextEditingController ivaPctCtrl;
+  TextEditingController loteCtrl;
+  bool cantidadEdited;
+  bool costoEdited;
+  bool ivaEdited;
+  bool loteEdited;
 
   EditableInvoiceItem({
     this.codigo = '',
@@ -36,10 +43,15 @@ class EditableInvoiceItem {
     String factorUnidad = '40',
     String costoUnitario = '',
     String ivaPct = '5.0',
+    this.cantidadEdited = false,
+    this.costoEdited = false,
+    this.ivaEdited = false,
+    this.loteEdited = false,
   })  : cantidadCtrl = TextEditingController(text: cantidad),
         factorUnidadCtrl = TextEditingController(text: factorUnidad),
         costoUnitarioCtrl = TextEditingController(text: costoUnitario),
-        ivaPctCtrl = TextEditingController(text: ivaPct);
+        ivaPctCtrl = TextEditingController(text: ivaPct),
+        loteCtrl = TextEditingController(text: loteFabricante);
 
   double get cantidad => double.tryParse(cantidadCtrl.text.replaceAll(RegExp(r'[^\d.]'), '')) ?? 0.0;
   double get factorUnidad => double.tryParse(factorUnidadCtrl.text.replaceAll(RegExp(r'[^\d.]'), '')) ?? 1.0;
@@ -57,22 +69,36 @@ class EditableInvoiceItem {
     factorUnidadCtrl.dispose();
     costoUnitarioCtrl.dispose();
     ivaPctCtrl.dispose();
+    loteCtrl.dispose();
   }
 }
 
 class NuevaFacturaModal extends ConsumerStatefulWidget {
   final String initialCategory;
+  final int initialStep;
+  final PurchaseInvoice? invoiceToEdit;
 
   const NuevaFacturaModal({
     super.key,
     this.initialCategory = 'concentrados',
+    this.initialStep = 0,
+    this.invoiceToEdit,
   });
 
-  static Future<void> show(BuildContext context, {String initialCategory = 'concentrados'}) {
+  static Future<void> show(
+    BuildContext context, {
+    String initialCategory = 'concentrados',
+    int initialStep = 0,
+    PurchaseInvoice? invoiceToEdit,
+  }) {
     return showDialog(
       context: context,
       barrierDismissible: true,
-      builder: (context) => NuevaFacturaModal(initialCategory: initialCategory),
+      builder: (context) => NuevaFacturaModal(
+        initialCategory: initialCategory,
+        initialStep: initialStep,
+        invoiceToEdit: invoiceToEdit,
+      ),
     );
   }
 
@@ -83,7 +109,7 @@ class NuevaFacturaModal extends ConsumerStatefulWidget {
 class _NuevaFacturaModalState extends ConsumerState<NuevaFacturaModal> {
   final _formKey = GlobalKey<FormState>();
 
-  // Wizard Step: 0: Cabecera & Proveedor, 1: Condiciones & Flete, 2: Productos Multi-Ítem, 3: Ticket Fiscal y Confirmación
+  // Wizard Step (3 pasos): 0: Condiciones (Proveedor + # Factura + Pago/Flete), 1: Producto, 2: Ticket Fiscal
   int _currentStep = 0;
 
   late String _categoriaSeleccionada;
@@ -98,6 +124,12 @@ class _NuevaFacturaModalState extends ConsumerState<NuevaFacturaModal> {
   CivilDate _fechaExpedicion = CivilDate.today();
   CivilDate _fechaVencimiento = CivilDate.today().addDays(30);
 
+  // Flags para limpiar al primer clic si aún no ha sido editado
+  bool _facturaEdited = false;
+  bool _fleteEdited = false;
+  bool _diasEdited = false;
+  bool _placaEdited = false;
+
   // Lista de Productos en la Factura (Multi-Ítem)
   final List<EditableInvoiceItem> _items = [];
   bool _isSubmitting = false;
@@ -105,9 +137,46 @@ class _NuevaFacturaModalState extends ConsumerState<NuevaFacturaModal> {
   @override
   void initState() {
     super.initState();
-    _categoriaSeleccionada = widget.initialCategory;
-    final randomNum = DateTime.now().millisecondsSinceEpoch.toString().substring(7);
-    _facturaCtrl.text = 'FACT-$randomNum';
+    final edit = widget.invoiceToEdit;
+    if (edit != null) {
+      _categoriaSeleccionada = edit.tipoFactura.toLowerCase().contains('alimento')
+          ? 'concentrados'
+          : (edit.tipoFactura.toLowerCase() == 'insumo' ? 'insumos' : edit.tipoFactura);
+      _currentStep = 0;
+      _facturaCtrl.text = edit.numeroFactura;
+      _fleteCtrl.text = CurrencyFormatters.formatCOP(edit.costoFlete);
+      _placaCtrl.text = edit.placaVehiculo ?? '';
+      _esCredito = edit.esCredito;
+      _diasCreditoCtrl.text = edit.diasCredito > 0 ? edit.diasCredito.toString() : '30';
+      _fechaExpedicion = CivilDate.fromDate(edit.fechaExpedicion);
+      _fechaVencimiento = CivilDate.fromDate(edit.fechaVencimiento);
+      _facturaEdited = true;
+      _fleteEdited = true;
+      _diasEdited = true;
+      _placaEdited = true;
+      for (final line in edit.productos) {
+        _items.add(
+          EditableInvoiceItem(
+            codigo: line.codigo,
+            nombre: line.nombre,
+            loteFabricante: line.loteFabricante ?? '',
+            cantidad: line.cantidadBultos.toString(),
+            factorUnidad: line.kgPorBulto.toStringAsFixed(0),
+            costoUnitario: CurrencyFormatters.formatCOP(line.valorUnitarioBulto),
+            ivaPct: line.ivaPct.toStringAsFixed(1),
+            cantidadEdited: true,
+            costoEdited: true,
+            ivaEdited: true,
+            loteEdited: true,
+          ),
+        );
+      }
+    } else {
+      _categoriaSeleccionada = widget.initialCategory;
+      _currentStep = widget.initialStep.clamp(0, 2);
+      final randomNum = DateTime.now().millisecondsSinceEpoch.toString().substring(7);
+      _facturaCtrl.text = 'FACT-$randomNum';
+    }
   }
 
   void _recalcularFechaVencimiento() {
@@ -170,7 +239,7 @@ class _NuevaFacturaModalState extends ConsumerState<NuevaFacturaModal> {
         prodName = switch (_categoriaSeleccionada) {
           'insumos' => 'Insumo Acuícola',
           'farmacia' => 'Fármaco Veterinario',
-          'oxigenadores' => 'Oxigenador / Aireador',
+          'oxigenadores' => 'Aireador / Equipo',
           _ => 'Producto General',
         };
       }
@@ -259,38 +328,26 @@ class _NuevaFacturaModalState extends ConsumerState<NuevaFacturaModal> {
   bool _validateStep(int step) {
     if (step == 0) {
       if (_selectedSupplier == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Por favor selecciona un proveedor oficial o registrado.'), backgroundColor: AppColors.coralAction),
-        );
+        AppToast.error(context, 'Por favor selecciona un proveedor oficial o registrado.');
         return false;
       }
       if (_facturaCtrl.text.trim().isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Por favor ingresa el número o consecutivo de la factura.'), backgroundColor: AppColors.coralAction),
-        );
+        AppToast.error(context, 'Por favor ingresa el número o consecutivo de la factura.');
         return false;
       }
       return true;
     } else if (step == 1) {
-      return true;
-    } else if (step == 2) {
       if (_items.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Debes ingresar al menos un producto a la factura.'), backgroundColor: AppColors.coralAction),
-        );
+        AppToast.error(context, 'Debes ingresar al menos un producto a la factura.');
         return false;
       }
       for (int i = 0; i < _items.length; i++) {
         if (_items[i].cantidad <= 0) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('El producto #${i + 1} tiene una cantidad inválida.'), backgroundColor: AppColors.coralAction),
-          );
+          AppToast.error(context, 'El producto #${i + 1} tiene una cantidad inválida.');
           return false;
         }
         if (_items[i].costoUnitario <= 0) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('El producto #${i + 1} requiere un valor unitario mayor a cero.'), backgroundColor: AppColors.coralAction),
-          );
+          AppToast.error(context, 'El producto #${i + 1} requiere un valor unitario mayor a cero.');
           return false;
         }
       }
@@ -301,7 +358,7 @@ class _NuevaFacturaModalState extends ConsumerState<NuevaFacturaModal> {
 
   void _nextStep() {
     if (!_validateStep(_currentStep)) return;
-    if (_currentStep < 3) {
+    if (_currentStep < 2) {
       setState(() => _currentStep++);
     }
   }
@@ -315,12 +372,11 @@ class _NuevaFacturaModalState extends ConsumerState<NuevaFacturaModal> {
   }
 
   Future<void> _guardarFactura() async {
-    if (!_validateStep(2)) return;
+    if (!_validateStep(1)) return;
 
     setState(() => _isSubmitting = true);
 
     final nav = Navigator.of(context);
-    final messenger = ScaffoldMessenger.of(context);
     final authState = ref.read(authProvider);
     final empresaId = authState.currentCompany?.id ?? authState.currentUser?.empresaId ?? '';
     final unidadId = authState.activeUnitId ?? authState.currentUser?.unidadAcuicolaId;
@@ -331,12 +387,7 @@ class _NuevaFacturaModalState extends ConsumerState<NuevaFacturaModal> {
 
     if (empresaId.isEmpty) {
       setState(() => _isSubmitting = false);
-      messenger.showSnackBar(
-        const SnackBar(
-          content: Text('No se pudo determinar la empresa activa. Por favor verifica tu sesión.'),
-          backgroundColor: AppColors.coralAction,
-        ),
-      );
+      AppToast.error(context, 'No se pudo determinar la empresa activa. Por favor verifica tu sesión.');
       return;
     }
 
@@ -364,7 +415,7 @@ class _NuevaFacturaModalState extends ConsumerState<NuevaFacturaModal> {
     }).toList();
 
     final invoice = PurchaseInvoice(
-      id: const Uuid().v4(),
+      id: widget.invoiceToEdit?.id ?? const Uuid().v4(),
       empresaId: empresaId,
       unidadAcuicolaId: unidadId ?? '',
       unidadAcuicolaSigla: sigla,
@@ -384,7 +435,7 @@ class _NuevaFacturaModalState extends ConsumerState<NuevaFacturaModal> {
       estadoPago: _esCredito ? 'Pendiente' : 'Paga',
       placaVehiculo: _placaCtrl.text.trim().isNotEmpty ? _placaCtrl.text.trim() : null,
       productos: invoiceLineItems,
-      creadoEn: DateTime.now(),
+      creadoEn: widget.invoiceToEdit?.creadoEn ?? DateTime.now(),
     );
 
     final itemsToSync = _items.map((it) {
@@ -446,25 +497,28 @@ class _NuevaFacturaModalState extends ConsumerState<NuevaFacturaModal> {
     }).toList();
 
     try {
-      await ref.read(warehouseProvider.notifier).registerMultiItemInvoice(invoice, itemsToSync);
+      if (widget.invoiceToEdit != null) {
+        await ref.read(warehouseProvider.notifier).updatePurchaseInvoice(
+              widget.invoiceToEdit!,
+              invoice,
+              itemsToSync,
+            );
+      } else {
+        await ref.read(warehouseProvider.notifier).registerMultiItemInvoice(invoice, itemsToSync);
+      }
       if (mounted) {
         nav.pop();
-        messenger.showSnackBar(
-          SnackBar(
-            content: Text('¡Factura ${_facturaCtrl.text} de $supName registrada exitosamente!'),
-            backgroundColor: AppColors.greenBiomass,
-          ),
+        AppToast.success(
+          context,
+          widget.invoiceToEdit != null
+              ? 'Factura ${_facturaCtrl.text} actualizada correctamente.'
+              : '¡Factura ${_facturaCtrl.text} de $supName registrada exitosamente!',
         );
       }
     } catch (e) {
       if (mounted) {
         setState(() => _isSubmitting = false);
-        messenger.showSnackBar(
-          SnackBar(
-            content: Text('Error al registrar factura: $e'),
-            backgroundColor: AppColors.coralAction,
-          ),
-        );
+        AppToast.error(context, 'Error al registrar factura: $e');
       }
     }
   }
@@ -483,7 +537,14 @@ class _NuevaFacturaModalState extends ConsumerState<NuevaFacturaModal> {
     ).toList();
 
     if (_selectedSupplier == null && filteredSuppliers.isNotEmpty) {
-      _selectedSupplier = filteredSuppliers.first;
+      if (widget.invoiceToEdit != null) {
+        _selectedSupplier = allSuppliers
+            .where((s) => s.nombre == widget.invoiceToEdit!.proveedorNombre)
+            .firstOrNull ??
+            filteredSuppliers.first;
+      } else {
+        _selectedSupplier = filteredSuppliers.first;
+      }
       if (_items.isEmpty) _addNewItem();
     }
 
@@ -505,9 +566,11 @@ class _NuevaFacturaModalState extends ConsumerState<NuevaFacturaModal> {
         child: GlassContainer(
           borderRadius: 24,
           padding: const EdgeInsets.all(22),
-          blur: 24,
-          opacity: isDark ? 0.18 : 0.96,
-          borderColor: AppColors.amberWarning.withValues(alpha: 0.35),
+          blur: 28,
+          opacity: isDark ? 0.22 : 0.90,
+          borderColor: isDark
+              ? Colors.white.withValues(alpha: 0.16)
+              : Colors.white.withValues(alpha: 0.75),
           child: Form(
             key: _formKey,
             child: SingleChildScrollView(
@@ -563,14 +626,13 @@ class _NuevaFacturaModalState extends ConsumerState<NuevaFacturaModal> {
                   _buildWizardStepIndicator(),
                   const SizedBox(height: 18),
 
-                  // Contenido de cada paso con animación fluida
+                  // Contenido de cada paso con animación fluida (3 pasos: Condiciones -> Producto -> Ticket Fiscal)
                   AnimatedSwitcher(
                     duration: const Duration(milliseconds: 250),
                     child: switch (_currentStep) {
-                      0 => _buildStep1FiscalHeader(isDark, filteredSuppliers, allSuppliers),
-                      1 => _buildStep2CommercialConditions(isDark),
-                      2 => _buildStep3ProductsList(isDark, availableProducts),
-                      3 => _buildStep4FiscalTicket(isDark),
+                      0 => _buildStep2CommercialConditions(isDark, filteredSuppliers),
+                      1 => _buildStep3ProductsList(isDark, availableProducts),
+                      2 => _buildStep4FiscalTicket(isDark),
                       _ => const SizedBox.shrink(),
                     },
                   ),
@@ -590,20 +652,20 @@ class _NuevaFacturaModalState extends ConsumerState<NuevaFacturaModal> {
 
   // --- WIDGETS DEL WIZARD ---
 
-  /// Barra de progreso interactiva con 4 pasos
+  /// Barra de progreso interactiva con 3 pasos (Condiciones → Producto → Ticket Fiscal)
   Widget _buildWizardStepIndicator() {
-    final stepLabels = ['Proveedor', 'Condiciones', 'Productos', 'Ticket Fiscal'];
+    final stepLabels = ['Condiciones', 'Producto', 'Ticket Fiscal'];
 
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.04),
+        color: Colors.white.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: List.generate(4, (index) {
+        children: List.generate(3, (index) {
           final isCompleted = _currentStep > index;
           final isCurrent = _currentStep == index;
           final stepColor = isCurrent ? AppColors.amberWarning : (isCompleted ? AppColors.greenBiomass : Colors.white24);
@@ -646,7 +708,7 @@ class _NuevaFacturaModalState extends ConsumerState<NuevaFacturaModal> {
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                if (index < 3)
+                if (index < 2)
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 4),
                     child: Icon(Icons.chevron_right_rounded, size: 14, color: isCompleted ? AppColors.greenBiomass : Colors.white24),
@@ -659,69 +721,34 @@ class _NuevaFacturaModalState extends ConsumerState<NuevaFacturaModal> {
     );
   }
 
-  /// PASO 1: Cabecera Fiscal & Proveedor
-  Widget _buildStep1FiscalHeader(bool isDark, List<Supplier> filteredSuppliers, List<Supplier> allSuppliers) {
+  /// PASO 1: Condiciones Comerciales, Proveedor y Factura
+  Widget _buildStep2CommercialConditions(bool isDark, List<Supplier> filteredSuppliers) {
     return Column(
       key: const ValueKey(0),
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'PASO 1: CATEGORÍA DE FACTURA Y PROVEEDOR',
-          style: AppTypography.labelMicro.copyWith(color: AppColors.amberWarning, fontWeight: FontWeight.w800, letterSpacing: 0.5),
+          'PASO 1: CONDICIONES, PROVEEDOR Y FACTURA',
+          style: AppTypography.labelMicro.copyWith(color: AppColors.cyanWater, fontWeight: FontWeight.w800, letterSpacing: 0.5),
         ),
         const SizedBox(height: 4),
         Text(
-          'Selecciona la categoría del gasto y el proveedor que emite el documento fiscal:',
+          'Selecciona el proveedor, ingresa el # de factura y define modalidad de pago y flete:',
           style: AppTypography.bodySmall.copyWith(color: AppColors.textSecondaryDark, fontSize: 12),
         ),
-        const SizedBox(height: 12),
-
-        // Chips de categoría
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          physics: const BouncingScrollPhysics(),
-          child: Row(
-            children: [
-              _buildCategoryChip('concentrados', 'Concentrados', isDark, allSuppliers),
-              _buildCategoryChip('insumos', 'Insumos', isDark, allSuppliers),
-              _buildCategoryChip('alevinos', 'Alevinos / Semilla', isDark, allSuppliers),
-              _buildCategoryChip('farmacia', 'Farmacia', isDark, allSuppliers),
-              _buildCategoryChip('oxigenadores', 'Equipos / Motores', isDark, allSuppliers),
-            ],
-          ),
-        ),
-        const SizedBox(height: 16),
-
-        // Selector de Proveedor
-        _buildSupplierDropdown(filteredSuppliers, isDark),
         const SizedBox(height: 14),
 
-        // Número o Consecutivo de Factura
+        _buildSupplierDropdown(filteredSuppliers, isDark),
+        const SizedBox(height: 12),
         _buildAnimatedTextField(
           controller: _facturaCtrl,
           label: 'Número Oficial de Factura / Remisión',
           hint: 'FE-002910',
           prefixIcon: Icons.tag_rounded,
           isDark: isDark,
-        ),
-      ],
-    );
-  }
-
-  /// PASO 2: Condiciones Comerciales & Logística
-  Widget _buildStep2CommercialConditions(bool isDark) {
-    return Column(
-      key: const ValueKey(1),
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'PASO 2: CONDICIONES COMERCIALES Y TRANSPORTE',
-          style: AppTypography.labelMicro.copyWith(color: AppColors.cyanWater, fontWeight: FontWeight.w800, letterSpacing: 0.5),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          'Define las fechas de expedición/vencimiento, modalidad de pago y flete:',
-          style: AppTypography.bodySmall.copyWith(color: AppColors.textSecondaryDark, fontSize: 12),
+          wasEdited: _facturaEdited,
+          onClearedOnFocus: () => _facturaEdited = true,
+          onChanged: (_) => _facturaEdited = true,
         ),
         const SizedBox(height: 14),
 
@@ -739,7 +766,12 @@ class _NuevaFacturaModalState extends ConsumerState<NuevaFacturaModal> {
                   keyboardType: TextInputType.number,
                   prefixIcon: Icons.timer_outlined,
                   isDark: isDark,
-                  onChanged: (_) => setState(() => _recalcularFechaVencimiento()),
+                  wasEdited: _diasEdited,
+                  onClearedOnFocus: () => _diasEdited = true,
+                  onChanged: (_) {
+                    _diasEdited = true;
+                    setState(() => _recalcularFechaVencimiento());
+                  },
                 ),
               )
             else
@@ -808,7 +840,12 @@ class _NuevaFacturaModalState extends ConsumerState<NuevaFacturaModal> {
                 inputFormatters: [CurrencyInputFormatter()],
                 prefixIcon: Icons.local_shipping_rounded,
                 isDark: isDark,
-                onChanged: (_) => setState(() {}),
+                wasEdited: _fleteEdited,
+                onClearedOnFocus: () => _fleteEdited = true,
+                onChanged: (_) {
+                  _fleteEdited = true;
+                  setState(() {});
+                },
               ),
             ),
             const SizedBox(width: 12),
@@ -820,6 +857,9 @@ class _NuevaFacturaModalState extends ConsumerState<NuevaFacturaModal> {
                 hint: 'WPA-123',
                 prefixIcon: Icons.directions_car_rounded,
                 isDark: isDark,
+                wasEdited: _placaEdited,
+                onClearedOnFocus: () => _placaEdited = true,
+                onChanged: (_) => _placaEdited = true,
               ),
             ),
           ],
@@ -828,32 +868,50 @@ class _NuevaFacturaModalState extends ConsumerState<NuevaFacturaModal> {
     );
   }
 
-  /// PASO 3: Lista de Productos (Multi-Ítem)
+  /// PASO 2: Lista de Productos (Multi-Ítem)
   Widget _buildStep3ProductsList(bool isDark, List<String> availableProducts) {
     return Column(
-      key: const ValueKey(2),
+      key: const ValueKey(1),
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'PASO 3: PRODUCTOS EN FACTURA (${_items.length})',
-                  style: AppTypography.labelMicro.copyWith(color: AppColors.cyanWater, fontWeight: FontWeight.w800, letterSpacing: 0.5),
-                ),
-                Text(
-                  'Agrega los ítems que componen el documento:',
-                  style: AppTypography.bodySmall.copyWith(color: AppColors.textSecondaryDark, fontSize: 12),
-                ),
-              ],
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'PASO 2: PRODUCTOS EN FACTURA (${_items.length})',
+                    style: AppTypography.labelMicro.copyWith(color: AppColors.cyanWater, fontWeight: FontWeight.w800, letterSpacing: 0.5),
+                  ),
+                  Text(
+                    'Agrega los ítems que componen el documento:',
+                    style: AppTypography.bodySmall.copyWith(color: AppColors.textSecondaryDark, fontSize: 12),
+                  ),
+                ],
+              ),
             ),
-            TextButton.icon(
-              icon: const Icon(Icons.add_circle_outline_rounded, size: 16, color: AppColors.cyanWater),
-              label: const Text('Agregar Producto', style: TextStyle(color: AppColors.cyanWater, fontWeight: FontWeight.w700, fontSize: 12)),
+            StarBorderButton(
               onPressed: () => _addNewItem(),
+              color: AppColors.cyanWater,
+              trailColor: Colors.white,
+              duration: 6,
+              trailLength: 0.3,
+              thickness: 1,
+              radius: 12,
+              glow: 0.7,
+              sparkle: true,
+              clickPulse: true,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.add_circle_outline_rounded, size: 16),
+                  SizedBox(width: 6),
+                  Text('Agregar Producto', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
+                ],
+              ),
             ),
           ],
         ),
@@ -865,14 +923,14 @@ class _NuevaFacturaModalState extends ConsumerState<NuevaFacturaModal> {
     );
   }
 
-  /// PASO 4: Ticket Fiscal Glassmorphic & Confirmación
+  /// PASO 3: Ticket Fiscal Glassmorphic & Confirmación
   Widget _buildStep4FiscalTicket(bool isDark) {
     return Column(
-      key: const ValueKey(3),
+      key: const ValueKey(2),
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'PASO 4: TICKET FISCAL Y LIQUIDACIÓN PUESTO EN GRANJA',
+          'PASO 3: TICKET FISCAL Y LIQUIDACIÓN PUESTO EN GRANJA',
           style: AppTypography.labelMicro.copyWith(color: AppColors.greenBiomass, fontWeight: FontWeight.w800, letterSpacing: 0.5),
         ),
         const SizedBox(height: 4),
@@ -1039,51 +1097,99 @@ class _NuevaFacturaModalState extends ConsumerState<NuevaFacturaModal> {
     );
   }
 
-  /// Botones de Navegación Inferior (Atrás / Continuar / Confirmar)
+  /// Botones de Navegación Inferior con <StarBorder /> (Atrás / Continuar / Confirmar)
   Widget _buildNavigationButtons() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Row(
       children: [
-        // Botón Atrás / Cancelar
-        TextButton.icon(
+        // Botón Atrás / Cancelar con StarBorder
+        StarBorderButton(
           onPressed: _prevStep,
-          icon: Icon(_currentStep == 0 ? Icons.close_rounded : Icons.arrow_back_rounded, size: 16, color: AppColors.textSecondaryDark),
-          label: Text(
-            _currentStep == 0 ? 'Cancelar' : 'Atrás',
-            style: const TextStyle(color: AppColors.textSecondaryDark, fontSize: 13, fontWeight: FontWeight.w600),
+          color: isDark ? Colors.white : const Color(0xFF18181B),
+          trailColor: AppColors.cyanWater,
+          duration: 6,
+          trailLength: 0.3,
+          thickness: 1,
+          radius: 12,
+          glow: 0.7,
+          sparkle: true,
+          clickPulse: true,
+          backgroundColor: isDark
+              ? Colors.white.withValues(alpha: 0.06)
+              : Colors.black.withValues(alpha: 0.04),
+          textColor: isDark ? Colors.white70 : AppColors.textPrimaryLight,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(_currentStep == 0 ? Icons.close_rounded : Icons.arrow_back_rounded, size: 16),
+              const SizedBox(width: 6),
+              Text(_currentStep == 0 ? 'Cancelar' : 'Atrás', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+            ],
           ),
         ),
         const Spacer(),
 
-        // Botón Continuar o Confirmar Factura
-        if (_currentStep < 3)
-          ElevatedButton.icon(
+        // Botón Continuar o Confirmar Factura con StarBorder
+        if (_currentStep < 2)
+          StarBorderButton(
             onPressed: _nextStep,
-            icon: const Icon(Icons.arrow_forward_rounded, size: 16, color: Colors.black),
-            label: const Text('Continuar', style: TextStyle(color: Colors.black, fontSize: 13, fontWeight: FontWeight.w800)),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.amberWarning,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            color: Colors.white,
+            trailColor: AppColors.amberWarning,
+            duration: 6,
+            trailLength: 0.3,
+            thickness: 1,
+            radius: 12,
+            glow: 0.7,
+            sparkle: true,
+            clickPulse: true,
+            backgroundColor: AppColors.amberWarning,
+            textColor: Colors.black,
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('Continuar', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800)),
+                SizedBox(width: 6),
+                Icon(Icons.arrow_forward_rounded, size: 16),
+              ],
             ),
           )
         else
-          ElevatedButton.icon(
+          StarBorderButton(
             onPressed: _isSubmitting ? null : _guardarFactura,
-            icon: _isSubmitting
-                ? const SizedBox(
+            isLoading: _isSubmitting,
+            color: Colors.white,
+            trailColor: AppColors.greenBiomass,
+            duration: 6,
+            trailLength: 0.3,
+            thickness: 1,
+            radius: 12,
+            glow: 0.7,
+            sparkle: true,
+            clickPulse: true,
+            backgroundColor: AppColors.greenBiomass,
+            textColor: Colors.black,
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (_isSubmitting)
+                  const SizedBox(
                     width: 16,
                     height: 16,
                     child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black),
                   )
-                : const Icon(Icons.check_circle_rounded, color: Colors.black, size: 18),
-            label: Text(
-              _isSubmitting ? 'Guardando Factura...' : 'Confirmar Factura',
-              style: const TextStyle(color: Colors.black, fontSize: 13, fontWeight: FontWeight.w800),
-            ),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.greenBiomass,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                else
+                  const Icon(Icons.check_circle_rounded, size: 18),
+                const SizedBox(width: 8),
+                Text(
+                  _isSubmitting
+                      ? 'Guardando Factura...'
+                      : (widget.invoiceToEdit != null ? 'Guardar Cambios' : 'Confirmar Factura'),
+                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
+                ),
+              ],
             ),
           ),
       ],
@@ -1227,28 +1333,39 @@ class _NuevaFacturaModalState extends ConsumerState<NuevaFacturaModal> {
     void Function(String)? onChanged,
     required bool isDark,
     bool readOnly = false,
+    bool wasEdited = true,
+    VoidCallback? onClearedOnFocus,
   }) {
-    return TextFormField(
-      controller: controller,
-      readOnly: readOnly,
-      keyboardType: keyboardType,
-      inputFormatters: inputFormatters,
-      onChanged: onChanged,
-      style: TextStyle(color: isDark ? Colors.white : AppColors.textPrimaryLight, fontSize: 12.5, fontWeight: FontWeight.w700),
-      decoration: InputDecoration(
-        labelText: label,
-        hintText: hint,
-        floatingLabelBehavior: FloatingLabelBehavior.auto,
-        labelStyle: TextStyle(fontSize: 11.5, color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight, fontWeight: FontWeight.w600),
-        floatingLabelStyle: const TextStyle(fontSize: 11.5, color: AppColors.cyanWater, fontWeight: FontWeight.w800),
-        prefixIcon: prefixIcon != null ? Icon(prefixIcon, color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight, size: 18) : null,
-        filled: true,
-        fillColor: isDark ? Colors.white.withValues(alpha: 0.04) : Colors.white,
-        isDense: true,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: isDark ? Colors.white12 : AppColors.glassBorderLight)),
-        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: isDark ? Colors.white12 : AppColors.glassBorderLight)),
-        focusedBorder: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(14)), borderSide: BorderSide(color: AppColors.cyanWater, width: 1.6)),
+    return Focus(
+      onFocusChange: (hasFocus) {
+        if (hasFocus && !readOnly && !wasEdited && controller.text.isNotEmpty) {
+          controller.clear();
+          onClearedOnFocus?.call();
+          setState(() {});
+        }
+      },
+      child: TextFormField(
+        controller: controller,
+        readOnly: readOnly,
+        keyboardType: keyboardType,
+        inputFormatters: inputFormatters,
+        onChanged: onChanged,
+        style: TextStyle(color: isDark ? Colors.white : AppColors.textPrimaryLight, fontSize: 12.5, fontWeight: FontWeight.w700),
+        decoration: InputDecoration(
+          labelText: label,
+          hintText: hint,
+          floatingLabelBehavior: FloatingLabelBehavior.auto,
+          labelStyle: TextStyle(fontSize: 11.5, color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight, fontWeight: FontWeight.w600),
+          floatingLabelStyle: const TextStyle(fontSize: 11.5, color: AppColors.cyanWater, fontWeight: FontWeight.w800),
+          prefixIcon: prefixIcon != null ? Icon(prefixIcon, color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight, size: 18) : null,
+          filled: true,
+          fillColor: isDark ? Colors.white.withValues(alpha: 0.06) : Colors.white.withValues(alpha: 0.72),
+          isDense: true,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: isDark ? Colors.white.withValues(alpha: 0.14) : AppColors.glassBorderLight)),
+          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: isDark ? Colors.white.withValues(alpha: 0.14) : AppColors.glassBorderLight)),
+          focusedBorder: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(14)), borderSide: BorderSide(color: AppColors.cyanWater, width: 1.6)),
+        ),
       ),
     );
   }
@@ -1302,75 +1419,131 @@ class _NuevaFacturaModalState extends ConsumerState<NuevaFacturaModal> {
             children: [
               Expanded(
                 flex: 2,
-                child: TextFormField(
-                  controller: item.cantidadCtrl,
-                  keyboardType: TextInputType.number,
-                  style: TextStyle(color: isDark ? Colors.white : AppColors.textPrimaryLight, fontSize: 12.5, fontWeight: FontWeight.w800),
-                  decoration: InputDecoration(
-                    labelText: 'Cantidad',
-                    floatingLabelBehavior: FloatingLabelBehavior.auto,
-                    labelStyle: const TextStyle(fontSize: 11, color: AppColors.cyanWater),
-                    isDense: true,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                child: Focus(
+                  onFocusChange: (hasFocus) {
+                    if (hasFocus && !item.cantidadEdited && item.cantidadCtrl.text.isNotEmpty) {
+                      item.cantidadCtrl.clear();
+                      item.cantidadEdited = true;
+                      setState(() {});
+                    }
+                  },
+                  child: TextFormField(
+                    controller: item.cantidadCtrl,
+                    keyboardType: TextInputType.number,
+                    style: TextStyle(color: isDark ? Colors.white : AppColors.textPrimaryLight, fontSize: 12.5, fontWeight: FontWeight.w800),
+                    decoration: InputDecoration(
+                      labelText: 'Cantidad',
+                      floatingLabelBehavior: FloatingLabelBehavior.auto,
+                      labelStyle: const TextStyle(fontSize: 11, color: AppColors.cyanWater),
+                      filled: true,
+                      fillColor: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.white.withValues(alpha: 0.72),
+                      isDense: true,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    onChanged: (_) {
+                      item.cantidadEdited = true;
+                      setState(() {});
+                    },
                   ),
-                  onChanged: (_) => setState(() {}),
                 ),
               ),
               const SizedBox(width: 8),
               Expanded(
                 flex: 3,
-                child: TextFormField(
-                  controller: item.costoUnitarioCtrl,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: false),
-                  inputFormatters: [CurrencyInputFormatter()],
-                  style: TextStyle(color: isDark ? Colors.white : AppColors.textPrimaryLight, fontSize: 12.5, fontWeight: FontWeight.w800),
-                  decoration: InputDecoration(
-                    labelText: 'Vlr. Unitario (\$)',
-                    floatingLabelBehavior: FloatingLabelBehavior.auto,
-                    labelStyle: const TextStyle(fontSize: 11, color: AppColors.amberWarning),
-                    isDense: true,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                child: Focus(
+                  onFocusChange: (hasFocus) {
+                    if (hasFocus && !item.costoEdited && item.costoUnitarioCtrl.text.isNotEmpty) {
+                      item.costoUnitarioCtrl.clear();
+                      item.costoEdited = true;
+                      setState(() {});
+                    }
+                  },
+                  child: TextFormField(
+                    controller: item.costoUnitarioCtrl,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: false),
+                    inputFormatters: [CurrencyInputFormatter()],
+                    style: TextStyle(color: isDark ? Colors.white : AppColors.textPrimaryLight, fontSize: 12.5, fontWeight: FontWeight.w800),
+                    decoration: InputDecoration(
+                      labelText: 'Vlr. Unitario (\$)',
+                      floatingLabelBehavior: FloatingLabelBehavior.auto,
+                      labelStyle: const TextStyle(fontSize: 11, color: AppColors.amberWarning),
+                      filled: true,
+                      fillColor: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.white.withValues(alpha: 0.72),
+                      isDense: true,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    onChanged: (_) {
+                      item.costoEdited = true;
+                      setState(() {});
+                    },
                   ),
-                  onChanged: (_) => setState(() {}),
                 ),
               ),
               const SizedBox(width: 8),
               Expanded(
                 flex: 2,
-                child: TextFormField(
-                  controller: item.ivaPctCtrl,
-                  readOnly: esConcentrado,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  style: TextStyle(color: esConcentrado ? AppColors.amberWarning : (isDark ? Colors.white : AppColors.textPrimaryLight), fontSize: 12, fontWeight: FontWeight.w700),
-                  decoration: InputDecoration(
-                    labelText: esConcentrado ? 'IVA 5% Fijo' : 'IVA %',
-                    floatingLabelBehavior: FloatingLabelBehavior.auto,
-                    labelStyle: const TextStyle(fontSize: 11, color: AppColors.textSecondaryDark),
-                    isDense: true,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                child: Focus(
+                  onFocusChange: (hasFocus) {
+                    if (hasFocus && !esConcentrado && !item.ivaEdited && item.ivaPctCtrl.text.isNotEmpty) {
+                      item.ivaPctCtrl.clear();
+                      item.ivaEdited = true;
+                      setState(() {});
+                    }
+                  },
+                  child: TextFormField(
+                    controller: item.ivaPctCtrl,
+                    readOnly: esConcentrado,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    style: TextStyle(color: esConcentrado ? AppColors.amberWarning : (isDark ? Colors.white : AppColors.textPrimaryLight), fontSize: 12, fontWeight: FontWeight.w700),
+                    decoration: InputDecoration(
+                      labelText: esConcentrado ? 'IVA 5% Fijo' : 'IVA %',
+                      floatingLabelBehavior: FloatingLabelBehavior.auto,
+                      labelStyle: const TextStyle(fontSize: 11, color: AppColors.textSecondaryDark),
+                      filled: true,
+                      fillColor: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.white.withValues(alpha: 0.72),
+                      isDense: true,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    onChanged: (_) {
+                      item.ivaEdited = true;
+                      setState(() {});
+                    },
                   ),
-                  onChanged: (_) => setState(() {}),
                 ),
               ),
               const SizedBox(width: 8),
               Expanded(
                 flex: 2,
-                child: TextFormField(
-                  initialValue: item.loteFabricante,
-                  style: TextStyle(color: isDark ? Colors.white : AppColors.textPrimaryLight, fontSize: 12),
-                  decoration: InputDecoration(
-                    labelText: 'Lote Fab.',
-                    floatingLabelBehavior: FloatingLabelBehavior.auto,
-                    labelStyle: const TextStyle(fontSize: 11, color: AppColors.textSecondaryDark),
-                    hintText: '88197',
-                    isDense: true,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                child: Focus(
+                  onFocusChange: (hasFocus) {
+                    if (hasFocus && !item.loteEdited && item.loteCtrl.text.isNotEmpty) {
+                      item.loteCtrl.clear();
+                      item.loteEdited = true;
+                      item.loteFabricante = '';
+                    }
+                  },
+                  child: TextFormField(
+                    controller: item.loteCtrl,
+                    style: TextStyle(color: isDark ? Colors.white : AppColors.textPrimaryLight, fontSize: 12),
+                    decoration: InputDecoration(
+                      labelText: 'Lote Fab.',
+                      floatingLabelBehavior: FloatingLabelBehavior.auto,
+                      labelStyle: const TextStyle(fontSize: 11, color: AppColors.textSecondaryDark),
+                      hintText: '88197',
+                      filled: true,
+                      fillColor: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.white.withValues(alpha: 0.72),
+                      isDense: true,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    onChanged: (v) {
+                      item.loteEdited = true;
+                      item.loteFabricante = v;
+                    },
                   ),
-                  onChanged: (v) => item.loteFabricante = v,
                 ),
               ),
             ],

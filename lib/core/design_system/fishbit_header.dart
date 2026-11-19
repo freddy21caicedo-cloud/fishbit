@@ -2,6 +2,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fishbit_finance/core/design_system/app_colors.dart';
+import 'package:fishbit_finance/core/design_system/fishbit_logo.dart';
 import 'package:fishbit_finance/modules/auth_tenant/presentation/providers/auth_provider.dart';
 import 'package:fishbit_finance/modules/auth_tenant/presentation/dialogs/sede_selector_modal.dart';
 import 'package:fishbit_finance/modules/auth_tenant/presentation/dialogs/user_profile_sheet.dart';
@@ -64,6 +65,14 @@ class FishBitHeader extends ConsumerWidget {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
+                  // Logo oficial FishBit. en la parte superior izquierda
+                  const Padding(
+                    padding: EdgeInsets.only(right: 10),
+                    child: FishBitLogo(
+                      size: 34,
+                    ),
+                  ),
+
                   // Píldora Flotante Glassmorphic de Empresa & Sede (Notion / Dynamic Island Style)
                   Expanded(
                     child: Padding(
@@ -98,6 +107,7 @@ class FishBitHeader extends ConsumerWidget {
                       // Avatar de usuario con animación independiente y acceso a UserProfileSheet
                       HeaderAvatarButton(
                         userInitial: (user?.nombre.isNotEmpty == true ? user!.nombre[0] : 'U').toUpperCase(),
+                        avatarUrl: user?.avatarUrl,
                         onTap: () => UserProfileSheet.show(context),
                       ),
                     ],
@@ -114,11 +124,13 @@ class FishBitHeader extends ConsumerWidget {
 
 class HeaderAvatarButton extends StatefulWidget {
   final String userInitial;
+  final String? avatarUrl;
   final VoidCallback onTap;
 
   const HeaderAvatarButton({
     super.key,
     required this.userInitial,
+    this.avatarUrl,
     required this.onTap,
   });
 
@@ -156,11 +168,26 @@ class _HeaderAvatarButtonState extends State<HeaderAvatarButton> {
               ),
             ],
           ),
-          child: Center(
-            child: Text(
-              widget.userInitial,
-              style: const TextStyle(color: AppColors.cyanWater, fontWeight: FontWeight.w900, fontSize: 13.5),
-            ),
+          child: ClipOval(
+            child: (widget.avatarUrl != null && widget.avatarUrl!.isNotEmpty)
+                ? Image.network(
+                    widget.avatarUrl!,
+                    width: 36,
+                    height: 36,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Center(
+                      child: Text(
+                        widget.userInitial,
+                        style: const TextStyle(color: AppColors.cyanWater, fontWeight: FontWeight.w900, fontSize: 13.5),
+                      ),
+                    ),
+                  )
+                : Center(
+                    child: Text(
+                      widget.userInitial,
+                      style: const TextStyle(color: AppColors.cyanWater, fontWeight: FontWeight.w900, fontSize: 13.5),
+                    ),
+                  ),
           ),
         ),
       ),

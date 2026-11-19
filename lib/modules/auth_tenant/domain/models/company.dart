@@ -20,6 +20,7 @@ class Company {
   final List<String> especiesHabilitadas;
   final String? logoUrl;
   final String estadoSuscripcion;
+  final Map<String, dynamic> preferenciasOperativas;
 
   const Company({
     required this.id,
@@ -42,6 +43,7 @@ class Company {
     this.especiesHabilitadas = const ['Tilapia Roja', 'Cachama Negra', 'Bocachico', 'Pangasius'],
     this.logoUrl,
     this.estadoSuscripcion = 'Activo',
+    this.preferenciasOperativas = const {},
   });
 
   factory Company.fromJson(Map<String, dynamic> json) {
@@ -82,6 +84,9 @@ class Company {
       especiesHabilitadas: especies,
       logoUrl: json['logo_url'] as String?,
       estadoSuscripcion: json['estado_suscripcion'] as String? ?? 'Activo',
+      preferenciasOperativas: json['preferencias_operativas'] is Map
+          ? Map<String, dynamic>.from(json['preferencias_operativas'] as Map)
+          : const {},
     );
   }
 
@@ -107,6 +112,7 @@ class Company {
         'especies_habilitadas': especiesHabilitadas,
         'logo_url': logoUrl,
         'estado_suscripcion': estadoSuscripcion,
+        'preferencias_operativas': preferenciasOperativas,
       };
 
   Company copyWith({
@@ -130,6 +136,7 @@ class Company {
     List<String>? especiesHabilitadas,
     String? logoUrl,
     String? estadoSuscripcion,
+    Map<String, dynamic>? preferenciasOperativas,
   }) {
     return Company(
       id: id ?? this.id,
@@ -152,8 +159,28 @@ class Company {
       especiesHabilitadas: especiesHabilitadas ?? this.especiesHabilitadas,
       logoUrl: logoUrl ?? this.logoUrl,
       estadoSuscripcion: estadoSuscripcion ?? this.estadoSuscripcion,
+      preferenciasOperativas: preferenciasOperativas ?? this.preferenciasOperativas,
     );
   }
+
+  double get fcrObjetivo =>
+      (preferenciasOperativas['fcr_objetivo'] as num?)?.toDouble() ?? 1.25;
+  double get oxigenoMinimoCritico =>
+      (preferenciasOperativas['oxigeno_minimo_critico'] as num?)?.toDouble() ?? 4.0;
+  double get phMinimo =>
+      (preferenciasOperativas['ph_minimo'] as num?)?.toDouble() ?? 6.5;
+  double get phMaximo =>
+      (preferenciasOperativas['ph_maximo'] as num?)?.toDouble() ?? 8.5;
+  String get unidadPeso =>
+      (preferenciasOperativas['unidad_peso'] as String?) ?? 'kg';
+  double get kgPorBultoAlimento =>
+      (preferenciasOperativas['kg_por_bulto_alimento'] as num?)?.toDouble() ?? 40.0;
+  String get unidadTemperatura =>
+      (preferenciasOperativas['unidad_temperatura'] as String?) ?? 'C';
+  bool get alertasIcaActivas =>
+      (preferenciasOperativas['alertas_ica_activas'] as bool?) ?? true;
+  bool get alertaSonoraOxigeno =>
+      (preferenciasOperativas['alerta_sonora_oxigeno'] as bool?) ?? true;
 
   /// Retorna el peso objetivo de cosecha estándar por especie
   static double defaultHarvestWeightForSpecies(String especie) {

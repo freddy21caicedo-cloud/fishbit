@@ -525,7 +525,7 @@ class _NuevoItemModalState extends ConsumerState<NuevoItemModal> {
       InventoryItemType.concentrado => ('Alimento en Bodega', 'Nutrición y Portafolio Balanceado', Icons.inventory_2_rounded, AppColors.cyanWater),
       InventoryItemType.farmacia => ('Fármaco Sanitario', 'Control de Principio Activo y Tiempos ICA', Icons.medical_services_rounded, AppColors.coralAction),
       InventoryItemType.insumo => ('Insumo Acuícola', 'Sal, Cal, Melaza y Aditivos', Icons.science_rounded, AppColors.amberWarning),
-      InventoryItemType.oxigenador => ('Oxigenador / Equipo', 'Aireadores, Motores y Bombas', Icons.air_rounded, AppColors.cyanWater),
+      InventoryItemType.oxigenador => ('Aireador / Equipo', 'Aireadores, Motores y Bombas', Icons.air_rounded, AppColors.cyanWater),
       InventoryItemType.alevino => ('Material Biológico', 'Ovas, Larvas y Alevinos', Icons.set_meal_rounded, AppColors.greenBiomass),
       InventoryItemType.herramienta => ('Herramienta / Activo', 'Redes, Balanzas y Equipos Menores', Icons.build_rounded, AppColors.amberWarning),
     };
@@ -706,7 +706,7 @@ class _NuevoItemModalState extends ConsumerState<NuevoItemModal> {
             _buildCategoryChip(InventoryItemType.alevino, 'Alevinos / Semilla', Icons.set_meal_rounded, AppColors.greenBiomass),
             _buildCategoryChip(InventoryItemType.farmacia, 'Farmacia / Sanidad', Icons.medical_services_rounded, AppColors.coralAction),
             _buildCategoryChip(InventoryItemType.insumo, 'Insumos / Químicos', Icons.science_rounded, AppColors.amberWarning),
-            _buildCategoryChip(InventoryItemType.oxigenador, 'Oxigenador / Equipo', Icons.air_rounded, AppColors.cyanWater),
+            _buildCategoryChip(InventoryItemType.oxigenador, 'Aireador / Equipo', Icons.air_rounded, AppColors.cyanWater),
             _buildCategoryChip(InventoryItemType.herramienta, 'Herramientas', Icons.build_rounded, AppColors.amberWarning),
           ],
         ),
@@ -843,7 +843,7 @@ class _NuevoItemModalState extends ConsumerState<NuevoItemModal> {
               fontWeight: FontWeight.w700,
             ),
             decoration: InputDecoration(
-              hintText: 'Ej. Cal Agrícola / Oxigenador 2HP / Florfenicol',
+              hintText: 'Ej. Cal Agrícola / Aireador 2HP / Florfenicol',
               filled: true,
               fillColor: isDark ? Colors.white.withValues(alpha: 0.06) : Colors.white,
               contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),

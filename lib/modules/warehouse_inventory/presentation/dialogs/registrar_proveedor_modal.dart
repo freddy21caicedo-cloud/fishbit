@@ -84,7 +84,7 @@ class _RegistrarProveedorModalState extends ConsumerState<RegistrarProveedorModa
     },
     {
       'key': 'oxigenadores',
-      'label': 'Equipos y Oxigenadores',
+      'label': 'Equipos y Aireadores',
       'icon': Icons.air_rounded,
     },
     {

@@ -7,6 +7,7 @@ import 'package:fishbit_finance/core/design_system/glass_form_field.dart';
 import 'package:fishbit_finance/core/design_system/glass_button.dart';
 import 'package:fishbit_finance/core/design_system/glass_date_picker.dart';
 import 'package:fishbit_finance/core/design_system/glass_select_field.dart';
+import 'package:fishbit_finance/modules/ponds_batches/domain/models/biometria_record.dart';
 import 'package:fishbit_finance/modules/ponds_batches/domain/models/fish_batch.dart';
 import 'package:fishbit_finance/modules/ponds_batches/domain/models/pond.dart';
 import 'package:fishbit_finance/modules/ponds_batches/presentation/providers/ponds_provider.dart';
@@ -14,14 +15,24 @@ import 'package:fishbit_finance/modules/ponds_batches/presentation/providers/pon
 class BiometriaModal extends ConsumerStatefulWidget {
   final Pond? pond;
   final FishBatch? batch;
+  final BiometriaRecord? recordToEdit;
 
-  const BiometriaModal({super.key, this.pond, this.batch});
+  const BiometriaModal({super.key, this.pond, this.batch, this.recordToEdit});
 
-  static Future<void> show(BuildContext context, {Pond? pond, FishBatch? batch}) {
+  static Future<void> show(
+    BuildContext context, {
+    Pond? pond,
+    FishBatch? batch,
+    BiometriaRecord? recordToEdit,
+  }) {
     return showDialog(
       context: context,
       barrierDismissible: true,
-      builder: (context) => BiometriaModal(pond: pond, batch: batch),
+      builder: (context) => BiometriaModal(
+        pond: pond,
+        batch: batch,
+        recordToEdit: recordToEdit,
+      ),
     );
   }
 
@@ -44,9 +55,24 @@ class _BiometriaModalState extends ConsumerState<BiometriaModal> {
   @override
   void initState() {
     super.initState();
-    _selectedPondId = widget.pond?.id;
-    _selectedBatchId = widget.batch?.id;
+    final edit = widget.recordToEdit;
     _pesoTotalCapturaKgCtrl = TextEditingController();
+    if (edit != null) {
+      _selectedPondId = edit.estanqueId;
+      _selectedBatchId = edit.loteId;
+      _pecesCapturadosCtrl.text = edit.pecesCapturados.toString();
+      _pesoTotalCapturaKgCtrl.text = edit.pesoTotalCapturaKg.toStringAsFixed(2);
+      if (edit.longitudCm != null && edit.longitudCm! > 0) {
+        _longitudCtrl.text = edit.longitudCm!.toStringAsFixed(1);
+      }
+      if (edit.observaciones != null) {
+        _obsCtrl.text = edit.observaciones!;
+      }
+      _fechaMuestreo = CivilDate.fromDate(edit.fecha);
+    } else {
+      _selectedPondId = widget.pond?.id;
+      _selectedBatchId = widget.batch?.id;
+    }
   }
 
   @override
@@ -70,8 +96,10 @@ class _BiometriaModalState extends ConsumerState<BiometriaModal> {
   Widget build(BuildContext context) {
     final pondsState = ref.watch(pondsProvider);
     final pondsList = pondsState.ponds.where((p) => p.estado == PondStatus.active).toList();
-    final activePond = widget.pond ??
-        (pondsList.where((p) => p.id == _selectedPondId).firstOrNull ?? (pondsList.isNotEmpty ? pondsList.first : null));
+    final effectivePondId = _selectedPondId ?? widget.pond?.id;
+    final activePond = pondsList.where((p) => p.id == effectivePondId).firstOrNull ??
+        widget.pond ??
+        (pondsList.isNotEmpty ? pondsList.first : null);
     final activeBatches = activePond != null
         ? pondsState.batches.where((b) => b.estanqueId == activePond.id && b.estado == BatchStatus.active).toList()
         : <FishBatch>[];
@@ -137,7 +165,7 @@ class _BiometriaModalState extends ConsumerState<BiometriaModal> {
                           ),
                           const SizedBox(width: 10),
                           Text(
-                            'Muestreo Biométrico',
+                            widget.recordToEdit != null ? 'Editar Muestreo Biométrico' : 'Muestreo Biométrico',
                             style: AppTypography.titleMedium.copyWith(color: Colors.white, fontWeight: FontWeight.w800),
                           ),
                         ],
@@ -150,8 +178,8 @@ class _BiometriaModalState extends ConsumerState<BiometriaModal> {
                   ),
                   const SizedBox(height: 12),
 
-                  // Selector de Estanque si no se abrió desde uno específico
-                  if (widget.pond == null && pondsList.isNotEmpty) ...[
+                  // Selector de Estanque si no es edición
+                  if (widget.recordToEdit == null && pondsList.isNotEmpty) ...[
                     GlassSelectField<String>(
                       label: 'ESTANQUE MUESTREADO',
                       value: activePond?.id,
@@ -165,7 +193,10 @@ class _BiometriaModalState extends ConsumerState<BiometriaModal> {
                                 icon: Icons.waves_rounded,
                               ))
                           .toList(),
-                      onChanged: (val) => setState(() => _selectedPondId = val),
+                      onChanged: (val) => setState(() {
+                        _selectedPondId = val;
+                        _selectedBatchId = null;
+                      }),
                     ),
                     const SizedBox(height: 12),
                   ] else if (activePond != null) ...[
@@ -225,6 +256,8 @@ class _BiometriaModalState extends ConsumerState<BiometriaModal> {
                           validator: (val) {
                             final n = int.tryParse(val?.trim() ?? '');
                             if (n == null || n <= 0) return 'Ingresa peces (> 0)';
+                            if (pecesVivos <= 0) return 'Lote sin peces vivos';
+                            if (n > pecesVivos) return 'Supera población ($pecesVivos)';
                             return null;
                           },
                           onChanged: (_) => setState(() {}),
@@ -426,45 +459,123 @@ class _BiometriaModalState extends ConsumerState<BiometriaModal> {
                   ),
                   const SizedBox(height: 18),
 
+                  if (activeBatch == null) ...[
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppColors.amberWarning.withValues(alpha: 0.14),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: AppColors.amberWarning.withValues(alpha: 0.4)),
+                      ),
+                      child: const Row(
+                        children: [
+                          Icon(Icons.info_outline_rounded, color: AppColors.amberWarning, size: 18),
+                          SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Este estanque no tiene un lote activo sembrado. Seleccione un estanque activo para registrar el muestreo.',
+                              style: TextStyle(color: Colors.white, fontSize: 11.5, fontWeight: FontWeight.w700),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+
                   // Botón de Confirmación
                   GlassButton(
-                    label: 'Guardar Muestreo y Actualizar Biomasa',
+                    label: widget.recordToEdit != null
+                        ? 'Actualizar Muestreo y Biomasa'
+                        : 'Guardar Muestreo y Actualizar Biomasa',
                     height: 46,
                     backgroundColor: AppColors.cyanWater,
                     isLoading: _isLoading,
-                    onPressed: (activePond == null || activeBatch == null || !hasValidSample)
-                        ? null
-                        : () async {
-                            if (!_formKey.currentState!.validate()) return;
-                            final nav = Navigator.of(context);
-                            final messenger = ScaffoldMessenger.of(context);
-                            setState(() => _isLoading = true);
-                            final ok = await ref.read(pondsProvider.notifier).recordBiometry(
-                                  estanqueId: activePond.id,
-                                  loteId: activeBatch.id,
-                                  nuevoPesoPromedioGramos: pesoPromedioGramos,
-                                  biomasaCalculadaKg: biomasaParcialKg,
-                                  cantidadPecesMuestreados: int.tryParse(_pecesCapturadosCtrl.text),
-                                  pesoTotalCapturaKg: pesoCapturaKg,
-                                  longitudPromedioCm: longitudCm,
-                                  factorK: factorK,
-                                  gdpGDia: gdp,
-                                  fecha: _fechaMuestreo.toDateTime(),
-                                  observaciones: _obsCtrl.text.trim().isEmpty ? null : _obsCtrl.text.trim(),
-                                );
-                            if (mounted) {
-                              setState(() => _isLoading = false);
-                              if (ok) {
-                                nav.pop();
-                                messenger.showSnackBar(
-                                  SnackBar(
-                                    content: Text('Biometría guardada en ${activePond.sigla} (${pesoPromedioGramos.toStringAsFixed(1)}g). Biomasa ajustada a ${biomasaParcialKg.toStringAsFixed(1)} kg • Densidad: ${nuevaDensidadKgM3.toStringAsFixed(2)} kg/m³.'),
-                                    backgroundColor: AppColors.cyanWater,
-                                  ),
-                                );
-                              }
-                            }
-                          },
+                    onPressed: () async {
+                      if (_isLoading) return;
+                      final messenger = ScaffoldMessenger.of(context);
+                      if (activePond == null || activeBatch == null) {
+                        messenger.showSnackBar(
+                          const SnackBar(
+                            content: Text('Debe seleccionar un estanque con lote activo para guardar la biometría.'),
+                            backgroundColor: AppColors.coralAction,
+                            behavior: SnackBarBehavior.floating,
+                          ),
+                        );
+                        return;
+                      }
+                      if (!_formKey.currentState!.validate() || !hasValidSample) {
+                        messenger.showSnackBar(
+                          const SnackBar(
+                            content: Text('Ingrese cantidad de peces capturados y peso total de captura mayores a 0.'),
+                            backgroundColor: AppColors.coralAction,
+                            behavior: SnackBarBehavior.floating,
+                          ),
+                        );
+                        return;
+                      }
+
+                      final nav = Navigator.of(context);
+                      setState(() => _isLoading = true);
+
+                      final bool ok;
+                      if (widget.recordToEdit != null) {
+                        final updated = widget.recordToEdit!.copyWith(
+                          estanqueId: activePond.id,
+                          loteId: activeBatch.id,
+                          fecha: _fechaMuestreo.toDateTime(),
+                          pecesCapturados: pecesCapturados,
+                          pesoTotalCapturaKg: pesoCapturaKg,
+                          pesoPromedioG: pesoPromedioGramos,
+                          biomasaParcialKg: biomasaParcialKg,
+                          longitudCm: longitudCm,
+                          factorK: factorK,
+                          gdpGDia: gdp,
+                          observaciones: _obsCtrl.text.trim().isEmpty ? null : _obsCtrl.text.trim(),
+                        );
+                        ok = await ref.read(pondsProvider.notifier).updateBiometry(updated);
+                      } else {
+                        ok = await ref.read(pondsProvider.notifier).recordBiometry(
+                              estanqueId: activePond.id,
+                              loteId: activeBatch.id,
+                              nuevoPesoPromedioGramos: pesoPromedioGramos,
+                              biomasaCalculadaKg: biomasaParcialKg,
+                              cantidadPecesMuestreados: int.tryParse(_pecesCapturadosCtrl.text),
+                              pesoTotalCapturaKg: pesoCapturaKg,
+                              longitudPromedioCm: longitudCm,
+                              factorK: factorK,
+                              gdpGDia: gdp,
+                              fecha: _fechaMuestreo.toDateTime(),
+                              observaciones: _obsCtrl.text.trim().isEmpty ? null : _obsCtrl.text.trim(),
+                            );
+                      }
+
+                      if (mounted) {
+                        setState(() => _isLoading = false);
+                        if (ok) {
+                          nav.pop();
+                          messenger.showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                widget.recordToEdit != null
+                                    ? 'Biometría actualizada (${pesoPromedioGramos.toStringAsFixed(1)}g). Biomasa ajustada a ${biomasaParcialKg.toStringAsFixed(1)} kg.'
+                                    : 'Biometría guardada en ${activePond.sigla} (${pesoPromedioGramos.toStringAsFixed(1)}g). Biomasa ajustada a ${biomasaParcialKg.toStringAsFixed(1)} kg • Densidad: ${nuevaDensidadKgM3.toStringAsFixed(2)} kg/m³.',
+                              ),
+                              backgroundColor: AppColors.cyanWater,
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                        } else {
+                          messenger.showSnackBar(
+                            SnackBar(
+                              content: Text('Error al guardar biometría: ${ref.read(pondsProvider).errorMessage ?? "Verifique su conexión"}'),
+                              backgroundColor: AppColors.coralAction,
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                        }
+                      }
+                    },
                   ),
                 ],
               ),

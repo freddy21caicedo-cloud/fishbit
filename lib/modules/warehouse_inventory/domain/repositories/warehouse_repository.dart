@@ -10,6 +10,8 @@ abstract class WarehouseRepository {
 
   Future<List<PurchaseInvoice>> fetchInvoices(String empresaId, String unidadAcuicolaId);
   Future<PurchaseInvoice> createPurchaseInvoice(PurchaseInvoice invoice);
+  Future<PurchaseInvoice> updatePurchaseInvoice(PurchaseInvoice invoice);
+  Future<void> deletePurchaseInvoice(String invoiceId, String empresaId);
 
   Future<List<BiologicalPurchase>> fetchBiologicalPurchases(String empresaId, String unidadAcuicolaId);
   Future<BiologicalPurchase> createBiologicalPurchase(BiologicalPurchase purchase);

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:fishbit_finance/core/design_system/app_colors.dart';
 import 'package:fishbit_finance/core/design_system/theme_provider.dart';
 
@@ -103,88 +104,182 @@ class ThemeSegmentedGlassSelector extends ConsumerWidget {
   }
 }
 
-/// Botón Switch Día/Noche animado (Estilo Uiverse JustCode14: Luna + Estrellas / Sol + Nube)
-class ThemeAnimatedGlassToggle extends ConsumerWidget {
-  const ThemeAnimatedGlassToggle({super.key});
+const String _sunSvg =
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">'
+    '<g fill="#ffd43b">'
+    '<circle r="5" cy="12" cx="12"></circle>'
+    '<path d="m21 13h-1a1 1 0 0 1 0-2h1a1 1 0 0 1 0 2zm-17 0h-1a1 1 0 0 1 0-2h1a1 1 0 0 1 0 2zm13.66-5.66a1 1 0 0 1 -.66-.29 1 1 0 0 1 0-1.41l.71-.71a1 1 0 1 1 1.41 1.41l-.71.71a1 1 0 0 1 -.75.29zm-12.02 12.02a1 1 0 0 1 -.71-.29 1 1 0 0 1 0-1.41l.71-.66a1 1 0 0 1 1.41 1.41l-.71.71a1 1 0 0 1 -.7.24zm6.36-14.36a1 1 0 0 1 -1-1v-1a1 1 0 0 1 2 0v1a1 1 0 0 1 -1 1zm0 17a1 1 0 0 1 -1-1v-1a1 1 0 0 1 2 0v1a1 1 0 0 1 -1 1zm-5.66-14.66a1 1 0 0 1 -.7-.29l-.71-.71a1 1 0 0 1 1.41-1.41l.71.71a1 1 0 0 1 0 1.41 1 1 0 0 1 -.71.29zm12.02 12.02a1 1 0 0 1 -.7-.29l-.66-.71a1 1 0 0 1 1.36-1.36l.71.71a1 1 0 0 1 0 1.41 1 1 0 0 1 -.71.24z"></path>'
+    '</g>'
+    '</svg>';
+
+const String _moonSvg =
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512">'
+    '<path fill="#73C0FC" d="m223.5 32c-123.5 0-223.5 100.3-223.5 224s100 224 223.5 224c60.6 0 115.5-24.2 155.8-63.4 5-4.9 6.3-12.5 3.1-18.7s-10.1-9.7-17-8.5c-9.8 1.7-19.8 2.6-30.1 2.6-96.9 0-175.5-78.8-175.5-176 0-65.8 36-123.1 89.3-153.3 6.1-3.5 9.2-10.5 7.7-17.3s-7.3-11.9-14.3-12.5c-6.3-.5-12.6-.8-19-.8z"></path>'
+    '</svg>';
+
+/// Botón Switch Día/Noche animado (Estilo Uiverse andrew-demchenk0: Sol rotando / Luna balanceándose)
+class ThemeAnimatedGlassToggle extends ConsumerStatefulWidget {
+  final double scale;
+
+  const ThemeAnimatedGlassToggle({
+    super.key,
+    this.scale = 1.0,
+  });
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ThemeAnimatedGlassToggle> createState() =>
+      _ThemeAnimatedGlassToggleState();
+}
+
+class _ThemeAnimatedGlassToggleState
+    extends ConsumerState<ThemeAnimatedGlassToggle>
+    with TickerProviderStateMixin {
+  late final AnimationController _sunController;
+  late final AnimationController _moonController;
+  late final Animation<double> _moonTiltAnimation;
+  bool _isFocused = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _sunController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 15),
+    )..repeat();
+
+    _moonController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 5),
+    )..repeat();
+
+    _moonTiltAnimation = TweenSequence<double>([
+      TweenSequenceItem(
+        tween: Tween<double>(begin: 0.0, end: -10.0 / 360.0),
+        weight: 25,
+      ),
+      TweenSequenceItem(
+        tween: Tween<double>(begin: -10.0 / 360.0, end: 10.0 / 360.0),
+        weight: 50,
+      ),
+      TweenSequenceItem(
+        tween: Tween<double>(begin: 10.0 / 360.0, end: 0.0),
+        weight: 25,
+      ),
+    ]).animate(_moonController);
+  }
+
+  @override
+  void dispose() {
+    _sunController.dispose();
+    _moonController.dispose();
+    super.dispose();
+  }
+
+  void _handleToggle() {
+    HapticFeedback.mediumImpact();
+    ref.read(themeModeProvider.notifier).toggleTheme(context);
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final themeMode = ref.watch(themeModeProvider);
     final effectiveIsDark = Theme.of(context).brightness == Brightness.dark;
-    final isDark =
-        themeMode == ThemeMode.dark || (themeMode == ThemeMode.system && effectiveIsDark);
+    final isDark = themeMode == ThemeMode.dark ||
+        (themeMode == ThemeMode.system && effectiveIsDark);
 
-    return Semantics(
-      toggled: !isDark,
-      button: true,
-      label: isDark ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro',
-      child: MouseRegion(
-        cursor: SystemMouseCursors.click,
-        child: GestureDetector(
-          onTap: () {
-            HapticFeedback.mediumImpact();
-            ref.read(themeModeProvider.notifier).toggleTheme(context);
+    final toggle = RepaintBoundary(
+      child: Semantics(
+        toggled: isDark,
+        button: true,
+        label: isDark ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro',
+        child: FocusableActionDetector(
+          mouseCursor: SystemMouseCursors.click,
+          onShowFocusHighlight: (focused) {
+            if (_isFocused != focused) {
+              setState(() => _isFocused = focused);
+            }
           },
-          behavior: HitTestBehavior.opaque,
-          child: Container(
-            width: 68,
-            height: 38,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(30),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.10),
-                  blurRadius: 10,
-                ),
-              ],
+          actions: <Type, Action<Intent>>{
+            ActivateIntent: CallbackAction<ActivateIntent>(
+              onInvoke: (_) {
+                _handleToggle();
+                return null;
+              },
             ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(30),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 400),
-                curve: Curves.easeInOut,
-                color: isDark ? const Color(0xFF2A2A2A) : const Color(0xFF00A6FF),
+          },
+          child: GestureDetector(
+            onTap: _handleToggle,
+            behavior: HitTestBehavior.opaque,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 400),
+              curve: Curves.easeInOut,
+              width: 64,
+              height: 34,
+              decoration: BoxDecoration(
+                color: isDark
+                    ? const Color(0xFF183153)
+                    : const Color(0xFF73C0FC),
+                borderRadius: BorderRadius.circular(30),
+                boxShadow: _isFocused
+                    ? const [
+                        BoxShadow(
+                          color: Color(0xFF183153),
+                          blurRadius: 1,
+                        ),
+                      ]
+                    : null,
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(30),
                 child: Stack(
-                  clipBehavior: Clip.hardEdge,
                   children: [
-                    // Estrellas (Modo Oscuro)
-                    _ThemeStarDot(left: 42.5, top: 8.5, visible: isDark),
-                    _ThemeStarDot(left: 37.4, top: 20.4, visible: isDark),
-                    _ThemeStarDot(left: 51.0, top: 15.3, visible: isDark),
-
-                    // Nube (Modo Claro)
+                    // Sol rotando 360° en 15s (visible en Modo Claro)
                     Positioned(
-                      left: -18.7,
-                      bottom: -23.8,
-                      child: AnimatedOpacity(
-                        opacity: isDark ? 0.0 : 1.0,
-                        duration: const Duration(milliseconds: 400),
-                        curve: Curves.easeInOut,
-                        child: CustomPaint(
-                          size: const Size(59.5, 42.0),
-                          painter: _DayCloudPainter(),
+                      top: 6,
+                      left: 36,
+                      width: 24,
+                      height: 24,
+                      child: RotationTransition(
+                        turns: _sunController,
+                        child: SvgPicture.string(
+                          _sunSvg,
+                          width: 24,
+                          height: 24,
+                          fit: BoxFit.contain,
                         ),
                       ),
                     ),
 
-                    // Perilla Luna / Sol
+                    // Luna balanceándose ±10° en 5s (visible en Modo Oscuro)
+                    Positioned(
+                      top: 5,
+                      left: 5,
+                      width: 24,
+                      height: 24,
+                      child: RotationTransition(
+                        turns: _moonTiltAnimation,
+                        child: SvgPicture.string(
+                          _moonSvg,
+                          width: 24,
+                          height: 24,
+                          fit: BoxFit.contain,
+                        ),
+                      ),
+                    ),
+
+                    // Perilla deslizante (.slider:before) sobre sol y luna (z-index: 2)
                     AnimatedPositioned(
                       duration: const Duration(milliseconds: 400),
-                      curve: const Cubic(0.81, -0.04, 0.38, 1.5),
-                      left: isDark ? 8.5 : 39.1,
-                      bottom: 8.5,
-                      width: 20.4,
-                      height: 20.4,
-                      child: TweenAnimationBuilder<double>(
-                        tween: Tween<double>(end: isDark ? 0.0 : 1.0),
-                        duration: const Duration(milliseconds: 400),
-                        curve: Curves.easeInOut,
-                        builder: (context, progress, _) {
-                          return CustomPaint(
-                            size: const Size.square(20.4),
-                            painter: _CelestialKnobPainter(progress: progress),
-                          );
-                        },
+                      curve: Curves.easeInOut,
+                      left: isDark ? 32 : 2,
+                      bottom: 2,
+                      width: 30,
+                      height: 30,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE8E8E8),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
                       ),
                     ),
                   ],
@@ -195,103 +290,15 @@ class ThemeAnimatedGlassToggle extends ConsumerWidget {
         ),
       ),
     );
-  }
-}
 
-class _ThemeStarDot extends StatelessWidget {
-  final double left;
-  final double top;
-  final bool visible;
-
-  const _ThemeStarDot({
-    required this.left,
-    required this.top,
-    required this.visible,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Positioned(
-      left: left,
-      top: top,
-      child: AnimatedOpacity(
-        opacity: visible ? 1.0 : 0.0,
-        duration: const Duration(milliseconds: 400),
-        curve: Curves.easeInOut,
-        child: Container(
-          width: 5,
-          height: 5,
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            shape: BoxShape.circle,
-          ),
-        ),
+    if (widget.scale == 1.0) return toggle;
+    return SizedBox(
+      width: 64 * widget.scale,
+      height: 34 * widget.scale,
+      child: FittedBox(
+        fit: BoxFit.contain,
+        child: toggle,
       ),
     );
   }
-}
-
-class _CelestialKnobPainter extends CustomPainter {
-  final double progress; // 0.0 = luna creciente (#FFFFFF), 1.0 = sol (#FFCF48)
-
-  const _CelestialKnobPainter({required this.progress});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height / 2);
-    final radius = size.width / 2;
-    final color = Color.lerp(Colors.white, const Color(0xFFFFCF48), progress)!;
-
-    final outerCircle = Path()
-      ..addOval(Rect.fromCircle(center: center, radius: radius));
-
-    if (progress >= 0.99) {
-      canvas.drawPath(outerCircle, Paint()..color = color);
-      return;
-    }
-
-    // Recorte que simula `box-shadow: inset 8px -4px 0px 0px #fff` en modo oscuro
-    // y se desliza fuera del círculo al pasar a modo claro.
-    final cutoutCenter = Offset(
-      center.dx + radius * (0.52 + progress * 1.65),
-      center.dy - radius * (0.34 + progress * 0.65),
-    );
-    final cutout = Path()
-      ..addOval(Rect.fromCircle(center: cutoutCenter, radius: radius * 0.88));
-
-    final crescent = Path.combine(PathOperation.difference, outerCircle, cutout);
-    canvas.drawPath(crescent, Paint()..color = color);
-  }
-
-  @override
-  bool shouldRepaint(covariant _CelestialKnobPainter oldDelegate) =>
-      oldDelegate.progress != progress;
-}
-
-class _DayCloudPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = Colors.white
-      ..style = PaintingStyle.fill;
-
-    final w = size.width;
-    final h = size.height;
-
-    final cloudPath = Path()
-      ..addOval(Rect.fromCircle(center: Offset(w * 0.30, h * 0.56), radius: w * 0.22))
-      ..addOval(Rect.fromCircle(center: Offset(w * 0.52, h * 0.36), radius: w * 0.26))
-      ..addOval(Rect.fromCircle(center: Offset(w * 0.74, h * 0.52), radius: w * 0.20))
-      ..addRRect(
-        RRect.fromRectAndRadius(
-          Rect.fromLTWH(w * 0.12, h * 0.48, w * 0.78, h * 0.42),
-          const Radius.circular(14),
-        ),
-      );
-
-    canvas.drawPath(cloudPath, paint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

@@ -198,10 +198,7 @@ class _MagicBentoCardState extends State<_MagicBentoCard>
     _starsController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 4),
-    );
-    if (widget.enableStars) {
-      _starsController.repeat();
-    }
+    )..value = 0.35;
 
     final rng = math.Random(widget.seed * 7919);
     _stars = List.generate(
@@ -219,10 +216,10 @@ class _MagicBentoCardState extends State<_MagicBentoCard>
   void didUpdateWidget(covariant _MagicBentoCard oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.enableStars != oldWidget.enableStars) {
-      if (widget.enableStars) {
-        _starsController.repeat();
-      } else {
+      if (!widget.enableStars) {
         _starsController.stop();
+      } else if (_isHovered && !_starsController.isAnimating) {
+        _starsController.repeat();
       }
     }
   }
@@ -268,15 +265,25 @@ class _MagicBentoCardState extends State<_MagicBentoCard>
           cursor: widget.data.onTap != null
               ? SystemMouseCursors.click
               : SystemMouseCursors.basic,
-          onEnter: (e) => setState(() {
-            _isHovered = true;
-            _hoverLocal = e.localPosition;
-          }),
+          onEnter: (e) {
+            setState(() {
+              _isHovered = true;
+              _hoverLocal = e.localPosition;
+            });
+            if (widget.enableStars && !_starsController.isAnimating) {
+              _starsController.repeat();
+            }
+          },
           onHover: (e) => setState(() => _hoverLocal = e.localPosition),
-          onExit: (_) => setState(() {
-            _isHovered = false;
-            _hoverLocal = null;
-          }),
+          onExit: (_) {
+            setState(() {
+              _isHovered = false;
+              _hoverLocal = null;
+            });
+            if (_starsController.isAnimating) {
+              _starsController.stop();
+            }
+          },
           child: GestureDetector(
             onTapDown: (d) {
               if (widget.clickEffect) {

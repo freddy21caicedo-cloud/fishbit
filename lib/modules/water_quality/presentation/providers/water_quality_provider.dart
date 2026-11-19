@@ -84,6 +84,35 @@ class WaterQualityNotifier extends StateNotifier<WaterQualityState> {
       return false;
     }
   }
+
+  Future<bool> updateWaterQuality(WaterParameter param) async {
+    try {
+      final updated = await _repository.updateParameters(param);
+      final list = state.recentParameters
+          .map((p) => p.id == updated.id ? updated : p)
+          .toList();
+      state = state.copyWith(recentParameters: list);
+      return true;
+    } catch (e) {
+      state = state.copyWith(errorMessage: e.toString());
+      return false;
+    }
+  }
+
+  Future<bool> deleteWaterQuality(String id) async {
+    final auth = _ref.read(authProvider);
+    final empresaId = auth.currentCompany?.id ?? auth.currentUser?.empresaId ?? '';
+    if (empresaId.isEmpty) return false;
+    try {
+      await _repository.deleteParameters(id, empresaId);
+      final list = state.recentParameters.where((p) => p.id != id).toList();
+      state = state.copyWith(recentParameters: list);
+      return true;
+    } catch (e) {
+      state = state.copyWith(errorMessage: e.toString());
+      return false;
+    }
+  }
 }
 
 final waterQualityProvider = StateNotifierProvider<WaterQualityNotifier, WaterQualityState>((ref) {

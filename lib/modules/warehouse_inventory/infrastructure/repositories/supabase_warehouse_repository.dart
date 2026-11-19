@@ -162,6 +162,45 @@ class SupabaseWarehouseRepository implements WarehouseRepository {
   }
 
   @override
+  Future<PurchaseInvoice> updatePurchaseInvoice(PurchaseInvoice invoice) async {
+    final idx = _demoInvoices.indexWhere((inv) => inv.id == invoice.id);
+    if (idx != -1) _demoInvoices[idx] = invoice;
+
+    if (invoice.empresaId.startsWith('c1000000-')) {
+      return invoice;
+    }
+    try {
+      final res = await _supabase
+          .from('facturas')
+          .update(invoice.toJson())
+          .eq('id', invoice.id)
+          .eq('empresa_id', invoice.empresaId)
+          .select()
+          .single();
+      return PurchaseInvoice.fromJson(res);
+    } catch (e) {
+      debugPrint('[SupabaseWarehouseRepository] Error in updatePurchaseInvoice: $e');
+      rethrow;
+    }
+  }
+
+  @override
+  Future<void> deletePurchaseInvoice(String invoiceId, String empresaId) async {
+    _demoInvoices.removeWhere((inv) => inv.id == invoiceId);
+    if (empresaId.startsWith('c1000000-')) return;
+    try {
+      await _supabase
+          .from('facturas')
+          .delete()
+          .eq('id', invoiceId)
+          .eq('empresa_id', empresaId);
+    } catch (e) {
+      debugPrint('[SupabaseWarehouseRepository] Error in deletePurchaseInvoice: $e');
+      rethrow;
+    }
+  }
+
+  @override
   Future<List<BiologicalPurchase>> fetchBiologicalPurchases(String empresaId, String unidadAcuicolaId) async {
     try {
       // BUG-W4: filtrar solo por empresa_id (sigla no es válida como filtro de UUID)

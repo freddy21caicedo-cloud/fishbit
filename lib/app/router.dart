@@ -35,12 +35,12 @@ final authRouterNotifierProvider = Provider<AuthRouterNotifier>((ref) {
 
 final routerProvider = Provider<GoRouter>((ref) {
   final authNotifier = ref.watch(authRouterNotifierProvider);
-  final authState = ref.watch(authProvider);
 
   return GoRouter(
     initialLocation: '/splash',
     refreshListenable: authNotifier,
     redirect: (context, state) {
+      final authState = ref.read(authProvider);
       final loc = state.matchedLocation;
       final isAuthRoute = loc == '/login' || loc == '/register' || loc == '/onboarding-empresa';
       final isOnboardingRoute = loc == '/onboarding-empresa';

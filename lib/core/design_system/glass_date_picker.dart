@@ -475,6 +475,7 @@ class _GlassCalendarPopoverState extends State<GlassCalendarPopover> {
         padding: const EdgeInsets.all(18),
         blur: 24,
         opacity: isDark ? 0.22 : 0.97,
+        isOverlay: true,
         tintColor: isDark ? AppColors.surfaceDarkRaised : Colors.white,
         borderColor: isDark ? Colors.white.withValues(alpha: 0.14) : AppColors.glassBorderLight,
         child: Column(

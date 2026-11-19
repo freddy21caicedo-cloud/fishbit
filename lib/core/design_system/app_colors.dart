@@ -17,7 +17,13 @@ class AppColors {
   // ─── Capas Glassmorphism (Translúcidas) ──────────────────────────────────────
   static const Color glassFillDark = Color(0x0FFFFFFF); // ~6% blanco
   static const Color glassFillLight = Color(0xF2FFFFFF); // ~95% blanco esmerilado puro
-  
+
+  // Superficies flotantes oscuras (menús, submenús, popovers y modales)
+  static const Color glassOverlayDarkBase = Color(0xFF101724);
+  static const double glassOverlayDarkOpacity = 0.88;
+  static const Color glassOverlaySheenDark = Color(0x10FFFFFF); // ~6% brillo superior liquid-glass
+  static const Color glassOverlayBorderDark = Color(0x26FFFFFF); // ~15% borde luminoso
+
   static const Color glassBorderDark = Color(0x1FFFFFFF); // ~12% blanco
   static const Color glassBorderLight = Color(0xFFE2E8F0); // Borde cristalino nítido
   

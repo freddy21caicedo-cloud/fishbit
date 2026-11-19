@@ -14,6 +14,9 @@ abstract class NutritionRepository {
     DateTime? fecha,
   });
 
+  Future<FeedingRecord> updateFeeding(FeedingRecord record);
+  Future<void> deleteFeeding(String recordId, String empresaId);
+
   Future<List<NutritionTable>> fetchNutritionTables(String empresaId);
   Future<void> saveNutritionTable(NutritionTable table);
   Future<void> deleteNutritionTable(String tableId);

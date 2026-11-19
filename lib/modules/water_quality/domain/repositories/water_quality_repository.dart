@@ -4,4 +4,6 @@ abstract class WaterQualityRepository {
   Future<List<WaterParameter>> fetchParametersByEstanque(String empresaId, String estanqueId);
   Future<List<WaterParameter>> fetchRecentParametersByUnit(String empresaId, String unidadAcuicolaId);
   Future<WaterParameter> recordParameters(WaterParameter parameter);
+  Future<WaterParameter> updateParameters(WaterParameter parameter);
+  Future<void> deleteParameters(String id, String empresaId);
 }

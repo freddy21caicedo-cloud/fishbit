@@ -15,14 +15,22 @@ import 'package:fishbit_finance/modules/water_quality/presentation/providers/wat
 
 class ParametroModal extends ConsumerStatefulWidget {
   final String? preselectedPondId;
+  final WaterParameter? parameterToEdit;
 
-  const ParametroModal({super.key, this.preselectedPondId});
+  const ParametroModal({super.key, this.preselectedPondId, this.parameterToEdit});
 
-  static Future<void> show(BuildContext context, {String? preselectedPondId}) {
+  static Future<void> show(
+    BuildContext context, {
+    String? preselectedPondId,
+    WaterParameter? parameterToEdit,
+  }) {
     return showDialog(
       context: context,
       barrierDismissible: true,
-      builder: (context) => ParametroModal(preselectedPondId: preselectedPondId),
+      builder: (context) => ParametroModal(
+        preselectedPondId: preselectedPondId,
+        parameterToEdit: parameterToEdit,
+      ),
     );
   }
 
@@ -56,7 +64,26 @@ class _ParametroModalState extends ConsumerState<ParametroModal> {
   @override
   void initState() {
     super.initState();
-    _selectedPondId = widget.preselectedPondId;
+    final edit = widget.parameterToEdit;
+    if (edit != null) {
+      _selectedPondId = edit.estanqueId;
+      _fechaMedicion = CivilDate.fromDate(edit.fecha);
+      _horaMedicion = TimeOfDay(hour: edit.fecha.hour, minute: edit.fecha.minute);
+      if (edit.oxigenoMgL != null) _oxigenoMgLCtrl.text = edit.oxigenoMgL!.toString();
+      if (edit.oxigenoPct != null) _oxigenoPctCtrl.text = edit.oxigenoPct!.toString();
+      if (edit.temperaturaC != null) _tempCtrl.text = edit.temperaturaC!.toString();
+      if (edit.ph != null) _phCtrl.text = edit.ph!.toString();
+      if (edit.amonioMgL != null) _amonioCtrl.text = edit.amonioMgL!.toString();
+      if (edit.nitritosMgL != null) _nitritosCtrl.text = edit.nitritosMgL!.toString();
+      if (edit.nitratosMgL != null) _nitratosCtrl.text = edit.nitratosMgL!.toString();
+      if (edit.alcalinidadMgL != null) _alcalinidadCtrl.text = edit.alcalinidadMgL!.toString();
+      if (edit.co2MgL != null) _co2Ctrl.text = edit.co2MgL!.toString();
+      if (edit.durezaMgL != null) _durezaCtrl.text = edit.durezaMgL!.toString();
+      if (edit.cloroMgL != null) _cloroCtrl.text = edit.cloroMgL!.toString();
+      if (edit.observaciones != null) _obsCtrl.text = edit.observaciones!;
+    } else {
+      _selectedPondId = widget.preselectedPondId;
+    }
   }
 
   @override
@@ -143,8 +170,14 @@ class _ParametroModalState extends ConsumerState<ParametroModal> {
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text('💧 Calidad de Agua', style: AppTypography.titleMedium.copyWith(color: isDark ? Colors.white : AppColors.textPrimaryLight, fontWeight: FontWeight.w800)),
-                              Text('Registro fisicoquímico integral', style: TextStyle(color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight, fontSize: 11)),
+                              Text(
+                                widget.parameterToEdit != null ? '💧 Editar Calidad de Agua' : '💧 Calidad de Agua',
+                                style: AppTypography.titleMedium.copyWith(color: isDark ? Colors.white : AppColors.textPrimaryLight, fontWeight: FontWeight.w800),
+                              ),
+                              Text(
+                                widget.parameterToEdit != null ? 'Actualizar medición fisicoquímica' : 'Registro fisicoquímico integral',
+                                style: TextStyle(color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight, fontSize: 11),
+                              ),
                             ],
                           ),
                         ],
@@ -481,7 +514,9 @@ class _ParametroModalState extends ConsumerState<ParametroModal> {
                     ),
 
                   GlassButton(
-                    label: 'Guardar Medición de Calidad de Agua',
+                    label: widget.parameterToEdit != null
+                        ? 'Actualizar Medición de Calidad de Agua'
+                        : 'Guardar Medición de Calidad de Agua',
                     isLoading: _isSubmitting || waterState.isLoading,
                     backgroundColor: AppColors.cyanWater,
                     onPressed: () async {
@@ -499,6 +534,7 @@ class _ParametroModalState extends ConsumerState<ParametroModal> {
                             const SnackBar(
                               content: Text('Debe seleccionar un estanque de medición válido para registrar los parámetros.'),
                               backgroundColor: AppColors.coralAction,
+                              behavior: SnackBarBehavior.floating,
                             ),
                           );
                           return;
@@ -509,6 +545,7 @@ class _ParametroModalState extends ConsumerState<ParametroModal> {
                             const SnackBar(
                               content: Text('Por favor complete los campos obligatorios (O₂, Temp, pH) dentro de los rangos válidos.'),
                               backgroundColor: AppColors.coralAction,
+                              behavior: SnackBarBehavior.floating,
                             ),
                           );
                           return;
@@ -521,6 +558,7 @@ class _ParametroModalState extends ConsumerState<ParametroModal> {
                             const SnackBar(
                               content: Text('Error: No se encontró una empresa activa para registrar la medición.'),
                               backgroundColor: AppColors.coralAction,
+                              behavior: SnackBarBehavior.floating,
                             ),
                           );
                           return;
@@ -536,10 +574,11 @@ class _ParametroModalState extends ConsumerState<ParametroModal> {
                           _horaMedicion.minute,
                         );
 
+                        final edit = widget.parameterToEdit;
                         final param = WaterParameter(
-                          id: const Uuid().v4(),
-                          empresaId: empresaId,
-                          unidadAcuicolaId: unidadId,
+                          id: edit?.id ?? const Uuid().v4(),
+                          empresaId: edit?.empresaId ?? empresaId,
+                          unidadAcuicolaId: edit?.unidadAcuicolaId ?? unidadId,
                           estanqueId: _selectedPondId!,
                           fecha: fullDateTime,
                           oxigenoMgL: _parseDecimal(_oxigenoMgLCtrl.text),
@@ -554,23 +593,31 @@ class _ParametroModalState extends ConsumerState<ParametroModal> {
                           durezaMgL: _parseDecimal(_durezaCtrl.text),
                           cloroMgL: _parseDecimal(_cloroCtrl.text),
                           observaciones: _obsCtrl.text.trim().isNotEmpty ? _obsCtrl.text.trim() : null,
-                          registradoPor: authState.currentUser?.nombre,
+                          registradoPor: edit?.registradoPor ?? authState.currentUser?.nombre,
                         );
 
-                        final success = await ref.read(waterQualityProvider.notifier).recordWaterQuality(param);
+                        final success = edit != null
+                            ? await ref.read(waterQualityProvider.notifier).updateWaterQuality(param)
+                            : await ref.read(waterQualityProvider.notifier).recordWaterQuality(param);
                         if (success && mounted) {
                           nav.pop();
                           messenger.showSnackBar(
-                            const SnackBar(
-                              content: Text('¡Medición registrada con éxito con 11 parámetros y hora de toma!'),
+                            SnackBar(
+                              content: Text(
+                                edit != null
+                                    ? 'Medición de calidad de agua actualizada correctamente.'
+                                    : '¡Medición registrada con éxito con 11 parámetros y hora de toma!',
+                              ),
                               backgroundColor: AppColors.cyanWater,
+                              behavior: SnackBarBehavior.floating,
                             ),
                           );
                         } else if (!success && mounted) {
                           messenger.showSnackBar(
                             SnackBar(
-                              content: Text('Error al registrar medición: ${ref.read(waterQualityProvider).errorMessage ?? "Error de red"}'),
+                              content: Text('Error al guardar medición: ${ref.read(waterQualityProvider).errorMessage ?? "Error de red"}'),
                               backgroundColor: AppColors.coralAction,
+                              behavior: SnackBarBehavior.floating,
                             ),
                           );
                         }

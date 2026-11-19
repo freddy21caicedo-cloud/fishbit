@@ -39,95 +39,235 @@
     #loading-splash {
       position: fixed;
       inset: 0;
-      background-color: #0A101D;
+      background: radial-gradient(circle at 30% 35%, rgba(6, 182, 212, 0.25), rgba(244, 63, 94, 0.12) 45%, #060b14 100%);
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
       z-index: 999999;
+      overflow: hidden;
       transition: opacity 0.4s ease-out;
     }
 
-    .splash-logo-box {
-      width: 88px;
-      height: 88px;
-      border-radius: 22px;
-      background: rgba(16, 26, 44, 0.95);
-      border: 1px solid rgba(0, 229, 255, 0.35);
+    #silk-splash-canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+      pointer-events: none;
+    }
+
+    .splash-scrim {
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at center, rgba(0, 0, 0, 0.48) 0%, rgba(0, 0, 0, 0.16) 55%, transparent 100%);
+      pointer-events: none;
+    }
+
+    .splash-content {
+      position: relative;
+      z-index: 2;
       display: flex;
+      flex-direction: column;
       align-items: center;
       justify-content: center;
-      box-shadow: 0 0 35px rgba(0, 229, 255, 0.25);
-      margin-bottom: 24px;
-      animation: pulse 2s infinite ease-in-out;
+      animation: splashFadeIn 0.35s ease-out forwards;
     }
 
-    .splash-logo-box img {
-      width: 58px;
-      height: 58px;
-      border-radius: 14px;
+    .splash-wordmark {
+      display: inline-flex;
+      align-items: baseline;
+      font-size: 44px;
+      font-weight: 900;
+      letter-spacing: -1.5px;
+      line-height: 1.05;
     }
 
-    .splash-title {
-      color: #FFFFFF;
-      font-size: 1.35rem;
-      font-weight: 700;
-      letter-spacing: 0.8px;
-      margin-bottom: 6px;
+    .splash-wordmark .fish {
+      color: #00E5FF;
+      text-shadow: 0 0 24px rgba(0, 229, 255, 0.7);
+    }
+
+    .splash-wordmark .bit {
+      color: #FF5252;
+      text-shadow: 0 0 24px rgba(255, 82, 82, 0.7);
     }
 
     .splash-subtitle {
-      color: #00E5FF;
-      font-size: 0.8rem;
-      font-weight: 600;
-      letter-spacing: 1.5px;
+      color: #94A3B8;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 2.5px;
       text-transform: uppercase;
-      margin-bottom: 24px;
-      opacity: 0.85;
+      margin-top: 8px;
+      margin-bottom: 40px;
     }
 
-    /* Loading bar */
-    .loader-bar-bg {
-      width: 140px;
-      height: 3px;
-      background: rgba(255, 255, 255, 0.08);
-      border-radius: 3px;
-      overflow: hidden;
-      position: relative;
+    .splash-spinner {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      border: 2.5px solid rgba(255, 255, 255, 0.08);
+      border-top-color: rgba(0, 229, 255, 0.85);
+      animation: spin 0.85s linear infinite;
     }
 
-    .loader-bar-fill {
-      width: 100%;
-      height: 100%;
-      background: linear-gradient(90deg, transparent, #00E5FF, transparent);
-      position: absolute;
-      transform: translateX(-100%);
-      animation: loadFlow 1.6s infinite ease-in-out;
+    @keyframes spin {
+      to { transform: rotate(360deg); }
     }
 
-    @keyframes loadFlow {
-      0% { transform: translateX(-100%); }
-      100% { transform: translateX(100%); }
-    }
-
-    @keyframes pulse {
-      0%, 100% { transform: scale(1); box-shadow: 0 0 25px rgba(0, 229, 255, 0.2); }
-      50% { transform: scale(1.03); box-shadow: 0 0 40px rgba(0, 229, 255, 0.4); }
+    @keyframes splashFadeIn {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
     }
   </style>
 </head>
 <body>
   <!-- Native Splash Screen while Flutter engine warms up -->
   <div id="loading-splash">
-    <div class="splash-logo-box">
-      <img src="icons/Icon-192.png" alt="FishBit Icon" />
-    </div>
-    <div class="splash-title">FishBit</div>
-    <div class="splash-subtitle">Aquaculture ERP</div>
-    <div class="loader-bar-bg">
-      <div class="loader-bar-fill"></div>
+    <canvas id="silk-splash-canvas" aria-hidden="true"></canvas>
+    <div class="splash-scrim"></div>
+    <div class="splash-content">
+      <div class="splash-wordmark">
+        <span class="fish">Fish</span><span class="bit">Bit.</span>
+      </div>
+      <div class="splash-subtitle">GESTIÓN ACUÍCOLA</div>
+      <div class="splash-spinner" aria-label="Cargando"></div>
     </div>
   </div>
+
+  <script>
+    // <Silk /> WebGL2 background for initial HTML splash
+    (function () {
+      const canvas = document.getElementById('silk-splash-canvas');
+      if (!canvas) return;
+      const gl = canvas.getContext('webgl2', {
+        alpha: true,
+        premultipliedAlpha: true,
+        antialias: false,
+        depth: false,
+        stencil: false
+      });
+      if (!gl) return;
+
+      const vsSrc = `#version 300 es
+        in vec2 aPosition;
+        void main() { gl_Position = vec4(aPosition, 0.0, 1.0); }`;
+      const fsSrc = `#version 300 es
+        precision highp float;
+        uniform vec2 uView;
+        uniform float uTime;
+        uniform float uFold;
+        uniform float uPresence;
+        out vec4 outColor;
+        const float e = 2.71828182845904523536;
+        float noise(vec2 c) {
+          vec2 r = (e * sin(e * c));
+          return fract(r.x * r.y * (1.0 + c.x));
+        }
+        float silk(vec2 vUv) {
+          vec2 tex = vUv;
+          tex.y += 0.03 * sin(8.0 * tex.x - uTime);
+          return 0.6 + 0.4 * uFold * sin(5.0 * (tex.x + tex.y + cos(3.0 * tex.x + 5.0 * tex.y) + 0.02 * uTime) + sin(20.0 * (tex.x + tex.y - 0.1 * uTime)));
+        }
+        vec3 softClip(vec3 c) {
+          vec3 over = max(c - 0.75, 0.0);
+          return min(c, 0.75) + 0.25 * (1.0 - exp(-over * 4.0));
+        }
+        void main() {
+          vec2 vUv = gl_FragCoord.xy / max(uView, vec2(1.0));
+          float pattern = silk(vUv);
+          float rnd = noise(gl_FragCoord.xy);
+          float n = clamp((pattern - 0.2) / 0.8, 0.0, 1.0);
+          vec2 stepUv = 1.0 / max(uView, vec2(1.0));
+          float gx = silk(vUv + vec2(stepUv.x, 0.0)) - pattern;
+          float gy = silk(vUv + vec2(0.0, stepUv.y)) - pattern;
+          vec3 normal = normalize(vec3(-gx * 26.0, -gy * 26.0, 1.0));
+          vec3 toLight = normalize(vec3(-0.55, 0.7, 0.85));
+          float relief = 1.0 + (dot(normal, toLight) - toLight.z) * 0.9;
+          vec3 halfway = normalize(toLight + vec3(0.0, 0.0, 1.0));
+          float gloss = pow(max(dot(normal, halfway), 0.0), 48.0) * smoothstep(0.25, 0.85, n);
+          float crest = pow(n, 5.0);
+          float shine = (gloss * 0.85 + crest * 0.4) * 0.5;
+          float bloom = pow(n, 6.0) * 0.45;
+          vec3 baseCol = vec3(0.0235, 0.7137, 0.8314);   // #06B6D4
+          vec3 sheenCol = vec3(0.9569, 0.2471, 0.3686);  // #F43F5E
+          float floorVal = mix(0.2, 0.03, 0.5);
+          float curve = pow(n, 1.7);
+          float shade = floorVal + (1.0 - floorVal) * curve;
+          vec3 tone = mix(baseCol, pow(baseCol, vec3(1.45)), (1.0 - n) * 0.5);
+          vec3 lit = tone * shade * relief - vec3(rnd / 15.0 * 1.5);
+          vec3 tint = mix(baseCol, sheenCol, 0.8);
+          vec3 extra = tint * (shine + bloom * 0.165);
+          vec3 result = clamp(softClip(lit + extra), 0.0, 1.0);
+          outColor = vec4(result * uPresence, uPresence);
+        }`;
+
+      const compile = (type, src) => {
+        const s = gl.createShader(type);
+        gl.shaderSource(s, src);
+        gl.compileShader(s);
+        return gl.getShaderParameter(s, gl.COMPILE_STATUS) ? s : null;
+      };
+      const vs = compile(gl.VERTEX_SHADER, vsSrc);
+      const fs = compile(gl.FRAGMENT_SHADER, fsSrc);
+      if (!vs || !fs) return;
+      const prog = gl.createProgram();
+      gl.attachShader(prog, vs);
+      gl.attachShader(prog, fs);
+      gl.bindAttribLocation(prog, 0, 'aPosition');
+      gl.linkProgram(prog);
+      if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) return;
+
+      const buf = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+      gl.enableVertexAttribArray(0);
+      gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+
+      const uView = gl.getUniformLocation(prog, 'uView');
+      const uTime = gl.getUniformLocation(prog, 'uTime');
+      const uFold = gl.getUniformLocation(prog, 'uFold');
+      const uPresence = gl.getUniformLocation(prog, 'uPresence');
+
+      let raf = 0;
+      let stopped = false;
+      let start = performance.now();
+
+      const resize = () => {
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        canvas.width = Math.max(1, Math.round(window.innerWidth * dpr));
+        canvas.height = Math.max(1, Math.round(window.innerHeight * dpr));
+      };
+      resize();
+      window.addEventListener('resize', resize);
+
+      const ease = t => t * t * t * (t * (t * 6 - 15) + 10);
+      const loop = now => {
+        if (stopped) return;
+        const sec = (now - start) / 1000;
+        const intro = Math.min(1, sec / 2.2);
+        const unfold = ease(intro);
+        const presence = 1 - Math.pow(1 - intro, 3);
+        gl.viewport(0, 0, canvas.width, canvas.height);
+        gl.useProgram(prog);
+        gl.uniform2f(uView, canvas.width, canvas.height);
+        gl.uniform1f(uTime, sec * 0.5 - 1.6 * (1 - unfold));
+        gl.uniform1f(uFold, 0.25 + 0.75 * unfold);
+        gl.uniform1f(uPresence, presence);
+        gl.drawArrays(gl.TRIANGLES, 0, 3);
+        raf = requestAnimationFrame(loop);
+      };
+      raf = requestAnimationFrame(loop);
+
+      window._stopSilkSplash = () => {
+        stopped = true;
+        cancelAnimationFrame(raf);
+        window.removeEventListener('resize', resize);
+      };
+    })();
+  </script>
 
   <script>
     // PWA Install Prompt Listener
@@ -149,7 +289,10 @@
       const splash = document.getElementById('loading-splash');
       if (splash) {
         splash.style.opacity = '0';
-        setTimeout(() => splash.remove(), 400);
+        setTimeout(() => {
+          window._stopSilkSplash?.();
+          splash.remove();
+        }, 400);
       }
     };
 

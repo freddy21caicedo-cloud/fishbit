@@ -85,4 +85,19 @@ abstract class PondsRepository {
     DateTime? fecha,
     String? hora,
   });
+
+  /// Actualiza una biometría existente y resincroniza lote y estanque
+  Future<BiometriaRecord> updateBiometry(BiometriaRecord record);
+
+  /// Elimina una biometría y resincroniza el peso/biomasa del lote y estanque
+  Future<void> deleteBiometry(BiometriaRecord record);
+
+  /// Actualiza un registro de mortalidad y ajusta la población viva del lote y estanque
+  Future<MortalityRecord> updateMortality(MortalityRecord oldRecord, MortalityRecord newRecord);
+
+  /// Elimina un registro de mortalidad y reintegra los peces al lote y estanque
+  Future<void> deleteMortality(MortalityRecord record);
+
+  /// Revierte y elimina un traslado o desdoble de lotes
+  Future<void> deleteTransfer(TransferRecord record);
 }

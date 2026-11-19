@@ -22,7 +22,7 @@ class GestionEquipoScreen extends ConsumerWidget {
     final operarios = team.where((m) => m.role == UserRole.operator).length;
 
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      backgroundColor: Colors.transparent,
       floatingActionButtonLocation: FloatingDockFabLocation.endFloat,
       floatingActionButton: FloatingActionButton.extended(
         backgroundColor: AppColors.cyanWater,

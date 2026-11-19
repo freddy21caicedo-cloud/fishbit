@@ -6,6 +6,8 @@ import 'package:fishbit_finance/modules/feeding_nutrition/domain/models/feeding_
 import 'package:fishbit_finance/modules/feeding_nutrition/domain/models/nutrition_table.dart';
 import 'package:fishbit_finance/modules/feeding_nutrition/domain/repositories/nutrition_repository.dart';
 import 'package:fishbit_finance/modules/feeding_nutrition/infrastructure/repositories/supabase_nutrition_repository.dart';
+import 'package:fishbit_finance/modules/ponds_batches/presentation/providers/ponds_provider.dart';
+import 'package:fishbit_finance/modules/warehouse_inventory/presentation/providers/warehouse_provider.dart';
 
 final nutritionRepositoryProvider = Provider<NutritionRepository>((ref) {
   final supabase = ref.watch(supabaseClientProvider);
@@ -78,7 +80,7 @@ class NutritionNotifier extends StateNotifier<NutritionState> {
     }
   }
 
-  Future<void> recordDailyFeeding({
+  Future<bool> recordDailyFeeding({
     required String estanqueId,
     required String loteId,
     String? insumoId,
@@ -91,7 +93,10 @@ class NutritionNotifier extends StateNotifier<NutritionState> {
     final unitId = auth.activeUnitId ?? user?.unidadAcuicolaId ?? user?.empresaId;
     final empresaId = auth.currentCompany?.id ?? user?.empresaId ?? unitId;
 
-    if (empresaId == null || empresaId.isEmpty || unitId == null || unitId.isEmpty) return;
+    if (empresaId == null || empresaId.isEmpty || unitId == null || unitId.isEmpty) {
+      state = state.copyWith(errorMessage: 'No se encontró empresa o sede activa.');
+      return false;
+    }
 
     try {
       final rec = await _repository.recordFeeding(
@@ -105,8 +110,10 @@ class NutritionNotifier extends StateNotifier<NutritionState> {
         fecha: fecha,
       );
       state = state.copyWith(records: [rec, ...state.records]);
+      return true;
     } catch (e) {
       state = state.copyWith(errorMessage: e.toString());
+      return false;
     }
   }
 
@@ -120,7 +127,7 @@ class NutritionNotifier extends StateNotifier<NutritionState> {
     required double costoUnitarioAlimento,
     DateTime? fecha,
   }) async {
-    await recordDailyFeeding(
+    return recordDailyFeeding(
       estanqueId: estanqueId,
       loteId: loteId,
       insumoId: insumoId,
@@ -128,7 +135,86 @@ class NutritionNotifier extends StateNotifier<NutritionState> {
       costoUnitarioAlimento: costoUnitarioAlimento,
       fecha: fecha,
     );
-    return true;
+  }
+
+  Future<bool> updateDailyFeeding({
+    required FeedingRecord oldRecord,
+    required double newKg,
+    required double costoUnitario,
+    String? newInsumoId,
+    DateTime? newFecha,
+  }) async {
+    try {
+      final updatedModel = oldRecord.copyWith(
+        insumoId: newInsumoId ?? oldRecord.insumoId,
+        cantidadConsumidaKg: newKg,
+        costoCalculado: newKg * costoUnitario,
+        fecha: newFecha ?? oldRecord.fecha,
+      );
+
+      final saved = await _repository.updateFeeding(updatedModel);
+
+      // Ajustar diferencia de inventario en Bodega
+      final warehouseNotifier = _ref.read(warehouseProvider.notifier);
+      final effectiveNewInsumo = newInsumoId ?? oldRecord.insumoId;
+      if (oldRecord.insumoId != null && effectiveNewInsumo != oldRecord.insumoId) {
+        await warehouseNotifier.restoreStock(
+          itemId: oldRecord.insumoId!,
+          cantidadKg: oldRecord.cantidadConsumidaKg,
+        );
+        if (effectiveNewInsumo != null) {
+          await warehouseNotifier.discountStock(
+            itemId: effectiveNewInsumo,
+            cantidadKg: newKg,
+            motivo: 'Edición de alimentación',
+          );
+        }
+      } else if (effectiveNewInsumo != null) {
+        final delta = newKg - oldRecord.cantidadConsumidaKg;
+        if (delta > 0) {
+          await warehouseNotifier.discountStock(
+            itemId: effectiveNewInsumo,
+            cantidadKg: delta,
+            motivo: 'Ajuste positivo en alimentación',
+          );
+        } else if (delta < 0) {
+          await warehouseNotifier.restoreStock(
+            itemId: effectiveNewInsumo,
+            cantidadKg: delta.abs(),
+          );
+        }
+      }
+
+      final updatedList = state.records.map((r) => r.id == saved.id ? saved : r).toList();
+      state = state.copyWith(records: updatedList);
+      await _ref.read(pondsProvider.notifier).loadPondsAndBatches();
+      return true;
+    } catch (e) {
+      state = state.copyWith(errorMessage: e.toString());
+      return false;
+    }
+  }
+
+  Future<bool> deleteDailyFeeding(FeedingRecord record) async {
+    final auth = _ref.read(authProvider);
+    final empresaId = auth.currentCompany?.id ?? auth.currentUser?.empresaId ?? record.empresaId;
+    if (empresaId.isEmpty) return false;
+    try {
+      await _repository.deleteFeeding(record.id, empresaId);
+      if (record.insumoId != null && record.insumoId!.isNotEmpty) {
+        await _ref.read(warehouseProvider.notifier).restoreStock(
+              itemId: record.insumoId!,
+              cantidadKg: record.cantidadConsumidaKg,
+            );
+      }
+      final updatedList = state.records.where((r) => r.id != record.id).toList();
+      state = state.copyWith(records: updatedList);
+      await _ref.read(pondsProvider.notifier).loadPondsAndBatches();
+      return true;
+    } catch (e) {
+      state = state.copyWith(errorMessage: e.toString());
+      return false;
+    }
   }
 }
 

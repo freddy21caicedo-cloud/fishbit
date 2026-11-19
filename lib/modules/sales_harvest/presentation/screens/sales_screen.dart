@@ -51,7 +51,7 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
     }).toList();
 
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      backgroundColor: Colors.transparent,
       floatingActionButtonLocation: FloatingDockFabLocation.endFloat,
       floatingActionButton: FloatingActionButton.extended(
         backgroundColor: AppColors.greenBiomass,

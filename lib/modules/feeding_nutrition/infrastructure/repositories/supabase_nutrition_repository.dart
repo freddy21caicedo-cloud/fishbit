@@ -85,58 +85,77 @@ class SupabaseNutritionRepository implements NutritionRepository {
       return record;
     }
 
-    try {
-      // 1. Guardar registro en alimentacion_diaria
-      final insertData = {
-        'id': record.id,
-        'empresa_id': empresaId,
-        'unit_id': unidadAcuicolaId,
-        'unidad_acuicola_id': unidadAcuicolaId,
-        'estanque_id': estanqueId,
-        'lote_id': loteId,
-        if (insumoId != null) 'insumo_id': insumoId,
-        'cantidad_consumida_kg': kgConsumidos,
-        'costo_calculado': costoTotal,
-        'fecha': recordDate.toIso8601String().split('T')[0],
-        'creado_en': now.toIso8601String(),
-      };
+    // 1. Guardar registro en alimentacion_diaria
+    final insertData = {
+      'id': record.id,
+      'empresa_id': empresaId,
+      'unit_id': unidadAcuicolaId,
+      'unidad_acuicola_id': unidadAcuicolaId,
+      'estanque_id': estanqueId,
+      'lote_id': loteId,
+      if (insumoId != null) 'insumo_id': insumoId,
+      'cantidad_consumida_kg': kgConsumidos,
+      'costo_calculado': costoTotal,
+      'fecha': recordDate.toIso8601String().split('T')[0],
+      'creado_en': now.toIso8601String(),
+    };
 
-      try {
-        await _supabase.from('alimentacion_diaria').insert(insertData);
-      } catch (_) {
-        // Fallback a tabla alimentacion si fuera necesario
-        try {
-          await _supabase.from('alimentacion').insert({
-            'estanque_id': estanqueId,
-            'lote_id': loteId,
-            'cantidad_kg': kgConsumidos,
-            'costo_total': costoTotal,
-            'fecha': recordDate.toIso8601String().split('T')[0],
-          });
-        } catch (_) {}
-      }
+    await _supabase.from('alimentacion_diaria').insert(insertData);
 
-      // El descuento de inventario en bodega es gestionado centralizadamente por WarehouseNotifier.discountStock
-      // para evitar doble decremento al sincronizar estados.
+    // El descuento de inventario en bodega es gestionado centralizadamente por WarehouseNotifier.discountStock
+    // para evitar doble decremento al sincronizar estados.
 
-      _eventBus.fire(DailyFeedingRecordedEvent(
-        estanqueId: estanqueId,
-        loteId: loteId,
-        kgConsumidos: kgConsumidos,
-        costoTotal: costoTotal,
-      ));
+    _eventBus.fire(DailyFeedingRecordedEvent(
+      estanqueId: estanqueId,
+      loteId: loteId,
+      kgConsumidos: kgConsumidos,
+      costoTotal: costoTotal,
+    ));
 
-      return record;
-    } catch (_) {
-      _demoRecords.insert(0, record);
-      _eventBus.fire(DailyFeedingRecordedEvent(
-        estanqueId: estanqueId,
-        loteId: loteId,
-        kgConsumidos: kgConsumidos,
-        costoTotal: costoTotal,
-      ));
+    return record;
+  }
+
+  @override
+  Future<FeedingRecord> updateFeeding(FeedingRecord record) async {
+    final idx = _demoRecords.indexWhere((r) => r.id == record.id);
+    if (idx != -1) {
+      _demoRecords[idx] = record;
+    }
+    if (record.empresaId.startsWith('c1000000-')) {
       return record;
     }
+
+    final updateData = {
+      'estanque_id': record.estanqueId,
+      'lote_id': record.loteId,
+      'insumo_id': record.insumoId,
+      'cantidad_consumida_kg': record.cantidadConsumidaKg,
+      'costo_calculado': record.costoCalculado,
+      'fecha': record.fecha.toIso8601String().split('T')[0],
+    };
+
+    final res = await _supabase
+        .from('alimentacion_diaria')
+        .update(updateData)
+        .eq('id', record.id)
+        .eq('empresa_id', record.empresaId)
+        .select()
+        .single();
+
+    return FeedingRecord.fromJson(res);
+  }
+
+  @override
+  Future<void> deleteFeeding(String recordId, String empresaId) async {
+    _demoRecords.removeWhere((r) => r.id == recordId);
+    if (empresaId.startsWith('c1000000-')) {
+      return;
+    }
+    await _supabase
+        .from('alimentacion_diaria')
+        .delete()
+        .eq('id', recordId)
+        .eq('empresa_id', empresaId);
   }
 
   @override

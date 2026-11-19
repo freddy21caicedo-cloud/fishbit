@@ -32,6 +32,8 @@ class UserMember {
   final MemberStatus estado;
   final String? tokenInvitacion;
   final String? cedula;
+  final String? telefono;
+  final String? avatarUrl;
   final double salarioBase;
   final String periodoPago; // 'Quincenal' | 'Mensual'
   final bool requiereCambioClave;
@@ -49,6 +51,8 @@ class UserMember {
     this.estado = MemberStatus.active,
     this.tokenInvitacion,
     this.cedula,
+    this.telefono,
+    this.avatarUrl,
     this.salarioBase = 0.0,
     this.periodoPago = 'Quincenal',
     this.requiereCambioClave = false,
@@ -168,6 +172,8 @@ class UserMember {
     MemberStatus? estado,
     String? tokenInvitacion,
     String? cedula,
+    String? telefono,
+    String? avatarUrl,
     double? salarioBase,
     String? periodoPago,
     bool? requiereCambioClave,
@@ -185,6 +191,8 @@ class UserMember {
       estado: estado ?? this.estado,
       tokenInvitacion: tokenInvitacion ?? this.tokenInvitacion,
       cedula: cedula ?? this.cedula,
+      telefono: telefono ?? this.telefono,
+      avatarUrl: avatarUrl ?? this.avatarUrl,
       salarioBase: salarioBase ?? this.salarioBase,
       periodoPago: periodoPago ?? this.periodoPago,
       requiereCambioClave: requiereCambioClave ?? this.requiereCambioClave,
@@ -230,6 +238,8 @@ class UserMember {
       estado: parseStatus(json['estado'] as String? ?? 'Activo'),
       tokenInvitacion: json['token_invitacion'] as String?,
       cedula: json['cedula'] as String?,
+      telefono: json['phone'] as String? ?? json['telefono'] as String?,
+      avatarUrl: json['avatar_url'] as String?,
       salarioBase: (json['salario_base'] as num?)?.toDouble() ?? 0.0,
       periodoPago: json['periodo_pago'] as String? ?? 'Quincenal',
       requiereCambioClave: requiresPasswordChange,

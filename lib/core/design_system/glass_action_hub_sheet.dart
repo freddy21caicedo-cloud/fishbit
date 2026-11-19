@@ -16,7 +16,7 @@ class GlassActionHubSheet extends ConsumerWidget {
       context: context,
       barrierDismissible: true,
       barrierLabel: 'Cerrar Menú',
-      barrierColor: Colors.black.withValues(alpha: 0.55),
+      barrierColor: Colors.black.withValues(alpha: 0.65),
       transitionDuration: const Duration(milliseconds: 240),
       pageBuilder: (dialogCtx, anim1, anim2) => const Material(
         type: MaterialType.transparency,
@@ -69,6 +69,8 @@ class GlassActionHubSheet extends ConsumerWidget {
                     padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 22),
                     blur: 28,
                     opacity: 0.18,
+                    enableBlur: true,
+                    isOverlay: true,
                     borderColor: AppColors.cyanWater.withValues(alpha: 0.3),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
@@ -100,18 +102,25 @@ class GlassActionHubSheet extends ConsumerWidget {
                                 ),
                               ],
                             ),
-                            Material(
-                              color: Colors.transparent,
-                              child: InkWell(
-                                onTap: () => Navigator.of(context).pop(),
-                                borderRadius: BorderRadius.circular(12),
-                                child: Container(
-                                  padding: const EdgeInsets.all(4),
+                            SizedBox(
+                              width: 48,
+                              height: 48,
+                              child: IconButton(
+                                onPressed: () => Navigator.of(context).pop(),
+                                tooltip: 'Cerrar',
+                                padding: EdgeInsets.zero,
+                                icon: Container(
+                                  width: 32,
+                                  height: 32,
                                   decoration: BoxDecoration(
                                     color: Colors.white.withValues(alpha: 0.08),
                                     shape: BoxShape.circle,
                                   ),
-                                  child: const Icon(Icons.close_rounded, size: 16, color: AppColors.textSecondaryDark),
+                                  child: const Icon(
+                                    Icons.close_rounded,
+                                    size: 18,
+                                    color: AppColors.textSecondaryDark,
+                                  ),
                                 ),
                               ),
                             ),

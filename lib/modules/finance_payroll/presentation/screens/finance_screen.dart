@@ -108,7 +108,7 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen>
     }).toList();
 
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      backgroundColor: Colors.transparent,
       floatingActionButtonLocation: FloatingDockFabLocation.endFloat,
       floatingActionButton: LayoutBuilder(
         builder: (context, constraints) {

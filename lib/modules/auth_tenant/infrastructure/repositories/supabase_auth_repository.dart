@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
@@ -667,10 +668,24 @@ class SupabaseAuthRepository implements AuthRepository {
   Future<void> updateCompany(Company company) async {
     try {
       if (_isValidUuid(company.id)) {
-        await _supabase
-            .from('empresas')
-            .update(company.toJson())
-            .eq('id', company.id);
+        final payload = Map<String, dynamic>.from(company.toJson());
+        try {
+          await _supabase
+              .from('empresas')
+              .update(payload)
+              .eq('id', company.id);
+        } on PostgrestException catch (e) {
+          // Resiliencia si la columna preferencias_operativas aún no se ha migrado
+          if (e.message.contains('preferencias_operativas')) {
+            payload.remove('preferencias_operativas');
+            await _supabase
+                .from('empresas')
+                .update(payload)
+                .eq('id', company.id);
+          } else {
+            rethrow;
+          }
+        }
       } else {
         await _supabase
             .from('configuraciones')
@@ -682,7 +697,10 @@ class SupabaseAuthRepository implements AuthRepository {
             })
             .limit(1);
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('[updateCompany] Error: $e');
+      rethrow;
+    }
   }
 
   @override
@@ -1284,6 +1302,115 @@ class SupabaseAuthRepository implements AuthRepository {
     } catch (e) {
       if (e is AppFailure) rethrow;
       throw ServerFailure('No se pudo actualizar la contraseña en Supabase: $e');
+    }
+  }
+
+  String _mimeFromExtension(String ext) {
+    final clean = ext.toLowerCase().replaceAll('.', '');
+    switch (clean) {
+      case 'png':
+        return 'image/png';
+      case 'webp':
+        return 'image/webp';
+      default:
+        return 'image/jpeg';
+    }
+  }
+
+  @override
+  Future<UserMember> updateMyProfile({
+    required UserMember currentUser,
+    required String nombre,
+    String? telefono,
+    String? avatarUrl,
+  }) async {
+    final cleanName = nombre.trim();
+    if (cleanName.isEmpty) {
+      throw const AuthFailure('El nombre no puede estar vacío.');
+    }
+    final cleanPhone = telefono?.trim();
+    final updated = currentUser.copyWith(
+      nombre: cleanName,
+      telefono: cleanPhone,
+      avatarUrl: avatarUrl ?? currentUser.avatarUrl,
+    );
+
+    try {
+      await _supabase.from('profiles').update({
+        'full_name': cleanName,
+        if (cleanPhone != null) 'phone': cleanPhone,
+        if (updated.avatarUrl != null) 'avatar_url': updated.avatarUrl,
+        'updated_at': DateTime.now().toUtc().toIso8601String(),
+      }).eq('id', currentUser.id);
+    } catch (e) {
+      debugPrint('[updateMyProfile] Error actualizando profiles: $e');
+      rethrow;
+    }
+
+    try {
+      await _supabase
+          .from('miembros_equipo')
+          .update({'nombre': cleanName})
+          .eq('email', currentUser.email.trim().toLowerCase());
+    } catch (_) {}
+
+    return updated;
+  }
+
+  @override
+  Future<String> uploadProfileAvatar({
+    required String userId,
+    required Uint8List bytes,
+    required String fileExtension,
+  }) async {
+    final ext = fileExtension.toLowerCase().replaceAll('.', '').isEmpty
+        ? 'jpg'
+        : fileExtension.toLowerCase().replaceAll('.', '');
+    final path = 'avatars/$userId/avatar.$ext';
+    await _supabase.storage.from('fishbit-media').uploadBinary(
+          path,
+          bytes,
+          fileOptions: FileOptions(
+            upsert: true,
+            contentType: _mimeFromExtension(ext),
+          ),
+        );
+    final publicUrl = _supabase.storage.from('fishbit-media').getPublicUrl(path);
+    return '$publicUrl?t=${DateTime.now().millisecondsSinceEpoch}';
+  }
+
+  @override
+  Future<String> uploadCompanyLogo({
+    required String empresaId,
+    required Uint8List bytes,
+    required String fileExtension,
+  }) async {
+    final ext = fileExtension.toLowerCase().replaceAll('.', '').isEmpty
+        ? 'png'
+        : fileExtension.toLowerCase().replaceAll('.', '');
+    final path = 'logos/$empresaId/logo.$ext';
+    await _supabase.storage.from('fishbit-media').uploadBinary(
+          path,
+          bytes,
+          fileOptions: FileOptions(
+            upsert: true,
+            contentType: _mimeFromExtension(ext),
+          ),
+        );
+    final publicUrl = _supabase.storage.from('fishbit-media').getPublicUrl(path);
+    return '$publicUrl?t=${DateTime.now().millisecondsSinceEpoch}';
+  }
+
+  @override
+  Future<void> changeMyPassword(String newPassword) async {
+    final cleanPassword = newPassword.trim();
+    if (cleanPassword.length < 8) {
+      throw const AuthFailure('La nueva contraseña debe tener al menos 8 caracteres.');
+    }
+    try {
+      await _supabase.auth.updateUser(UserAttributes(password: cleanPassword));
+    } on AuthException catch (e) {
+      throw AuthFailure(_translateAuthError(e));
     }
   }
 }
