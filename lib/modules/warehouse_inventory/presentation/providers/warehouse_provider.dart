@@ -521,6 +521,9 @@ class WarehouseNotifier extends StateNotifier<WarehouseState> {
     required double cantidadKg,
   }) async {
     if (cantidadKg <= 0) return;
+    if (state.items.isEmpty || !state.items.any((i) => i.id == itemId)) {
+      await loadWarehouseData();
+    }
     final idx = state.items.indexWhere((i) => i.id == itemId);
     if (idx != -1) {
       final item = state.items[idx];
@@ -529,9 +532,7 @@ class WarehouseNotifier extends StateNotifier<WarehouseState> {
         cantidadActualKg: nuevoStock,
         costoTotal: nuevoStock * item.costoUnitarioHistorico,
       );
-      try {
-        await _repository.updateInventoryItem(updated);
-      } catch (_) {}
+      await _repository.updateInventoryItem(updated);
 
       final list = [...state.items];
       list[idx] = updated;
@@ -544,22 +545,42 @@ class WarehouseNotifier extends StateNotifier<WarehouseState> {
     required double cantidadKg,
     required String motivo,
   }) async {
+    if (state.items.isEmpty || !state.items.any((i) => i.id == itemId)) {
+      await loadWarehouseData();
+    }
     final idx = state.items.indexWhere((i) => i.id == itemId);
     if (idx != -1) {
       final item = state.items[idx];
-      final remanente = (item.cantidadActualKg - cantidadKg).clamp(0.0, 999999.0);
+      final remanente = (item.cantidadActualKg - cantidadKg).clamp(0.0, double.infinity);
       final updated = item.copyWith(
         cantidadActualKg: remanente,
         costoTotal: remanente * item.costoUnitarioHistorico,
       );
-      try {
-        await _repository.updateInventoryItem(updated);
-      } catch (_) {}
+      await _repository.updateInventoryItem(updated);
 
       final list = [...state.items];
       list[idx] = updated;
       state = state.copyWith(items: list);
     }
+  }
+
+  /// Calcula el nuevo stock al editar una factura usando el delta real (nueva - anterior).
+  /// Evita regenerar stock fantasma cuando una factura ya fue consumida o sembrada,
+  /// y bloquea reducciones por debajo de lo ya consumido/sembrado.
+  static double computeUpdatedStockForInvoiceEdit({
+    required String itemName,
+    required double currentStock,
+    required double oldInvoiceQty,
+    required double newInvoiceQty,
+  }) {
+    final delta = newInvoiceQty - oldInvoiceQty;
+    final projected = currentStock + delta;
+    if (projected < -0.0001) {
+      throw Exception(
+        'No se puede reducir "$itemName" en ${(-delta).toStringAsFixed(0)} unidades porque parte o la totalidad ya fue sembrada o consumida (disponible actual: ${currentStock.toStringAsFixed(0)}).',
+      );
+    }
+    return projected < 0 ? 0.0 : projected;
   }
 
   Future<void> registerInvoiceWithItem(PurchaseInvoice invoice, InventoryItem item) async {
@@ -568,59 +589,44 @@ class WarehouseNotifier extends StateNotifier<WarehouseState> {
 
   /// Registra una Factura Multi-Ítem (ej. Facturas de 30 toneladas de Italcol con 4+ tipos de concentrado)
   Future<void> registerMultiItemInvoice(PurchaseInvoice invoice, List<InventoryItem> itemsToProcess) async {
-    try {
-      final createdInv = await _repository.createPurchaseInvoice(invoice);
+    final createdInv = await _repository.createPurchaseInvoice(invoice);
+    final updatedItemsList = List<InventoryItem>.from(state.items);
 
-      final updatedItemsList = List<InventoryItem>.from(state.items);
+    for (final newItem in itemsToProcess) {
+      final existingIdx = updatedItemsList.indexWhere((i) =>
+          i.nombre.trim().toLowerCase() == newItem.nombre.trim().toLowerCase() &&
+          i.tipo == newItem.tipo);
 
-      for (final newItem in itemsToProcess) {
-        final existingIdx = updatedItemsList.indexWhere((i) =>
-            i.nombre.trim().toLowerCase() == newItem.nombre.trim().toLowerCase() &&
-            i.tipo == newItem.tipo);
+      if (existingIdx != -1) {
+        // Actualizar stock y CPP del item existente
+        final existing = updatedItemsList[existingIdx];
+        final stockAnterior = existing.cantidadActualKg;
+        final stockNuevo = stockAnterior + newItem.cantidadActualKg;
+        final nuevoCostoUnitario = stockNuevo > 0
+            ? ((stockAnterior * existing.costoUnitarioHistorico) + (newItem.cantidadActualKg * newItem.costoUnitarioHistorico)) / stockNuevo
+            : newItem.costoUnitarioHistorico;
+        final nuevoCostoTotal = stockNuevo * nuevoCostoUnitario;
 
-        if (existingIdx != -1) {
-          // Actualizar stock y CPP del item existente
-          final existing = updatedItemsList[existingIdx];
-          final stockAnterior = existing.cantidadActualKg;
-          final stockNuevo = stockAnterior + newItem.cantidadActualKg;
-          final nuevoCostoUnitario = stockNuevo > 0
-              ? ((stockAnterior * existing.costoUnitarioHistorico) + (newItem.cantidadActualKg * newItem.costoUnitarioHistorico)) / stockNuevo
-              : newItem.costoUnitarioHistorico;
-          final nuevoCostoTotal = stockNuevo * nuevoCostoUnitario;
+        final updated = existing.copyWith(
+          cantidadActualKg: stockNuevo,
+          costoUnitarioHistorico: nuevoCostoUnitario,
+          costoTotal: nuevoCostoTotal,
+          loteFabricante: newItem.loteFabricante ?? existing.loteFabricante,
+        );
 
-          final updated = existing.copyWith(
-            cantidadActualKg: stockNuevo,
-            costoUnitarioHistorico: nuevoCostoUnitario,
-            costoTotal: nuevoCostoTotal,
-            loteFabricante: newItem.loteFabricante ?? existing.loteFabricante,
-          );
-
-          try {
-            await _repository.updateInventoryItem(updated);
-          } catch (_) {}
-
-          updatedItemsList[existingIdx] = updated;
-        } else {
-          // Crear nuevo item de inventario
-          try {
-            final created = await _repository.addInventoryItem(newItem);
-            updatedItemsList.add(created);
-          } catch (_) {
-            updatedItemsList.add(newItem);
-          }
-        }
+        await _repository.updateInventoryItem(updated);
+        updatedItemsList[existingIdx] = updated;
+      } else {
+        // Crear nuevo item de inventario
+        final created = await _repository.addInventoryItem(newItem);
+        updatedItemsList.add(created);
       }
-
-      state = state.copyWith(
-        invoices: [createdInv, ...state.invoices],
-        items: updatedItemsList,
-      );
-    } catch (_) {
-      state = state.copyWith(
-        invoices: [invoice, ...state.invoices],
-        items: [...state.items, ...itemsToProcess],
-      );
     }
+
+    state = state.copyWith(
+      invoices: [createdInv, ...state.invoices],
+      items: updatedItemsList,
+    );
   }
 
   /// Descontar alevinos utilizados durante la siembra de un lote
@@ -655,80 +661,118 @@ class WarehouseNotifier extends StateNotifier<WarehouseState> {
     }
   }
 
-  /// Actualizar una factura de compra existente y ajustar stock diferencial en bodega
+  /// Actualizar una factura de compra existente y ajustar stock diferencial real (nueva - anterior)
   Future<void> updatePurchaseInvoice(
     PurchaseInvoice oldInvoice,
     PurchaseInvoice newInvoice,
     List<InventoryItem> newItems,
   ) async {
-    try {
-      final updatedInv = await _repository.updatePurchaseInvoice(newInvoice);
-      final updatedItemsList = List<InventoryItem>.from(state.items);
-
-      // 1. Revertir cantidades de la factura anterior
-      for (final oldLine in oldInvoice.productos) {
-        final idx = updatedItemsList.indexWhere(
-          (i) => i.nombre.trim().toLowerCase() == oldLine.nombre.trim().toLowerCase(),
-        );
-        if (idx != -1) {
-          final existing = updatedItemsList[idx];
-          final revertedStock = (existing.cantidadActualKg - oldLine.kilosTotales).clamp(0.0, double.infinity);
-          final updated = existing.copyWith(
-            cantidadActualKg: revertedStock,
-            costoTotal: revertedStock * existing.costoUnitarioHistorico,
-          );
-          try {
-            await _repository.updateInventoryItem(updated);
-          } catch (_) {}
-          updatedItemsList[idx] = updated;
-        }
-      }
-
-      // 2. Aplicar nuevas líneas de la factura editada
-      for (final newItem in newItems) {
-        final idx = updatedItemsList.indexWhere(
-          (i) => i.nombre.trim().toLowerCase() == newItem.nombre.trim().toLowerCase() && i.tipo == newItem.tipo,
-        );
-        if (idx != -1) {
-          final existing = updatedItemsList[idx];
-          final stockAnterior = existing.cantidadActualKg;
-          final stockNuevo = stockAnterior + newItem.cantidadActualKg;
-          final nuevoCostoUnitario = stockNuevo > 0
-              ? ((stockAnterior * existing.costoUnitarioHistorico) + (newItem.cantidadActualKg * newItem.costoUnitarioHistorico)) / stockNuevo
-              : newItem.costoUnitarioHistorico;
-          final updated = existing.copyWith(
-            cantidadActualKg: stockNuevo,
-            costoUnitarioHistorico: nuevoCostoUnitario,
-            costoTotal: stockNuevo * nuevoCostoUnitario,
-            loteFabricante: newItem.loteFabricante ?? existing.loteFabricante,
-          );
-          try {
-            await _repository.updateInventoryItem(updated);
-          } catch (_) {}
-          updatedItemsList[idx] = updated;
-        } else {
-          try {
-            final created = await _repository.addInventoryItem(newItem);
-            updatedItemsList.add(created);
-          } catch (_) {
-            updatedItemsList.add(newItem);
-          }
-        }
-      }
-
-      state = state.copyWith(
-        invoices: state.invoices.map((inv) => inv.id == updatedInv.id ? updatedInv : inv).toList(),
-        items: updatedItemsList,
-      );
-    } catch (_) {
-      state = state.copyWith(
-        invoices: state.invoices.map((inv) => inv.id == newInvoice.id ? newInvoice : inv).toList(),
-      );
+    if (state.items.isEmpty) {
+      await loadWarehouseData();
     }
+    final updatedItemsList = List<InventoryItem>.from(state.items);
+
+    // Agrupar cantidades anteriores y nuevas por nombre normalizado
+    final Map<String, double> oldQtyByKey = {};
+    final Map<String, String> displayNameByKey = {};
+    for (final oldLine in oldInvoice.productos) {
+      final key = oldLine.nombre.trim().toLowerCase();
+      oldQtyByKey[key] = (oldQtyByKey[key] ?? 0.0) + oldLine.kilosTotales;
+      displayNameByKey[key] = oldLine.nombre;
+    }
+
+    final Map<String, double> newQtyByKey = {};
+    final Map<String, InventoryItem> newItemByKey = {};
+    for (final newItem in newItems) {
+      final key = newItem.nombre.trim().toLowerCase();
+      newQtyByKey[key] = (newQtyByKey[key] ?? 0.0) + newItem.cantidadActualKg;
+      newItemByKey[key] = newItem;
+      displayNameByKey[key] = newItem.nombre;
+    }
+
+    final allKeys = <String>{...oldQtyByKey.keys, ...newQtyByKey.keys};
+
+    // 1. Pre-validación: bloquear reducciones por debajo de lo ya consumido/sembrado antes de mutar BD
+    for (final key in allKeys) {
+      final oldQty = oldQtyByKey[key] ?? 0.0;
+      final newQty = newQtyByKey[key] ?? 0.0;
+      final newItem = newItemByKey[key];
+      final idx = updatedItemsList.indexWhere(
+        (i) =>
+            i.nombre.trim().toLowerCase() == key &&
+            (newItem == null || i.tipo == newItem.tipo),
+      );
+      if (idx != -1) {
+        computeUpdatedStockForInvoiceEdit(
+          itemName: displayNameByKey[key] ?? updatedItemsList[idx].nombre,
+          currentStock: updatedItemsList[idx].cantidadActualKg,
+          oldInvoiceQty: oldQty,
+          newInvoiceQty: newQty,
+        );
+      }
+    }
+
+    // 2. Persistir la factura actualizada en Supabase
+    final updatedInv = await _repository.updatePurchaseInvoice(newInvoice);
+
+    // 3. Aplicar deltas reales en inventario
+    for (final key in allKeys) {
+      final oldQty = oldQtyByKey[key] ?? 0.0;
+      final newQty = newQtyByKey[key] ?? 0.0;
+      final delta = newQty - oldQty;
+      final newItem = newItemByKey[key];
+
+      final idx = updatedItemsList.indexWhere(
+        (i) =>
+            i.nombre.trim().toLowerCase() == key &&
+            (newItem == null || i.tipo == newItem.tipo),
+      );
+
+      if (idx != -1) {
+        final existing = updatedItemsList[idx];
+        final stockAnterior = existing.cantidadActualKg;
+        final stockNuevo = computeUpdatedStockForInvoiceEdit(
+          itemName: displayNameByKey[key] ?? existing.nombre,
+          currentStock: stockAnterior,
+          oldInvoiceQty: oldQty,
+          newInvoiceQty: newQty,
+        );
+
+        double nuevoCostoUnitario = existing.costoUnitarioHistorico;
+        if (delta > 0 && newItem != null) {
+          nuevoCostoUnitario = stockNuevo > 0
+              ? ((stockAnterior * existing.costoUnitarioHistorico) + (delta * newItem.costoUnitarioHistorico)) / stockNuevo
+              : newItem.costoUnitarioHistorico;
+        } else if (delta == 0 && newItem != null && newItem.costoUnitarioHistorico > 0) {
+          nuevoCostoUnitario = newItem.costoUnitarioHistorico;
+        }
+
+        final updated = existing.copyWith(
+          cantidadActualKg: stockNuevo,
+          costoUnitarioHistorico: nuevoCostoUnitario,
+          costoTotal: stockNuevo * nuevoCostoUnitario,
+          loteFabricante: newItem?.loteFabricante ?? existing.loteFabricante,
+        );
+
+        await _repository.updateInventoryItem(updated);
+        updatedItemsList[idx] = updated;
+      } else if (newItem != null && newQty > 0) {
+        final created = await _repository.addInventoryItem(newItem);
+        updatedItemsList.add(created);
+      }
+    }
+
+    state = state.copyWith(
+      invoices: state.invoices.map((inv) => inv.id == updatedInv.id ? updatedInv : inv).toList(),
+      items: updatedItemsList,
+    );
   }
 
   /// Eliminar una factura de compra y descontar el stock ingresado por ella
   Future<void> deletePurchaseInvoice(PurchaseInvoice invoice) async {
+    if (state.items.isEmpty) {
+      await loadWarehouseData();
+    }
     await _repository.deletePurchaseInvoice(invoice.id, invoice.empresaId);
     final updatedItemsList = List<InventoryItem>.from(state.items);
 
@@ -743,9 +787,7 @@ class WarehouseNotifier extends StateNotifier<WarehouseState> {
           cantidadActualKg: revertedStock,
           costoTotal: revertedStock * existing.costoUnitarioHistorico,
         );
-        try {
-          await _repository.updateInventoryItem(updated);
-        } catch (_) {}
+        await _repository.updateInventoryItem(updated);
         updatedItemsList[idx] = updated;
       }
     }

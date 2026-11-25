@@ -58,7 +58,7 @@ class UserProfileSheet extends ConsumerStatefulWidget {
 class _UserProfileSheetState extends ConsumerState<UserProfileSheet> {
   static const List<String> _allSpecies = [
     'Tilapia Roja',
-    'Cachama Negra',
+    'Cachama Blanca',
     'Bocachico',
     'Trucha Arcoíris',
     'Pangasius',
@@ -159,7 +159,7 @@ class _UserProfileSheetState extends ConsumerState<UserProfileSheet> {
 
     _selectedSpecies = List<String>.from(
       company?.especiesHabilitadas ??
-          const ['Tilapia Roja', 'Cachama Negra', 'Bocachico', 'Pangasius'],
+          const ['Tilapia Roja', 'Cachama Blanca', 'Bocachico', 'Pangasius'],
     );
     for (final sp in _allSpecies) {
       final targetGrams = company != null

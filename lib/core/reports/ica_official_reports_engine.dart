@@ -282,7 +282,7 @@ class IcaOfficialReportsEngine {
     _writeKpiCard(sheet, 6, startRow, 'DENSIDAD PROMEDIO', '${ExcelStylerHelper.formatNumber(densidadGranja)} Kg/m³');
 
     final tableHeaderRow = startRow + 3;
-    final headers = ['CÓDIGO LOTE', 'ESTANQUE', 'ESPECIE', 'PECES INICIALES', 'BAJAS MORTALIDAD', 'PECES ACTUALES', 'SUPERVIVENCIA (%)', 'PESO PROM. (g)', 'BIOMASA (Kg)', 'FCR ESTIMADO'];
+    final headers = ['CÓDIGO LOTE', 'ESTANQUE', 'ESPECIE', 'PECES INICIALES', 'TRASLADADOS', 'BAJAS MORTALIDAD', 'PECES ACTUALES', 'SUPERVIVENCIA (%)', 'PESO PROM. (g)', 'BIOMASA (Kg)', 'FCR ESTIMADO'];
     for (int i = 0; i < headers.length; i++) {
       final c = sheet.cell(CellIndex.indexByColumnRow(columnIndex: i, rowIndex: tableHeaderRow));
       c.value = TextCellValue(headers[i]);
@@ -296,9 +296,10 @@ class IcaOfficialReportsEngine {
       final pond = ponds.where((p) => p.id == b.estanqueId).firstOrNull;
       final pondLabel = pond?.nombreLimpio ?? b.estanqueId;
       final iniciales = b.cantidadInicialPeces;
+      final trasladados = b.pecesTrasladadosSalientes;
       final actuales = b.cantidadActualPeces;
-      final perdidas = (iniciales - actuales).clamp(0, 999999);
-      final supervivencia = iniciales > 0 ? (actuales / iniciales) * 100.0 : 0.0;
+      final perdidas = b.mortalidadAcumuladaPeces;
+      final supervivencia = b.supervivenciaPct;
 
       final styleL = isZebra ? ExcelStylerHelper.cellZebraLeft : ExcelStylerHelper.cellLeft;
       final styleC = isZebra ? ExcelStylerHelper.cellZebraCenter : ExcelStylerHelper.cellCenter;
@@ -308,12 +309,13 @@ class IcaOfficialReportsEngine {
       _setCellValue(sheet, 1, currentRow, pondLabel, styleL);
       _setCellValue(sheet, 2, currentRow, b.especie, styleL);
       _setCellValue(sheet, 3, currentRow, ExcelStylerHelper.formatInt(iniciales), styleR);
-      _setCellValue(sheet, 4, currentRow, ExcelStylerHelper.formatInt(perdidas), styleR);
-      _setCellValue(sheet, 5, currentRow, ExcelStylerHelper.formatInt(actuales), styleR);
-      _setCellValue(sheet, 6, currentRow, '${supervivencia.toStringAsFixed(1)}%', styleC);
-      _setCellValue(sheet, 7, currentRow, '${ExcelStylerHelper.formatNumber(b.pesoActualGramos)} g', styleR);
-      _setCellValue(sheet, 8, currentRow, '${ExcelStylerHelper.formatNumber(b.biomasaActualKg)} Kg', styleR);
-      _setCellValue(sheet, 9, currentRow, b.fcr.toStringAsFixed(2), styleC);
+      _setCellValue(sheet, 4, currentRow, ExcelStylerHelper.formatInt(trasladados), styleR);
+      _setCellValue(sheet, 5, currentRow, ExcelStylerHelper.formatInt(perdidas), styleR);
+      _setCellValue(sheet, 6, currentRow, ExcelStylerHelper.formatInt(actuales), styleR);
+      _setCellValue(sheet, 7, currentRow, '${supervivencia.toStringAsFixed(1)}%', styleC);
+      _setCellValue(sheet, 8, currentRow, '${ExcelStylerHelper.formatNumber(b.pesoActualGramos)} g', styleR);
+      _setCellValue(sheet, 9, currentRow, '${ExcelStylerHelper.formatNumber(b.biomasaActualKg)} Kg', styleR);
+      _setCellValue(sheet, 10, currentRow, b.fcr.toStringAsFixed(2), styleC);
 
       currentRow++;
     }
@@ -322,11 +324,12 @@ class IcaOfficialReportsEngine {
     sheet.merge(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: currentRow), CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: currentRow));
     _setCellValue(sheet, 3, currentRow, '', ExcelStylerHelper.totalValueStyle);
     _setCellValue(sheet, 4, currentRow, '', ExcelStylerHelper.totalValueStyle);
-    _setCellValue(sheet, 5, currentRow, ExcelStylerHelper.formatInt(totalPeces), ExcelStylerHelper.totalValueStyle);
-    _setCellValue(sheet, 6, currentRow, '', ExcelStylerHelper.totalValueStyle);
+    _setCellValue(sheet, 5, currentRow, '', ExcelStylerHelper.totalValueStyle);
+    _setCellValue(sheet, 6, currentRow, ExcelStylerHelper.formatInt(totalPeces), ExcelStylerHelper.totalValueStyle);
     _setCellValue(sheet, 7, currentRow, '', ExcelStylerHelper.totalValueStyle);
-    _setCellValue(sheet, 8, currentRow, '${ExcelStylerHelper.formatNumber(totalBiomasa)} Kg', ExcelStylerHelper.totalValueStyle);
-    _setCellValue(sheet, 9, currentRow, '', ExcelStylerHelper.totalValueStyle);
+    _setCellValue(sheet, 8, currentRow, '', ExcelStylerHelper.totalValueStyle);
+    _setCellValue(sheet, 9, currentRow, '${ExcelStylerHelper.formatNumber(totalBiomasa)} Kg', ExcelStylerHelper.totalValueStyle);
+    _setCellValue(sheet, 10, currentRow, '', ExcelStylerHelper.totalValueStyle);
 
     sheet.setColumnWidth(0, 36.0);
     sheet.setColumnWidth(1, 16.0);
@@ -1211,7 +1214,7 @@ class IcaOfficialReportsEngine {
       final b = batches[i];
       final isZebra = i % 2 == 1;
       final pond = ponds.where((p) => p.id == b.estanqueId).firstOrNull;
-      final sup = b.cantidadInicialPeces > 0 ? (b.cantidadActualPeces / b.cantidadInicialPeces) * 100.0 : 0.0;
+      final sup = b.supervivenciaPct;
 
       final styleL = isZebra ? ExcelStylerHelper.cellZebraLeft : ExcelStylerHelper.cellLeft;
       final styleC = isZebra ? ExcelStylerHelper.cellZebraCenter : ExcelStylerHelper.cellCenter;

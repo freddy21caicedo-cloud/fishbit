@@ -35,7 +35,7 @@ class _AppConfigModalState extends ConsumerState<AppConfigModal> {
 
   final List<String> _todasEspecies = [
     'Tilapia Roja',
-    'Cachama Negra',
+    'Cachama Blanca',
     'Bocachico',
     'Trucha Arcoíris',
     'Pangasius',
@@ -51,7 +51,7 @@ class _AppConfigModalState extends ConsumerState<AppConfigModal> {
     final company = ref.read(authProvider).currentCompany;
     _especiesSeleccionadas = List<String>.from(company?.especiesHabilitadas ?? [
       'Tilapia Roja',
-      'Cachama Negra',
+      'Cachama Blanca',
       'Bocachico',
       'Pangasius',
     ]);

@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fishbit_finance/modules/finance_payroll/domain/services/production_cost_engine.dart';
 import 'package:fishbit_finance/modules/finance_payroll/domain/models/jornal_record.dart';
+import 'package:fishbit_finance/modules/ponds_batches/domain/models/fish_batch.dart';
 import 'package:fishbit_finance/modules/ponds_batches/domain/models/pond.dart';
 
 void main() {
@@ -149,6 +150,63 @@ void main() {
       expect(cachama.totalBiomasaKg, 1000.0);
       expect(cachama.costoDirectoJornales, 0.0);
       expect(summary.roiEstimadoPorcentaje, isNot(isNaN));
+    });
+
+    test('No duplica alimento cuando pond.costoAcumuladoBiologico ya incluye semilla + insumos y existen lotes activos', () {
+      final ponds = [
+        Pond(
+          id: 'pond-8',
+          empresaId: 'emp-1',
+          unidadAcuicolaId: 'u-1',
+          nombre: 'EST - Estanque 8',
+          sigla: 'EST-8',
+          capacidadM3: 100.0,
+          biomasaKg: 10854.0,
+          costoAcumuladoBiologico: 34343873.0, // 3.850.000 semilla + 30.493.873 alimento
+          especieActual: 'Tilapia Roja',
+          estado: PondStatus.active,
+          creadoEn: DateTime(2026, 1, 1),
+        ),
+      ];
+      final batches = [
+        FishBatch(
+          id: 'batch-8',
+          empresaId: 'emp-1',
+          unidadAcuicolaId: 'u-1',
+          estanqueId: 'pond-8',
+          especie: 'Tilapia Roja',
+          cantidadInicialPeces: 20000,
+          cantidadActualPeces: 18000,
+          pesoPromedioInicialG: 5.0,
+          pesoActualGramos: 603.0,
+          costoInicialAlevinos: 3850000.0,
+          costoAcumuladoInsumos: 30493873.0,
+          fechaSiembra: DateTime(2026, 1, 1),
+          estado: BatchStatus.active,
+          creadoEn: DateTime(2026, 1, 1),
+        ),
+      ];
+
+      final summary = ProductionCostEngine.calculate(
+        ponds: ponds,
+        batches: batches,
+        totalAlimentoInsumos: 30493873.0,
+        totalNominaFija: 0.0,
+        totalJornales: 0.0,
+        totalEnergia: 0.0,
+        totalDepreciacionCapex: 0.0,
+        precioMercadoKg: 11000.0,
+      );
+
+      expect(summary.totalCostoAlevinos, 3850000.0);
+      expect(summary.totalCostoAlimento, 30493873.0);
+      expect(summary.totalCostosDirectos, 34343873.0);
+      expect(summary.investmentSummary!.capitalEnAguaAlevines, 3850000.0);
+      expect(summary.investmentSummary!.capitalEnAguaAlimento, 30493873.0);
+      expect(summary.investmentSummary!.capitalEnAguaTotal, 34343873.0);
+      expect(summary.estanquesBreakdown.first.costoDirectoAlevines, 3850000.0);
+      expect(summary.estanquesBreakdown.first.costoDirectoAlimento, 30493873.0);
+      expect(summary.estanquesBreakdown.first.costoTotal, 34343873.0);
     });
   });
 }

@@ -85,34 +85,36 @@ class SupabaseNutritionRepository implements NutritionRepository {
       return record;
     }
 
-    // 1. Guardar registro en alimentacion_diaria
-    final insertData = {
-      'id': record.id,
-      'empresa_id': empresaId,
-      'unit_id': unidadAcuicolaId,
-      'unidad_acuicola_id': unidadAcuicolaId,
-      'estanque_id': estanqueId,
-      'lote_id': loteId,
-      if (insumoId != null) 'insumo_id': insumoId,
-      'cantidad_consumida_kg': kgConsumidos,
-      'costo_calculado': costoTotal,
-      'fecha': recordDate.toIso8601String().split('T')[0],
-      'creado_en': now.toIso8601String(),
-    };
+    // 1. Registrar alimentación y descontar stock de forma atómica vía RPC en Supabase
+    final res = await _supabase.rpc<dynamic>(
+      'record_daily_feeding_with_stock',
+      params: {
+        'p_id': record.id,
+        'p_empresa_id': empresaId,
+        'p_unidad_acuicola_id': unidadAcuicolaId,
+        'p_estanque_id': estanqueId,
+        'p_lote_id': loteId,
+        'p_insumo_id': insumoId,
+        'p_cantidad_kg': kgConsumidos,
+        'p_costo_unitario': costoUnitarioAlimento,
+        'p_fecha': recordDate.toIso8601String().split('T')[0],
+      },
+    );
 
-    await _supabase.from('alimentacion_diaria').insert(insertData);
-
-    // El descuento de inventario en bodega es gestionado centralizadamente por WarehouseNotifier.discountStock
-    // para evitar doble decremento al sincronizar estados.
+    final savedRecord = res is Map
+        ? FeedingRecord.fromJson(Map<String, dynamic>.from(res))
+        : (res is List && res.isNotEmpty && res.first is Map
+            ? FeedingRecord.fromJson(Map<String, dynamic>.from(res.first as Map))
+            : record);
 
     _eventBus.fire(DailyFeedingRecordedEvent(
       estanqueId: estanqueId,
       loteId: loteId,
       kgConsumidos: kgConsumidos,
-      costoTotal: costoTotal,
+      costoTotal: savedRecord.costoCalculado,
     ));
 
-    return record;
+    return savedRecord;
   }
 
   @override
@@ -125,24 +127,28 @@ class SupabaseNutritionRepository implements NutritionRepository {
       return record;
     }
 
-    final updateData = {
-      'estanque_id': record.estanqueId,
-      'lote_id': record.loteId,
-      'insumo_id': record.insumoId,
-      'cantidad_consumida_kg': record.cantidadConsumidaKg,
-      'costo_calculado': record.costoCalculado,
-      'fecha': record.fecha.toIso8601String().split('T')[0],
-    };
+    final unitCost = record.cantidadConsumidaKg > 0
+        ? (record.costoCalculado / record.cantidadConsumidaKg)
+        : 0.0;
 
-    final res = await _supabase
-        .from('alimentacion_diaria')
-        .update(updateData)
-        .eq('id', record.id)
-        .eq('empresa_id', record.empresaId)
-        .select()
-        .single();
+    final res = await _supabase.rpc<dynamic>(
+      'update_daily_feeding_with_stock',
+      params: {
+        'p_feeding_id': record.id,
+        'p_new_kg': record.cantidadConsumidaKg,
+        'p_costo_unitario': unitCost,
+        'p_new_insumo_id': record.insumoId,
+        'p_new_fecha': record.fecha.toIso8601String().split('T')[0],
+      },
+    );
 
-    return FeedingRecord.fromJson(res);
+    if (res is Map) {
+      return FeedingRecord.fromJson(Map<String, dynamic>.from(res));
+    }
+    if (res is List && res.isNotEmpty && res.first is Map) {
+      return FeedingRecord.fromJson(Map<String, dynamic>.from(res.first as Map));
+    }
+    return record;
   }
 
   @override
@@ -151,11 +157,16 @@ class SupabaseNutritionRepository implements NutritionRepository {
     if (empresaId.startsWith('c1000000-')) {
       return;
     }
-    await _supabase
+    final deleted = await _supabase
         .from('alimentacion_diaria')
         .delete()
         .eq('id', recordId)
-        .eq('empresa_id', empresaId);
+        .eq('empresa_id', empresaId)
+        .select('id');
+
+    if ((deleted as List).isEmpty) {
+      throw Exception('No se encontró el registro o no tienes permisos de administrador para eliminarlo.');
+    }
   }
 
   @override

@@ -222,10 +222,11 @@ class _WarehouseScreenState extends ConsumerState<WarehouseScreen> with SingleTi
                     ],
                   ),
 
-                  // 5 Tabs de Navegación Especializada (HeroUI v3 Tabs)
+                  // 5 Tabs de Navegación Especializada (HeroUI v3 Tabs, estilo Bitácora sin bordes)
                   Center(
                     child: HeroTabsBar(
                       controller: _tabController,
+                      borderless: true,
                       onTap: (_) => setState(() {}),
                       tabs: _tabs.map((tab) {
                         final type = tab['type'] as InventoryItemType;
@@ -283,7 +284,7 @@ class _WarehouseScreenState extends ConsumerState<WarehouseScreen> with SingleTi
                     final invoice = filteredInvoices[index];
                     return Padding(
                       padding: const EdgeInsets.only(bottom: 12),
-                      child: _buildInvoiceCard(context, invoice, currentTabColor),
+                      child: _buildInvoiceCard(context, invoice, currentTabColor, state.items),
                     );
                   },
                   childCount: filteredInvoices.length,
@@ -416,12 +417,30 @@ class _WarehouseScreenState extends ConsumerState<WarehouseScreen> with SingleTi
     BuildContext context,
     PurchaseInvoice inv,
     Color badgeColor,
+    List<InventoryItem> inventoryItems,
   ) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final expDate =
         '${inv.fechaExpedicion.day.toString().padLeft(2, '0')}/${inv.fechaExpedicion.month.toString().padLeft(2, '0')}/${inv.fechaExpedicion.year}';
     final vencDate =
         '${inv.fechaVencimiento.day.toString().padLeft(2, '0')}/${inv.fechaVencimiento.month.toString().padLeft(2, '0')}/${inv.fechaVencimiento.year}';
+    final bool isAlevinoInvoice = _matchesCategory(inv.tipoFactura, InventoryItemType.alevino);
+
+    double? alevinosEnBodega;
+    if (isAlevinoInvoice && inv.productos.isNotEmpty) {
+      double totalDisp = 0.0;
+      for (final line in inv.productos) {
+        final match = inventoryItems.where(
+          (i) =>
+              i.tipo == InventoryItemType.alevino &&
+              i.nombre.trim().toLowerCase() == line.nombre.trim().toLowerCase(),
+        );
+        for (final item in match) {
+          totalDisp += item.cantidadActualKg;
+        }
+      }
+      alevinosEnBodega = totalDisp;
+    }
 
     return GlassCard(
       title: '${inv.numeroFactura} • ${inv.proveedorNombre}',
@@ -456,6 +475,34 @@ class _WarehouseScreenState extends ConsumerState<WarehouseScreen> with SingleTi
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          if (alevinosEnBodega != null) ...[
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Row(
+                children: [
+                  GlassBadge(
+                    text: alevinosEnBodega <= 0
+                        ? 'SEMBRADA / AGOTADA'
+                        : 'EN BODEGA • ${CurrencyFormatters.formatInt(alevinosEnBodega.toInt())} PCS',
+                    color: alevinosEnBodega <= 0 ? AppColors.cyanWater : AppColors.greenBiomass,
+                  ),
+                  if (alevinosEnBodega <= 0) ...[
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Factura conservada en historial contable',
+                        style: AppTypography.labelMicro.copyWith(
+                          color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                          fontSize: 10,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
           ...inv.productos.map((line) {
             return Container(
               margin: const EdgeInsets.only(bottom: 6),

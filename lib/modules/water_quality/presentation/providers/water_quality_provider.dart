@@ -77,7 +77,9 @@ class WaterQualityNotifier extends StateNotifier<WaterQualityState> {
   Future<bool> recordWaterQuality(WaterParameter param) async {
     try {
       final saved = await _repository.recordParameters(param);
-      state = state.copyWith(recentParameters: [saved, ...state.recentParameters]);
+      final list = [saved, ...state.recentParameters]
+        ..sort((a, b) => b.fecha.compareTo(a.fecha));
+      state = state.copyWith(recentParameters: list);
       return true;
     } catch (e) {
       state = state.copyWith(errorMessage: e.toString());
@@ -90,7 +92,8 @@ class WaterQualityNotifier extends StateNotifier<WaterQualityState> {
       final updated = await _repository.updateParameters(param);
       final list = state.recentParameters
           .map((p) => p.id == updated.id ? updated : p)
-          .toList();
+          .toList()
+        ..sort((a, b) => b.fecha.compareTo(a.fecha));
       state = state.copyWith(recentParameters: list);
       return true;
     } catch (e) {

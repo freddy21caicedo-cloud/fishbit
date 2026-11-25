@@ -282,7 +282,7 @@ void main() {
     nombre: 'Estanque 02',
     sigla: 'E-02',
     capacidadM3: 100.0,
-    especieActual: 'Cachama Negra',
+    especieActual: 'Cachama Blanca',
     biomasaKg: 1800.0,
     creadoEn: DateTime(2026, 1, 1),
   );
@@ -310,7 +310,7 @@ void main() {
     unidadAcuicolaId: 'unit-1',
     estanqueId: 'pond-2',
     codigoLote: 'LOT-2026-02',
-    especie: 'Cachama Negra',
+    especie: 'Cachama Blanca',
     cantidadInicialPeces: 5000,
     cantidadActualPeces: 4900,
     pesoInicialGramos: 10.0,

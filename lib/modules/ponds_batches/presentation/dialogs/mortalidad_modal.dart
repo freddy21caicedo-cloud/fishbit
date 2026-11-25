@@ -71,7 +71,10 @@ class _MortalidadModalState extends ConsumerState<MortalidadModal> {
       _selectedBatchId = edit.loteId;
       _muertosCtrl.text = edit.cantidadPecesMuertos.toString();
       _pesoCtrl = TextEditingController(text: edit.pesoPromedioGramos.toStringAsFixed(1));
-      if (_causas.contains(edit.causaProbable)) {
+      if (edit.causaProbable.trim().isNotEmpty) {
+        if (!_causas.contains(edit.causaProbable)) {
+          _causas.insert(0, edit.causaProbable);
+        }
         _causaSeleccionada = edit.causaProbable;
       }
       if (edit.observaciones != null) _obsCtrl.text = edit.observaciones!;
@@ -96,28 +99,35 @@ class _MortalidadModalState extends ConsumerState<MortalidadModal> {
 
   @override
   Widget build(BuildContext context) {
+    final isEditing = widget.recordToEdit != null;
+    final editRecord = widget.recordToEdit;
     final pondsState = ref.watch(pondsProvider);
     final authState = ref.watch(authProvider);
     final user = authState.currentUser;
 
-    // Estanque y lote activo
+    // Estanque y lote (en edición buscar también históricos aunque ya no estén activos)
     final pondsList = pondsState.ponds.where((p) => p.estado == PondStatus.active).toList();
     final effectivePondId = _selectedPondId ?? widget.pond?.id;
-    final activePond = pondsList.where((p) => p.id == effectivePondId).firstOrNull ??
+    final activePond = (isEditing
+            ? pondsState.ponds.where((p) => p.id == effectivePondId).firstOrNull
+            : pondsList.where((p) => p.id == effectivePondId).firstOrNull) ??
         widget.pond ??
         (pondsList.isNotEmpty ? pondsList.first : null);
     final activeBatches = activePond != null
         ? pondsState.batches.where((b) => b.estanqueId == activePond.id && b.estado == BatchStatus.active).toList()
         : <FishBatch>[];
     final activeBatch = widget.batch ??
-        (activeBatches.where((b) => b.id == _selectedBatchId).firstOrNull ?? activeBatches.firstOrNull);
+        (isEditing
+            ? pondsState.batches.where((b) => b.id == editRecord!.loteId).firstOrNull
+            : (activeBatches.where((b) => b.id == _selectedBatchId).firstOrNull ?? activeBatches.firstOrNull));
 
     final muertos = int.tryParse(_muertosCtrl.text.trim()) ?? 0;
     final pesoG = double.tryParse(_pesoCtrl.text.replaceAll(',', '.').trim()) ?? (activeBatch?.pesoActualGramos ?? 0.0);
     final biomasaPerdidaKg = (muertos * pesoG) / 1000.0;
     final poblacionPrevia = activeBatch?.cantidadActualPeces ?? 0;
-    final poblacionDisponible = poblacionPrevia + (widget.recordToEdit?.cantidadPecesMuertos ?? 0);
-    final superacionPoblacion = poblacionDisponible > 0 && muertos > poblacionDisponible;
+    final poblacionDisponible = poblacionPrevia + (editRecord?.cantidadPecesMuertos ?? 0);
+    final bool aumentoBajas = !isEditing || muertos > editRecord!.cantidadPecesMuertos;
+    final superacionPoblacion = aumentoBajas && poblacionDisponible > 0 && muertos > poblacionDisponible;
     final nuevaPoblacion = (poblacionDisponible - muertos).clamp(0, 9999999);
     final tasaMortalidadPct = poblacionDisponible > 0 ? (muertos / poblacionDisponible) * 100.0 : 0.0;
     final esAlertaCritica = tasaMortalidadPct >= 2.0;
@@ -194,6 +204,30 @@ class _MortalidadModalState extends ConsumerState<MortalidadModal> {
                           }
                         });
                       },
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+
+                  if (isEditing) ...[
+                    Container(
+                      padding: const EdgeInsets.all(11),
+                      decoration: BoxDecoration(
+                        color: AppColors.cyanWater.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppColors.cyanWater.withValues(alpha: 0.35)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.edit_note_rounded, color: AppColors.cyanWater, size: 18),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Modo Edición: actualizando reporte del ${editRecord!.fecha.day}/${editRecord.fecha.month}/${editRecord.fecha.year} (${editRecord.cantidadPecesMuertos} bajas). No se creará un dato nuevo.',
+                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 11.5),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                     const SizedBox(height: 12),
                   ],
@@ -292,10 +326,11 @@ class _MortalidadModalState extends ConsumerState<MortalidadModal> {
                           validator: (val) {
                             final n = int.tryParse(val?.trim() ?? '');
                             if (n == null || n <= 0) return 'Ingresa bajas (> 0)';
-                            if (poblacionDisponible <= 0) {
+                            final aumenta = !isEditing || n > editRecord!.cantidadPecesMuertos;
+                            if (aumenta && poblacionDisponible <= 0) {
                               return 'Lote sin peces vivos';
                             }
-                            if (n > poblacionDisponible) {
+                            if (aumenta && n > poblacionDisponible) {
                               return 'Supera población ($poblacionDisponible)';
                             }
                             return null;
@@ -378,7 +413,7 @@ class _MortalidadModalState extends ConsumerState<MortalidadModal> {
                               const SizedBox(width: 6),
                               Expanded(
                                 child: Text(
-                                  'Error: La cantidad de bajas ($muertos) supera la población viva en el lote ($poblacionPrevia peces).',
+                                  'Error: La cantidad de bajas ($muertos) supera la población disponible en el lote ($poblacionDisponible peces).',
                                   style: const TextStyle(color: AppColors.coralAction, fontSize: 11, fontWeight: FontWeight.w800),
                                 ),
                               ),
@@ -422,16 +457,17 @@ class _MortalidadModalState extends ConsumerState<MortalidadModal> {
 
                   // Botón de Confirmación
                   GlassButton(
-                    label: widget.recordToEdit != null
+                    label: isEditing
                         ? 'Actualizar Registro de Mortalidad'
                         : 'Confirmar Registro de Mortalidad',
+                    loadingLabel: isEditing ? 'Actualizando...' : 'Guardando...',
                     height: 46,
                     backgroundColor: AppColors.coralAction,
                     isLoading: _isLoading,
                     onPressed: () async {
                       if (_isLoading) return;
                       final messenger = ScaffoldMessenger.of(context);
-                      if (activePond == null || activeBatch == null) {
+                      if (!isEditing && (activePond == null || activeBatch == null)) {
                         messenger.showSnackBar(
                           const SnackBar(
                             content: Text('Seleccione un estanque con lote activo para registrar la mortalidad.'),
@@ -460,20 +496,22 @@ class _MortalidadModalState extends ConsumerState<MortalidadModal> {
                       setState(() => _isLoading = true);
 
                       final bool ok;
-                      if (widget.recordToEdit != null) {
-                        final updated = widget.recordToEdit!.copyWith(
+                      if (isEditing) {
+                        final obsText = _obsCtrl.text.trim();
+                        final updated = editRecord!.copyWith(
                           cantidadPecesMuertos: muertos,
                           pesoPromedioGramos: pesoG,
                           causaProbable: _causaSeleccionada,
                           biomasaPerdidaKg: biomasaPerdidaKg,
                           fecha: _fechaRegistro.toDateTime(),
-                          observaciones: _obsCtrl.text.trim().isEmpty ? null : _obsCtrl.text.trim(),
+                          observaciones: obsText.isEmpty ? null : obsText,
+                          clearObservaciones: obsText.isEmpty,
                         );
-                        ok = await ref.read(pondsProvider.notifier).updateMortality(widget.recordToEdit!, updated);
+                        ok = await ref.read(pondsProvider.notifier).updateMortality(editRecord, updated);
                       } else {
                         ok = await ref.read(pondsProvider.notifier).recordMortality(
-                              estanqueId: activePond.id,
-                              loteId: activeBatch.id,
+                              estanqueId: activePond!.id,
+                              loteId: activeBatch!.id,
                               cantidadPecesMuertos: muertos,
                               pesoPromedioGramos: pesoG,
                               causaProbable: _causaSeleccionada,
@@ -491,9 +529,9 @@ class _MortalidadModalState extends ConsumerState<MortalidadModal> {
                           messenger.showSnackBar(
                             SnackBar(
                               content: Text(
-                                widget.recordToEdit != null
-                                    ? 'Mortalidad actualizada en ${activePond.sigla} ($muertos peces). Biomasa recalculada.'
-                                    : 'Mortalidad registrada en ${activePond.sigla} (-$muertos peces). Biomasa recalculada.',
+                                isEditing
+                                    ? 'Mortalidad actualizada ($muertos peces). Datos sincronizados.'
+                                    : 'Mortalidad registrada en ${activePond!.sigla} (-$muertos peces). Biomasa recalculada.',
                               ),
                               backgroundColor: AppColors.coralAction,
                               behavior: SnackBarBehavior.floating,

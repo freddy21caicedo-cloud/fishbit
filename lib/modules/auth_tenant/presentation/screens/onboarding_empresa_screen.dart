@@ -51,7 +51,7 @@ class _OnboardingEmpresaScreenState extends ConsumerState<OnboardingEmpresaScree
   // Especies acuícolas
   final List<String> _allAvailableSpecies = [
     'Tilapia Roja',
-    'Cachama Negra',
+    'Cachama Blanca',
     'Bocachico',
     'Trucha Arcoíris',
     'Pangasius',
@@ -60,7 +60,7 @@ class _OnboardingEmpresaScreenState extends ConsumerState<OnboardingEmpresaScree
 
   late final List<String> _selectedSpecies = [
     'Tilapia Roja',
-    'Cachama Negra',
+    'Cachama Blanca',
     'Bocachico',
   ];
 

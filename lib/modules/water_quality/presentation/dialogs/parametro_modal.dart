@@ -190,6 +190,30 @@ class _ParametroModalState extends ConsumerState<ParametroModal> {
                   ),
                   const SizedBox(height: 16),
 
+                  if (widget.parameterToEdit != null) ...[
+                    Container(
+                      padding: const EdgeInsets.all(11),
+                      decoration: BoxDecoration(
+                        color: AppColors.cyanWater.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppColors.cyanWater.withValues(alpha: 0.35)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.edit_note_rounded, color: AppColors.cyanWater, size: 18),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Modo Edición: actualizando medición del ${widget.parameterToEdit!.fecha.day}/${widget.parameterToEdit!.fecha.month}/${widget.parameterToEdit!.fecha.year}. No se creará un registro nuevo.',
+                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 11.5),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                  ],
+
                   GlassSelectField<String>(
                     label: 'ESTANQUE DE MEDICIÓN',
                     placeholder: 'Selecciona un estanque *',
@@ -517,6 +541,7 @@ class _ParametroModalState extends ConsumerState<ParametroModal> {
                     label: widget.parameterToEdit != null
                         ? 'Actualizar Medición de Calidad de Agua'
                         : 'Guardar Medición de Calidad de Agua',
+                    loadingLabel: widget.parameterToEdit != null ? 'Actualizando...' : 'Guardando...',
                     isLoading: _isSubmitting || waterState.isLoading,
                     backgroundColor: AppColors.cyanWater,
                     onPressed: () async {

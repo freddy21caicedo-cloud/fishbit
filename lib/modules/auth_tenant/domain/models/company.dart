@@ -40,17 +40,36 @@ class Company {
     this.preciosMercadoEspecies = const {},
     this.ciclosEspeciesDias = const {},
     this.pesosFinalesEspeciesG = const {},
-    this.especiesHabilitadas = const ['Tilapia Roja', 'Cachama Negra', 'Bocachico', 'Pangasius'],
+    this.especiesHabilitadas = const ['Tilapia Roja', 'Cachama Blanca', 'Bocachico', 'Pangasius'],
     this.logoUrl,
     this.estadoSuscripcion = 'Activo',
     this.preferenciasOperativas = const {},
   });
 
+  static String _normalizeSpeciesName(String name) {
+    return name.trim().toLowerCase() == 'cachama negra' ? 'Cachama Blanca' : name;
+  }
+
+  static Map<String, dynamic> _normalizeSpeciesMap(Map<String, dynamic>? raw) {
+    if (raw == null || raw.isEmpty) return {};
+    final normalized = <String, dynamic>{};
+    raw.forEach((key, value) {
+      final normKey = _normalizeSpeciesName(key);
+      if (!normalized.containsKey(normKey) || normKey == key) {
+        normalized[normKey] = value;
+      }
+    });
+    return normalized;
+  }
+
   factory Company.fromJson(Map<String, dynamic> json) {
-    List<String> especies = ['Tilapia Roja', 'Cachama Negra', 'Bocachico', 'Pangasius'];
+    List<String> especies = ['Tilapia Roja', 'Cachama Blanca', 'Bocachico', 'Pangasius'];
     if (json['especies_habilitadas'] != null) {
       if (json['especies_habilitadas'] is List) {
-        especies = (json['especies_habilitadas'] as List).map((e) => e.toString()).toList();
+        especies = (json['especies_habilitadas'] as List)
+            .map((e) => _normalizeSpeciesName(e.toString()))
+            .toSet()
+            .toList();
       }
     }
 
@@ -78,9 +97,9 @@ class Company {
       limiteMortalidadCritica: (json['limite_mortalidad_critica'] as num?)?.toDouble() ?? 10.0,
       stockAlertaMinimoAlimento: (json['stock_alerta_minimo_alimento'] as num?)?.toDouble() ?? 200.0,
       precioMercadoActualKg: (json['precio_mercado_actual_kg'] as num?)?.toDouble() ?? 8500.0,
-      preciosMercadoEspecies: json['precios_mercado_especies'] as Map<String, dynamic>? ?? {},
-      ciclosEspeciesDias: json['ciclos_especies_dias'] as Map<String, dynamic>? ?? {},
-      pesosFinalesEspeciesG: json['pesos_finales_especies_g'] as Map<String, dynamic>? ?? {},
+      preciosMercadoEspecies: _normalizeSpeciesMap(json['precios_mercado_especies'] as Map<String, dynamic>?),
+      ciclosEspeciesDias: _normalizeSpeciesMap(json['ciclos_especies_dias'] as Map<String, dynamic>?),
+      pesosFinalesEspeciesG: _normalizeSpeciesMap(json['pesos_finales_especies_g'] as Map<String, dynamic>?),
       especiesHabilitadas: especies,
       logoUrl: json['logo_url'] as String?,
       estadoSuscripcion: json['estado_suscripcion'] as String? ?? 'Activo',

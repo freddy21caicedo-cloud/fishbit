@@ -50,9 +50,11 @@ class WaterParameter {
   factory WaterParameter.fromJson(Map<String, dynamic> json) {
     DateTime parsedDate = DateTime.now();
     if (json['fecha'] != null) {
-      parsedDate = DateTime.tryParse(json['fecha'].toString()) ?? DateTime.now();
+      final parsed = DateTime.tryParse(json['fecha'].toString());
+      parsedDate = parsed != null ? (parsed.isUtc ? parsed.toLocal() : parsed) : DateTime.now();
     } else if (json['created_at'] != null) {
-      parsedDate = DateTime.tryParse(json['created_at'].toString()) ?? DateTime.now();
+      final parsed = DateTime.tryParse(json['created_at'].toString());
+      parsedDate = parsed != null ? (parsed.isUtc ? parsed.toLocal() : parsed) : DateTime.now();
     } else if (json['date'] != null) {
       final dStr = json['date'].toString();
       final hStr = json['hour']?.toString() ?? '00:00:00';

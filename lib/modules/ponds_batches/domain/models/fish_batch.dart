@@ -8,11 +8,15 @@ class FishBatch {
   final String? unidadAcuicolaSigla;
   final String estanqueId;
   final String? lotePadreId;
+  final String? inventoryItemId;
   final String codigoLote;
   final String especie;
   final String rolPolicultivo; // 'principal', 'secundaria', 'asociada'
   final int cantidadInicialPeces;
   final int cantidadActualPeces;
+  final int mortalidadAcumuladaPeces;
+  final int pecesTrasladadosSalientes;
+  final int pecesCosechados;
   final double pesoInicialGramos;
   final double pesoActualGramos;
   final double biomasaInicialKg;
@@ -34,11 +38,15 @@ class FishBatch {
     this.unidadAcuicolaSigla,
     required this.estanqueId,
     this.lotePadreId,
+    this.inventoryItemId,
     required this.codigoLote,
     required this.especie,
     this.rolPolicultivo = 'principal',
     required this.cantidadInicialPeces,
     required this.cantidadActualPeces,
+    this.mortalidadAcumuladaPeces = 0,
+    this.pecesTrasladadosSalientes = 0,
+    this.pecesCosechados = 0,
     this.pesoInicialGramos = 1.0,
     this.pesoActualGramos = 1.0,
     this.biomasaInicialKg = 0.0,
@@ -92,11 +100,15 @@ class FishBatch {
     String? unidadAcuicolaSigla,
     String? estanqueId,
     String? lotePadreId,
+    String? inventoryItemId,
     String? codigoLote,
     String? especie,
     String? rolPolicultivo,
     int? cantidadInicialPeces,
     int? cantidadActualPeces,
+    int? mortalidadAcumuladaPeces,
+    int? pecesTrasladadosSalientes,
+    int? pecesCosechados,
     double? pesoInicialGramos,
     double? pesoActualGramos,
     double? biomasaInicialKg,
@@ -118,11 +130,15 @@ class FishBatch {
       unidadAcuicolaSigla: unidadAcuicolaSigla ?? this.unidadAcuicolaSigla,
       estanqueId: estanqueId ?? this.estanqueId,
       lotePadreId: lotePadreId ?? this.lotePadreId,
+      inventoryItemId: inventoryItemId ?? this.inventoryItemId,
       codigoLote: codigoLote ?? this.codigoLote,
       especie: especie ?? this.especie,
       rolPolicultivo: rolPolicultivo ?? this.rolPolicultivo,
       cantidadInicialPeces: cantidadInicialPeces ?? this.cantidadInicialPeces,
       cantidadActualPeces: cantidadActualPeces ?? this.cantidadActualPeces,
+      mortalidadAcumuladaPeces: mortalidadAcumuladaPeces ?? this.mortalidadAcumuladaPeces,
+      pecesTrasladadosSalientes: pecesTrasladadosSalientes ?? this.pecesTrasladadosSalientes,
+      pecesCosechados: pecesCosechados ?? this.pecesCosechados,
       pesoInicialGramos: pesoInicialGramos ?? this.pesoInicialGramos,
       pesoActualGramos: pesoActualGramos ?? this.pesoActualGramos,
       biomasaInicialKg: biomasaInicialKg ?? this.biomasaInicialKg,
@@ -145,12 +161,27 @@ class FishBatch {
   /// Costo por Kilogramo producido (CPK)
   double get cpk => biomasaActualKg > 0 ? (costoTotal / biomasaActualKg) : 0.0;
 
-  /// Mortalidad acumulada en porcentaje
-  double get porcentajeMortalidad {
-    if (cantidadInicialPeces <= 0) return 0.0;
-    final muertos = cantidadInicialPeces - cantidadActualPeces;
-    return (muertos / cantidadInicialPeces) * 100.0;
+  /// Población base neta del lote excluyendo peces trasladados por desdoble a otros estanques.
+  /// Evita doble conteo global entre lote padre e hijos y evita confundir traslados con mortalidad.
+  int get poblacionBaseNeta {
+    final neta = cantidadInicialPeces - pecesTrasladadosSalientes;
+    if (neta > 0) return neta;
+    final balance = cantidadActualPeces + mortalidadAcumuladaPeces + pecesCosechados;
+    return balance > 0 ? balance : cantidadInicialPeces;
   }
+
+  /// Total de bajas reales registradas en mortalidad (nunca incluye traslados ni cosechas)
+  int get totalBajasMortalidad => mortalidadAcumuladaPeces;
+
+  /// Mortalidad acumulada real en porcentaje
+  double get porcentajeMortalidad {
+    final base = poblacionBaseNeta;
+    if (base <= 0) return 0.0;
+    return ((mortalidadAcumuladaPeces / base) * 100.0).clamp(0.0, 100.0);
+  }
+
+  /// Supervivencia real del lote en porcentaje (100% - mortalidad real)
+  double get supervivenciaPct => (100.0 - porcentajeMortalidad).clamp(0.0, 100.0);
 
   static BatchStatus parseStatus(String val) {
     switch (val.toLowerCase()) {
@@ -185,11 +216,15 @@ class FishBatch {
       unidadAcuicolaSigla: json['unidad_acuicola_sigla'] as String?,
       estanqueId: json['estanque_id'] as String? ?? '',
       lotePadreId: json['lote_padre_id'] as String?,
+      inventoryItemId: json['inventory_item_id'] as String?,
       codigoLote: json['codigo_lote'] as String? ?? '',
       especie: json['especie'] as String? ?? '',
       rolPolicultivo: json['rol_policultivo'] as String? ?? 'principal',
-      cantidadInicialPeces: json['cantidad_inicial_peces'] as int? ?? 0,
-      cantidadActualPeces: json['cantidad_actual_peces'] as int? ?? 0,
+      cantidadInicialPeces: (json['cantidad_inicial_peces'] as num?)?.toInt() ?? 0,
+      cantidadActualPeces: (json['cantidad_actual_peces'] as num?)?.toInt() ?? 0,
+      mortalidadAcumuladaPeces: (json['mortalidad_acumulada_peces'] as num?)?.toInt() ?? 0,
+      pecesTrasladadosSalientes: (json['peces_trasladados_salientes'] as num?)?.toInt() ?? 0,
+      pecesCosechados: (json['peces_cosechados'] as num?)?.toInt() ?? 0,
       pesoInicialGramos: (json['peso_inicial_gramos'] as num?)?.toDouble() ?? 1.0,
       pesoActualGramos: (json['peso_actual_gramos'] as num?)?.toDouble() ?? (json['peso_inicial_gramos'] as num?)?.toDouble() ?? 1.0,
       biomasaInicialKg: (json['biomasa_inicial_kg'] as num?)?.toDouble() ?? 0.0,
@@ -222,6 +257,9 @@ class FishBatch {
       'especie': especie,
       'cantidad_inicial_peces': cantidadInicialPeces,
       'cantidad_actual_peces': cantidadActualPeces,
+      'mortalidad_acumulada_peces': mortalidadAcumuladaPeces,
+      'peces_trasladados_salientes': pecesTrasladadosSalientes,
+      'peces_cosechados': pecesCosechados,
       'peso_inicial_gramos': pesoInicialGramos,
       'peso_actual_gramos': pesoActualGramos,       // BUG-2: campo faltante
       'biomasa_inicial_kg': biomasaInicialKg,
@@ -236,6 +274,9 @@ class FishBatch {
 
     if (lotePadreId != null && lotePadreId!.isNotEmpty) {
       map['lote_padre_id'] = lotePadreId;
+    }
+    if (inventoryItemId != null && inventoryItemId!.isNotEmpty) {
+      map['inventory_item_id'] = inventoryItemId;
     }
     if (unidadAcuicolaSigla != null && unidadAcuicolaSigla!.isNotEmpty) {
       map['unidad_acuicola_sigla'] = unidadAcuicolaSigla;

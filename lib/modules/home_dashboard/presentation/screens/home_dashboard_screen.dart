@@ -42,10 +42,11 @@ class HomeDashboardScreen extends ConsumerWidget {
         ? activeBatches.fold(0.0, (sum, b) => sum + b.pesoActualGramos) / activeBatches.length
         : 0.0;
 
-    final double supervivenciaGlobal = activeBatches.isNotEmpty
-        ? activeBatches.fold(0.0, (sum, b) => sum + (100.0 - b.porcentajeMortalidad).clamp(0.0, 100.0)) /
-            activeBatches.length
-        : 0.0;
+    final int totalBaseNetaGlobal = activeBatches.fold(0, (sum, b) => sum + b.poblacionBaseNeta);
+    final int totalBajasGlobales = activeBatches.fold(0, (sum, b) => sum + b.mortalidadAcumuladaPeces);
+    final double supervivenciaGlobal = totalBaseNetaGlobal > 0
+        ? (((totalBaseNetaGlobal - totalBajasGlobales) / totalBaseNetaGlobal) * 100.0).clamp(0.0, 100.0)
+        : (activeBatches.isNotEmpty ? 100.0 : 0.0);
 
     final double consumoProyectadoDiaKg = computeTotalProjectedFeedKgPerDay(
       pondsState.ponds,

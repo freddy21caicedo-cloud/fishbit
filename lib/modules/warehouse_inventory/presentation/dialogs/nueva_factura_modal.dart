@@ -201,6 +201,7 @@ class _NuevaFacturaModalState extends ConsumerState<NuevaFacturaModal> {
   }
 
   void _onCategoryChanged(String newCat, List<Supplier> allSuppliers) {
+    if (widget.invoiceToEdit != null) return;
     setState(() {
       _categoriaSeleccionada = newCat;
       final matching = allSuppliers.where((s) =>
@@ -432,7 +433,9 @@ class _NuevaFacturaModalState extends ConsumerState<NuevaFacturaModal> {
       totalIva: _totalIva,
       totalFactura: _granTotalFactura,
       costoFlete: _flete,
-      estadoPago: _esCredito ? 'Pendiente' : 'Paga',
+      estadoPago: (widget.invoiceToEdit != null && widget.invoiceToEdit!.esCredito == _esCredito)
+          ? widget.invoiceToEdit!.estadoPago
+          : (_esCredito ? 'Pendiente' : 'Paga'),
       placaVehiculo: _placaCtrl.text.trim().isNotEmpty ? _placaCtrl.text.trim() : null,
       productos: invoiceLineItems,
       creadoEn: widget.invoiceToEdit?.creadoEn ?? DateTime.now(),
@@ -467,7 +470,7 @@ class _NuevaFacturaModalState extends ConsumerState<NuevaFacturaModal> {
           } else if (lower.contains('tilapia')) {
             especieAlevino = lower.contains('roja') ? 'Tilapia Roja' : 'Tilapia';
           } else if (lower.contains('cachama')) {
-            especieAlevino = lower.contains('negra') ? 'Cachama Negra' : 'Cachama Blanca';
+            especieAlevino = 'Cachama Blanca';
           } else if (lower.contains('bocachico')) {
             especieAlevino = 'Bocachico';
           } else if (lower.contains('carpa')) {
@@ -599,7 +602,9 @@ class _NuevaFacturaModalState extends ConsumerState<NuevaFacturaModal> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'Ingreso de Factura de Almacén',
+                                widget.invoiceToEdit != null
+                                    ? 'Editar Factura ${widget.invoiceToEdit!.numeroFactura}'
+                                    : 'Ingreso de Factura de Almacén',
                                 style: AppTypography.titleLarge.copyWith(
                                   color: isDark ? Colors.white : AppColors.textPrimaryLight,
                                   fontSize: 17,
@@ -607,8 +612,14 @@ class _NuevaFacturaModalState extends ConsumerState<NuevaFacturaModal> {
                                 ),
                               ),
                               Text(
-                                'Multi-producto, liquidación fiscal y actualización de stock',
-                                style: AppTypography.labelMicro.copyWith(color: AppColors.textSecondaryDark),
+                                widget.invoiceToEdit != null
+                                    ? 'Modo Edición • Actualizando factura existente (sin duplicar)'
+                                    : 'Multi-producto, liquidación fiscal y actualización de stock',
+                                style: AppTypography.labelMicro.copyWith(
+                                  color: widget.invoiceToEdit != null
+                                      ? AppColors.cyanWater
+                                      : AppColors.textSecondaryDark,
+                                ),
                               ),
                             ],
                           ),
@@ -1131,7 +1142,30 @@ class _NuevaFacturaModalState extends ConsumerState<NuevaFacturaModal> {
         const Spacer(),
 
         // Botón Continuar o Confirmar Factura con StarBorder
-        if (_currentStep < 2)
+        if (_currentStep < 2) ...[
+          if (widget.invoiceToEdit != null) ...[
+            OutlinedButton.icon(
+              onPressed: _isSubmitting ? null : _guardarFactura,
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.greenBiomass,
+                side: BorderSide(color: AppColors.greenBiomass.withValues(alpha: 0.65)),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              icon: _isSubmitting
+                  ? const SizedBox(
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.greenBiomass),
+                    )
+                  : const Icon(Icons.check_circle_outline_rounded, size: 16),
+              label: Text(
+                _isSubmitting ? 'Guardando...' : 'Guardar Cambios',
+                style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800),
+              ),
+            ),
+            const SizedBox(width: 8),
+          ],
           StarBorderButton(
             onPressed: _nextStep,
             color: Colors.white,
@@ -1154,8 +1188,8 @@ class _NuevaFacturaModalState extends ConsumerState<NuevaFacturaModal> {
                 Icon(Icons.arrow_forward_rounded, size: 16),
               ],
             ),
-          )
-        else
+          ),
+        ] else
           StarBorderButton(
             onPressed: _isSubmitting ? null : _guardarFactura,
             isLoading: _isSubmitting,

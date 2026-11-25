@@ -119,6 +119,47 @@ class Pond {
   /// HP de aireación mecánica sugerido (1 HP por cada 1.000 kg de biomasa en alta densidad)
   double get hpAireacionSugerido => (biomasaKg / 1000.0) * (densidadKgM3 > 10 ? 1.2 : 0.8);
 
+  /// Número natural del estanque para ordenamiento ascendente (1, 2, 3, ..., 10, 11...).
+  /// Prioriza el número en [nombreLimpio] (ej. "Estanque 02" -> 2) y usa [sigla]
+  /// solo como respaldo si el nombre no contiene dígitos (ej. "E-03" -> 3).
+  /// Retorna `null` para estanques solo nominales (ej. "Salacuna").
+  int? get numeroOrden {
+    final nameMatch = RegExp(r'\d+').firstMatch(nombreLimpio);
+    if (nameMatch != null) {
+      return int.tryParse(nameMatch.group(0)!);
+    }
+    final siglaMatch = RegExp(r'\d+').firstMatch(sigla);
+    if (siglaMatch != null) {
+      return int.tryParse(siglaMatch.group(0)!);
+    }
+    return null;
+  }
+
+  /// Comparador numérico natural para ordenar estanques de forma determinista.
+  /// Los estanques numerados van primero (1, 2, 3... 10, 11...) y los nominales
+  /// sin número al final ordenados alfabéticamente.
+  static int compareByNumber(Pond a, Pond b) {
+    final aNum = a.numeroOrden;
+    final bNum = b.numeroOrden;
+
+    if (aNum != null && bNum != null) {
+      final numCmp = aNum.compareTo(bNum);
+      if (numCmp != 0) return numCmp;
+    } else if (aNum != null) {
+      return -1;
+    } else if (bNum != null) {
+      return 1;
+    }
+
+    final nameCmp = a.nombreLimpio.toLowerCase().compareTo(b.nombreLimpio.toLowerCase());
+    if (nameCmp != 0) return nameCmp;
+
+    final siglaCmp = a.sigla.toLowerCase().compareTo(b.sigla.toLowerCase());
+    if (siglaCmp != 0) return siglaCmp;
+
+    return a.creadoEn.compareTo(b.creadoEn);
+  }
+
   static PondStatus parseStatus(String val) {
     switch (val.toLowerCase()) {
       case 'activo':

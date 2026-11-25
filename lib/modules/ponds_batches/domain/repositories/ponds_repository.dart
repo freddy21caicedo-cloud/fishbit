@@ -12,6 +12,11 @@ abstract class PondsRepository {
 
   Future<List<FishBatch>> fetchBatchesByUnit(String empresaId, String unidadAcuicolaId);
   Future<FishBatch> createBatch(FishBatch batch);
+  /// Siembra atómica de un lote con descuento bloqueado de alevinos en inventario
+  Future<FishBatch> plantBatchWithSeedDiscount({
+    required FishBatch batch,
+    required String inventoryItemId,
+  });
   Future<void> updateBatch(FishBatch batch);
   
   /// Realiza un traslado o desdoble atómico entre dos estanques

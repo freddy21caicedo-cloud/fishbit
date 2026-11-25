@@ -48,10 +48,11 @@ class _SiembraModalState extends ConsumerState<SiembraModal> {
   String? _selectedInventoryItemId;
   CivilDate _fechaSiembra = CivilDate.today();
   bool _costoModificadoManualmente = false;
+  bool _isSubmitting = false;
 
   final List<String> _especies = [
     'Tilapia Roja',
-    'Cachama Negra',
+    'Cachama Blanca',
     'Trucha Arcoíris',
     'Bocachico',
     'Pangasius',
@@ -66,6 +67,11 @@ class _SiembraModalState extends ConsumerState<SiembraModal> {
       _selectedEspecie = company.especiesHabilitadas.first;
       _metaCosechaCtrl.text = company.getTargetHarvestWeightGrams(_selectedEspecie).toInt().toString();
     }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        ref.read(warehouseProvider.notifier).loadWarehouseData();
+      }
+    });
   }
 
   @override
@@ -146,6 +152,7 @@ class _SiembraModalState extends ConsumerState<SiembraModal> {
   }
 
   Future<void> _handleSiembra() async {
+    if (_isSubmitting) return;
     if (!_formKey.currentState!.validate()) return;
     if (_selectedPondId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -238,6 +245,7 @@ class _SiembraModalState extends ConsumerState<SiembraModal> {
       unidadAcuicolaId: unidadId,
       unidadAcuicolaSigla: pondSigla,
       estanqueId: _selectedPondId!,
+      inventoryItemId: _selectedInventoryItemId,
       codigoLote: _codigoCtrl.text.trim(),
       especie: _selectedEspecie,
       rolPolicultivo: isPolyculture ? 'secundaria' : 'principal',
@@ -255,47 +263,63 @@ class _SiembraModalState extends ConsumerState<SiembraModal> {
       creadoEn: DateTime.now(),
     );
 
+    setState(() => _isSubmitting = true);
+
     try {
-      // 1. Plantar el lote
-      final success = await ref.read(pondsProvider.notifier).plantBatch(batch);
-      if (success) {
-        // 2. Descontar con trazabilidad estricta del lote específico en almacén
+      // 1. Siembra atómica con descuento bloqueado de alevinos en Supabase (previene siembras dobles)
+      await ref.read(pondsProvider.notifier).plantBatchWithSeedDiscount(
+            batch: batch,
+            inventoryItemId: _selectedInventoryItemId!,
+          );
+
+      // En modo demo el RPC no corre en Postgres; descontar en memoria local
+      if (empresaId.startsWith('c1000000-')) {
         await ref.read(warehouseProvider.notifier).discountAlevinosSiembra(
           especie: _selectedEspecie,
           cantidadPeces: peces.toDouble(),
           specificItemId: _selectedInventoryItemId,
         );
+      } else {
+        await ref.read(warehouseProvider.notifier).loadWarehouseData();
+      }
 
-        final metaCosechaG = double.tryParse(_metaCosechaCtrl.text.replaceAll(',', '.').trim());
-        if (metaCosechaG != null && metaCosechaG > 0) {
-          final currentCompany = authState.currentCompany;
-          if (currentCompany != null) {
-            final Map<String, dynamic> nuevosPesos = Map<String, dynamic>.from(currentCompany.pesosFinalesEspeciesG);
-            nuevosPesos[_selectedEspecie] = metaCosechaG;
-            await ref.read(authProvider.notifier).updateCompany(
-              currentCompany.copyWith(pesosFinalesEspeciesG: nuevosPesos),
-            );
-          }
-        }
-
-        if (mounted) {
-          nav.pop();
-          messenger.showSnackBar(
-            SnackBar(
-              content: Text('¡Lote ${batch.codigoLote} sembrado con éxito! Stock descontado de "${selectedSeedItem.nombre}".'),
-              backgroundColor: AppColors.greenBiomass,
-            ),
+      final metaCosechaG = double.tryParse(_metaCosechaCtrl.text.replaceAll(',', '.').trim());
+      if (metaCosechaG != null && metaCosechaG > 0) {
+        final currentCompany = authState.currentCompany;
+        if (currentCompany != null) {
+          final Map<String, dynamic> nuevosPesos = Map<String, dynamic>.from(currentCompany.pesosFinalesEspeciesG);
+          nuevosPesos[_selectedEspecie] = metaCosechaG;
+          await ref.read(authProvider.notifier).updateCompany(
+            currentCompany.copyWith(pesosFinalesEspeciesG: nuevosPesos),
           );
         }
       }
+
+      if (mounted) {
+        nav.pop();
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text('¡Lote ${batch.codigoLote} sembrado con éxito! Stock descontado de "${selectedSeedItem.nombre}".'),
+            backgroundColor: AppColors.greenBiomass,
+          ),
+        );
+      }
     } catch (e) {
+      // Recargar inventario real desde Supabase por si el stock ya fue consumido
+      if (!empresaId.startsWith('c1000000-')) {
+        await ref.read(warehouseProvider.notifier).loadWarehouseData();
+      }
       if (mounted) {
         messenger.showSnackBar(
           SnackBar(
-            content: Text('Error al sembrar lote: $e'),
+            content: Text('No se pudo completar la siembra: $e'),
             backgroundColor: AppColors.waterCritical,
           ),
         );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
       }
     }
   }
@@ -603,8 +627,14 @@ class _SiembraModalState extends ConsumerState<SiembraModal> {
                           validator: (val) {
                             final n = CurrencyFormatters.parseCOP(val).toInt();
                             if (n <= 0) return 'Ingresa cantidad';
-                            if (n > stockDisponible && stockDisponible > 0) {
-                              return 'Excede stock (${stockDisponible.toInt()})';
+                            final selectedSeed = alevinosDisponibles
+                                .where((i) => i.id == _selectedInventoryItemId)
+                                .firstOrNull;
+                            final maxPermitido = selectedSeed != null
+                                ? selectedSeed.cantidadActualKg
+                                : stockDisponible;
+                            if (n > maxPermitido && maxPermitido > 0) {
+                              return 'Excede saldo del lote (${maxPermitido.toInt()})';
                             }
                             return null;
                           },
@@ -714,9 +744,10 @@ class _SiembraModalState extends ConsumerState<SiembraModal> {
 
                   GlassButton(
                     label: sinMaterialGenetico ? 'Material Genético no Disponible' : 'Confirmar Siembra',
-                    isLoading: pondsState.isLoading,
+                    loadingLabel: 'Sembrando...',
+                    isLoading: _isSubmitting || pondsState.isLoading,
                     backgroundColor: sinMaterialGenetico ? Colors.grey.shade700 : AppColors.greenBiomass,
-                    onPressed: sinMaterialGenetico ? null : _handleSiembra,
+                    onPressed: (sinMaterialGenetico || _isSubmitting) ? null : _handleSiembra,
                   ),
                 ],
               ),

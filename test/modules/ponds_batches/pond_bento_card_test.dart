@@ -50,7 +50,7 @@ void main() {
     unidadAcuicolaId: 'u-1',
     estanqueId: 'pond-test-1',
     codigoLote: 'LOT-CACHAMA-01',
-    especie: 'Cachama Negra',
+    especie: 'Cachama Blanca',
     rolPolicultivo: 'secundaria',
     cantidadInicialPeces: 1500,
     cantidadActualPeces: 1450,
@@ -66,8 +66,8 @@ void main() {
     creadoEn: now,
   );
 
-  group('PondBentoCard - UX-01 & WCAG 2.5.5 Field Ergonomics Tests', () {
-    testWidgets('1. Primary Action Button renders with compact ergonomics (40dp)', (tester) async {
+  group('PondBentoCard - Clean Bento UI & WCAG 2.5.5 Tests', () {
+    testWidgets('1. Front card omits Registrar acción de campo button and emojis', (tester) async {
       await tester.pumpWidget(
         ProviderScope(
           child: MaterialApp(
@@ -85,115 +85,14 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      final primaryBtnFinder = find.text('REGISTRAR ACCIÓN DE CAMPO');
-      expect(primaryBtnFinder, findsOneWidget);
-
-      final elevatedBtnFinder = find.ancestor(of: primaryBtnFinder, matching: find.byType(ElevatedButton));
-      expect(elevatedBtnFinder, findsOneWidget);
-
-      final primaryBtnSize = tester.getSize(elevatedBtnFinder);
-      expect(primaryBtnSize.height, equals(40.0),
-          reason: 'Primary field button is specified to be compact (40dp height)');
+      expect(find.text('REGISTRAR ACCIÓN DE CAMPO'), findsNothing);
+      expect(find.textContaining('🟢'), findsNothing);
+      expect(find.textContaining('🟡'), findsNothing);
+      expect(find.textContaining('🔴'), findsNothing);
+      expect(find.textContaining('⚪'), findsNothing);
     });
 
-    testWidgets('2. Tapping primary button opens Operational Bottom Sheet with all 5 routines >= 56dp', (tester) async {
-      bool feedCalled = false;
-      bool waterCalled = false;
-      bool sampleCalled = false;
-      bool mortalityCalled = false;
-      bool transferCalled = false;
-
-      await tester.pumpWidget(
-        ProviderScope(
-          child: MaterialApp(
-            home: Scaffold(
-              body: SingleChildScrollView(
-                child: PondBentoCard(
-                  pond: testPond,
-                  batch: testBatch1,
-                  batches: [testBatch1],
-                  onFeedPressed: () => feedCalled = true,
-                  onWaterQualityPressed: () => waterCalled = true,
-                  onSamplePressed: () => sampleCalled = true,
-                  onMortalityPressed: () => mortalityCalled = true,
-                  onTransferPressed: () => transferCalled = true,
-                ),
-              ),
-            ),
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      // Open bottom sheet
-      await tester.tap(find.text('REGISTRAR ACCIÓN DE CAMPO'));
-      await tester.pumpAndSettle();
-
-      // Verify bottom sheet title and pond indicator
-      expect(find.text('ACCIONES DE CAMPO'), findsOneWidget);
-      expect(find.text(testPond.sigla), findsWidgets);
-
-      // Verify close button size >= 48x48 dp
-      final closeBtnFinder = find.widgetWithIcon(IconButton, Icons.close_rounded);
-      expect(closeBtnFinder, findsOneWidget);
-      final closeBtnSize = tester.getSize(closeBtnFinder);
-      expect(closeBtnSize.width, greaterThanOrEqualTo(48.0));
-      expect(closeBtnSize.height, greaterThanOrEqualTo(48.0));
-
-      // Verify all 5 field routines exist and have minHeight >= 56dp
-      final routines = [
-        'Registrar Alimentación',
-        'Calidad de Agua (O₂, pH, Temp)',
-        'Muestreo y Biometría',
-        'Registrar Bajas / Mortalidad',
-        'Traslado o Cosecha',
-      ];
-
-      for (final routineTitle in routines) {
-        final routineFinder = find.text(routineTitle);
-        expect(routineFinder, findsOneWidget);
-
-        final inkWellFinder = find.ancestor(of: routineFinder, matching: find.byType(InkWell)).first;
-        final size = tester.getSize(inkWellFinder);
-        expect(size.height, greaterThanOrEqualTo(56.0),
-            reason: '$routineTitle must be >= 56dp for wet field operation');
-      }
-
-      // Tap Calidad de Agua and verify callback is invoked
-      await tester.tap(find.text('Calidad de Agua (O₂, pH, Temp)'));
-      await tester.pumpAndSettle();
-      expect(waterCalled, isTrue);
-
-      // Re-open and test Alimentación
-      await tester.tap(find.text('REGISTRAR ACCIÓN DE CAMPO'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Registrar Alimentación'));
-      await tester.pumpAndSettle();
-      expect(feedCalled, isTrue);
-
-      // Re-open and test Muestreo y Biometría
-      await tester.tap(find.text('REGISTRAR ACCIÓN DE CAMPO'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Muestreo y Biometría'));
-      await tester.pumpAndSettle();
-      expect(sampleCalled, isTrue);
-
-      // Re-open and test Mortalidad
-      await tester.tap(find.text('REGISTRAR ACCIÓN DE CAMPO'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Registrar Bajas / Mortalidad'));
-      await tester.pumpAndSettle();
-      expect(mortalityCalled, isTrue);
-
-      // Re-open and test Traslado
-      await tester.tap(find.text('REGISTRAR ACCIÓN DE CAMPO'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Traslado o Cosecha'));
-      await tester.pumpAndSettle();
-      expect(transferCalled, isTrue);
-    });
-
-    testWidgets('3. Front card has single top-right flip button meeting WCAG 2.5.5 >= 48x48dp and no redundant bottom flip banner', (tester) async {
+    testWidgets('2. Front card has single top-right flip button meeting WCAG 2.5.5 >= 48x48dp', (tester) async {
       await tester.pumpWidget(
         ProviderScope(
           child: MaterialApp(
@@ -211,26 +110,28 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // Front flip button (top right)
       final flipIconFinder = find.byIcon(Icons.flip_camera_android_rounded).first;
       final flipTouchParent = find.ancestor(of: flipIconFinder, matching: find.byType(SizedBox)).first;
       final flipTouchSize = tester.getSize(flipTouchParent);
       expect(flipTouchSize.width, greaterThanOrEqualTo(48.0));
       expect(flipTouchSize.height, greaterThanOrEqualTo(48.0));
-
-      // Front redundant flip banner is removed
-      final bannerFinder = find.text('Radiografía y Costos (Flip)');
-      expect(bannerFinder, findsNothing);
     });
 
-    testWidgets('4. Back card face has single top VOLVER button and no redundant bottom return button', (tester) async {
+    testWidgets('3. Back card face has clean headers without emojis and omits Ficha estructural y aireación', (tester) async {
+      final pondWithDims = testPond.copyWith(
+        largoM: 30.0,
+        anchoM: 20.0,
+        profundidadM: 1.0,
+        tipoEstructura: 'Geomembrana Circular',
+      );
+
       await tester.pumpWidget(
         ProviderScope(
           child: MaterialApp(
             home: Scaffold(
               body: SingleChildScrollView(
                 child: PondBentoCard(
-                  pond: testPond,
+                  pond: pondWithDims,
                   batch: testBatch1,
                   batches: [testBatch1, testBatch2],
                 ),
@@ -241,35 +142,49 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // Tap 3D Flip trigger (top-right icon) to show back face
+      // Flip card to reverse face
       await tester.tap(find.byIcon(Icons.flip_camera_android_rounded).first);
       await tester.pumpAndSettle();
 
-      // 1. Header VOLVER button
+      // Header VOLVER button >= 48dp
       final volverFinder = find.text('VOLVER');
       expect(volverFinder, findsOneWidget);
       final volverParent = find.ancestor(of: volverFinder, matching: find.byType(SizedBox)).first;
-      final volverSize = tester.getSize(volverParent);
-      expect(volverSize.height, greaterThanOrEqualTo(48.0));
+      expect(tester.getSize(volverParent).height, greaterThanOrEqualTo(48.0));
 
-      // 2. Species selector chips
-      final species1Chip = find.text('🐟 Tilapia Roja');
+      // Species selector chips without emojis (>= 48dp)
+      final species1Chip = find.text('Tilapia Roja');
       expect(species1Chip, findsOneWidget);
-      final species1Size = tester.getSize(find.ancestor(of: species1Chip, matching: find.byType(InkWell)).first);
-      expect(species1Size.height, greaterThanOrEqualTo(48.0));
+      expect(tester.getSize(find.ancestor(of: species1Chip, matching: find.byType(InkWell)).first).height, greaterThanOrEqualTo(48.0));
 
-      // 3. Consolidated chip
-      final consolidatedChip = find.text('📊 Consolidado');
+      final consolidatedChip = find.text('Consolidado');
       expect(consolidatedChip, findsOneWidget);
-      final consolidatedSize = tester.getSize(find.ancestor(of: consolidatedChip, matching: find.byType(InkWell)).first);
-      expect(consolidatedSize.height, greaterThanOrEqualTo(48.0));
+      expect(tester.getSize(find.ancestor(of: consolidatedChip, matching: find.byType(InkWell)).first).height, greaterThanOrEqualTo(48.0));
 
-      // 4. Redundant bottom return button is removed
-      final returnBottomFinder = find.text('↩️ Volver a Vista de Estanque');
-      expect(returnBottomFinder, findsNothing);
+      // Single-batch headers without emojis
+      expect(find.text('DESGLOSE BIOLÓGICO'), findsOneWidget);
+      expect(find.text('RADIOGRAFÍA FINANCIERA Y COSTOS'), findsOneWidget);
+
+      // No structural card and no emojis
+      expect(find.textContaining('FICHA ESTRUCTURAL'), findsNothing);
+      expect(find.textContaining('🏗️'), findsNothing);
+      expect(find.textContaining('🔬'), findsNothing);
+      expect(find.textContaining('💰'), findsNothing);
+      expect(find.textContaining('🐟'), findsNothing);
+      expect(find.textContaining('📊'), findsNothing);
+
+      // Switch to consolidated polyculture view and verify clean headers
+      await tester.tap(consolidatedChip);
+      await tester.pumpAndSettle();
+
+      expect(find.text('DISTRIBUCIÓN DE BIOMASA POR ESPECIE'), findsOneWidget);
+      expect(find.text('INVERSIÓN TOTAL DEL POLICULTIVO'), findsOneWidget);
+      expect(find.textContaining('FICHA ESTRUCTURAL'), findsNothing);
+      expect(find.textContaining('📊'), findsNothing);
+      expect(find.textContaining('💰'), findsNothing);
     });
 
-    testWidgets('5. Front card renders Water Quality mini-strip with live O2, Temp, and pH', (tester) async {
+    testWidgets('4. Front card renders Water Quality mini-strip with live O2, Temp, and pH', (tester) async {
       final testParam = WaterParameter(
         id: 'wq-1',
         empresaId: 'emp-1',
@@ -304,83 +219,7 @@ void main() {
       expect(find.textContaining('pH: 7.4'), findsOneWidget);
     });
 
-    testWidgets('6. Reverse face includes Structural and Aeration card with dimensions and harvest projection', (tester) async {
-      final pondWithDims = testPond.copyWith(
-        largoM: 30.0,
-        anchoM: 20.0,
-        profundidadM: 1.0,
-        tipoEstructura: 'Geomembrana Circular',
-      );
-
-      final batchWithHarvest = testBatch1.copyWith(
-        fechaCosechaEstimada: now.add(const Duration(days: 30)),
-      );
-
-      await tester.pumpWidget(
-        ProviderScope(
-          child: MaterialApp(
-            home: Scaffold(
-              body: SingleChildScrollView(
-                child: PondBentoCard(
-                  pond: pondWithDims,
-                  batch: batchWithHarvest,
-                  batches: [batchWithHarvest],
-                ),
-              ),
-            ),
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      // Tap 3D Flip trigger to show back face
-      await tester.tap(find.byIcon(Icons.flip_camera_android_rounded).first);
-      await tester.pumpAndSettle();
-
-      expect(find.text('🏗️ FICHA ESTRUCTURAL Y AIREACIÓN'), findsOneWidget);
-      expect(find.textContaining('30.0m × 20.0m × 1.0m'), findsOneWidget);
-      expect(find.textContaining('600 m³ de agua'), findsOneWidget);
-      expect(find.textContaining('Aireación sug.:'), findsOneWidget);
-    });
-
-    testWidgets('7. Operational Bottom Sheet includes Edit Pond action >= 56dp and fires onEditPondPressed', (tester) async {
-      bool editCalled = false;
-
-      await tester.pumpWidget(
-        ProviderScope(
-          child: MaterialApp(
-            home: Scaffold(
-              body: SingleChildScrollView(
-                child: PondBentoCard(
-                  pond: testPond,
-                  batch: testBatch1,
-                  batches: [testBatch1],
-                  onEditPondPressed: () => editCalled = true,
-                ),
-              ),
-            ),
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      // Open bottom sheet
-      await tester.tap(find.text('REGISTRAR ACCIÓN DE CAMPO'));
-      await tester.pumpAndSettle();
-
-      final editFinder = find.text('Editar Parámetros del Estanque');
-      expect(editFinder, findsOneWidget);
-
-      final inkWellFinder = find.ancestor(of: editFinder, matching: find.byType(InkWell)).first;
-      final size = tester.getSize(inkWellFinder);
-      expect(size.height, greaterThanOrEqualTo(56.0));
-
-      await tester.tap(editFinder);
-      await tester.pumpAndSettle();
-      expect(editCalled, isTrue);
-    });
-
-    testWidgets('8. Reverse face does not overflow inside constrained grid cell (e.g. 340x420 & 360x450)', (tester) async {
+    testWidgets('5. Reverse face does not overflow inside constrained grid cell (340x390)', (tester) async {
       await tester.pumpWidget(
         ProviderScope(
           child: MaterialApp(
@@ -388,7 +227,7 @@ void main() {
               body: Center(
                 child: SizedBox(
                   width: 340,
-                  height: 420,
+                  height: 390,
                   child: PondBentoCard(
                     pond: testPond,
                     batch: testBatch1,
@@ -403,13 +242,11 @@ void main() {
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
 
-      // Flip card to reverse face
       await tester.tap(find.byIcon(Icons.flip_camera_android_rounded).first);
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
 
-      // Switch to consolidated polyculture view on reverse face
-      final consolidatedFinder = find.text('📊 Consolidado');
+      final consolidatedFinder = find.text('Consolidado');
       await tester.ensureVisible(consolidatedFinder);
       await tester.pumpAndSettle();
       await tester.tap(consolidatedFinder);
@@ -417,7 +254,7 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('9. Target harvest weight reflects custom targetWeightsBySpecies on front and back faces', (tester) async {
+    testWidgets('6. Target harvest weight reflects custom targetWeightsBySpecies on front and back faces', (tester) async {
       await tester.pumpWidget(
         ProviderScope(
           child: MaterialApp(
@@ -438,14 +275,11 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // Front card should display custom harvest target
       expect(find.textContaining('800g cosecha'), findsOneWidget);
 
-      // Flip to reverse face
       await tester.tap(find.byIcon(Icons.flip_camera_android_rounded).first);
       await tester.pumpAndSettle();
 
-      // Reverse face should display custom target
       expect(find.textContaining('800g meta'), findsOneWidget);
     });
   });

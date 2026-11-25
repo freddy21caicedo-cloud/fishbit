@@ -45,16 +45,18 @@ class MortalityRecord {
 
   factory MortalityRecord.fromJson(Map<String, dynamic> json) {
     DateTime parsedDate = DateTime.now();
-    if (json['fecha'] != null) {
-      parsedDate = DateTime.tryParse(json['fecha'].toString()) ?? DateTime.now();
-    } else if (json['date'] != null) {
-      final dStr = json['date'].toString();
-      final hStr = json['hora']?.toString() ?? json['hour']?.toString() ?? '00:00:00';
-      parsedDate = DateTime.tryParse('${dStr}T$hStr') ?? DateTime.tryParse(dStr) ?? DateTime.now();
+    if (json['date'] != null) {
+      final dStr = json['date'].toString().split('T').first.split(' ').first;
+      parsedDate = DateTime.tryParse(dStr) ?? DateTime.now();
+    } else if (json['fecha'] != null) {
+      final fStr = json['fecha'].toString().split('T').first.split(' ').first;
+      parsedDate = DateTime.tryParse(fStr) ?? DateTime.tryParse(json['fecha'].toString()) ?? DateTime.now();
     } else if (json['created_at'] != null) {
-      parsedDate = DateTime.tryParse(json['created_at'].toString()) ?? DateTime.now();
+      final parsed = DateTime.tryParse(json['created_at'].toString());
+      parsedDate = parsed != null ? (parsed.isUtc ? parsed.toLocal() : parsed) : DateTime.now();
     } else if (json['creado_en'] != null) {
-      parsedDate = DateTime.tryParse(json['creado_en'].toString()) ?? DateTime.now();
+      final parsed = DateTime.tryParse(json['creado_en'].toString());
+      parsedDate = parsed != null ? (parsed.isUtc ? parsed.toLocal() : parsed) : DateTime.now();
     }
 
     final rawCantidad = json['cantidad_peces_muertos'] ?? json['cantidad'] ?? json['quantity'] ?? json['muertos'] ?? json['peces_muertos'];
@@ -121,6 +123,7 @@ class MortalityRecord {
     double? biomasaPerdidaKg,
     String? causaProbable,
     String? observaciones,
+    bool clearObservaciones = false,
     String? registradoPor,
     DateTime? fecha,
     String? hora,
@@ -136,7 +139,7 @@ class MortalityRecord {
       pesoPromedioGramos: pesoPromedioGramos ?? this.pesoPromedioGramos,
       biomasaPerdidaKg: biomasaPerdidaKg ?? this.biomasaPerdidaKg,
       causaProbable: causaProbable ?? this.causaProbable,
-      observaciones: observaciones ?? this.observaciones,
+      observaciones: clearObservaciones ? null : (observaciones ?? this.observaciones),
       registradoPor: registradoPor ?? this.registradoPor,
       fecha: fecha ?? this.fecha,
       hora: hora ?? this.hora,

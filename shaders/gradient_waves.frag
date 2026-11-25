@@ -25,10 +25,12 @@ float hash21(vec2 p) {
   return fract(p.x * p.y);
 }
 
+// Ruido de valor con interpolación quíntica (continuidad C2 en derivadas 1ª y 2ª)
+// para evitar costuras o líneas rectas visibles al calcular normales por diferencias finitas.
 float vnoise(vec2 p) {
   vec2 i = floor(p);
   vec2 f = fract(p);
-  vec2 u = f * f * (3.0 - 2.0 * f);
+  vec2 u = f * f * f * (f * (f * 6.0 - 15.0) + 10.0);
   float a = hash21(i);
   float b = hash21(i + vec2(1.0, 0.0));
   float c = hash21(i + vec2(0.0, 1.0));
@@ -36,25 +38,34 @@ float vnoise(vec2 p) {
   return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
 }
 
-float waveHeight(vec2 p, float t) {
+float organicTurbulence(vec2 p, float t) {
+  // Rotación no alineada a ejes para eliminar cualquier traza de grilla en perspectiva
+  mat2 rot1 = mat2(0.80, -0.60, 0.60, 0.80);
+  mat2 rot2 = mat2(0.60, 0.80, -0.80, 0.60);
+  float n1 = vnoise(rot1 * p + vec2(t * 0.32, -t * 0.22));
+  float n2 = vnoise(rot2 * (p * 1.85) + vec2(-t * 0.24, t * 0.28));
+  return ((n1 * 0.68 + n2 * 0.32) - 0.5) * 2.0;
+}
+
+float waveHeight(vec2 p, float t, vec2 clickCoord) {
   float sc = max(0.25, uWaveScale);
   float swellAmp = uSwell * 0.012;
-  float turbAmp = uTurbulence * 0.008;
+  float turbAmp = uTurbulence * 0.0065;
 
   // Rolling primary ocean swells
   float w1 = sin(p.x * 1.45 * sc + t * 1.10 + sin(p.y * 0.75 * sc - t * 0.55) * 0.85);
   float w2 = sin(p.y * 2.10 * sc - t * 0.85 + cos(p.x * 1.20 * sc + t * 0.45) * 0.65);
   float w3 = sin((p.x * 0.9 - p.y * 1.35) * 2.6 * sc + t * 1.40) * 0.45;
 
-  // Fine surface turbulence
-  float n = (vnoise(p * 2.4 * sc + vec2(t * 0.35, -t * 0.25)) - 0.5) * 2.0;
+  // Fine organic surface turbulence (C2-smooth, rotated)
+  float n = organicTurbulence(p * 2.1 * sc, t);
   float h = (w1 * 0.50 + w2 * 0.34 + w3 * 0.22) * (0.65 + swellAmp) + n * turbAmp;
 
-  // Interactive swell pulse on click/tap
+  // Interactive swell pulse evaluated consistently in waveCoord space
   if (uClickWave.w > 0.001) {
-    float dist = length(p - uClickWave.xy);
-    float ring = exp(-pow((dist - uClickWave.z) * 4.2, 2.0)) * uClickWave.w;
-    h += sin((dist - uClickWave.z) * 14.0) * ring * 0.55;
+    float dist = length(p - clickCoord);
+    float ring = exp(-pow((dist - uClickWave.z * 2.4) * 2.2, 2.0)) * uClickWave.w;
+    h += sin((dist - uClickWave.z * 2.4) * 10.0) * ring * 0.45;
   }
 
   return h * uAmplitude * 0.24;
@@ -80,20 +91,13 @@ void main() {
   float clickPersp = mix(3.4, 0.95, pow(clickDepth, 0.72));
   vec2 clickCoord = vec2(clickCentered.x * clickPersp, clickDepth * 3.8) + ptrShift;
 
-  // Evaluate height & analytical finite-difference normal
-  float eps = 0.045;
-  float h0 = waveHeight(waveCoord, uTime);
-  float hx = waveHeight(waveCoord + vec2(eps, 0.0), uTime);
-  float hy = waveHeight(waveCoord + vec2(0.0, eps), uTime);
+  // Evaluate height & smooth finite-difference normal
+  float eps = 0.05;
+  float h0 = waveHeight(waveCoord, uTime, clickCoord);
+  float hx = waveHeight(waveCoord + vec2(eps, 0.0), uTime, clickCoord);
+  float hy = waveHeight(waveCoord + vec2(0.0, eps), uTime, clickCoord);
 
-  // Add localized click ripple directly in waveCoord space
-  if (uClickWave.w > 0.001) {
-    float d = length(waveCoord - clickCoord);
-    float ring = exp(-pow((d - uClickWave.z * 2.4) * 2.2, 2.0)) * uClickWave.w;
-    h0 += sin((d - uClickWave.z * 2.4) * 10.0) * ring * 0.28;
-  }
-
-  vec3 normal = normalize(vec3((h0 - hx) * 6.5 * uRelief, (h0 - hy) * 6.5 * uRelief, 1.0));
+  vec3 normal = normalize(vec3((h0 - hx) * 6.0 * uRelief, (h0 - hy) * 6.0 * uRelief, 1.0));
   vec3 lightDir = normalize(vec3(uLightDir.x, uLightDir.y, 0.78));
   vec3 viewDir = vec3(0.0, 0.0, 1.0);
   vec3 halfVec = normalize(lightDir + viewDir);
@@ -112,6 +116,9 @@ void main() {
   vec3 skyAndHorizon = mix(uHorizonColor * 0.55, uHorizonColor, smoothstep(0.0, 0.35, uv.y));
   vec3 finalRgb = mix(skyAndHorizon, litWave, smoothstep(0.04, 0.52, depth));
   finalRgb += uHorizonColor * horizonGlow * 0.22;
+
+  // Dithering sutil de 1/255 para eliminar bandas de color en pantallas OLED oscuras
+  finalRgb += (hash21(fc) - 0.5) / 255.0;
 
   float alpha = clamp(uOpacity, 0.0, 1.0);
   fragColor = vec4(clamp(finalRgb, 0.0, 1.0) * alpha, alpha);

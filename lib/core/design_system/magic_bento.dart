@@ -10,6 +10,7 @@ class MagicBentoCardData {
   final String title;
   final String? subtitle;
   final IconData? icon;
+  final Widget? trailingWidget;
   final Color glowColor;
   final VoidCallback? onTap;
   final Widget child;
@@ -18,6 +19,7 @@ class MagicBentoCardData {
     required this.title,
     this.subtitle,
     this.icon,
+    this.trailingWidget,
     this.glowColor = AppColors.cyanWater,
     this.onTap,
     required this.child,
@@ -140,6 +142,406 @@ class _MagicBentoGridState extends State<MagicBentoGrid> {
                 }),
               ),
             ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// Tarjeta Bento individual de altura intrínseca con las mismas animaciones
+/// interactivas de [MagicBentoGrid] (spotlight, border glow, estrellas,
+/// magnetismo 3D y onda expansiva al clic).
+class MagicBentoCard extends StatefulWidget {
+  final String? title;
+  final String? subtitle;
+  final IconData? icon;
+  final Widget? trailingWidget;
+  final Color glowColor;
+  final VoidCallback? onTap;
+  final Widget child;
+  final double radius;
+  final EdgeInsetsGeometry padding;
+  final int seed;
+  final bool enableBorderGlow;
+  final bool enableSpotlight;
+  final double spotlightRadius;
+  final bool clickEffect;
+  final bool enableStars;
+  final bool enableMagnetism;
+
+  const MagicBentoCard({
+    super.key,
+    this.title,
+    this.subtitle,
+    this.icon,
+    this.trailingWidget,
+    this.glowColor = AppColors.cyanWater,
+    this.onTap,
+    required this.child,
+    this.radius = 20.0,
+    this.padding = const EdgeInsets.all(16),
+    this.seed = 1,
+    this.enableBorderGlow = true,
+    this.enableSpotlight = true,
+    this.spotlightRadius = 420.0,
+    this.clickEffect = true,
+    this.enableStars = true,
+    this.enableMagnetism = true,
+  });
+
+  @override
+  State<MagicBentoCard> createState() => _MagicBentoCardStandaloneState();
+}
+
+class _MagicBentoCardStandaloneState extends State<MagicBentoCard>
+    with TickerProviderStateMixin {
+  final ValueNotifier<Offset?> _pointerNotifier = ValueNotifier<Offset?>(null);
+  bool _isHovered = false;
+  Offset? _hoverLocal;
+  Offset? _clickOrigin;
+
+  late final AnimationController _rippleController;
+  late final AnimationController _starsController;
+  late final List<_BentoStar> _stars;
+
+  @override
+  void initState() {
+    super.initState();
+    _rippleController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 520),
+    );
+    _starsController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 4),
+    )..value = 0.35;
+
+    final rng = math.Random(widget.seed * 7919);
+    _stars = List.generate(
+      10,
+      (_) => _BentoStar(
+        nx: 0.1 + rng.nextDouble() * 0.8,
+        ny: 0.1 + rng.nextDouble() * 0.8,
+        radius: 0.9 + rng.nextDouble() * 1.4,
+        phase: rng.nextDouble() * math.pi * 2,
+      ),
+    );
+  }
+
+  @override
+  void didUpdateWidget(covariant MagicBentoCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.enableStars != oldWidget.enableStars) {
+      if (!widget.enableStars) {
+        _starsController.stop();
+      } else if (_isHovered && !_starsController.isAnimating) {
+        _starsController.repeat();
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _pointerNotifier.dispose();
+    _rippleController.dispose();
+    _starsController.dispose();
+    super.dispose();
+  }
+
+  void _triggerRipple(Offset localPos) {
+    if (!widget.clickEffect) return;
+    _clickOrigin = localPos;
+    _rippleController.forward(from: 0.0);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final glowColor = widget.glowColor;
+    final borderRadius = BorderRadius.circular(widget.radius);
+    final hasHeader =
+        widget.title != null || widget.icon != null || widget.trailingWidget != null;
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final w = math.max(constraints.maxWidth, 1.0);
+        final h = constraints.hasBoundedHeight
+            ? math.max(constraints.maxHeight, 1.0)
+            : 180.0;
+
+        Matrix4 transform = Matrix4.identity();
+        if (widget.enableMagnetism && _isHovered && _hoverLocal != null) {
+          final dx = ((_hoverLocal!.dx / w) - 0.5).clamp(-0.5, 0.5);
+          final dy = ((_hoverLocal!.dy / h) - 0.5).clamp(-0.5, 0.5);
+          transform = Matrix4.identity()
+            ..setEntry(3, 2, 0.0012)
+            ..translateByDouble(dx * 4.0, dy * 4.0, 0.0, 1.0)
+            ..rotateX(-dy * 0.035)
+            ..rotateY(dx * 0.035);
+        }
+
+        final baseBg = isDark
+            ? const Color(0xFF0C1322).withValues(alpha: 0.84)
+            : Colors.white.withValues(alpha: 0.90);
+        final restingBorder = isDark
+            ? Colors.white.withValues(alpha: 0.09)
+            : Colors.black.withValues(alpha: 0.07);
+
+        final cardContainer = AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOutCubic,
+          transform: transform,
+          transformAlignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: baseBg,
+            borderRadius: borderRadius,
+            border: Border.all(color: restingBorder, width: 1),
+            boxShadow: [
+              BoxShadow(
+                color: _isHovered
+                    ? glowColor.withValues(alpha: isDark ? 0.16 : 0.14)
+                    : Colors.black.withValues(alpha: isDark ? 0.28 : 0.06),
+                blurRadius: _isHovered ? 24 : 14,
+                offset: const Offset(0, 6),
+              ),
+            ],
+          ),
+          child: ClipRRect(
+            borderRadius: borderRadius,
+            child: Stack(
+              children: [
+                if (widget.enableSpotlight)
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: RepaintBoundary(
+                        child: ValueListenableBuilder<Offset?>(
+                          valueListenable: _pointerNotifier,
+                          builder: (context, pointer, _) {
+                            if (pointer == null) return const SizedBox.shrink();
+                            return CustomPaint(
+                              painter: _SpotlightPainter(
+                                center: pointer,
+                                radius: widget.spotlightRadius,
+                                color: glowColor.withValues(
+                                  alpha: isDark ? 0.16 : 0.12,
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ),
+                  ),
+                if (widget.enableStars)
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: RepaintBoundary(
+                        child: AnimatedBuilder(
+                          animation: _starsController,
+                          builder: (context, _) {
+                            return CustomPaint(
+                              painter: _StarsPainter(
+                                stars: _stars,
+                                progress: _starsController.value,
+                                color: glowColor,
+                                intensity: _isHovered ? 1.0 : 0.45,
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ),
+                  ),
+                if (widget.clickEffect)
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: AnimatedBuilder(
+                        animation: _rippleController,
+                        builder: (context, _) {
+                          if (_clickOrigin == null ||
+                              _rippleController.value == 0 ||
+                              _rippleController.isCompleted) {
+                            return const SizedBox.shrink();
+                          }
+                          return CustomPaint(
+                            painter: _ClickRipplePainter(
+                              origin: _clickOrigin!,
+                              progress: Curves.easeOutCubic
+                                  .transform(_rippleController.value),
+                              color: glowColor,
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                Padding(
+                  padding: widget.padding,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (hasHeader) ...[
+                        Row(
+                          children: [
+                            if (widget.icon != null) ...[
+                              Container(
+                                padding: const EdgeInsets.all(7),
+                                decoration: BoxDecoration(
+                                  color: glowColor.withValues(alpha: 0.14),
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(
+                                    color: glowColor.withValues(alpha: 0.25),
+                                    width: 1,
+                                  ),
+                                ),
+                                child: Icon(
+                                  widget.icon,
+                                  size: 16,
+                                  color: glowColor,
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                            ],
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  if (widget.title != null)
+                                    Text(
+                                      widget.title!.toUpperCase(),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: AppTypography.labelMicro.copyWith(
+                                        color: isDark
+                                            ? AppColors.textSecondaryDark
+                                            : AppColors.textSecondaryLight,
+                                        letterSpacing: 0.8,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  if (widget.subtitle != null) ...[
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      widget.subtitle!,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: AppTypography.bodySmall.copyWith(
+                                        color: isDark
+                                            ? AppColors.textSecondaryDark
+                                            : AppColors.textSecondaryLight,
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                            if (widget.trailingWidget != null) ...[
+                              const SizedBox(width: 8),
+                              Flexible(
+                                flex: 0,
+                                child: widget.trailingWidget!,
+                              ),
+                            ] else if (widget.onTap != null)
+                              Icon(
+                                Icons.arrow_outward_rounded,
+                                size: 14,
+                                color: _isHovered
+                                    ? glowColor
+                                    : (isDark
+                                        ? Colors.white24
+                                        : AppColors.textTertiaryLight),
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                      ],
+                      widget.child,
+                    ],
+                  ),
+                ),
+                if (widget.enableBorderGlow)
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: RepaintBoundary(
+                        child: ValueListenableBuilder<Offset?>(
+                          valueListenable: _pointerNotifier,
+                          builder: (context, pointer, _) {
+                            if (pointer == null) return const SizedBox.shrink();
+                            return CustomPaint(
+                              painter: _BorderGlowPainter(
+                                center: pointer,
+                                spotlightRadius: widget.spotlightRadius,
+                                borderRadius: widget.radius,
+                                color: glowColor,
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        );
+
+        Widget interactive = Listener(
+          behavior: HitTestBehavior.translucent,
+          onPointerMove: (e) => _pointerNotifier.value = e.localPosition,
+          onPointerDown: (e) {
+            _pointerNotifier.value = e.localPosition;
+            if (widget.onTap == null) {
+              _triggerRipple(e.localPosition);
+            }
+          },
+          child: cardContainer,
+        );
+
+        if (widget.onTap != null) {
+          interactive = GestureDetector(
+            onTapDown: (d) => _triggerRipple(d.localPosition),
+            onTap: () {
+              HapticFeedback.lightImpact();
+              widget.onTap!();
+            },
+            child: interactive,
+          );
+        }
+
+        return RepaintBoundary(
+          child: MouseRegion(
+            cursor: widget.onTap != null
+                ? SystemMouseCursors.click
+                : SystemMouseCursors.basic,
+            onEnter: (e) {
+              _pointerNotifier.value = e.localPosition;
+              setState(() {
+                _isHovered = true;
+                _hoverLocal = e.localPosition;
+              });
+              if (widget.enableStars && !_starsController.isAnimating) {
+                _starsController.repeat();
+              }
+            },
+            onHover: (e) {
+              _pointerNotifier.value = e.localPosition;
+              if (widget.enableMagnetism) {
+                setState(() => _hoverLocal = e.localPosition);
+              }
+            },
+            onExit: (_) {
+              _pointerNotifier.value = null;
+              setState(() {
+                _isHovered = false;
+                _hoverLocal = null;
+              });
+              if (_starsController.isAnimating) {
+                _starsController.stop();
+              }
+            },
+            child: interactive,
           ),
         );
       },
@@ -430,7 +832,10 @@ class _MagicBentoCardState extends State<_MagicBentoCard>
                                   ),
                                 ),
                               ),
-                              if (widget.data.onTap != null)
+                              if (widget.data.trailingWidget != null) ...[
+                                const SizedBox(width: 6),
+                                widget.data.trailingWidget!,
+                              ] else if (widget.data.onTap != null)
                                 Icon(
                                   Icons.arrow_outward_rounded,
                                   size: 14,

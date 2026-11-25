@@ -138,6 +138,7 @@ class PondsNotifier extends StateNotifier<PondsState> {
       final newBio = (newCount * oldBatch.pesoActualGramos) / 1000.0;
       final updatedBatch = oldBatch.copyWith(
         cantidadActualPeces: newCount,
+        mortalidadAcumuladaPeces: oldBatch.mortalidadAcumuladaPeces + event.cantidadPecesMuertos,
         biomasaActualKg: newBio,
       );
 
@@ -204,6 +205,7 @@ class PondsNotifier extends StateNotifier<PondsState> {
       final updatedBatch = oldBatch.copyWith(
         biomasaActualKg: isTotalHarvest ? 0.0 : remanenteBiomasa,
         cantidadActualPeces: isTotalHarvest ? 0 : remanentePeces,
+        pecesCosechados: oldBatch.pecesCosechados + pecesVendidos,
         estado: isTotalHarvest ? BatchStatus.harvested : oldBatch.estado,
       );
 
@@ -274,7 +276,7 @@ class PondsNotifier extends StateNotifier<PondsState> {
         _repository.fetchTransfersByUnit(empresaId, finalUnitId),
       ]);
 
-      final ponds = results[0] as List<Pond>;
+      final ponds = List<Pond>.from(results[0] as List<Pond>)..sort(Pond.compareByNumber);
       final batches = results[1] as List<FishBatch>;
       final biometries = results[2] as List<BiometriaRecord>;
       final mortality = results[3] as List<MortalityRecord>;
@@ -296,7 +298,8 @@ class PondsNotifier extends StateNotifier<PondsState> {
   Future<void> addPond(Pond pond) async {
     try {
       final created = await _repository.createPond(pond);
-      state = state.copyWith(ponds: [...state.ponds, created]);
+      final sortedPonds = [...state.ponds, created]..sort(Pond.compareByNumber);
+      state = state.copyWith(ponds: sortedPonds);
     } catch (e) {
       state = state.copyWith(errorMessage: e.toString());
       rethrow;
@@ -306,7 +309,8 @@ class PondsNotifier extends StateNotifier<PondsState> {
   Future<void> updatePond(Pond pond) async {
     try {
       await _repository.updatePond(pond);
-      final updatedPonds = state.ponds.map((p) => p.id == pond.id ? pond : p).toList();
+      final updatedPonds = state.ponds.map((p) => p.id == pond.id ? pond : p).toList()
+        ..sort(Pond.compareByNumber);
       state = state.copyWith(ponds: updatedPonds);
     } catch (e) {
       state = state.copyWith(errorMessage: e.toString());
@@ -327,6 +331,24 @@ class PondsNotifier extends StateNotifier<PondsState> {
   Future<bool> plantBatch(FishBatch batch) async {
     await addBatch(batch);
     return true;
+  }
+
+  /// Siembra atómica con descuento bloqueado de alevinos en Supabase (previene siembras dobles)
+  Future<FishBatch> plantBatchWithSeedDiscount({
+    required FishBatch batch,
+    required String inventoryItemId,
+  }) async {
+    try {
+      final created = await _repository.plantBatchWithSeedDiscount(
+        batch: batch,
+        inventoryItemId: inventoryItemId,
+      );
+      await loadPondsAndBatches();
+      return created;
+    } catch (e) {
+      state = state.copyWith(errorMessage: e.toString());
+      rethrow;
+    }
   }
 
   Future<void> executeTransferSplit({
@@ -402,6 +424,7 @@ class PondsNotifier extends StateNotifier<PondsState> {
           final newBio = (newCount * effectivePeso) / 1000.0;
           return b.copyWith(
             cantidadActualPeces: newCount,
+            mortalidadAcumuladaPeces: b.mortalidadAcumuladaPeces + cantidadPecesMuertos,
             biomasaActualKg: newBio,
           );
         }

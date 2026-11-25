@@ -8,12 +8,8 @@ import 'package:fishbit_finance/core/design_system/floating_dock_layout.dart';
 import 'package:fishbit_finance/modules/auth_tenant/presentation/providers/auth_provider.dart';
 import 'package:fishbit_finance/modules/ponds_batches/domain/models/pond.dart';
 import 'package:fishbit_finance/modules/ponds_batches/domain/models/fish_batch.dart';
-import 'package:fishbit_finance/modules/ponds_batches/presentation/dialogs/alimentar_modal.dart';
-import 'package:fishbit_finance/modules/ponds_batches/presentation/dialogs/biometria_modal.dart';
 import 'package:fishbit_finance/modules/ponds_batches/presentation/dialogs/crear_estanque_modal.dart';
-import 'package:fishbit_finance/modules/ponds_batches/presentation/dialogs/mortalidad_modal.dart';
 import 'package:fishbit_finance/modules/ponds_batches/presentation/dialogs/siembra_modal.dart';
-import 'package:fishbit_finance/modules/ponds_batches/presentation/dialogs/traslado_modal.dart';
 import 'package:fishbit_finance/modules/ponds_batches/presentation/providers/ponds_provider.dart';
 import 'package:fishbit_finance/modules/ponds_batches/presentation/widgets/pond_bento_card.dart';
 import 'package:fishbit_finance/modules/water_quality/presentation/providers/water_quality_provider.dart';
@@ -164,7 +160,7 @@ class _PondsDashboardScreenState extends ConsumerState<PondsDashboardScreen> {
                     sliver: SliverGrid(
                       gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
                         maxCrossAxisExtent: 440,
-                        mainAxisExtent: 450,
+                        mainAxisExtent: 390,
                         crossAxisSpacing: 16,
                         mainAxisSpacing: 16,
                       ),
@@ -182,17 +178,6 @@ class _PondsDashboardScreenState extends ConsumerState<PondsDashboardScreen> {
                               batches: activeBatches,
                               latestWaterParameter: waterQualityByPond[pond.id],
                               targetWeightsBySpecies: targetWeightsBySpecies,
-                              onFeedPressed: () {
-                                if (primaryBatch != null) {
-                                  AlimentarModal.show(context, pond: pond, batch: primaryBatch);
-                                } else {
-                                  SiembraModal.show(context);
-                                }
-                              },
-                              onSamplePressed: primaryBatch != null ? () => BiometriaModal.show(context, pond: pond, batch: primaryBatch) : null,
-                              onMortalityPressed: primaryBatch != null ? () => MortalidadModal.show(context, pond: pond, batch: primaryBatch) : null,
-                              onTransferPressed: primaryBatch != null ? () => TrasladoModal.show(context, pond: pond, batch: primaryBatch) : null,
-                              onEditPondPressed: () => CrearEstanqueModal.show(context, pondToEdit: pond),
                             ),
                           );
                         },
@@ -222,17 +207,6 @@ class _PondsDashboardScreenState extends ConsumerState<PondsDashboardScreen> {
                                 batches: activeBatches,
                                 latestWaterParameter: waterQualityByPond[pond.id],
                                 targetWeightsBySpecies: targetWeightsBySpecies,
-                                onFeedPressed: () {
-                                  if (primaryBatch != null) {
-                                    AlimentarModal.show(context, pond: pond, batch: primaryBatch);
-                                  } else {
-                                    SiembraModal.show(context);
-                                  }
-                                },
-                                onSamplePressed: primaryBatch != null ? () => BiometriaModal.show(context, pond: pond, batch: primaryBatch) : null,
-                                onMortalityPressed: primaryBatch != null ? () => MortalidadModal.show(context, pond: pond, batch: primaryBatch) : null,
-                                onTransferPressed: primaryBatch != null ? () => TrasladoModal.show(context, pond: pond, batch: primaryBatch) : null,
-                                onEditPondPressed: () => CrearEstanqueModal.show(context, pondToEdit: pond),
                               ),
                             ),
                           );

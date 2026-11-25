@@ -204,10 +204,15 @@ class SupabaseWaterQualityRepository implements WaterQualityRepository {
     if (empresaId.startsWith('c1000000-')) {
       return;
     }
-    await _supabase
+    final deleted = await _supabase
         .from('parametros_calidad_agua')
         .delete()
         .eq('id', id)
-        .eq('empresa_id', empresaId);
+        .eq('empresa_id', empresaId)
+        .select('id');
+
+    if ((deleted as List).isEmpty) {
+      throw Exception('No se encontró la medición o no tienes permisos de administrador para eliminarla.');
+    }
   }
 }

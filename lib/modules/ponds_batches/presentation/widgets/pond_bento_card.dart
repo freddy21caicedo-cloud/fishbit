@@ -4,34 +4,19 @@ import 'package:fishbit_finance/core/design_system/app_colors.dart';
 import 'package:fishbit_finance/core/design_system/app_typography.dart';
 import 'package:fishbit_finance/core/design_system/glass_card.dart';
 import 'package:fishbit_finance/core/design_system/glass_badge.dart';
-import 'package:fishbit_finance/core/design_system/glass_container.dart';
 import 'package:fishbit_finance/core/utils/currency_formatters.dart';
 import 'package:fishbit_finance/modules/ponds_batches/domain/models/pond.dart';
 import 'package:fishbit_finance/modules/ponds_batches/domain/models/fish_batch.dart';
 import 'package:fishbit_finance/modules/water_quality/domain/models/water_parameter.dart';
-import 'package:fishbit_finance/modules/water_quality/presentation/dialogs/parametro_modal.dart';
-import 'package:fishbit_finance/modules/ponds_batches/presentation/dialogs/alimentar_modal.dart';
-import 'package:fishbit_finance/modules/ponds_batches/presentation/dialogs/biometria_modal.dart';
-import 'package:fishbit_finance/modules/ponds_batches/presentation/dialogs/mortalidad_modal.dart';
-import 'package:fishbit_finance/modules/ponds_batches/presentation/dialogs/traslado_modal.dart';
-import 'package:fishbit_finance/modules/ponds_batches/presentation/dialogs/siembra_modal.dart';
-import 'package:fishbit_finance/modules/ponds_batches/presentation/dialogs/crear_estanque_modal.dart';
 
 /// Tarjeta Bento de Estanque Interactiva Optimizada a 60/120 FPS con efecto 3D Flip de 180°
-/// - Cara Frontal: Resumen Operativo, Calidad de Agua, Densidad y Acciones Rápidas.
-/// - Cara Trasera (Reverso 180°): Trazabilidad, Ficha Estructural/Aireación, Radiografía por Especie y Costos.
+/// - Cara Frontal: Resumen Operativo, Calidad de Agua, Densidad y Progreso de Talla.
+/// - Cara Trasera (Reverso 180°): Radiografía Biológica y Financiera por Especie / Policultivo.
 class PondBentoCard extends StatefulWidget {
   final Pond pond;
   final FishBatch? batch;
   final List<FishBatch> batches;
   final WaterParameter? latestWaterParameter;
-  final VoidCallback? onFeedPressed;
-  final VoidCallback? onTransferPressed;
-  final VoidCallback? onSamplePressed;
-  final VoidCallback? onMortalityPressed;
-  final VoidCallback? onWaterQualityPressed;
-  final VoidCallback? onOperationsPressed;
-  final VoidCallback? onEditPondPressed;
   final Map<String, dynamic>? targetWeightsBySpecies;
 
   const PondBentoCard({
@@ -40,13 +25,6 @@ class PondBentoCard extends StatefulWidget {
     this.batch,
     this.batches = const [],
     this.latestWaterParameter,
-    this.onFeedPressed,
-    this.onTransferPressed,
-    this.onSamplePressed,
-    this.onMortalityPressed,
-    this.onWaterQualityPressed,
-    this.onOperationsPressed,
-    this.onEditPondPressed,
     this.targetWeightsBySpecies,
   });
 
@@ -138,7 +116,7 @@ class _PondBentoCardState extends State<PondBentoCard> with SingleTickerProvider
   }
 
   // ---------------------------------------------------------------------------
-  // CARA FRONTAL: Resumen Operativo, Densidad y Acciones Rápidas
+  // CARA FRONTAL: Resumen Operativo, Calidad de Agua, Densidad y Progreso
   // ---------------------------------------------------------------------------
   Widget _buildFrontCard(
     BuildContext context,
@@ -158,7 +136,8 @@ class _PondBentoCardState extends State<PondBentoCard> with SingleTickerProvider
     final displayDensidad = capacidadM3 > 0 ? (displayBiomasa / capacidadM3) : widget.pond.densidadKgM3;
     final activeBatch = allBatches.isNotEmpty ? allBatches.first : widget.batch;
 
-    final isRealActive = (widget.pond.estado == PondStatus.active || allBatches.isNotEmpty || displayBiomasa > 0) && (totalPeces > 0 || displayBiomasa > 0);
+    final isRealActive = (widget.pond.estado == PondStatus.active || allBatches.isNotEmpty || displayBiomasa > 0) &&
+        (totalPeces > 0 || displayBiomasa > 0);
     final densidadPecesM3 = capacidadM3 > 0 && totalPeces > 0 ? (totalPeces / capacidadM3) : 0.0;
     final avgWeightGrams = totalPeces > 0
         ? (displayBiomasa * 1000 / totalPeces)
@@ -225,7 +204,9 @@ class _PondBentoCardState extends State<PondBentoCard> with SingleTickerProvider
                     child: Icon(
                       Icons.flip_camera_android_rounded,
                       size: 18,
-                      color: isRealActive ? (isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight) : AppColors.textTertiaryDark,
+                      color: isRealActive
+                          ? (isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight)
+                          : AppColors.textTertiaryDark,
                     ),
                   ),
                 ),
@@ -256,7 +237,11 @@ class _PondBentoCardState extends State<PondBentoCard> with SingleTickerProvider
                             child: Text(
                               '• ${b.especie} (${b.codigoLote})',
                               overflow: TextOverflow.ellipsis,
-                              style: TextStyle(color: isDark ? Colors.white : AppColors.textPrimaryLight, fontSize: 12, fontWeight: FontWeight.w600),
+                              style: TextStyle(
+                                color: isDark ? Colors.white : AppColors.textPrimaryLight,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                           ),
                           const SizedBox(width: 8),
@@ -321,8 +306,8 @@ class _PondBentoCardState extends State<PondBentoCard> with SingleTickerProvider
                       caption: isRealActive
                           ? (densidadPecesM3 > 0
                               ? '${densidadPecesM3.toStringAsFixed(1)} pcs/m³ • ${(displayDensidad < 8.0 ? 'Óptima' : (displayDensidad <= 16.0 ? 'Alerta' : 'Crítica'))}'
-                              : (displayDensidad < 8.0 ? '🟢 Óptima' : (displayDensidad <= 16.0 ? '🟡 Alerta' : '🔴 Crítica')))
-                          : '⚪ Disponible',
+                              : (displayDensidad < 8.0 ? 'Óptima' : (displayDensidad <= 16.0 ? 'Alerta' : 'Crítica')))
+                          : 'Disponible',
                       color: isRealActive
                           ? (displayDensidad < 8.0
                               ? AppColors.purpleAnalytics
@@ -413,57 +398,6 @@ class _PondBentoCardState extends State<PondBentoCard> with SingleTickerProvider
                   ],
                 ),
               ],
-
-              if (isActive) ...[
-                const SizedBox(height: 12),
-                // Botón de Acción Principal de Campo (compacto y ergonómico)
-                SizedBox(
-                  width: double.infinity,
-                  height: 40,
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.cyanWater.withValues(alpha: isDark ? 0.18 : 0.12),
-                      foregroundColor: isDark ? AppColors.cyanWater : AppColors.blueOcean,
-                      elevation: 0,
-                      side: BorderSide(
-                        color: AppColors.cyanWater.withValues(alpha: isDark ? 0.55 : 0.75),
-                        width: 1.2,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                    ),
-                    onPressed: () {
-                      if (widget.onOperationsPressed != null) {
-                        widget.onOperationsPressed!();
-                      } else {
-                        _showOperationsBottomSheet(context, activeBatch);
-                      }
-                    },
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(Icons.flash_on_rounded, size: 16),
-                        const SizedBox(width: 6),
-                        Flexible(
-                          child: Text(
-                            'REGISTRAR ACCIÓN DE CAMPO',
-                            overflow: TextOverflow.ellipsis,
-                            style: AppTypography.titleSmall.copyWith(
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 0.4,
-                              fontSize: 11.5,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 4),
-                        const Icon(Icons.keyboard_arrow_up_rounded, size: 16),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
             ],
           );
 
@@ -500,7 +434,9 @@ class _PondBentoCardState extends State<PondBentoCard> with SingleTickerProvider
           ? (_showConsolidated ? 'POLICULTIVO CONSOLIDADO' : 'LOTE: ${activeBatch?.codigoLote ?? "ACTIVO"}')
           : 'LOTE: ${activeBatch?.codigoLote ?? "ACTIVO"}',
       subtitle: isPolyculture
-          ? (_showConsolidated ? '${allBatches.length} especies coexistentes' : '${activeBatch?.especie} • Día ${_getDaysInCulture(activeBatch)} de cultivo')
+          ? (_showConsolidated
+              ? '${allBatches.length} especies coexistentes'
+              : '${activeBatch?.especie} • Día ${_getDaysInCulture(activeBatch)} de cultivo')
           : '${activeBatch?.especie ?? "Especie Principal"} • Día ${_getDaysInCulture(activeBatch)} de cultivo',
       trailingWidget: SizedBox(
         height: 48,
@@ -513,14 +449,23 @@ class _PondBentoCardState extends State<PondBentoCard> with SingleTickerProvider
             decoration: BoxDecoration(
               color: isDark ? Colors.black.withValues(alpha: 0.2) : Colors.white.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: isDark ? Colors.white.withValues(alpha: 0.16) : Colors.black.withValues(alpha: 0.18)),
+              border: Border.all(
+                color: isDark ? Colors.white.withValues(alpha: 0.16) : Colors.black.withValues(alpha: 0.18),
+              ),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Icon(Icons.undo_rounded, size: 14, color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight),
                 const SizedBox(width: 6),
-                Text('VOLVER', style: TextStyle(color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight, fontSize: 11, fontWeight: FontWeight.w800)),
+                Text(
+                  'VOLVER',
+                  style: TextStyle(
+                    color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
               ],
             ),
           ),
@@ -569,8 +514,16 @@ class _PondBentoCardState extends State<PondBentoCard> with SingleTickerProvider
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
+                                  Icon(
+                                    Icons.set_meal_rounded,
+                                    size: 12,
+                                    color: isSelected
+                                        ? Colors.purpleAccent
+                                        : (isDark ? Colors.white70 : AppColors.textPrimaryLight),
+                                  ),
+                                  const SizedBox(width: 5),
                                   Text(
-                                    '🐟 ${b.especie}',
+                                    b.especie,
                                     style: TextStyle(
                                       color: isSelected
                                           ? Colors.purpleAccent
@@ -594,7 +547,9 @@ class _PondBentoCardState extends State<PondBentoCard> with SingleTickerProvider
                           constraints: const BoxConstraints(minHeight: 48),
                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                           decoration: BoxDecoration(
-                            color: _showConsolidated ? AppColors.cyanWater.withValues(alpha: 0.25) : Colors.white.withValues(alpha: 0.04),
+                            color: _showConsolidated
+                                ? AppColors.cyanWater.withValues(alpha: 0.25)
+                                : Colors.white.withValues(alpha: 0.04),
                             borderRadius: BorderRadius.circular(8),
                             border: Border.all(
                               color: _showConsolidated ? AppColors.cyanWater : Colors.white.withValues(alpha: 0.12),
@@ -603,12 +558,20 @@ class _PondBentoCardState extends State<PondBentoCard> with SingleTickerProvider
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(Icons.pie_chart_rounded, size: 12, color: _showConsolidated ? AppColors.cyanWater : Colors.white70),
+                              Icon(
+                                Icons.pie_chart_rounded,
+                                size: 12,
+                                color: _showConsolidated
+                                    ? AppColors.cyanWater
+                                    : (isDark ? Colors.white70 : AppColors.textPrimaryLight),
+                              ),
                               const SizedBox(width: 4),
                               Text(
-                                '📊 Consolidado',
+                                'Consolidado',
                                 style: TextStyle(
-                                  color: _showConsolidated ? AppColors.cyanWater : Colors.white70,
+                                  color: _showConsolidated
+                                      ? AppColors.cyanWater
+                                      : (isDark ? Colors.white70 : AppColors.textPrimaryLight),
                                   fontSize: 10.5,
                                   fontWeight: _showConsolidated ? FontWeight.w800 : FontWeight.w500,
                                 ),
@@ -645,7 +608,7 @@ class _PondBentoCardState extends State<PondBentoCard> with SingleTickerProvider
           }
 
           return ConstrainedBox(
-            constraints: const BoxConstraints(maxHeight: 380),
+            constraints: const BoxConstraints(maxHeight: 340),
             child: Scrollbar(
               thumbVisibility: false,
               child: SingleChildScrollView(
@@ -659,13 +622,39 @@ class _PondBentoCardState extends State<PondBentoCard> with SingleTickerProvider
     );
   }
 
+  Widget _buildSectionHeader({
+    required IconData icon,
+    required String title,
+    required Color color,
+  }) {
+    return Row(
+      children: [
+        Icon(icon, size: 13, color: color),
+        const SizedBox(width: 5),
+        Expanded(
+          child: Text(
+            title,
+            overflow: TextOverflow.ellipsis,
+            style: AppTypography.labelMicro.copyWith(
+              color: color,
+              letterSpacing: 1.1,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   // Radiografía de un Lote Individual
   Widget _buildSingleBatchView(FishBatch? activeBatch) {
     final bool isDark = Theme.of(context).brightness == Brightness.dark;
     final initialPeces = activeBatch?.cantidadInicialPeces ?? 0;
     final currentPeces = activeBatch?.cantidadActualPeces ?? 0;
-    final mortalidadPeces = (initialPeces - currentPeces).clamp(0, initialPeces);
-    final mortalidadPorcentaje = initialPeces > 0 ? (mortalidadPeces / initialPeces * 100) : 0.0;
+    final trasladadosSalientes = activeBatch?.pecesTrasladadosSalientes ?? 0;
+    final poblacionBase = activeBatch?.poblacionBaseNeta ?? initialPeces;
+    final mortalidadPeces = activeBatch?.mortalidadAcumuladaPeces ?? 0;
+    final mortalidadPorcentaje = activeBatch?.porcentajeMortalidad ?? 0.0;
 
     final initialWeight = activeBatch?.pesoInicialGramos ?? 1.0;
     final currentWeight = activeBatch?.pesoActualGramos ?? 1.0;
@@ -697,7 +686,11 @@ class _PondBentoCardState extends State<PondBentoCard> with SingleTickerProvider
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // 1. Desglose Biológico
-        Text('🔬 DESGLOSE BIOLÓGICO', style: AppTypography.labelMicro.copyWith(color: AppColors.cyanWater, letterSpacing: 1.2, fontWeight: FontWeight.w800)),
+        _buildSectionHeader(
+          icon: Icons.biotech_rounded,
+          title: 'DESGLOSE BIOLÓGICO',
+          color: AppColors.cyanWater,
+        ),
         const SizedBox(height: 5),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
@@ -711,10 +704,20 @@ class _PondBentoCardState extends State<PondBentoCard> with SingleTickerProvider
               _buildDataRow(
                 context: context,
                 label: 'Población:',
-                value: '${CurrencyFormatters.formatInt(currentPeces)} / ${CurrencyFormatters.formatInt(initialPeces)} pcs',
+                value: '${CurrencyFormatters.formatInt(currentPeces)} / ${CurrencyFormatters.formatInt(poblacionBase)} pcs',
                 extra: '$mortalidadPeces bajas (${mortalidadPorcentaje.toStringAsFixed(1)}%)',
                 extraColor: mortalidadPorcentaje > 5.0 ? AppColors.coralAction : AppColors.greenBiomass,
               ),
+              if (trasladadosSalientes > 0) ...[
+                const Divider(height: 6, color: Colors.white12),
+                _buildDataRow(
+                  context: context,
+                  label: 'Trasladados (Desdoble):',
+                  value: '${CurrencyFormatters.formatInt(trasladadosSalientes)} pcs',
+                  extra: 'Sembrados orig.: ${CurrencyFormatters.formatInt(initialPeces)}',
+                  extraColor: AppColors.amberWarning,
+                ),
+              ],
               const Divider(height: 6, color: Colors.white12),
               _buildDataRow(
                 context: context,
@@ -793,7 +796,11 @@ class _PondBentoCardState extends State<PondBentoCard> with SingleTickerProvider
         const SizedBox(height: 8),
 
         // 2. Desglose Financiero y Costo Invertido
-        Text('💰 RADIOGRAFÍA FINANCIERA Y COSTOS', style: AppTypography.labelMicro.copyWith(color: AppColors.greenBiomass, letterSpacing: 1.2, fontWeight: FontWeight.w800)),
+        _buildSectionHeader(
+          icon: Icons.account_balance_wallet_rounded,
+          title: 'RADIOGRAFÍA FINANCIERA Y COSTOS',
+          color: AppColors.greenBiomass,
+        ),
         const SizedBox(height: 5),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
@@ -814,12 +821,19 @@ class _PondBentoCardState extends State<PondBentoCard> with SingleTickerProvider
                   Expanded(
                     child: Text(
                       'COSTO TOTAL INVERTIDO:',
-                      style: TextStyle(color: Theme.of(context).brightness == Brightness.dark ? Colors.white : AppColors.textPrimaryLight, fontWeight: FontWeight.w800, fontSize: 11),
+                      style: TextStyle(
+                        color: isDark ? Colors.white : AppColors.textPrimaryLight,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 11,
+                      ),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
                   const SizedBox(width: 8),
-                  Text(CurrencyFormatters.formatCOP(costoTotal), style: const TextStyle(color: AppColors.greenBiomass, fontWeight: FontWeight.w900, fontSize: 12.5)),
+                  Text(
+                    CurrencyFormatters.formatCOP(costoTotal),
+                    style: const TextStyle(color: AppColors.greenBiomass, fontWeight: FontWeight.w900, fontSize: 12.5),
+                  ),
                 ],
               ),
               const SizedBox(height: 2),
@@ -829,28 +843,33 @@ class _PondBentoCardState extends State<PondBentoCard> with SingleTickerProvider
                   Expanded(
                     child: Text(
                       'Costo Unitario por Kilo (CPK):',
-                      style: TextStyle(color: Theme.of(context).brightness == Brightness.dark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight, fontSize: 10),
+                      style: TextStyle(
+                        color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                        fontSize: 10,
+                      ),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
                   const SizedBox(width: 8),
-                  Text('${CurrencyFormatters.formatCOP(cpk)} / kg', style: const TextStyle(color: AppColors.cyanWater, fontWeight: FontWeight.w800, fontSize: 11)),
+                  Text(
+                    '${CurrencyFormatters.formatCOP(cpk)} / kg',
+                    style: const TextStyle(color: AppColors.cyanWater, fontWeight: FontWeight.w800, fontSize: 11),
+                  ),
                 ],
               ),
             ],
           ),
         ),
-
-        // 3. Ficha Estructural y Aireación
-        _buildStructuralCard(context, widget.pond, activeBatch),
       ],
     );
   }
 
   // Radiografía Consolidada del Policultivo
   Widget _buildConsolidatedPolycultureView(List<FishBatch> allBatches) {
+    final bool isDark = Theme.of(context).brightness == Brightness.dark;
     final totalPeces = allBatches.fold(0, (sum, b) => sum + b.cantidadActualPeces);
-    final totalPecesIniciales = allBatches.fold(0, (sum, b) => sum + b.cantidadInicialPeces);
+    final totalBaseNeta = allBatches.fold(0, (sum, b) => sum + b.poblacionBaseNeta);
+    final totalBajas = allBatches.fold(0, (sum, b) => sum + b.mortalidadAcumuladaPeces);
     final totalBiomasa = allBatches.fold(0.0, (sum, b) => sum + b.biomasaActualKg);
     final totalBiomasaInicial = allBatches.fold(0.0, (sum, b) => sum + b.biomasaInicialKg);
     final totalAlimento = allBatches.fold(0.0, (sum, b) => sum + b.alimentoAcumuladoKg);
@@ -862,14 +881,20 @@ class _PondBentoCardState extends State<PondBentoCard> with SingleTickerProvider
     final granTotal = totalAlevines + totalInsumos + totalFijos;
     final cpkGlobal = totalBiomasa > 0 ? (granTotal / totalBiomasa) : 0.0;
 
-    final supervGlobal = totalPecesIniciales > 0 ? (totalPeces / totalPecesIniciales * 100) : 100.0;
+    final supervGlobal = totalBaseNeta > 0
+        ? (((totalBaseNeta - totalBajas) / totalBaseNeta) * 100.0).clamp(0.0, 100.0)
+        : 100.0;
 
     return Column(
       key: const ValueKey('polyculture_consolidated'),
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // 1. Distribución Porcentual de Biomasa
-        Text('📊 DISTRIBUCIÓN DE BIOMASA POR ESPECIE', style: AppTypography.labelMicro.copyWith(color: Colors.purpleAccent, letterSpacing: 1.2, fontWeight: FontWeight.w800)),
+        _buildSectionHeader(
+          icon: Icons.donut_large_rounded,
+          title: 'DISTRIBUCIÓN DE BIOMASA POR ESPECIE',
+          color: Colors.purpleAccent,
+        ),
         const SizedBox(height: 5),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
@@ -893,11 +918,18 @@ class _PondBentoCardState extends State<PondBentoCard> with SingleTickerProvider
                             child: Text(
                               '• ${b.especie}',
                               overflow: TextOverflow.ellipsis,
-                              style: TextStyle(color: Theme.of(context).brightness == Brightness.dark ? Colors.white : AppColors.textPrimaryLight, fontSize: 11, fontWeight: FontWeight.w700),
+                              style: TextStyle(
+                                color: isDark ? Colors.white : AppColors.textPrimaryLight,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                              ),
                             ),
                           ),
                           const SizedBox(width: 8),
-                          Text('${(pct * 100).toStringAsFixed(1)}% (${CurrencyFormatters.formatKg(b.biomasaActualKg)})', style: const TextStyle(color: AppColors.cyanWater, fontSize: 10.5, fontWeight: FontWeight.w800)),
+                          Text(
+                            '${(pct * 100).toStringAsFixed(1)}% (${CurrencyFormatters.formatKg(b.biomasaActualKg)})',
+                            style: const TextStyle(color: AppColors.cyanWater, fontSize: 10.5, fontWeight: FontWeight.w800),
+                          ),
                         ],
                       ),
                       const SizedBox(height: 2),
@@ -906,7 +938,9 @@ class _PondBentoCardState extends State<PondBentoCard> with SingleTickerProvider
                         child: LinearProgressIndicator(
                           value: pct,
                           backgroundColor: Colors.white10,
-                          valueColor: AlwaysStoppedAnimation<Color>(b.especie.toLowerCase().contains('tilapia') ? AppColors.cyanWater : Colors.purpleAccent),
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            b.especie.toLowerCase().contains('tilapia') ? AppColors.cyanWater : Colors.purpleAccent,
+                          ),
                           minHeight: 4,
                         ),
                       ),
@@ -921,7 +955,11 @@ class _PondBentoCardState extends State<PondBentoCard> with SingleTickerProvider
         const SizedBox(height: 8),
 
         // 2. Estructura Financiera Global del Policultivo
-        Text('💰 INVERSIÓN TOTAL DEL POLICULTIVO', style: AppTypography.labelMicro.copyWith(color: AppColors.greenBiomass, letterSpacing: 1.2, fontWeight: FontWeight.w800)),
+        _buildSectionHeader(
+          icon: Icons.account_balance_wallet_rounded,
+          title: 'INVERSIÓN TOTAL DEL POLICULTIVO',
+          color: AppColors.greenBiomass,
+        ),
         const SizedBox(height: 5),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
@@ -955,7 +993,9 @@ class _PondBentoCardState extends State<PondBentoCard> with SingleTickerProvider
                 extra: '${(totalPeces / (widget.pond.capacidadM3 > 0 ? widget.pond.capacidadM3 : 1.0)).toStringAsFixed(1)} pcs/m³',
                 extraColor: (totalBiomasa / (widget.pond.capacidadM3 > 0 ? widget.pond.capacidadM3 : 1.0)) < 8.0
                     ? AppColors.greenBiomass
-                    : ((totalBiomasa / (widget.pond.capacidadM3 > 0 ? widget.pond.capacidadM3 : 1.0)) <= 16.0 ? AppColors.amberWarning : AppColors.coralAction),
+                    : ((totalBiomasa / (widget.pond.capacidadM3 > 0 ? widget.pond.capacidadM3 : 1.0)) <= 16.0
+                        ? AppColors.amberWarning
+                        : AppColors.coralAction),
               ),
               const Divider(height: 6, color: Colors.white12),
               _buildFinancialRow(context, '• Total Semilla/Alevinaje:', CurrencyFormatters.formatCOP(totalAlevines)),
@@ -968,12 +1008,19 @@ class _PondBentoCardState extends State<PondBentoCard> with SingleTickerProvider
                   Expanded(
                     child: Text(
                       'INVERSIÓN TOTAL EN ESTANQUE:',
-                      style: TextStyle(color: Theme.of(context).brightness == Brightness.dark ? Colors.white : AppColors.textPrimaryLight, fontWeight: FontWeight.w800, fontSize: 11),
+                      style: TextStyle(
+                        color: isDark ? Colors.white : AppColors.textPrimaryLight,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 11,
+                      ),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
                   const SizedBox(width: 8),
-                  Text(CurrencyFormatters.formatCOP(granTotal), style: const TextStyle(color: AppColors.greenBiomass, fontWeight: FontWeight.w900, fontSize: 12.5)),
+                  Text(
+                    CurrencyFormatters.formatCOP(granTotal),
+                    style: const TextStyle(color: AppColors.greenBiomass, fontWeight: FontWeight.w900, fontSize: 12.5),
+                  ),
                 ],
               ),
               const SizedBox(height: 2),
@@ -983,20 +1030,23 @@ class _PondBentoCardState extends State<PondBentoCard> with SingleTickerProvider
                   Expanded(
                     child: Text(
                       'CPK Promedio Ponderado:',
-                      style: TextStyle(color: Theme.of(context).brightness == Brightness.dark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight, fontSize: 10),
+                      style: TextStyle(
+                        color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                        fontSize: 10,
+                      ),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
                   const SizedBox(width: 8),
-                  Text('${CurrencyFormatters.formatCOP(cpkGlobal)} / kg', style: const TextStyle(color: AppColors.cyanWater, fontWeight: FontWeight.w800, fontSize: 11)),
+                  Text(
+                    '${CurrencyFormatters.formatCOP(cpkGlobal)} / kg',
+                    style: const TextStyle(color: AppColors.cyanWater, fontWeight: FontWeight.w800, fontSize: 11),
+                  ),
                 ],
               ),
             ],
           ),
         ),
-
-        // 3. Ficha Estructural y Aireación
-        _buildStructuralCard(context, widget.pond, allBatches.firstOrNull),
       ],
     );
   }
@@ -1101,77 +1151,6 @@ class _PondBentoCardState extends State<PondBentoCard> with SingleTickerProvider
     );
   }
 
-  Widget _buildStructuralCard(BuildContext context, Pond pond, FishBatch? batch) {
-    final dims = (pond.largoM != null && pond.anchoM != null && pond.profundidadM != null && pond.largoM! > 0)
-        ? '${pond.largoM!.toStringAsFixed(1)}m × ${pond.anchoM!.toStringAsFixed(1)}m × ${pond.profundidadM!.toStringAsFixed(1)}m'
-        : 'Geometría no definida';
-    final tipo = pond.tipoEstructura?.isNotEmpty == true ? pond.tipoEstructura! : 'Tierra / Geomembrana';
-    final hpSugerido = (pond.capacidadM3 / 100.0).clamp(1.0, 15.0);
-
-    final fechaSiembraStr = batch != null
-        ? '${batch.fechaSiembra.day}/${batch.fechaSiembra.month}/${batch.fechaSiembra.year}'
-        : 'Sin siembra';
-    final fechaCosechaStr = batch?.fechaCosechaEstimada != null
-        ? '${batch!.fechaCosechaEstimada!.day}/${batch.fechaCosechaEstimada!.month}/${batch.fechaCosechaEstimada!.year}'
-        : 'Por proyectar';
-
-    return Container(
-      margin: const EdgeInsets.only(top: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.03),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.architecture_rounded, size: 13, color: AppColors.cyanWater),
-              const SizedBox(width: 5),
-              Expanded(
-                child: Text(
-                  '🏗️ FICHA ESTRUCTURAL Y AIREACIÓN',
-                  overflow: TextOverflow.ellipsis,
-                  style: AppTypography.labelMicro.copyWith(
-                    color: AppColors.cyanWater,
-                    letterSpacing: 1.0,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 5),
-          _buildDataRow(
-            context: context,
-            label: 'Dimensiones:',
-            value: dims,
-            extra: 'Tipo: $tipo',
-            extraColor: AppColors.textSecondaryDark,
-          ),
-          const Divider(height: 6, color: Colors.white12),
-          _buildDataRow(
-            context: context,
-            label: 'Capacidad Hidráulica:',
-            value: '${pond.capacidadM3.toInt()} m³ de agua',
-            extra: 'Aireación sug.: ~${hpSugerido.toStringAsFixed(1)} HP',
-            extraColor: pond.aireacionActiva ? AppColors.cyanWater : AppColors.amberWarning,
-          ),
-          const Divider(height: 6, color: Colors.white12),
-          _buildDataRow(
-            context: context,
-            label: 'Fecha de Siembra:',
-            value: fechaSiembraStr,
-            extra: 'Cosecha est.: $fechaCosechaStr',
-            extraColor: AppColors.greenBiomass,
-          ),
-        ],
-      ),
-    );
-  }
-
   int _getDaysInCulture(FishBatch? batch) {
     if (batch == null) return 0;
     final diff = DateTime.now().difference(batch.fechaSiembra).inDays;
@@ -1194,10 +1173,17 @@ class _PondBentoCardState extends State<PondBentoCard> with SingleTickerProvider
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(label, style: TextStyle(color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight, fontSize: 10)),
+              Text(
+                label,
+                style: TextStyle(color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight, fontSize: 10),
+              ),
               Text(
                 value,
-                style: TextStyle(color: isDark ? Colors.white : AppColors.textPrimaryLight, fontWeight: FontWeight.w700, fontSize: 11),
+                style: TextStyle(
+                  color: isDark ? Colors.white : AppColors.textPrimaryLight,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 11,
+                ),
                 overflow: TextOverflow.ellipsis,
               ),
             ],
@@ -1233,7 +1219,11 @@ class _PondBentoCardState extends State<PondBentoCard> with SingleTickerProvider
           const SizedBox(width: 8),
           Text(
             amount,
-            style: TextStyle(color: isDark ? Colors.white : AppColors.textPrimaryLight, fontWeight: FontWeight.w600, fontSize: 11),
+            style: TextStyle(
+              color: isDark ? Colors.white : AppColors.textPrimaryLight,
+              fontWeight: FontWeight.w600,
+              fontSize: 11,
+            ),
           ),
         ],
       ),
@@ -1285,402 +1275,6 @@ class _PondBentoCardState extends State<PondBentoCard> with SingleTickerProvider
             ),
           ],
         ],
-      ),
-    );
-  }
-
-  // ---------------------------------------------------------------------------
-  // MODAL OPERATIVO DE CAMPO (WCAG 2.5.5 >= 56dp por acción)
-  // ---------------------------------------------------------------------------
-  void _showOperationsBottomSheet(BuildContext context, FishBatch? activeBatch) {
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      barrierColor: Colors.black.withValues(alpha: 0.65),
-      builder: (modalCtx) => _PondOperationsSheetContent(
-        pond: widget.pond,
-        batch: activeBatch,
-        onFeed: () {
-          Navigator.of(modalCtx).pop();
-          if (widget.onFeedPressed != null) {
-            widget.onFeedPressed!();
-          } else if (activeBatch != null) {
-            AlimentarModal.show(context, pond: widget.pond, batch: activeBatch);
-          } else {
-            SiembraModal.show(context, pond: widget.pond);
-          }
-        },
-        onWaterQuality: () {
-          Navigator.of(modalCtx).pop();
-          if (widget.onWaterQualityPressed != null) {
-            widget.onWaterQualityPressed!();
-          } else {
-            ParametroModal.show(context, preselectedPondId: widget.pond.id);
-          }
-        },
-        onSample: () {
-          Navigator.of(modalCtx).pop();
-          if (widget.onSamplePressed != null) {
-            widget.onSamplePressed!();
-          } else if (activeBatch != null) {
-            BiometriaModal.show(context, pond: widget.pond, batch: activeBatch);
-          }
-        },
-        onMortality: () {
-          Navigator.of(modalCtx).pop();
-          if (widget.onMortalityPressed != null) {
-            widget.onMortalityPressed!();
-          } else if (activeBatch != null) {
-            MortalidadModal.show(context, pond: widget.pond, batch: activeBatch);
-          }
-        },
-        onTransfer: () {
-          Navigator.of(modalCtx).pop();
-          if (widget.onTransferPressed != null) {
-            widget.onTransferPressed!();
-          } else if (activeBatch != null) {
-            TrasladoModal.show(context, pond: widget.pond, batch: activeBatch);
-          }
-        },
-        onEditPond: () {
-          Navigator.of(modalCtx).pop();
-          if (widget.onEditPondPressed != null) {
-            widget.onEditPondPressed!();
-          } else {
-            CrearEstanqueModal.show(context, pondToEdit: widget.pond);
-          }
-        },
-      ),
-    );
-  }
-}
-
-/// Contenido del Bottom Sheet Operativo de Campo optimizado para manos húmedas
-class _PondOperationsSheetContent extends StatelessWidget {
-  final Pond pond;
-  final FishBatch? batch;
-  final VoidCallback onFeed;
-  final VoidCallback onWaterQuality;
-  final VoidCallback onSample;
-  final VoidCallback onMortality;
-  final VoidCallback onTransfer;
-  final VoidCallback onEditPond;
-
-  const _PondOperationsSheetContent({
-    required this.pond,
-    this.batch,
-    required this.onFeed,
-    required this.onWaterQuality,
-    required this.onSample,
-    required this.onMortality,
-    required this.onTransfer,
-    required this.onEditPond,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final hasBatch = batch != null;
-
-    return SafeArea(
-      bottom: true,
-      child: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 500),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: GlassContainer(
-              borderRadius: 28,
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-              blur: 24,
-              opacity: isDark ? 0.22 : 0.16,
-              isOverlay: true,
-              borderColor: AppColors.cyanWater.withValues(alpha: 0.35),
-              child: SingleChildScrollView(
-                physics: const BouncingScrollPhysics(),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Indicador de arrastre táctil
-                    Center(
-                      child: Container(
-                        width: 44,
-                        height: 4,
-                        margin: const EdgeInsets.only(bottom: 12),
-                        decoration: BoxDecoration(
-                          color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.25),
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                      ),
-                    ),
-                    // Cabecera Operativa con Tag del Estanque y Botón Cerrar (48x48)
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Expanded(
-                          child: Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: AppColors.cyanWater.withValues(alpha: 0.2),
-                                  borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(color: AppColors.cyanWater.withValues(alpha: 0.5)),
-                                ),
-                                child: Text(
-                                  pond.sigla,
-                                  style: const TextStyle(
-                                    color: AppColors.cyanWater,
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w900,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Text(
-                                      'ACCIONES DE CAMPO',
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: AppTypography.titleSmall.copyWith(
-                                        color: isDark ? Colors.white : AppColors.textPrimaryLight,
-                                        fontWeight: FontWeight.w900,
-                                      ),
-                                    ),
-                                    Text(
-                                      '${pond.nombre} • ${hasBatch ? (batch!.especie) : "Sin lote activo"}',
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: AppTypography.labelMicro.copyWith(
-                                        color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        SizedBox(
-                          width: 48,
-                          height: 48,
-                          child: IconButton(
-                            icon: const Icon(Icons.close_rounded),
-                            color: isDark ? Colors.white70 : AppColors.textPrimaryLight,
-                            onPressed: () => Navigator.of(context).pop(),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-
-                    // 1. Alimentación (Feeding)
-                    _buildLargeOperationTile(
-                      context: context,
-                      icon: Icons.restaurant_rounded,
-                      color: AppColors.greenBiomass,
-                      title: 'Registrar Alimentación',
-                      subtitle: hasBatch
-                          ? 'Ración diaria de concentrado y costo'
-                          : 'Sembrar lote previo para habilitar',
-                      onTap: onFeed,
-                    ),
-                    const SizedBox(height: 10),
-
-                    // 2. Calidad de Agua (Water Quality) - Rutina Reglamentaria ICA
-                    _buildLargeOperationTile(
-                      context: context,
-                      icon: Icons.water_drop_rounded,
-                      color: AppColors.cyanWater,
-                      title: 'Calidad de Agua (O₂, pH, Temp)',
-                      subtitle: 'Medición físico-química reglamentaria ICA',
-                      onTap: onWaterQuality,
-                    ),
-                    const SizedBox(height: 10),
-
-                    // 3. Muestreo Biométrico (Biometry)
-                    _buildLargeOperationTile(
-                      context: context,
-                      icon: Icons.scale_rounded,
-                      color: AppColors.purpleAnalytics,
-                      title: 'Muestreo y Biometría',
-                      subtitle: hasBatch
-                          ? 'Pesaje de control, talla promedio y FCR'
-                          : 'Requiere lote activo en estanque',
-                      onTap: hasBatch
-                          ? onSample
-                          : () => _showEmptyPondNotice(context, 'el muestreo biométrico'),
-                      enabled: hasBatch,
-                    ),
-                    const SizedBox(height: 10),
-
-                    // 4. Mortalidad / Bajas
-                    _buildLargeOperationTile(
-                      context: context,
-                      icon: Icons.warning_amber_rounded,
-                      color: AppColors.coralAction,
-                      title: 'Registrar Bajas / Mortalidad',
-                      subtitle: hasBatch
-                          ? 'Ajuste de biomasa viva y causas sanitarias'
-                          : 'Requiere lote activo en estanque',
-                      onTap: hasBatch
-                          ? onMortality
-                          : () => _showEmptyPondNotice(context, 'el registro de mortalidad'),
-                      enabled: hasBatch,
-                    ),
-                    const SizedBox(height: 10),
-
-                    // 5. Traslado o Cosecha
-                    _buildLargeOperationTile(
-                      context: context,
-                      icon: Icons.swap_horiz_rounded,
-                      color: AppColors.amberWarning,
-                      title: 'Traslado o Cosecha',
-                      subtitle: hasBatch
-                          ? 'Transferir a otro estanque o iniciar cosecha'
-                          : 'Requiere lote activo en estanque',
-                      onTap: hasBatch
-                          ? onTransfer
-                          : () => _showEmptyPondNotice(context, 'el traslado o cosecha'),
-                      enabled: hasBatch,
-                    ),
-                    const SizedBox(height: 10),
-
-                    // 6. Configurar y Editar Estanque Físico
-                    _buildLargeOperationTile(
-                      context: context,
-                      icon: Icons.tune_rounded,
-                      color: AppColors.cyanWater,
-                      title: 'Editar Parámetros del Estanque',
-                      subtitle: 'Dimensiones, cubicaje, aireación y tipo',
-                      onTap: onEditPond,
-                      enabled: true,
-                    ),
-                    const SizedBox(height: 8),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _showEmptyPondNotice(BuildContext context, String actionName) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Este estanque no tiene un lote sembrado para realizar $actionName.'),
-        backgroundColor: AppColors.surfaceDark,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        action: SnackBarAction(
-          label: 'Sembrar Lote',
-          textColor: AppColors.cyanWater,
-          onPressed: () {
-            Navigator.of(context).maybePop();
-            SiembraModal.show(context, pond: pond);
-          },
-        ),
-      ),
-    );
-  }
-
-  Widget _buildLargeOperationTile({
-    required BuildContext context,
-    required IconData icon,
-    required Color color,
-    required String title,
-    required String subtitle,
-    required VoidCallback onTap,
-    bool enabled = true,
-  }) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Container(
-          constraints: const BoxConstraints(minHeight: 60),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          decoration: BoxDecoration(
-            color: enabled
-                ? color.withValues(alpha: isDark ? 0.12 : 0.08)
-                : Colors.grey.withValues(alpha: 0.05),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: enabled
-                  ? color.withValues(alpha: isDark ? 0.35 : 0.45)
-                  : Colors.grey.withValues(alpha: 0.15),
-              width: 1.2,
-            ),
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: enabled
-                      ? color.withValues(alpha: isDark ? 0.22 : 0.16)
-                      : Colors.grey.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(
-                  icon,
-                  color: enabled ? color : Colors.grey,
-                  size: 22,
-                ),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      title,
-                      style: AppTypography.titleSmall.copyWith(
-                        color: enabled
-                            ? (isDark ? Colors.white : AppColors.textPrimaryLight)
-                            : Colors.grey,
-                        fontWeight: FontWeight.w800,
-                        fontSize: 13.5,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      subtitle,
-                      style: AppTypography.labelMicro.copyWith(
-                        color: enabled
-                            ? (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight)
-                            : Colors.grey.withValues(alpha: 0.7),
-                        fontSize: 10,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ),
-              ),
-              Icon(
-                Icons.arrow_forward_ios_rounded,
-                size: 14,
-                color: enabled
-                    ? (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight)
-                    : Colors.grey.withValues(alpha: 0.3),
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }

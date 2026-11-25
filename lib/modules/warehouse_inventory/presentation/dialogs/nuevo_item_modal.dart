@@ -267,7 +267,7 @@ class _NuevoItemModalState extends ConsumerState<NuevoItemModal> {
         } else if (lower.contains('tilapia')) {
           _especieAlevino = lower.contains('roja') ? 'Tilapia Roja' : 'Tilapia';
         } else if (lower.contains('cachama')) {
-          _especieAlevino = lower.contains('negra') ? 'Cachama Negra' : 'Cachama Blanca';
+          _especieAlevino = 'Cachama Blanca';
         } else if (lower.contains('bocachico')) {
           _especieAlevino = 'Bocachico';
         } else if (companySpecies.isNotEmpty) {

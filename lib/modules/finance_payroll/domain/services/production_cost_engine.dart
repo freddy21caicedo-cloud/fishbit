@@ -27,13 +27,18 @@ class ProductionCostEngine {
   }) {
     final activePonds = ponds.where((p) => !p.isDeleted && p.estado == PondStatus.active).toList();
     final effectivePonds = activePonds.isNotEmpty ? activePonds : ponds.where((p) => !p.isDeleted).toList();
+    final activeBatches = batches.where((b) => b.estado == BatchStatus.active).toList();
 
     // 1. Biomasa Total Viva
     final totalBiomasaKg = effectivePonds.fold(0.0, (sum, p) => sum + p.biomasaKg);
     final biomasaCalculo = totalBiomasaKg > 0 ? totalBiomasaKg : (effectivePonds.length * 100.0 > 0 ? effectivePonds.length * 100.0 : 1000.0);
 
-    // 2. Costo Directo de Alevinos/Semilla (Costo biológico acumulado en estanques)
-    final totalAlevines = effectivePonds.fold(0.0, (sum, p) => sum + p.costoAcumuladoBiologico);
+    // 2. Costo Directo de Alevinos/Semilla
+    // Si existen lotes activos, se suma únicamente `costoInicialAlevinos` porque
+    // `pond.costoAcumuladoBiologico` ya incluye semilla + alimento acumulado (evita doble conteo).
+    final totalAlevines = activeBatches.isNotEmpty
+        ? activeBatches.fold(0.0, (sum, b) => sum + b.costoInicialAlevinos)
+        : effectivePonds.fold(0.0, (sum, p) => sum + p.costoAcumuladoBiologico);
 
     // 3. Costo Directo de Alimento (si no hay facturas registradas aún, estimar basado en biomasa y FCR típico 1.35)
     final alimentoReal = totalAlimentoInsumos > 0
@@ -85,15 +90,29 @@ class ProductionCostEngine {
     final puntoEquilibrioCOP = puntoEquilibrioKg.isFinite ? puntoEquilibrioKg * precioMercadoKg : 0.0;
 
     // 9. Desglose por Estanque Individual
+    final Map<String, List<FishBatch>> activeBatchesByPond = {};
+    for (final b in activeBatches) {
+      activeBatchesByPond.putIfAbsent(b.estanqueId, () => []).add(b);
+    }
+
     final estanquesBreakdown = <PondCostBreakdown>[];
     for (final p in effectivePonds) {
       final pesoPonderadoBiomasa = totalBiomasaKg > 0
           ? (p.biomasaKg / totalBiomasaKg)
           : (1.0 / (effectivePonds.isNotEmpty ? effectivePonds.length : 1));
 
-      // Asignar alimento proporcionalmente a la biomasa
-      final alimentoEstanque = alimentoReal * pesoPonderadoBiomasa;
-      final alevinesEstanque = p.costoAcumuladoBiologico;
+      final pondBatches = activeBatchesByPond[p.id];
+      final hasPondBatches = pondBatches != null && pondBatches.isNotEmpty;
+      final alevinesEstanque = hasPondBatches
+          ? pondBatches.fold(0.0, (sum, b) => sum + b.costoInicialAlevinos)
+          : p.costoAcumuladoBiologico;
+      final insumosLotesEstanque = hasPondBatches
+          ? pondBatches.fold(0.0, (sum, b) => sum + b.costoAcumuladoInsumos)
+          : 0.0;
+      // Asignar alimento real del lote si existe, o proporcionalmente a la biomasa
+      final alimentoEstanque = insumosLotesEstanque > 0
+          ? insumosLotesEstanque
+          : (alimentoReal * pesoPonderadoBiomasa);
       final jornalesDirectosPond = jornalesPorEstanque[p.id] ?? 0.0;
       final directosEstanque = alimentoEstanque + alevinesEstanque + jornalesDirectosPond;
 
@@ -128,7 +147,6 @@ class ProductionCostEngine {
     final Map<String, _SpeciesAccumulator> speciesMap = {};
 
     // Agrupar a partir de lotes activos si existen
-    final activeBatches = batches.where((b) => b.estado == BatchStatus.active).toList();
     if (activeBatches.isNotEmpty) {
       for (final b in activeBatches) {
         final esp = b.especie.isNotEmpty ? b.especie : 'Tilapia Roja';

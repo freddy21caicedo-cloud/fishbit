@@ -1188,11 +1188,11 @@ class _BitacoraScreenState extends ConsumerState<BitacoraScreen> with SingleTick
     final relevantBatches = _selectedPondId != null
         ? pondsState.batches.where((b) => b.estanqueId.trim() == _selectedPondId!.trim()).toList()
         : pondsState.batches;
-    final totalPecesActual = relevantBatches.fold<int>(0, (sum, b) => sum + b.cantidadActualPeces);
-    final totalPecesInicial = relevantBatches.fold<int>(0, (sum, b) => sum + b.cantidadInicialPeces);
-    final supervivencia = totalPecesInicial > 0
-        ? (totalPecesActual / totalPecesInicial) * 100.0
-        : (totalBajas > 0 ? (100.0 - (totalBajas / (totalBajas + 1000) * 100.0)) : 100.0);
+    final totalBaseNeta = relevantBatches.fold<int>(0, (sum, b) => sum + b.poblacionBaseNeta);
+    final totalBajasLotes = relevantBatches.fold<int>(0, (sum, b) => sum + b.mortalidadAcumuladaPeces);
+    final supervivencia = totalBaseNeta > 0
+        ? (((totalBaseNeta - totalBajasLotes) / totalBaseNeta) * 100.0).clamp(0.0, 100.0)
+        : 100.0;
 
     Color getCauseColor(String causa) {
       final c = causa.toLowerCase();
@@ -1344,8 +1344,8 @@ class _BitacoraScreenState extends ConsumerState<BitacoraScreen> with SingleTick
               final causeColor = getCauseColor(r.causaProbable);
 
               final double mortalityPct;
-              if (batch != null && batch.cantidadInicialPeces > 0) {
-                mortalityPct = (r.cantidadPecesMuertos / batch.cantidadInicialPeces) * 100.0;
+              if (batch != null && batch.poblacionBaseNeta > 0) {
+                mortalityPct = (r.cantidadPecesMuertos / batch.poblacionBaseNeta) * 100.0;
               } else {
                 mortalityPct = 0.0;
               }
@@ -1476,7 +1476,7 @@ class _BitacoraScreenState extends ConsumerState<BitacoraScreen> with SingleTick
                             ),
                           if (batch != null)
                             Text(
-                              'Supervivencia actual lote: ${(100.0 - batch.porcentajeMortalidad).toStringAsFixed(1)}%',
+                              'Supervivencia actual lote: ${batch.supervivenciaPct.toStringAsFixed(1)}%',
                               style: const TextStyle(color: AppColors.greenBiomass, fontSize: 11, fontWeight: FontWeight.w600),
                             ),
                         ],

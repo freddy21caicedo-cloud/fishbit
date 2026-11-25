@@ -109,7 +109,13 @@ class NutritionNotifier extends StateNotifier<NutritionState> {
         costoUnitarioAlimento: costoUnitarioAlimento,
         fecha: fecha,
       );
-      state = state.copyWith(records: [rec, ...state.records]);
+      final updatedRecords = [rec, ...state.records]
+        ..sort((a, b) => b.fecha.compareTo(a.fecha));
+      state = state.copyWith(records: updatedRecords);
+      if (!empresaId.startsWith('c1000000-')) {
+        await _ref.read(warehouseProvider.notifier).loadWarehouseData();
+        await _ref.read(pondsProvider.notifier).loadPondsAndBatches();
+      }
       return true;
     } catch (e) {
       state = state.copyWith(errorMessage: e.toString());
@@ -154,38 +160,44 @@ class NutritionNotifier extends StateNotifier<NutritionState> {
 
       final saved = await _repository.updateFeeding(updatedModel);
 
-      // Ajustar diferencia de inventario en Bodega
-      final warehouseNotifier = _ref.read(warehouseProvider.notifier);
-      final effectiveNewInsumo = newInsumoId ?? oldRecord.insumoId;
-      if (oldRecord.insumoId != null && effectiveNewInsumo != oldRecord.insumoId) {
-        await warehouseNotifier.restoreStock(
-          itemId: oldRecord.insumoId!,
-          cantidadKg: oldRecord.cantidadConsumidaKg,
-        );
-        if (effectiveNewInsumo != null) {
-          await warehouseNotifier.discountStock(
-            itemId: effectiveNewInsumo,
-            cantidadKg: newKg,
-            motivo: 'Edición de alimentación',
-          );
-        }
-      } else if (effectiveNewInsumo != null) {
-        final delta = newKg - oldRecord.cantidadConsumidaKg;
-        if (delta > 0) {
-          await warehouseNotifier.discountStock(
-            itemId: effectiveNewInsumo,
-            cantidadKg: delta,
-            motivo: 'Ajuste positivo en alimentación',
-          );
-        } else if (delta < 0) {
+      // En empresas reales, el RPC update_daily_feeding_with_stock ajusta el stock atómicamente en Postgres.
+      // Solo ajustamos en memoria local cuando es la empresa demo.
+      if (oldRecord.empresaId.startsWith('c1000000-')) {
+        final warehouseNotifier = _ref.read(warehouseProvider.notifier);
+        final effectiveNewInsumo = newInsumoId ?? oldRecord.insumoId;
+        if (oldRecord.insumoId != null && effectiveNewInsumo != oldRecord.insumoId) {
           await warehouseNotifier.restoreStock(
-            itemId: effectiveNewInsumo,
-            cantidadKg: delta.abs(),
+            itemId: oldRecord.insumoId!,
+            cantidadKg: oldRecord.cantidadConsumidaKg,
           );
+          if (effectiveNewInsumo != null) {
+            await warehouseNotifier.discountStock(
+              itemId: effectiveNewInsumo,
+              cantidadKg: newKg,
+              motivo: 'Edición de alimentación',
+            );
+          }
+        } else if (effectiveNewInsumo != null) {
+          final delta = newKg - oldRecord.cantidadConsumidaKg;
+          if (delta > 0) {
+            await warehouseNotifier.discountStock(
+              itemId: effectiveNewInsumo,
+              cantidadKg: delta,
+              motivo: 'Ajuste positivo en alimentación',
+            );
+          } else if (delta < 0) {
+            await warehouseNotifier.restoreStock(
+              itemId: effectiveNewInsumo,
+              cantidadKg: delta.abs(),
+            );
+          }
         }
+      } else {
+        await _ref.read(warehouseProvider.notifier).loadWarehouseData();
       }
 
-      final updatedList = state.records.map((r) => r.id == saved.id ? saved : r).toList();
+      final updatedList = state.records.map((r) => r.id == saved.id ? saved : r).toList()
+        ..sort((a, b) => b.fecha.compareTo(a.fecha));
       state = state.copyWith(records: updatedList);
       await _ref.read(pondsProvider.notifier).loadPondsAndBatches();
       return true;
@@ -201,11 +213,16 @@ class NutritionNotifier extends StateNotifier<NutritionState> {
     if (empresaId.isEmpty) return false;
     try {
       await _repository.deleteFeeding(record.id, empresaId);
-      if (record.insumoId != null && record.insumoId!.isNotEmpty) {
-        await _ref.read(warehouseProvider.notifier).restoreStock(
-              itemId: record.insumoId!,
-              cantidadKg: record.cantidadConsumidaKg,
-            );
+      // En empresas reales, el trigger AFTER DELETE en Supabase reintegra el stock atómicamente.
+      if (empresaId.startsWith('c1000000-')) {
+        if (record.insumoId != null && record.insumoId!.isNotEmpty) {
+          await _ref.read(warehouseProvider.notifier).restoreStock(
+                itemId: record.insumoId!,
+                cantidadKg: record.cantidadConsumidaKg,
+              );
+        }
+      } else {
+        await _ref.read(warehouseProvider.notifier).loadWarehouseData();
       }
       final updatedList = state.records.where((r) => r.id != record.id).toList();
       state = state.copyWith(records: updatedList);

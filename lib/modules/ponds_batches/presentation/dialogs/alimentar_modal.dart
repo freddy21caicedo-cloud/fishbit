@@ -41,6 +41,72 @@ class AlimentarModal extends ConsumerStatefulWidget {
     );
   }
 
+  /// Valida disponibilidad de stock distinguiendo creación vs edición en sitio.
+  /// En modo edición, si no se cambia de insumo y no se aumenta la cantidad (ej. solo se edita la fecha),
+  /// nunca exige stock adicional en bodega aunque las existencias actuales sean 0.
+  static ({bool isInsufficient, bool requiresStockCheck, double deltaKg, String? reason})
+      validateStockForFeeding({
+    required bool isEditing,
+    required String? originalInsumoId,
+    required String? selectedInsumoId,
+    required double originalKg,
+    required double newKg,
+    required double? currentStockKg,
+  }) {
+    if (!isEditing) {
+      if (currentStockKg == null || currentStockKg <= 0) {
+        return (
+          isInsufficient: true,
+          requiresStockCheck: true,
+          deltaKg: newKg,
+          reason: 'No hay concentrado con stock disponible en Almacén.',
+        );
+      }
+      if (newKg > currentStockKg + 0.0001) {
+        return (
+          isInsufficient: true,
+          requiresStockCheck: true,
+          deltaKg: newKg,
+          reason:
+              'La cantidad (${newKg.toStringAsFixed(1)} kg) supera el stock en bodega (${currentStockKg.toStringAsFixed(1)} kg).',
+        );
+      }
+      return (isInsufficient: false, requiresStockCheck: true, deltaKg: newKg, reason: null);
+    }
+
+    final sameInsumo = originalInsumoId == selectedInsumoId;
+    if (sameInsumo) {
+      final delta = newKg - originalKg;
+      if (delta <= 0.0001) {
+        return (isInsufficient: false, requiresStockCheck: false, deltaKg: delta, reason: null);
+      }
+      final available = currentStockKg ?? 0.0;
+      if (delta > available + 0.0001) {
+        return (
+          isInsufficient: true,
+          requiresStockCheck: true,
+          deltaKg: delta,
+          reason:
+              'El incremento de +${delta.toStringAsFixed(1)} kg supera el stock disponible en bodega (${available.toStringAsFixed(1)} kg).',
+        );
+      }
+      return (isInsufficient: false, requiresStockCheck: true, deltaKg: delta, reason: null);
+    }
+
+    // Cambio a un concentrado diferente: requiere stock completo para el nuevo insumo
+    final available = currentStockKg ?? 0.0;
+    if (currentStockKg == null || newKg > available + 0.0001) {
+      return (
+        isInsufficient: true,
+        requiresStockCheck: true,
+        deltaKg: newKg,
+        reason:
+            'El nuevo concentrado seleccionado solo tiene ${available.toStringAsFixed(1)} kg disponibles (requiere ${newKg.toStringAsFixed(1)} kg).',
+      );
+    }
+    return (isInsufficient: false, requiresStockCheck: true, deltaKg: newKg, reason: null);
+  }
+
   @override
   ConsumerState<AlimentarModal> createState() => _AlimentarModalState();
 }
@@ -65,6 +131,11 @@ class _AlimentarModalState extends ConsumerState<AlimentarModal> {
     } else {
       _selectedPondId = widget.pond?.id;
     }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        ref.read(warehouseProvider.notifier).loadWarehouseData();
+      }
+    });
   }
 
   @override
@@ -100,6 +171,8 @@ class _AlimentarModalState extends ConsumerState<AlimentarModal> {
 
   @override
   Widget build(BuildContext context) {
+    final isEditing = widget.recordToEdit != null;
+    final editRecord = widget.recordToEdit;
     final pondsState = ref.watch(pondsProvider);
     final warehouseState = ref.watch(warehouseProvider);
     final feedItems = warehouseState.items
@@ -108,42 +181,52 @@ class _AlimentarModalState extends ConsumerState<AlimentarModal> {
 
     final pondsList = pondsState.ponds.where((p) => p.estado == PondStatus.active).toList();
     final effectivePondId = _selectedPondId ?? widget.pond?.id;
-    final activePond = pondsList.where((p) => p.id == effectivePondId).firstOrNull ??
+    final activePond = (isEditing
+            ? pondsState.ponds.where((p) => p.id == effectivePondId).firstOrNull
+            : pondsList.where((p) => p.id == effectivePondId).firstOrNull) ??
         widget.pond ??
         (pondsList.isNotEmpty ? pondsList.first : null);
     final activeBatch = widget.batch ??
-        (activePond != null
-            ? pondsState.batches.where((b) => b.estanqueId == activePond.id && b.estado == BatchStatus.active).firstOrNull
-            : null);
+        (isEditing
+            ? pondsState.batches.where((b) => b.id == editRecord!.loteId).firstOrNull
+            : (activePond != null
+                ? pondsState.batches.where((b) => b.estanqueId == activePond.id && b.estado == BatchStatus.active).firstOrNull
+                : null));
 
-    if ((_selectedInsumoId == null || !feedItems.any((i) => i.id == _selectedInsumoId)) && feedItems.isNotEmpty) {
+    if (!isEditing &&
+        (_selectedInsumoId == null || !feedItems.any((i) => i.id == _selectedInsumoId)) &&
+        feedItems.isNotEmpty) {
       final itemConStock = feedItems.where((i) => i.cantidadActualKg > 0).firstOrNull;
       _selectedInsumoId = itemConStock?.id ?? feedItems.first.id;
     }
 
-    final hasBatch = activeBatch != null;
+    final hasBatch = activeBatch != null || isEditing;
     final pesoProm = activeBatch?.pesoActualGramos ?? 0.0;
     final biomasaKg = activeBatch?.biomasaActualKg ?? 0.0;
     final especie = activeBatch?.especie ?? 'Tilapia Roja';
-    final rationPct = hasBatch ? _getSuggestedRationPct(especie, pesoProm) : 0.0;
-    final racionSugeridaDiaKg = hasBatch ? (biomasaKg * rationPct) / 100.0 : 0.0;
+    final rationPct = activeBatch != null ? _getSuggestedRationPct(especie, pesoProm) : 0.0;
+    final racionSugeridaDiaKg = activeBatch != null ? (biomasaKg * rationPct) / 100.0 : 0.0;
 
-    if (widget.recordToEdit == null && _kgCtrl.text.isEmpty && hasBatch && racionSugeridaDiaKg > 0) {
+    if (!isEditing && _kgCtrl.text.isEmpty && activeBatch != null && racionSugeridaDiaKg > 0) {
       _kgCtrl.text = racionSugeridaDiaKg.toStringAsFixed(1);
     }
 
     final selectedItem = feedItems.where((i) => i.id == _selectedInsumoId).firstOrNull;
-    final extraEdicionKg = (widget.recordToEdit != null && widget.recordToEdit!.insumoId == _selectedInsumoId)
-        ? widget.recordToEdit!.cantidadConsumidaKg
-        : 0.0;
-    final stockDisponibleKg = (selectedItem?.cantidadActualKg ?? 0.0) + extraEdicionKg;
     final costoUnitario = selectedItem?.costoUnitarioHistorico ??
-        (widget.recordToEdit != null && widget.recordToEdit!.cantidadConsumidaKg > 0
-            ? widget.recordToEdit!.costoCalculado / widget.recordToEdit!.cantidadConsumidaKg
+        (editRecord != null && editRecord.cantidadConsumidaKg > 0
+            ? editRecord.costoCalculado / editRecord.cantidadConsumidaKg
             : 4800.0);
     final kgSuministrados = double.tryParse(_kgCtrl.text.replaceAll(',', '.').trim()) ?? 0.0;
-    final sinStock = selectedItem == null || stockDisponibleKg <= 0;
-    final stockInsuficiente = sinStock || (kgSuministrados > stockDisponibleKg);
+    final stockCheck = AlimentarModal.validateStockForFeeding(
+      isEditing: isEditing,
+      originalInsumoId: editRecord?.insumoId,
+      selectedInsumoId: _selectedInsumoId,
+      originalKg: editRecord?.cantidadConsumidaKg ?? 0.0,
+      newKg: kgSuministrados,
+      currentStockKg: selectedItem?.cantidadActualKg,
+    );
+    final sinStock = !isEditing && (selectedItem == null || (selectedItem.cantidadActualKg <= 0));
+    final stockInsuficiente = stockCheck.isInsufficient;
     final costoTotal = kgSuministrados * costoUnitario;
     final racionesNum = int.tryParse(_racionesCtrl.text.trim()) ?? 3;
     final kgPorRacion = racionesNum > 0 ? (kgSuministrados / racionesNum) : kgSuministrados;
@@ -247,8 +330,29 @@ class _AlimentarModalState extends ConsumerState<AlimentarModal> {
                   const SizedBox(height: 12),
                 ],
 
-                // Sugerencia Acuícola de Precisión o Aviso de Estanque sin Lote
-                if (!hasBatch)
+                // Banner de Modo Edición vs Sugerencia Acuícola (solo creación)
+                if (isEditing) ...[
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppColors.cyanWater.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: AppColors.cyanWater.withValues(alpha: 0.35)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.edit_note_rounded, color: AppColors.cyanWater, size: 20),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            'Modo Edición: actualizando registro del ${editRecord!.fecha.day}/${editRecord.fecha.month}/${editRecord.fecha.year} (${editRecord.cantidadConsumidaKg.toStringAsFixed(1)} kg). No se creará un dato nuevo.',
+                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 11.5),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ] else if (!hasBatch)
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
@@ -290,7 +394,7 @@ class _AlimentarModalState extends ConsumerState<AlimentarModal> {
                                 style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 12),
                               ),
                               Text(
-                                'Para peso promedio de ${pesoProm.toStringAsFixed(1)}g en ${activeBatch.especie}',
+                                'Para peso promedio de ${pesoProm.toStringAsFixed(1)}g en ${activeBatch!.especie}',
                                 style: const TextStyle(color: AppColors.textSecondaryDark, fontSize: 10.5),
                               ),
                             ],
@@ -301,27 +405,34 @@ class _AlimentarModalState extends ConsumerState<AlimentarModal> {
                   ),
                 const SizedBox(height: 14),
 
-                GlassSelectField<String>(
-                  label: 'ALIMENTO DISPONIBLE EN BODEGA',
-                  value: _selectedInsumoId,
-                  accentColor: AppColors.amberWarning,
-                  leadingIcon: Icons.restaurant_rounded,
-                  options: feedItems.map((item) {
-                    final tieneStock = item.cantidadActualKg > 0;
-                    return GlassSelectOption<String>(
-                      value: item.id,
-                      label: item.nombre,
-                      subtitle: tieneStock
-                          ? '${item.cantidadActualKg.toStringAsFixed(1)} kg disponibles • \$${item.costoUnitarioHistorico.toInt()}/kg'
-                          : 'Sin Stock en bodega',
-                      icon: Icons.restaurant_rounded,
-                      badgeText: tieneStock ? 'STOCK' : 'AGOTADO',
-                      badgeColor: tieneStock ? AppColors.greenBiomass : AppColors.coralAction,
-                    );
-                  }).toList(),
-                  onChanged: (val) => setState(() => _selectedInsumoId = val),
-                ),
-                if (feedItems.isEmpty || sinStock) ...[
+                if (feedItems.isNotEmpty || !isEditing)
+                  GlassSelectField<String>(
+                    label: isEditing ? 'CONCENTRADO DEL REGISTRO' : 'ALIMENTO DISPONIBLE EN BODEGA',
+                    placeholder: isEditing ? 'Mantener concentrado original' : 'Seleccionar concentrado...',
+                    value: feedItems.any((i) => i.id == _selectedInsumoId) ? _selectedInsumoId : null,
+                    accentColor: AppColors.amberWarning,
+                    leadingIcon: Icons.restaurant_rounded,
+                    options: feedItems.map((item) {
+                      final tieneStock = item.cantidadActualKg > 0;
+                      final esOriginal = isEditing && item.id == editRecord?.insumoId;
+                      return GlassSelectOption<String>(
+                        value: item.id,
+                        label: item.nombre,
+                        subtitle: esOriginal
+                            ? 'En bodega: ${item.cantidadActualKg.toStringAsFixed(1)} kg • Original del registro'
+                            : (tieneStock
+                                ? '${item.cantidadActualKg.toStringAsFixed(1)} kg disponibles • \$${item.costoUnitarioHistorico.toInt()}/kg'
+                                : 'Sin Stock en bodega'),
+                        icon: Icons.restaurant_rounded,
+                        badgeText: esOriginal ? 'ACTUAL' : (tieneStock ? 'STOCK' : 'AGOTADO'),
+                        badgeColor: esOriginal
+                            ? AppColors.cyanWater
+                            : (tieneStock ? AppColors.greenBiomass : AppColors.coralAction),
+                      );
+                    }).toList(),
+                    onChanged: (val) => setState(() => _selectedInsumoId = val),
+                  ),
+                if (!isEditing && (feedItems.isEmpty || sinStock)) ...[
                   const SizedBox(height: 10),
                   Container(
                     padding: const EdgeInsets.all(12),
@@ -386,41 +497,50 @@ class _AlimentarModalState extends ConsumerState<AlimentarModal> {
                       ],
                     ),
                   ),
-                ] else if (stockInsuficiente) ...[
+                ] else if (stockInsuficiente && stockCheck.reason != null) ...[
                   const SizedBox(height: 6),
                   Text(
-                    '⚠️ La cantidad a suministrar (${kgSuministrados.toStringAsFixed(1)} kg) supera el stock en bodega (${stockDisponibleKg.toStringAsFixed(1)} kg).',
+                    '⚠️ ${stockCheck.reason}',
                     style: const TextStyle(color: AppColors.coralAction, fontSize: 11, fontWeight: FontWeight.w700),
                   ),
                 ],
                 const SizedBox(height: 14),
 
-                // Cantidad de Alimento y Distribución de Raciones
-                Row(
-                  children: [
-                    Expanded(
-                      flex: 3,
-                      child: GlassFormField(
-                        label: 'TOTAL ALIMENTO A SUMINISTRAR (kg)',
-                        hint: '0.0',
-                        controller: _kgCtrl,
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                        onChanged: (_) => setState(() {}),
+                // Cantidad de Alimento (y Distribución de Raciones solo al crear)
+                if (isEditing)
+                  GlassFormField(
+                    label: 'CANTIDAD SUMINISTRADA (kg)',
+                    hint: '0.0',
+                    controller: _kgCtrl,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    onChanged: (_) => setState(() {}),
+                  )
+                else
+                  Row(
+                    children: [
+                      Expanded(
+                        flex: 3,
+                        child: GlassFormField(
+                          label: 'TOTAL ALIMENTO A SUMINISTRAR (kg)',
+                          hint: '0.0',
+                          controller: _kgCtrl,
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          onChanged: (_) => setState(() {}),
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      flex: 2,
-                      child: GlassFormField(
-                        label: 'RACIONES/DÍA',
-                        hint: '3',
-                        controller: _racionesCtrl,
-                        keyboardType: TextInputType.number,
-                        onChanged: (_) => setState(() {}),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        flex: 2,
+                        child: GlassFormField(
+                          label: 'RACIONES/DÍA',
+                          hint: '3',
+                          controller: _racionesCtrl,
+                          keyboardType: TextInputType.number,
+                          onChanged: (_) => setState(() {}),
+                        ),
                       ),
-                    ),
-                  ],
-                ),
+                    ],
+                  ),
                 const SizedBox(height: 14),
 
                 GlassDatePickerField(
@@ -440,14 +560,41 @@ class _AlimentarModalState extends ConsumerState<AlimentarModal> {
                   ),
                   child: Column(
                     children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text('Distribución:', style: TextStyle(color: AppColors.textSecondaryDark, fontSize: 12)),
-                          Text('${kgPorRacion.toStringAsFixed(1)} kg en cada ración', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 12.5)),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
+                      if (!isEditing) ...[
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text('Distribución:', style: TextStyle(color: AppColors.textSecondaryDark, fontSize: 12)),
+                            Text('${kgPorRacion.toStringAsFixed(1)} kg en cada ración', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 12.5)),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                      ] else ...[
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text('Impacto en Bodega:', style: TextStyle(color: AppColors.textSecondaryDark, fontSize: 12)),
+                            Flexible(
+                              child: Text(
+                                editRecord!.insumoId != _selectedInsumoId
+                                    ? 'Reintegra ${editRecord.cantidadConsumidaKg.toStringAsFixed(1)} kg y descuenta ${kgSuministrados.toStringAsFixed(1)} kg'
+                                    : (stockCheck.deltaKg.abs() < 0.01
+                                        ? 'Sin cambios en inventario'
+                                        : (stockCheck.deltaKg > 0
+                                            ? 'Descuento adicional: -${stockCheck.deltaKg.toStringAsFixed(1)} kg'
+                                            : 'Devolución a bodega: +${stockCheck.deltaKg.abs().toStringAsFixed(1)} kg')),
+                                textAlign: TextAlign.right,
+                                style: TextStyle(
+                                  color: stockCheck.deltaKg > 0 ? AppColors.amberWarning : AppColors.cyanWater,
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 11.5,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                      ],
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
@@ -462,16 +609,17 @@ class _AlimentarModalState extends ConsumerState<AlimentarModal> {
 
                 // Botón de Confirmación
                 GlassButton(
-                  label: widget.recordToEdit != null
+                  label: isEditing
                       ? 'Actualizar Suministro de Alimento'
                       : 'Registrar Suministro de Alimento',
+                  loadingLabel: isEditing ? 'Actualizando...' : 'Registrando...',
                   height: 46,
                   backgroundColor: AppColors.greenBiomass,
                   isLoading: _isLoading,
                   onPressed: () async {
                     if (_isLoading) return;
                     final messenger = ScaffoldMessenger.of(context);
-                    if (activePond == null || activeBatch == null) {
+                    if (!isEditing && (activePond == null || activeBatch == null)) {
                       messenger.showSnackBar(
                         const SnackBar(
                           content: Text('Seleccione un estanque con un lote activo sembrado para registrar alimentación.'),
@@ -495,9 +643,7 @@ class _AlimentarModalState extends ConsumerState<AlimentarModal> {
                       messenger.showSnackBar(
                         SnackBar(
                           content: Text(
-                            sinStock
-                                ? 'No hay concentrado con stock disponible en Almacén.'
-                                : 'La cantidad (${kgSuministrados.toStringAsFixed(1)} kg) supera el stock en bodega (${stockDisponibleKg.toStringAsFixed(1)} kg).',
+                            stockCheck.reason ?? 'Stock insuficiente en Almacén.',
                           ),
                           backgroundColor: AppColors.coralAction,
                           behavior: SnackBarBehavior.floating,
@@ -510,35 +656,31 @@ class _AlimentarModalState extends ConsumerState<AlimentarModal> {
                     setState(() => _isLoading = true);
 
                     bool ok = false;
-                    if (widget.recordToEdit != null) {
+                    if (isEditing) {
                       ok = await ref.read(nutritionProvider.notifier).updateDailyFeeding(
-                            oldRecord: widget.recordToEdit!,
+                            oldRecord: editRecord!,
                             newKg: kgSuministrados,
                             costoUnitario: costoUnitario,
                             newInsumoId: _selectedInsumoId,
                             newFecha: _fechaAlimentacion.toDateTime(),
                           );
                     } else {
-                      // 1. Registrar en módulo de nutrición
+                      // 1. Registrar alimentación + descontar stock atómicamente en Supabase vía RPC
                       ok = await ref.read(nutritionProvider.notifier).recordDailyFeeding(
-                            estanqueId: activePond.id,
-                            loteId: activeBatch.id,
+                            estanqueId: activePond!.id,
+                            loteId: activeBatch!.id,
                             insumoId: _selectedInsumoId,
                             kgConsumidos: kgSuministrados,
                             costoUnitarioAlimento: costoUnitario,
                             fecha: _fechaAlimentacion.toDateTime(),
                           );
-                      // 2. Descontar inventario en Bodega solo si se guardó en BD
-                      if (ok && _selectedInsumoId != null) {
+                      // 2. Solo en empresa demo descontar en memoria local
+                      if (ok && activePond.empresaId.startsWith('c1000000-') && _selectedInsumoId != null) {
                         await ref.read(warehouseProvider.notifier).discountStock(
                               itemId: _selectedInsumoId!,
                               cantidadKg: kgSuministrados,
                               motivo: 'Alimentación en estanque ${activePond.sigla}',
                             );
-                      }
-                      // 3. Recargar estanques para actualizar FCR y costo
-                      if (ok) {
-                        await ref.read(pondsProvider.notifier).loadPondsAndBatches();
                       }
                     }
 
@@ -549,9 +691,9 @@ class _AlimentarModalState extends ConsumerState<AlimentarModal> {
                         messenger.showSnackBar(
                           SnackBar(
                             content: Text(
-                              widget.recordToEdit != null
+                              isEditing
                                   ? 'Alimentación actualizada (${kgSuministrados.toStringAsFixed(1)} kg) y stock sincronizado.'
-                                  : 'Alimentación registrada en ${activePond.sigla} (${kgSuministrados.toStringAsFixed(1)} kg). Stock descontado en Bodega.',
+                                  : 'Alimentación registrada en ${activePond!.sigla} (${kgSuministrados.toStringAsFixed(1)} kg). Stock descontado en Bodega.',
                             ),
                             backgroundColor: AppColors.greenBiomass,
                             behavior: SnackBarBehavior.floating,

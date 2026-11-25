@@ -26,6 +26,7 @@ class HeroTabsBar extends StatefulWidget {
   final List<HeroTabItem> tabs;
   final ValueChanged<int>? onTap;
   final bool borderless;
+  final bool iconOnly;
 
   const HeroTabsBar({
     super.key,
@@ -33,6 +34,7 @@ class HeroTabsBar extends StatefulWidget {
     required this.tabs,
     this.onTap,
     this.borderless = false,
+    this.iconOnly = false,
   });
 
   @override
@@ -248,6 +250,73 @@ class _HeroTabsBarState extends State<HeroTabsBar> {
                           activeWeight,
                         )!;
 
+                        final tabContent = Container(
+                          key: _tabKeys[index],
+                          padding: widget.iconOnly
+                              ? const EdgeInsets.symmetric(
+                                  horizontal: 20,
+                                  vertical: 10,
+                                )
+                              : const EdgeInsets.symmetric(
+                                  horizontal: 14,
+                                  vertical: 9,
+                                ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                tab.icon,
+                                size: widget.iconOnly ? 20 : 16,
+                                color: iconColor,
+                              ),
+                              if (!widget.iconOnly) ...[
+                                const SizedBox(width: 7),
+                                Text(
+                                  tab.label,
+                                  style: TextStyle(
+                                    color: labelColor,
+                                    fontSize: 13,
+                                    fontWeight: isSelected
+                                        ? FontWeight.w700
+                                        : FontWeight.w500,
+                                    letterSpacing: -0.1,
+                                  ),
+                                ),
+                              ],
+                              if (tab.badgeCount != null) ...[
+                                const SizedBox(width: 6),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                    vertical: 1.5,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: isSelected
+                                        ? tab.accentColor
+                                            .withValues(alpha: 0.18)
+                                        : (isDark
+                                            ? Colors.white
+                                                .withValues(alpha: 0.07)
+                                            : Colors.black
+                                                .withValues(alpha: 0.06)),
+                                    borderRadius: BorderRadius.circular(99),
+                                  ),
+                                  child: Text(
+                                    '${tab.badgeCount}',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700,
+                                      color: isSelected
+                                          ? tab.accentColor
+                                          : inactiveText,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        );
+
                         return MouseRegion(
                           cursor: SystemMouseCursors.click,
                           onEnter: (_) => setState(() => _hoveredIndex = index),
@@ -260,65 +329,17 @@ class _HeroTabsBarState extends State<HeroTabsBar> {
                               widget.controller.animateTo(index);
                               widget.onTap?.call(index);
                             },
-                            child: Container(
-                              key: _tabKeys[index],
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 14,
-                                vertical: 9,
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    tab.icon,
-                                    size: 16,
-                                    color: iconColor,
-                                  ),
-                                  const SizedBox(width: 7),
-                                  Text(
-                                    tab.label,
-                                    style: TextStyle(
-                                      color: labelColor,
-                                      fontSize: 13,
-                                      fontWeight: isSelected
-                                          ? FontWeight.w700
-                                          : FontWeight.w500,
-                                      letterSpacing: -0.1,
+                            child: widget.iconOnly
+                                ? Semantics(
+                                    label: tab.label,
+                                    button: true,
+                                    selected: isSelected,
+                                    child: Tooltip(
+                                      message: tab.label,
+                                      child: tabContent,
                                     ),
-                                  ),
-                                  if (tab.badgeCount != null) ...[
-                                    const SizedBox(width: 6),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 6,
-                                        vertical: 1.5,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: isSelected
-                                            ? tab.accentColor
-                                                .withValues(alpha: 0.18)
-                                            : (isDark
-                                                ? Colors.white
-                                                    .withValues(alpha: 0.07)
-                                                : Colors.black
-                                                    .withValues(alpha: 0.06)),
-                                        borderRadius: BorderRadius.circular(99),
-                                      ),
-                                      child: Text(
-                                        '${tab.badgeCount}',
-                                        style: TextStyle(
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w700,
-                                          color: isSelected
-                                              ? tab.accentColor
-                                              : inactiveText,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ],
-                              ),
-                            ),
+                                  )
+                                : tabContent,
                           ),
                         );
                       }),

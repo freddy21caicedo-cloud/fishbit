@@ -94,17 +94,23 @@ class _BiometriaModalState extends ConsumerState<BiometriaModal> {
 
   @override
   Widget build(BuildContext context) {
+    final isEditing = widget.recordToEdit != null;
+    final editRecord = widget.recordToEdit;
     final pondsState = ref.watch(pondsProvider);
     final pondsList = pondsState.ponds.where((p) => p.estado == PondStatus.active).toList();
     final effectivePondId = _selectedPondId ?? widget.pond?.id;
-    final activePond = pondsList.where((p) => p.id == effectivePondId).firstOrNull ??
+    final activePond = (isEditing
+            ? pondsState.ponds.where((p) => p.id == effectivePondId).firstOrNull
+            : pondsList.where((p) => p.id == effectivePondId).firstOrNull) ??
         widget.pond ??
         (pondsList.isNotEmpty ? pondsList.first : null);
     final activeBatches = activePond != null
         ? pondsState.batches.where((b) => b.estanqueId == activePond.id && b.estado == BatchStatus.active).toList()
         : <FishBatch>[];
     final activeBatch = widget.batch ??
-        (activeBatches.where((b) => b.id == _selectedBatchId).firstOrNull ?? activeBatches.firstOrNull);
+        (isEditing
+            ? pondsState.batches.where((b) => b.id == editRecord!.loteId).firstOrNull
+            : (activeBatches.where((b) => b.id == _selectedBatchId).firstOrNull ?? activeBatches.firstOrNull));
 
     final pesoCapturaKg = double.tryParse(_pesoTotalCapturaKgCtrl.text.replaceAll(',', '.').trim()) ?? 0.0;
     final pecesCapturados = int.tryParse(_pecesCapturadosCtrl.text.trim()) ?? 0;
@@ -114,16 +120,24 @@ class _BiometriaModalState extends ConsumerState<BiometriaModal> {
 
     final pesoAnteriorG = activeBatch?.pesoActualGramos ?? 0.0;
     final pecesVivos = activeBatch?.cantidadActualPeces ?? 0;
-    final biomasaParcialKg = (pecesVivos * pesoPromedioGramos) / 1000.0;
+    final bool sampleUnchangedInEdit = isEditing &&
+        pecesCapturados == editRecord!.pecesCapturados &&
+        (pesoCapturaKg - editRecord.pesoTotalCapturaKg).abs() < 0.001;
+    final biomasaParcialKg = sampleUnchangedInEdit
+        ? editRecord.biomasaParcialKg
+        : (pecesVivos * pesoPromedioGramos) / 1000.0;
     final gananciaPesoG = hasValidSample ? (pesoPromedioGramos - pesoAnteriorG) : 0.0;
 
     final capacidadM3 = activePond?.capacidadM3 ?? 0.0;
     final nuevaDensidadKgM3 = capacidadM3 > 0 ? (biomasaParcialKg / capacidadM3) : 0.0;
     final densidadPecesM3 = capacidadM3 > 0 ? (pecesVivos / capacidadM3) : 0.0;
 
-    // Cálculo GDP (Ganancia Diaria de Peso)
-    final dias = (activeBatch?.diasDeCultivo ?? 30) > 0 ? (activeBatch?.diasDeCultivo ?? 30) : 1;
-    final gdp = dias > 0 ? ((pesoPromedioGramos - (activeBatch?.pesoInicialGramos ?? 10.0)) / dias) : 0.0;
+    // Cálculo GDP (Ganancia Diaria de Peso) respecto a la fecha del muestreo, no a DateTime.now()
+    final int diasDesdeSiembra = activeBatch != null
+        ? _fechaMuestreo.toDateTime().difference(activeBatch.fechaSiembra).inDays
+        : 30;
+    final dias = diasDesdeSiembra > 0 ? diasDesdeSiembra : 1;
+    final gdp = (pesoPromedioGramos - (activeBatch?.pesoInicialGramos ?? 1.0)) / dias;
 
     // Factor K de Fulton (si se ingresa longitud en cm)
     final longitudCm = double.tryParse(_longitudCtrl.text.replaceAll(',', '.').trim());
@@ -224,8 +238,32 @@ class _BiometriaModalState extends ConsumerState<BiometriaModal> {
                     const SizedBox(height: 12),
                   ],
 
+                  if (isEditing) ...[
+                    Container(
+                      padding: const EdgeInsets.all(11),
+                      decoration: BoxDecoration(
+                        color: AppColors.cyanWater.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppColors.cyanWater.withValues(alpha: 0.35)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.edit_note_rounded, color: AppColors.cyanWater, size: 18),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Modo Edición: actualizando muestreo del ${editRecord!.fecha.day}/${editRecord.fecha.month}/${editRecord.fecha.year} (${editRecord.pesoPromedioG.toStringAsFixed(1)} g). No se creará un dato nuevo.',
+                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 11.5),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+
                   // Selector de Lote / Especie si el estanque está en Policultivo
-                  if (activeBatches.length > 1) ...[
+                  if (!isEditing && activeBatches.length > 1) ...[
                     GlassSelectField<String>(
                       label: 'ESPECIE / LOTE A MUESTREAR (POLICULTIVO)',
                       value: activeBatch?.id,
@@ -256,8 +294,10 @@ class _BiometriaModalState extends ConsumerState<BiometriaModal> {
                           validator: (val) {
                             final n = int.tryParse(val?.trim() ?? '');
                             if (n == null || n <= 0) return 'Ingresa peces (> 0)';
-                            if (pecesVivos <= 0) return 'Lote sin peces vivos';
-                            if (n > pecesVivos) return 'Supera población ($pecesVivos)';
+                            if (!isEditing) {
+                              if (pecesVivos <= 0) return 'Lote sin peces vivos';
+                              if (n > pecesVivos) return 'Supera población ($pecesVivos)';
+                            }
                             return null;
                           },
                           onChanged: (_) => setState(() {}),
@@ -421,28 +461,30 @@ class _BiometriaModalState extends ConsumerState<BiometriaModal> {
                   ),
                   const SizedBox(height: 12),
 
-                  // Recomendación de Pellet y Proteína
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: AppColors.greenBiomass.withValues(alpha: 0.10),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: AppColors.greenBiomass.withValues(alpha: 0.25)),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.check_circle_outline_rounded, color: AppColors.greenBiomass, size: 16),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            'Alimento Sugerido: $recomendacionNutricional',
-                            style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w700),
+                  // Recomendación de Pellet y Proteína (solo en nuevo muestreo)
+                  if (!isEditing) ...[
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: AppColors.greenBiomass.withValues(alpha: 0.10),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppColors.greenBiomass.withValues(alpha: 0.25)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.check_circle_outline_rounded, color: AppColors.greenBiomass, size: 16),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Alimento Sugerido: $recomendacionNutricional',
+                              style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w700),
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 14),
+                    const SizedBox(height: 14),
+                  ],
 
                   GlassDatePickerField(
                     label: 'FECHA DEL MUESTREO',
@@ -459,7 +501,7 @@ class _BiometriaModalState extends ConsumerState<BiometriaModal> {
                   ),
                   const SizedBox(height: 18),
 
-                  if (activeBatch == null) ...[
+                  if (!isEditing && activeBatch == null) ...[
                     Container(
                       margin: const EdgeInsets.only(bottom: 12),
                       padding: const EdgeInsets.all(12),
@@ -485,16 +527,17 @@ class _BiometriaModalState extends ConsumerState<BiometriaModal> {
 
                   // Botón de Confirmación
                   GlassButton(
-                    label: widget.recordToEdit != null
+                    label: isEditing
                         ? 'Actualizar Muestreo y Biomasa'
                         : 'Guardar Muestreo y Actualizar Biomasa',
+                    loadingLabel: isEditing ? 'Actualizando...' : 'Guardando...',
                     height: 46,
                     backgroundColor: AppColors.cyanWater,
                     isLoading: _isLoading,
                     onPressed: () async {
                       if (_isLoading) return;
                       final messenger = ScaffoldMessenger.of(context);
-                      if (activePond == null || activeBatch == null) {
+                      if (!isEditing && (activePond == null || activeBatch == null)) {
                         messenger.showSnackBar(
                           const SnackBar(
                             content: Text('Debe seleccionar un estanque con lote activo para guardar la biometría.'),
@@ -519,25 +562,29 @@ class _BiometriaModalState extends ConsumerState<BiometriaModal> {
                       setState(() => _isLoading = true);
 
                       final bool ok;
-                      if (widget.recordToEdit != null) {
-                        final updated = widget.recordToEdit!.copyWith(
-                          estanqueId: activePond.id,
-                          loteId: activeBatch.id,
+                      if (isEditing) {
+                        final obsText = _obsCtrl.text.trim();
+                        final updated = editRecord!.copyWith(
+                          estanqueId: activePond?.id ?? editRecord.estanqueId,
+                          loteId: activeBatch?.id ?? editRecord.loteId,
                           fecha: _fechaMuestreo.toDateTime(),
                           pecesCapturados: pecesCapturados,
                           pesoTotalCapturaKg: pesoCapturaKg,
                           pesoPromedioG: pesoPromedioGramos,
                           biomasaParcialKg: biomasaParcialKg,
                           longitudCm: longitudCm,
+                          clearLongitudCm: longitudCm == null,
                           factorK: factorK,
+                          clearFactorK: factorK == null,
                           gdpGDia: gdp,
-                          observaciones: _obsCtrl.text.trim().isEmpty ? null : _obsCtrl.text.trim(),
+                          observaciones: obsText.isEmpty ? null : obsText,
+                          clearObservaciones: obsText.isEmpty,
                         );
                         ok = await ref.read(pondsProvider.notifier).updateBiometry(updated);
                       } else {
                         ok = await ref.read(pondsProvider.notifier).recordBiometry(
-                              estanqueId: activePond.id,
-                              loteId: activeBatch.id,
+                              estanqueId: activePond!.id,
+                              loteId: activeBatch!.id,
                               nuevoPesoPromedioGramos: pesoPromedioGramos,
                               biomasaCalculadaKg: biomasaParcialKg,
                               cantidadPecesMuestreados: int.tryParse(_pecesCapturadosCtrl.text),
@@ -557,9 +604,9 @@ class _BiometriaModalState extends ConsumerState<BiometriaModal> {
                           messenger.showSnackBar(
                             SnackBar(
                               content: Text(
-                                widget.recordToEdit != null
+                                isEditing
                                     ? 'Biometría actualizada (${pesoPromedioGramos.toStringAsFixed(1)}g). Biomasa ajustada a ${biomasaParcialKg.toStringAsFixed(1)} kg.'
-                                    : 'Biometría guardada en ${activePond.sigla} (${pesoPromedioGramos.toStringAsFixed(1)}g). Biomasa ajustada a ${biomasaParcialKg.toStringAsFixed(1)} kg • Densidad: ${nuevaDensidadKgM3.toStringAsFixed(2)} kg/m³.',
+                                    : 'Biometría guardada en ${activePond!.sigla} (${pesoPromedioGramos.toStringAsFixed(1)}g). Biomasa ajustada a ${biomasaParcialKg.toStringAsFixed(1)} kg • Densidad: ${nuevaDensidadKgM3.toStringAsFixed(2)} kg/m³.',
                               ),
                               backgroundColor: AppColors.cyanWater,
                               behavior: SnackBarBehavior.floating,

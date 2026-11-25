@@ -302,7 +302,7 @@ class SupabaseAuthRepository implements AuthRepository {
     double? anchoM,
     double? profundidadM,
   }) async {
-    final especies = especiesHabilitadas ?? ['Tilapia Roja', 'Cachama Negra', 'Bocachico', 'Pangasius'];
+    final especies = especiesHabilitadas ?? ['Tilapia Roja', 'Cachama Blanca', 'Bocachico', 'Pangasius'];
 
     try {
       final res = await _supabase.rpc<dynamic>('setup_company_for_user', params: {

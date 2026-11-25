@@ -194,19 +194,21 @@ class SupabaseFinanceRepository implements FinanceRepository {
     }
     try {
       var query = _supabase.from('jornales').select('*');
-      if (empresaId.isNotEmpty) {
-        query = query.eq('empresa_id', empresaId);
-      }
       if (unidadAcuicolaId.isNotEmpty) {
-        query = query.or('unidad_acuicola_id.eq.$unidadAcuicolaId,unit_id.eq.$unidadAcuicolaId');
+        query = query.eq('unit_id', unidadAcuicolaId);
       }
       final res = await query.order('fecha', ascending: false).limit(100);
 
-      final list = (res as List).map((row) => JornalRecord.fromJson(row as Map<String, dynamic>)).toList();
-      return list.isNotEmpty ? list : _demoJornales;
+      final list = (res as List)
+          .map((row) => JornalRecord.fromJson({
+                ...(row as Map<String, dynamic>),
+                'empresa_id': empresaId,
+              }))
+          .toList();
+      return list;
     } catch (e) {
       debugPrint('Error obteniendo jornales: $e');
-      return _demoJornales;
+      return const [];
     }
   }
 
@@ -223,11 +225,13 @@ class SupabaseFinanceRepository implements FinanceRepository {
           .select()
           .single();
 
-      return JornalRecord.fromJson(res);
+      return JornalRecord.fromJson({
+        ...res,
+        'empresa_id': record.empresaId,
+      });
     } catch (e) {
       debugPrint('Error insertando jornales en Supabase: $e');
-      _demoJornales.insert(0, record);
-      return record;
+      rethrow;
     }
   }
 

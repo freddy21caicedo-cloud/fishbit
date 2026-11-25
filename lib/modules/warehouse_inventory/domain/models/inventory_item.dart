@@ -178,7 +178,7 @@ class InventoryItem {
       } else if (nameLower.contains('tilapia')) {
         deducedSpecies = nameLower.contains('roja') ? 'Tilapia Roja' : 'Tilapia';
       } else if (nameLower.contains('cachama')) {
-        deducedSpecies = nameLower.contains('negra') ? 'Cachama Negra' : 'Cachama Blanca';
+        deducedSpecies = 'Cachama Blanca';
       } else if (nameLower.contains('bocachico')) {
         deducedSpecies = 'Bocachico';
       } else if (nameLower.contains('carpa')) {
